@@ -2,6 +2,8 @@
 #include <sstream>
 #include <iostream>
 
+#include "parser.hpp"
+
 int main(int argc, char *argv[]) {
 	if (argc < 2) {
 		printf("Usage:\n");
@@ -16,7 +18,11 @@ int main(int argc, char *argv[]) {
 	stream << in.rdbuf();
 	std::string source_file = stream.str();
 
-	std::cout << source_file;
+	std::cout << argv[1] << '\n';
+	std::cout << source_file << '\n';
+
+	// Parse
+	parse(SourceFile(argv[1], source_file.begin(), source_file.end()));
 
 	return 0;
 }
