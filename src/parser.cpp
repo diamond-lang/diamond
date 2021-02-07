@@ -1,23 +1,10 @@
 #include <iostream>
 #include <algorithm>
 #include <map>
+#include <regex>
 
 #include "parser.hpp"
 
-// Prototypes
-// ==========
-// ParserResult<Ast::Node> parse_expression(SourceFile source);
-// ParserResult<Ast::Node> parse_binary(SourceFile source, int precedence = 0);
-// ParserResult<Ast::Node> parse_unary(SourceFile source);
-ParserResult<std::string> parse_binary_operator(SourceFile source);
-ParserResult<std::string> parse_add(SourceFile source);
-ParserResult<std::string> parse_minus(SourceFile source);
-ParserResult<std::string> parse_mul(SourceFile source);
-ParserResult<std::string> parse_div(SourceFile source);
-ParserResult<std::string> parse_string(SourceFile source, std::string str);
-
-// Implementations
-// ===============
 void parse(SourceFile source) {
 	// std::vector<std::unique_ptr<Ast::Node>> expressions;
 	//
@@ -27,6 +14,8 @@ void parse(SourceFile source) {
 	// 		expressions.push_back(std::move(result.value));
 	// 		source = result.source;
 	// 	}
+
+	parse_regex(source, "\\*");
 	// }
 
 	while (!at_end(source)) {
@@ -87,4 +76,14 @@ ParserResult<std::string> parse_div(SourceFile source)   {return parse_string(so
 ParserResult<std::string> parse_string(SourceFile source, std::string str) {
 	if (match(source, str)) return ParserResult<std::string>(std::make_unique<std::string>(str), source + str.size());
 	else                    return ParserResult<std::string>(source, "Expecting \"" + str + "\"");
+}
+
+ParserResult<std::string> parse_regex(SourceFile source, std::string regex) {
+	std::smatch sm;
+	if (std::regex_search((std::string::const_iterator) source.it, (std::string::const_iterator) source.end, sm, std::regex(regex), std::regex_constants::match_continuous)) {
+		return ParserResult<std::string>(std::make_unique<std::string>(sm[0]), source + sm[0].str().size());
+	}
+	else {
+		return ParserResult<std::string>(source, "Expecting \"" + regex + "\"");
+	}
 }
