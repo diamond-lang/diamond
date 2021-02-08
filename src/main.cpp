@@ -22,7 +22,7 @@ int main(int argc, char *argv[]) {
 	std::cout << source_file << '\n';
 
 	// Parse
-	parse(SourceFile(argv[1], source_file.begin(), source_file.end()));
+	parse::program(SourceFile(argv[1], source_file.begin(), source_file.end()));
 
 	return 0;
 }
