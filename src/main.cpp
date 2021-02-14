@@ -18,11 +18,9 @@ int main(int argc, char *argv[]) {
 	stream << in.rdbuf();
 	std::string source_file = stream.str();
 
-	std::cout << argv[1] << '\n';
-	std::cout << source_file << '\n';
-
 	// Parse
-	parse::program(SourceFile(argv[1], source_file.begin(), source_file.end()));
+	auto ast = parse::program(Source(argv[1], source_file.begin(), source_file.end()));
+	ast.print();
 
 	return 0;
 }
