@@ -8,22 +8,22 @@ TEST_CASE("testing parse::number")  {
 
 	str = "4.3";
 	source = Source("", str.begin(), str.end());
-	CHECK(*(parse::number(source).value.get()) == "4.3");
+	CHECK(parse::number(source).value == "4.3");
 	CHECK(at_end(parse::number(source).source) == true);
 
 	str = "6";
 	source = Source("", str.begin(), str.end());
-	CHECK(*(parse::number(source).value.get()) == "6");
+	CHECK(parse::number(source).value == "6");
 	CHECK(at_end(parse::number(source).source) == true);
 
 	str = ".8";
 	source = Source("", str.begin(), str.end());
-	CHECK(*(parse::number(source).value.get()) == ".8");
+	CHECK(parse::number(source).value == ".8");
 	CHECK(at_end(parse::number(source).source) == true);
 
 	str = "0.33333333";
 	source = Source("", str.begin(), str.end());
-	CHECK(*(parse::number(source).value.get()) == "0.33333333");
+	CHECK(parse::number(source).value == "0.33333333");
 	CHECK(at_end(parse::number(source).source) == true);
 
 	str = "hello";
@@ -45,5 +45,5 @@ TEST_CASE("testing parse::regex") {
 	str = " identifier 2343 555 ";
 	regex = "[a-zA-Z_][a-zA-Z_0-9]+";
 	source = Source("", str.begin(), str.end());
-	CHECK(*(parse::regex(source + 1, regex).value.get()) == "identifier");
+	CHECK(parse::regex(source + 1, regex).value == "identifier");
 }

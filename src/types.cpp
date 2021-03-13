@@ -38,10 +38,12 @@ Source operator+(Source source, size_t offset) {
 }
 
 // Ast
+// ---
 void put_indent_level(size_t indent_level) {
 	for (size_t i = 0; i < indent_level; i++) std::cout << "    ";
 }
 
+// Program
 void Ast::Program::print(size_t indent_level) {
 	put_indent_level(indent_level);
 	std::cout << "program" << '\n';
@@ -50,7 +52,16 @@ void Ast::Program::print(size_t indent_level) {
 	}
 }
 
+Ast::Program::~Program() {
+	for (size_t i = 0; i < this->expressions.size(); i++) {
+		delete this->expressions[i];
+	}
+}
+
+// Float
 void Ast::Float::print(size_t indent_level) {
 	put_indent_level(indent_level);
 	std::cout << this->value << '\n';
 }
+
+Ast::Float::~Float() {}
