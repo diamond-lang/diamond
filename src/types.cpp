@@ -58,6 +58,13 @@ Ast::Program::~Program() {
 	}
 }
 
+llvm::Value* Ast::Program::codegen(Codegen codegen) {
+	for (size_t i = 0; i < this->expressions.size(); i++) {
+		this->expressions[i]->codegen(codegen);
+	}
+	return nullptr;
+}
+
 // Float
 void Ast::Float::print(size_t indent_level) {
 	put_indent_level(indent_level);
@@ -65,3 +72,17 @@ void Ast::Float::print(size_t indent_level) {
 }
 
 Ast::Float::~Float() {}
+
+llvm::Value* Ast::Float::codegen(Codegen codegen) {
+	llvm::Value* value = llvm::ConstantFP::get(*(codegen.context), llvm::APFloat(this->value));
+	llvm::Function* print_function = codegen.module->getFunction("printf");
+
+	if (!print_function) {
+		std::cout << "No print funciont :(" << '\n';
+	}
+
+	std::vector<llvm::Value*> printArgs;
+	printArgs.push_back(codegen.format_str);
+	printArgs.push_back(value);
+	return codegen.builder->CreateCall(codegen.module->getFunction("printf"), printArgs);
+}

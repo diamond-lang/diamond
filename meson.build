@@ -4,3 +4,9 @@ inc = include_directories('src')
 
 subdir('src')
 subdir('test')
+
+executable('diamond',
+            sources : ['src/main.cpp'],
+            include_directories : inc,
+            link_with : libdiamond,
+            install : true)

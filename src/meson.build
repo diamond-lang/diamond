@@ -1,10 +1,7 @@
-libdiamond = library('diamond',
-                      sources : ['parser.cpp', 'types.cpp'],
+libdiamond = static_library('diamond',
+                      sources : ['parser.cpp', 'types.cpp', 'codegen.cpp'],
                       include_directories : inc,
-                      install : false)
-
-executable('diamond',
-            sources : ['main.cpp'],
-            include_directories : inc,
-            link_with : libdiamond,
-            install : true)
+                      dependencies : [
+                          dependency('llvm')
+                      ],
+                      install : true)
