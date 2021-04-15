@@ -58,6 +58,21 @@ Ast::Program::~Program() {
 	}
 }
 
+// Call
+void Ast::Call::print(size_t indent_level) {
+	put_indent_level(indent_level);
+	std::cout << this->identifier << '\n';
+	for (size_t i = 0; i < this->args.size(); i++) {
+		this->args[i]->print(indent_level + 1);
+	}
+}
+
+Ast::Call::~Call() {
+	for (size_t i = 0; i < this->args.size(); i++) {
+		delete this->args[i];
+	}
+}
+
 // Number
 void Ast::Number::print(size_t indent_level) {
 	put_indent_level(indent_level);

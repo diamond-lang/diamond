@@ -40,11 +40,13 @@ struct ParserResult {
 // Ast
 namespace Ast {
 	struct Program;
+	struct Call;
 	struct Number;
 
 	struct Visitor {
-		virtual void visit(Program* node) = 0;
-		virtual void visit(Number* node) = 0;
+		virtual void visit(Program* node) {}
+		virtual void visit(Number* node) {}
+		virtual void visit(Call* node) {}
 		virtual ~Visitor() {}
 	};
 
@@ -64,6 +66,18 @@ namespace Ast {
 
 		Program(std::vector<Ast::Node*> expressions, size_t line, size_t col, std::string file) : Node(line, col, file), expressions(expressions) {}
 		virtual ~Program();
+		virtual void print(size_t indent_level = 0);
+		virtual void accept(Visitor* visitor) override {
+			visitor->visit(this);
+		}
+	};
+
+	struct Call : Node {
+		std::string identifier;
+		std::vector<Ast::Node*> args;
+
+		Call(std::string identifier, std::vector<Ast::Node*> args, size_t line, size_t col, std::string file) : Node(line, col, file), identifier(identifier), args(args) {}
+		virtual ~Call();
 		virtual void print(size_t indent_level = 0);
 		virtual void accept(Visitor* visitor) override {
 			visitor->visit(this);

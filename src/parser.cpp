@@ -10,11 +10,18 @@ Ast::Program parse::program(Source source) {
 	std::vector<Ast::Node*> expressions;
 
 	while (!at_end(source)) {
+		// Parse expression
 		auto result = parse::expression(source);
 		if (!result.error()) {
 			expressions.push_back(result.value);
 			source = result.source;
 		}
+		else {
+			std::cout << result.error_message << '\n';
+		}
+
+		// Advance until new line
+		while (current(source) != '\n') source = source + 1;
 		while (current(source) == '\n') source = source + 1; // Eat new lines
 	}
 
@@ -22,17 +29,66 @@ Ast::Program parse::program(Source source) {
 }
 
 ParserResult<Ast::Node*> parse::expression(Source source) {
-	auto result = parse::number(source);
+	return parse::binary(source);
+}
+
+ParserResult<Ast::Node*> parse::binary(Source source, int precedence) {
+	static std::map<std::string, int> bin_op_precedence;
+	bin_op_precedence["+"] = 1;
+	bin_op_precedence["-"] = 1;
+	bin_op_precedence["*"] = 2;
+	bin_op_precedence["/"] = 2;
+
+	if (precedence > std::get<1>(*std::max_element(bin_op_precedence.begin(), bin_op_precedence.end()))) {
+		return parse::unary(source);
+	}
+	else {
+		auto left = parse::binary(source, precedence + 1);
+
+		if (left.error()) return left;
+		source = left.source;
+
+		while (true) {
+			auto op = parse::token(source, "[+\\-*/]");
+			if (bin_op_precedence[op.value] != precedence) break;
+			source = op.source;
+
+			auto right = parse::binary(source, precedence + 1);
+			if (right.error()) return right;
+			source = right.source;
+
+			std::string identifier = op.value;
+			std::vector<Ast::Node*> args;
+			args.push_back(left.value);
+			args.push_back(right.value);
+			left.value = new Ast::Call(identifier, args, source.line, source.col, source.file);
+		}
+
+		return ParserResult<Ast::Node*>(left.value, source);
+	}
+}
+
+ParserResult<Ast::Node*> parse::unary(Source source) {
+	return parse::number(source);
+}
+
+ParserResult<Ast::Node*> parse::number(Source source) {
+	auto result = parse::token(source, "([0-9]*[.])?[0-9]+");
+	if (result.error()) return ParserResult<Ast::Node*>(source, result.error_message);
 	double value = atof(result.value.c_str());
 	Ast::Number* node = new Ast::Number(value, source.line, source.col, source.file);
 	return ParserResult<Ast::Node*>(node, result.source);
 }
 
-ParserResult<std::string> parse::number(Source source) {return parse::regex(source, "([0-9]*[.])?[0-9]+");}
+ParserResult<std::string> parse::token(Source source, std::string regex) {
+	while (!parse::whitespace(source).error()) {
+		source = parse::whitespace(source).source;
+	}
+	return parse::regex(source, regex);
+}
 
-ParserResult<std::string> parse::string(Source source, std::string str) {
-	if (match(source, str)) return ParserResult<std::string>(str, source + str.size());
-	else                    return ParserResult<std::string>(source, "Expecting \"" + str + "\"");
+ParserResult<std::string> parse::whitespace(Source source) {
+	return parse::regex(source, "[ \\r\\t]+");
 }
 
 ParserResult<std::string> parse::regex(Source source, std::string regex) {

@@ -31,7 +31,7 @@ int main(int argc, char *argv[]) {
 	ast.print();
 
 	// Generate executable
-	generate_executable(ast, get_executable_name(argv[1]));
+	//generate_executable(ast, get_executable_name(argv[1]));
 
 	return 0;
 }

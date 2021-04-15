@@ -8,22 +8,22 @@ TEST_CASE("testing parse::number")  {
 
 	str = "4.3";
 	source = Source("", str.begin(), str.end());
-	CHECK(parse::number(source).value == "4.3");
+	CHECK(((Ast::Number*) parse::number(source).value)->value == 4.3);
 	CHECK(at_end(parse::number(source).source) == true);
 
 	str = "6";
 	source = Source("", str.begin(), str.end());
-	CHECK(parse::number(source).value == "6");
+	CHECK(((Ast::Number*) parse::number(source).value)->value == 6);
 	CHECK(at_end(parse::number(source).source) == true);
 
 	str = ".8";
 	source = Source("", str.begin(), str.end());
-	CHECK(parse::number(source).value == ".8");
+	CHECK(((Ast::Number*) parse::number(source).value)->value == 0.8);
 	CHECK(at_end(parse::number(source).source) == true);
 
 	str = "0.33333333";
 	source = Source("", str.begin(), str.end());
-	CHECK(parse::number(source).value == "0.33333333");
+	CHECK(((Ast::Number*) parse::number(source).value)->value == 0.33333333);
 	CHECK(at_end(parse::number(source).source) == true);
 
 	str = "hello";
