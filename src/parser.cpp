@@ -24,7 +24,7 @@ Ast::Program parse::program(Source source) {
 ParserResult<Ast::Node*> parse::expression(Source source) {
 	auto result = parse::number(source);
 	double value = atof(result.value.c_str());
-	Ast::Float* node = new Ast::Float(value, source.line, source.col, source.file);
+	Ast::Number* node = new Ast::Number(value, source.line, source.col, source.file);
 	return ParserResult<Ast::Node*>(node, result.source);
 }
 

@@ -1,4 +1,4 @@
-libdiamond = static_library('diamond',
+libdiamond = library('diamond',
                       sources : ['parser.cpp', 'types.cpp', 'codegen.cpp'],
                       include_directories : inc,
                       dependencies : [

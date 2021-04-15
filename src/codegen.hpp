@@ -3,6 +3,6 @@
 
 #include "types.hpp"
 
-Codegen codegen(Ast::Program &program);
+void generate_executable(Ast::Program &program, std::string executable_name);
 
 #endif
