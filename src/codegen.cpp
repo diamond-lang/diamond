@@ -35,6 +35,8 @@ struct Codegen {
 	}
 
 	void codegen(Ast::Program* node);
+	llvm::Value* codegen_expression(Ast::Node* node);
+	llvm::Value* codegen(Ast::Call* node);
 	llvm::Value* codegen(Ast::Number* node);
 };
 
@@ -111,9 +113,23 @@ void Codegen::codegen(Ast::Program* node) {
 	llvm::BasicBlock* entry = llvm::BasicBlock::Create(*(this->context), "entry", main);
 	this->builder->SetInsertPoint(entry);
 
+	// Create global string for printing doubles
+	llvm::Value* format_str = this->builder->CreateGlobalStringPtr("%g\n");
+	llvm::Function* print_function = this->module->getFunction("printf");
+
+	if (!print_function) {
+		std::cout << "No print funciont :(" << '\n';
+	}
+
 	for (size_t i = 0; i < node->expressions.size(); i++) {
-		if (dynamic_cast<Ast::Number*>(node->expressions[i])) {
-			this->codegen(dynamic_cast<Ast::Number*>(node->expressions[i]));
+		std::vector<llvm::Value*> printArgs;
+		printArgs.push_back(format_str);
+
+		llvm::Value* value = this->codegen_expression(node->expressions[i]);
+
+		if (value != nullptr) {
+			printArgs.push_back(value);
+			this->builder->CreateCall(this->module->getFunction("printf"), printArgs);
 		}
 	}
 
@@ -121,19 +137,22 @@ void Codegen::codegen(Ast::Program* node) {
 	this->builder->CreateRet(llvm::ConstantInt::get(*(this->context), llvm::APInt(32, 0)));
 }
 
+llvm::Value* Codegen::codegen_expression(Ast::Node* node) {
+	if      (dynamic_cast<Ast::Call*>(node))   return this->codegen(dynamic_cast<Ast::Call*>(node));
+	else if (dynamic_cast<Ast::Number*>(node)) return this->codegen(dynamic_cast<Ast::Number*>(node));
+	else                                       return nullptr;
+}
+
+llvm::Value* Codegen::codegen(Ast::Call* node) {
+	llvm::Value* left = this->codegen_expression(node->args[0]);
+	llvm::Value* right = this->codegen_expression(node->args[1]);
+	if (node->identifier == "+") return this->builder->CreateFAdd(left, right, "addtmp");
+	if (node->identifier == "-") return this->builder->CreateFSub(left, right, "subtmp");
+	if (node->identifier == "*") return this->builder->CreateFMul(left, right, "multmp");
+	if (node->identifier == "/") return this->builder->CreateFDiv(left, right, "divtmp");
+	return nullptr;
+}
+
 llvm::Value* Codegen::codegen(Ast::Number* node) {
-	llvm::Value* value = llvm::ConstantFP::get(*(this->context), llvm::APFloat(node->value));
-	llvm::Function* print_function = this->module->getFunction("printf");
-
-	if (!print_function) {
-		std::cout << "No print funciont :(" << '\n';
-	}
-
-	// Format string
-	std::vector<llvm::Value*> printArgs;
-	llvm::Value* format_str = this->builder->CreateGlobalStringPtr("%g\n");
-	printArgs.push_back(format_str);
-	printArgs.push_back(value);
-	this->builder->CreateCall(this->module->getFunction("printf"), printArgs);
-	return value;
+	return llvm::ConstantFP::get(*(this->context), llvm::APFloat(node->value));
 }
