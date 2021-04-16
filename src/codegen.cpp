@@ -23,26 +23,24 @@
 
 #include "codegen.hpp"
 
-struct CodegenVisitor : Ast::Visitor {
+struct Codegen {
 	llvm::LLVMContext* context;
 	llvm::Module* module;
 	llvm::IRBuilder<>* builder;
 
-	virtual void visit(Ast::Program* node) override;
-	virtual void visit(Ast::Number* node) override;
+	Codegen() {
+		this->context = new llvm::LLVMContext();
+		this->module = new llvm::Module("My cool jit", *(this->context));
+		this->builder = new llvm::IRBuilder(*(this->context));
+	}
 
-	CodegenVisitor(llvm::LLVMContext* context, llvm::Module* module, llvm::IRBuilder<>* builder) : context(context), module(module), builder(builder) {}
+	void codegen(Ast::Program* node);
+	llvm::Value* codegen(Ast::Number* node);
 };
 
-// Prototypes
-// ==========
-CodegenVisitor generate_llvm_ir(Ast::Program &program);
-
-
-// Implementantions
-// ================
 void generate_executable(Ast::Program &program, std::string executable_name) {
-	CodegenVisitor visitor = generate_llvm_ir(program);
+	Codegen llvm_ir;
+	llvm_ir.codegen(&program);
 
 	// Generate object file
 	auto TargetTriple = llvm::sys::getDefaultTargetTriple();
@@ -69,8 +67,8 @@ void generate_executable(Ast::Program &program, std::string executable_name) {
 	auto RM = llvm::Optional<llvm::Reloc::Model>();
 	auto TargetMachine = Target->createTargetMachine(TargetTriple, CPU, Features, opt, RM);
 
-	visitor.module->setDataLayout(TargetMachine->createDataLayout());
-	visitor.module->setTargetTriple(TargetTriple);
+	llvm_ir.module->setDataLayout(TargetMachine->createDataLayout());
+	llvm_ir.module->setTargetTriple(TargetTriple);
 
 	std::string object_file_name = executable_name + ".o";
 
@@ -88,7 +86,7 @@ void generate_executable(Ast::Program &program, std::string executable_name) {
 		llvm::errs() << "TargetMachine can't emit a file of this type";
 	}
 
-	pass.run(*(visitor.module));
+	pass.run(*(llvm_ir.module));
 	dest.flush();
 
 	std::string command = "clang-12 -o ";
@@ -100,40 +98,30 @@ void generate_executable(Ast::Program &program, std::string executable_name) {
 	system(command.c_str());
 }
 
-CodegenVisitor generate_llvm_ir(Ast::Program &program) {
-	auto context = new llvm::LLVMContext();
-	auto module = new llvm::Module("My cool jit", *context);
-	auto builder = new llvm::IRBuilder(*context);
-	CodegenVisitor visitor = CodegenVisitor(context, module, builder);
-
+void Codegen::codegen(Ast::Program* node) {
 	// Declare printf
 	std::vector<llvm::Type*> args;
-	args.push_back(llvm::Type::getInt8PtrTy(*context));
-	llvm::FunctionType *printfType = llvm::FunctionType::get(builder->getInt32Ty(), args, true); // `true` specifies the function as variadic
-	llvm::Function::Create(printfType, llvm::Function::ExternalLinkage, "printf", module);
+	args.push_back(llvm::Type::getInt8PtrTy(*(this->context)));
+	llvm::FunctionType *printfType = llvm::FunctionType::get(this->builder->getInt32Ty(), args, true); // `true` specifies the function as variadic
+	llvm::Function::Create(printfType, llvm::Function::ExternalLinkage, "printf", this->module);
 
-	// Generate program
-	program.accept(&visitor);
-
-	return visitor;
-}
-
-void CodegenVisitor::visit(Ast::Program* node) {
 	// Crate main function
-	llvm::FunctionType* mainType = llvm::FunctionType::get(builder->getInt32Ty(), false);
+	llvm::FunctionType* mainType = llvm::FunctionType::get(this->builder->getInt32Ty(), false);
 	llvm::Function* main = llvm::Function::Create(mainType, llvm::Function::ExternalLinkage, "main", this->module);
 	llvm::BasicBlock* entry = llvm::BasicBlock::Create(*(this->context), "entry", main);
 	this->builder->SetInsertPoint(entry);
 
 	for (size_t i = 0; i < node->expressions.size(); i++) {
-		node->expressions[i]->accept(this);
+		if (dynamic_cast<Ast::Number*>(node->expressions[i])) {
+			this->codegen(dynamic_cast<Ast::Number*>(node->expressions[i]));
+		}
 	}
 
 	// Create return statement
-	builder->CreateRet(llvm::ConstantInt::get(*context, llvm::APInt(32, 0)));
+	this->builder->CreateRet(llvm::ConstantInt::get(*(this->context), llvm::APInt(32, 0)));
 }
 
-void CodegenVisitor::visit(Ast::Number* node) {
+llvm::Value* Codegen::codegen(Ast::Number* node) {
 	llvm::Value* value = llvm::ConstantFP::get(*(this->context), llvm::APFloat(node->value));
 	llvm::Function* print_function = this->module->getFunction("printf");
 
@@ -147,4 +135,5 @@ void CodegenVisitor::visit(Ast::Number* node) {
 	printArgs.push_back(format_str);
 	printArgs.push_back(value);
 	this->builder->CreateCall(this->module->getFunction("printf"), printArgs);
+	return value;
 }

@@ -39,17 +39,6 @@ struct ParserResult {
 
 // Ast
 namespace Ast {
-	struct Program;
-	struct Call;
-	struct Number;
-
-	struct Visitor {
-		virtual void visit(Program* node) {}
-		virtual void visit(Number* node) {}
-		virtual void visit(Call* node) {}
-		virtual ~Visitor() {}
-	};
-
 	struct Node {
 		size_t line;
 		size_t col;
@@ -58,7 +47,6 @@ namespace Ast {
 		Node(size_t line, size_t col, std::string file): line(line), col(col), file(file) {}
 		virtual ~Node() {}
 		virtual void print(size_t indent_level = 0) = 0;
-		virtual void accept(Visitor* visitor) = 0;
 	};
 
 	struct Program : Node {
@@ -67,9 +55,6 @@ namespace Ast {
 		Program(std::vector<Ast::Node*> expressions, size_t line, size_t col, std::string file) : Node(line, col, file), expressions(expressions) {}
 		virtual ~Program();
 		virtual void print(size_t indent_level = 0);
-		virtual void accept(Visitor* visitor) override {
-			visitor->visit(this);
-		}
 	};
 
 	struct Call : Node {
@@ -79,9 +64,6 @@ namespace Ast {
 		Call(std::string identifier, std::vector<Ast::Node*> args, size_t line, size_t col, std::string file) : Node(line, col, file), identifier(identifier), args(args) {}
 		virtual ~Call();
 		virtual void print(size_t indent_level = 0);
-		virtual void accept(Visitor* visitor) override {
-			visitor->visit(this);
-		}
 	};
 
 	struct Number : Node {
@@ -90,9 +72,6 @@ namespace Ast {
 		Number(double value, size_t line, size_t col, std::string file) : Node(line, col, file), value(value) {}
 		virtual ~Number();
 		virtual void print(size_t indent_level = 0);
-		virtual void accept(Visitor* visitor) override {
-			visitor->visit(this);
-		}
 	};
 }
 
