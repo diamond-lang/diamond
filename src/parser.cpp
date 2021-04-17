@@ -10,14 +10,20 @@ Ast::Program parse::program(Source source) {
 	std::vector<Ast::Node*> expressions;
 
 	while (!at_end(source)) {
-		// Parse expression
-		auto result = parse::expression(source);
-		if (!result.error()) {
-			expressions.push_back(result.value);
-			source = result.source;
+		// Parse comment
+		if (!parse::comment(source).error()) {
+			source = parse::comment(source).source;
 		}
 		else {
-			std::cout << result.error_message << '\n';
+			// Parse expression
+			auto result = parse::expression(source);
+			if (!result.error()) {
+				expressions.push_back(result.value);
+				source = result.source;
+			}
+			else {
+				std::cout << result.error_message << '\n';
+			}
 		}
 
 		// Advance until new line
@@ -50,7 +56,7 @@ ParserResult<Ast::Node*> parse::binary(Source source, int precedence) {
 
 		while (true) {
 			auto op = parse::token(source, "[+\\-*/]");
-			if (bin_op_precedence[op.value] != precedence) break;
+			if (op.error() || bin_op_precedence[op.value] != precedence) break;
 			source = op.source;
 
 			auto right = parse::binary(source, precedence + 1);
@@ -81,14 +87,23 @@ ParserResult<Ast::Node*> parse::number(Source source) {
 }
 
 ParserResult<std::string> parse::token(Source source, std::string regex) {
-	while (!parse::whitespace(source).error()) {
-		source = parse::whitespace(source).source;
+	while (!parse::whitespace(source).error() || !parse::comment(source).error()) {
+		if (!parse::whitespace(source).error()) {
+			source = parse::whitespace(source).source;
+		}
+		else if (!parse::comment(source).error()) {
+			source = parse::comment(source).source;
+		}
 	}
 	return parse::regex(source, regex);
 }
 
 ParserResult<std::string> parse::whitespace(Source source) {
 	return parse::regex(source, "[ \\r\\t]+");
+}
+
+ParserResult<std::string> parse::comment(Source source) {
+	return parse::regex(source, "(--).*");
 }
 
 ParserResult<std::string> parse::regex(Source source, std::string regex) {

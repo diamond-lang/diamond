@@ -11,6 +11,7 @@ namespace parse {
 	ParserResult<Ast::Node*> number(Source source);
 	ParserResult<std::string> token(Source source, std::string regex);
 	ParserResult<std::string> whitespace(Source source);
+	ParserResult<std::string> comment(Source source);
 	ParserResult<std::string> regex(Source source, std::string regex);
 };
 
