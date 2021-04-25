@@ -45,6 +45,10 @@ ParserResult<Ast::Node*> parse::binary(Source source, int precedence) {
 	bin_op_precedence["-"] = 1;
 	bin_op_precedence["*"] = 2;
 	bin_op_precedence["/"] = 2;
+	bin_op_precedence["<"] = 3;
+	bin_op_precedence["<="] = 3;
+	bin_op_precedence[">"] = 3;
+	bin_op_precedence[">="] = 3;
 
 	if (precedence > std::get<1>(*std::max_element(bin_op_precedence.begin(), bin_op_precedence.end()))) {
 		return parse::unary(source);
@@ -56,7 +60,7 @@ ParserResult<Ast::Node*> parse::binary(Source source, int precedence) {
 		source = left.source;
 
 		while (true) {
-			auto op = parse::token(source, "[+\\-*/]");
+			auto op = parse::token(source, "(\\+|-|\\*|\\/|<=|<|>=|>)");
 			if (op.error() || bin_op_precedence[op.value] != precedence) break;
 			source = op.source;
 

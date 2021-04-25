@@ -22,6 +22,7 @@
 #include <iostream>
 
 #include "codegen.hpp"
+#include <iostream>
 
 struct Codegen {
 	llvm::LLVMContext* context;
@@ -114,7 +115,8 @@ void Codegen::codegen(Ast::Program* node) {
 	this->builder->SetInsertPoint(entry);
 
 	// Create global string for printing doubles
-	llvm::Value* format_str = this->builder->CreateGlobalStringPtr("%g\n");
+	llvm::Value* format_float = this->builder->CreateGlobalStringPtr("%g\n");
+	llvm::Value* format_integer = this->builder->CreateGlobalStringPtr("%d\n");
 	llvm::Function* print_function = this->module->getFunction("printf");
 
 	if (!print_function) {
@@ -122,14 +124,20 @@ void Codegen::codegen(Ast::Program* node) {
 	}
 
 	for (size_t i = 0; i < node->expressions.size(); i++) {
-		std::vector<llvm::Value*> printArgs;
-		printArgs.push_back(format_str);
-
 		llvm::Value* value = this->codegen_expression(node->expressions[i]);
 
+		std::vector<llvm::Value*> printArgs;
 		if (value != nullptr) {
-			printArgs.push_back(value);
-			this->builder->CreateCall(this->module->getFunction("printf"), printArgs);
+			if (value->getType()->isDoubleTy()) {
+				printArgs.push_back(format_float);
+				printArgs.push_back(value);
+				this->builder->CreateCall(this->module->getFunction("printf"), printArgs);
+			}
+			else if (value->getType()->isIntegerTy(1)) {
+				printArgs.push_back(format_integer);
+				printArgs.push_back(value);
+				this->builder->CreateCall(this->module->getFunction("printf"), printArgs);
+			}
 		}
 	}
 
@@ -150,6 +158,10 @@ llvm::Value* Codegen::codegen(Ast::Call* node) {
 	if (node->identifier == "-") return this->builder->CreateFSub(left, right, "subtmp");
 	if (node->identifier == "*") return this->builder->CreateFMul(left, right, "multmp");
 	if (node->identifier == "/") return this->builder->CreateFDiv(left, right, "divtmp");
+	if (node->identifier == "<") return this->builder->CreateFCmpOLT(left, right, "cmptmp");
+	if (node->identifier == "<=") return this->builder->CreateFCmpOLE(left, right, "cmptmp");
+	if (node->identifier == ">") return this->builder->CreateFCmpOGT(left, right, "cmptmp");
+	if (node->identifier == ">=") return this->builder->CreateFCmpOGE(left, right, "cmptmp");
 	return nullptr;
 }
 
