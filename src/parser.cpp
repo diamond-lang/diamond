@@ -4,6 +4,7 @@
 #include <regex>
 #include <cstdlib>
 
+#include "errors.hpp"
 #include "parser.hpp"
 
 Ast::Program parse::program(Source source) {
@@ -80,7 +81,7 @@ ParserResult<Ast::Node*> parse::unary(Source source) {
 
 ParserResult<Ast::Node*> parse::number(Source source) {
 	auto result = parse::token(source, "([0-9]*[.])?[0-9]+");
-	if (result.error()) return ParserResult<Ast::Node*>(source, result.error_message);
+	if (result.error()) return ParserResult<Ast::Node*>(source, errors::expecting_number(result.source));
 	double value = atof(result.value.c_str());
 	Ast::Number* node = new Ast::Number(value, source.line, source.col, source.file);
 	return ParserResult<Ast::Node*>(node, result.source);

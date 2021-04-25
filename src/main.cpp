@@ -2,6 +2,8 @@
 #include <sstream>
 #include <iostream>
 
+#include "errors.hpp"
+#include "utilities.hpp"
 #include "parser.hpp"
 #include "codegen.hpp"
 
@@ -14,21 +16,21 @@ std::string get_executable_name(std::string path);
 // ----------------
 int main(int argc, char *argv[]) {
 	if (argc < 2) {
-		printf("Usage:\n");
-		printf("    diamond source_file_path\n");
+		// Print usage
+		std::cout << errors::usage();
 		exit(EXIT_FAILURE);
 	}
 
 	// Read file
-	std::ifstream in;
-	in.open(argv[1]);
-	std::stringstream stream;
-	stream << in.rdbuf();
-	std::string source_file = stream.str();
+	utilities::ReadFileResult result = utilities::read_file(argv[1]);
+	if (result.error) {
+		std::cout << result.error_message;
+		exit(EXIT_FAILURE);
+	}
+	std::string file = result.file;
 
 	// Parse
-	auto ast = parse::program(Source(argv[1], source_file.begin(), source_file.end()));
-	ast.print();
+	auto ast = parse::program(Source(argv[1], file.begin(), file.end()));
 
 	// Generate executable
 	generate_executable(ast, get_executable_name(argv[1]));
