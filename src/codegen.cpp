@@ -123,8 +123,8 @@ void Codegen::codegen(Ast::Program* node) {
 		std::cout << "No print funciont :(" << '\n';
 	}
 
-	for (size_t i = 0; i < node->expressions.size(); i++) {
-		llvm::Value* value = this->codegen_expression(node->expressions[i]);
+	for (size_t i = 0; i < node->statements.size(); i++) {
+		llvm::Value* value = this->codegen_expression(node->statements[i]);
 
 		std::vector<llvm::Value*> printArgs;
 		if (value != nullptr) {

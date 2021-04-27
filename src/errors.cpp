@@ -32,6 +32,18 @@ std::string errors::expecting_number(Source source) {
 	       underline_current_char(source);
 }
 
+std::string errors::expecting_identifier(Source source) {
+	return make_header("Expecting identifier\n\n") +
+	       std::to_string(source.line) + "| " + current_line(source) + "\n" +
+	       underline_current_char(source);
+}
+
+std::string errors::unexpected_character(Source source) {
+	return make_header("Unexpected character\n\n") +
+	       std::to_string(source.line) + "| " + current_line(source) + "\n" +
+	       underline_current_char(source);
+}
+
 std::string errors::file_couldnt_be_found(std::string path) {
 	return make_header("File not found\n\n") +
 	       "\"" + path + "\"" + " couldn't be found." + "\n";

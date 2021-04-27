@@ -7,19 +7,38 @@
 #include "errors.hpp"
 #include "parser.hpp"
 
+// Prototypes
+// ----------
+
+bool is_assignment(Source source);
+
+
+//  Implementations
+//  ---------------
+
 Ast::Program parse::program(Source source) {
-	std::vector<Ast::Node*> expressions;
+	std::vector<Ast::Node*> statements;
 
 	while (!at_end(source)) {
 		// Parse comment
 		if (!parse::comment(source).error()) {
 			source = parse::comment(source).source;
 		}
+		else if (is_assignment(source)) {
+			auto result = parse::assignment(source);
+			if (!result.error()) {
+				statements.push_back(result.value);
+				source = result.source;
+			}
+			else {
+				std::cout << result.error_message << '\n';
+			}
+		}
 		else {
 			// Parse expression
 			auto result = parse::expression(source);
 			if (!result.error()) {
-				expressions.push_back(result.value);
+				statements.push_back(result.value);
 				source = result.source;
 			}
 			else {
@@ -32,7 +51,25 @@ Ast::Program parse::program(Source source) {
 		while (current(source) == '\n') source = source + 1; // Eat new lines
 	}
 
-	return Ast::Program(expressions, 1, 1, source.file);
+	return Ast::Program(statements, 1, 1, source.file);
+}
+
+ParserResult<Ast::Node*> parse::assignment(Source source) {
+	auto identifier = parse::identifier(source);
+	if (identifier.error()) return identifier;
+	source = identifier.source;
+	std::string identifier_str = ((Ast::Identifier*) identifier.value)->value;
+
+	auto be = parse::token(source, "be");
+	if (be.error()) return ParserResult<Ast::Node*>(be.source, be.error_message);
+	source = be.source;
+
+	auto expression = parse::expression(source);
+	if (expression.error()) return expression;
+	source = expression.source;
+
+	auto node = new Ast::Assignment(identifier_str, expression.value, source.line, source.col, source.file);
+	return ParserResult<Ast::Node*>(node, source);
 }
 
 ParserResult<Ast::Node*> parse::expression(Source source) {
@@ -80,7 +117,9 @@ ParserResult<Ast::Node*> parse::binary(Source source, int precedence) {
 }
 
 ParserResult<Ast::Node*> parse::unary(Source source) {
-	return parse::number(source);
+	if (!parse::number(source).error()) return parse::number(source);
+	if (!parse::identifier(source).error()) return parse::identifier(source);
+	return ParserResult<Ast::Node*>(source, errors::unexpected_character(source));
 }
 
 ParserResult<Ast::Node*> parse::number(Source source) {
@@ -88,6 +127,13 @@ ParserResult<Ast::Node*> parse::number(Source source) {
 	if (result.error()) return ParserResult<Ast::Node*>(source, errors::expecting_number(result.source));
 	double value = atof(result.value.c_str());
 	Ast::Number* node = new Ast::Number(value, source.line, source.col, source.file);
+	return ParserResult<Ast::Node*>(node, result.source);
+}
+
+ParserResult<Ast::Node*> parse::identifier(Source source) {
+	auto result = parse::token(source, "[a-zA-Z_][a-zA-Z0-9_]*");
+	if (result.error()) return ParserResult<Ast::Node*>(source, errors::expecting_identifier(result.source));
+	Ast::Identifier* node = new Ast::Identifier(result.value, source.line, source.col, source.file);
 	return ParserResult<Ast::Node*>(node, result.source);
 }
 
@@ -119,4 +165,10 @@ ParserResult<std::string> parse::regex(Source source, std::string regex) {
 	else {
 		return ParserResult<std::string>(source, "Expecting \"" + regex + "\"");
 	}
+}
+
+bool is_assignment(Source source) {
+	auto result = parse::identifier(source);
+	if (!result.error() && !parse::token(result.source, "be").error()) return true;
+	else                                                               return false;
 }

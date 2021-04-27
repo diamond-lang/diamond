@@ -50,9 +50,9 @@ namespace Ast {
 	};
 
 	struct Program : Node {
-		std::vector<Ast::Node*> expressions;
+		std::vector<Ast::Node*> statements;
 
-		Program(std::vector<Ast::Node*> expressions, size_t line, size_t col, std::string file) : Node(line, col, file), expressions(expressions) {}
+		Program(std::vector<Ast::Node*> statements, size_t line, size_t col, std::string file) : Node(line, col, file), statements(statements) {}
 		virtual ~Program();
 		virtual void print(size_t indent_level = 0);
 	};
@@ -66,11 +66,28 @@ namespace Ast {
 		virtual void print(size_t indent_level = 0);
 	};
 
+	struct Assignment : Node {
+		std::string identifier;
+		Ast::Node* expression;
+
+		Assignment(std::string identifier, Ast::Node* expression, size_t line, size_t col, std::string file) : Node(line, col, file), identifier(identifier), expression(expression) {}
+		virtual ~Assignment();
+		virtual void print(size_t indent_level = 0);
+	};
+
 	struct Number : Node {
 		double value;
 
 		Number(double value, size_t line, size_t col, std::string file) : Node(line, col, file), value(value) {}
 		virtual ~Number();
+		virtual void print(size_t indent_level = 0);
+	};
+
+	struct Identifier : Node {
+		std::string value;
+
+		Identifier(std::string value, size_t line, size_t col, std::string file) : Node(line, col, file), value(value) {}
+		virtual ~Identifier();
 		virtual void print(size_t indent_level = 0);
 	};
 }

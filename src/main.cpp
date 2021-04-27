@@ -31,9 +31,10 @@ int main(int argc, char *argv[]) {
 
 	// Parse
 	auto ast = parse::program(Source(argv[1], file.begin(), file.end()));
+	ast.print();
 
 	// Generate executable
-	generate_executable(ast, get_executable_name(argv[1]));
+	//generate_executable(ast, get_executable_name(argv[1]));
 
 	return 0;
 }

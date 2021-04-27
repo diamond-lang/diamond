@@ -47,14 +47,14 @@ void put_indent_level(size_t indent_level) {
 void Ast::Program::print(size_t indent_level) {
 	put_indent_level(indent_level);
 	std::cout << "program" << '\n';
-	for (size_t i = 0; i < this->expressions.size(); i++) {
-		this->expressions[i]->print(indent_level + 1);
+	for (size_t i = 0; i < this->statements.size(); i++) {
+		this->statements[i]->print(indent_level + 1);
 	}
 }
 
 Ast::Program::~Program() {
-	for (size_t i = 0; i < this->expressions.size(); i++) {
-		delete this->expressions[i];
+	for (size_t i = 0; i < this->statements.size(); i++) {
+		delete this->statements[i];
 	}
 }
 
@@ -73,6 +73,19 @@ Ast::Call::~Call() {
 	}
 }
 
+// Assignment
+void Ast::Assignment::print(size_t indent_level) {
+	put_indent_level(indent_level);
+	std::cout << this->identifier << '\n';
+	put_indent_level(indent_level + 1);
+	std::cout << "be" << '\n';
+	this->expression->print(indent_level + 1);
+}
+
+Ast::Assignment::~Assignment() {
+	delete this->expression;
+}
+
 // Number
 void Ast::Number::print(size_t indent_level) {
 	put_indent_level(indent_level);
@@ -80,3 +93,11 @@ void Ast::Number::print(size_t indent_level) {
 }
 
 Ast::Number::~Number() {}
+
+// Identifier
+void Ast::Identifier::print(size_t indent_level) {
+	put_indent_level(indent_level);
+	std::cout << this->value << '\n';
+}
+
+Ast::Identifier::~Identifier() {}
