@@ -154,14 +154,14 @@ llvm::Value* Codegen::codegen_expression(Ast::Node* node) {
 llvm::Value* Codegen::codegen(Ast::Call* node) {
 	llvm::Value* left = this->codegen_expression(node->args[0]);
 	llvm::Value* right = this->codegen_expression(node->args[1]);
-	if (node->identifier == "+") return this->builder->CreateFAdd(left, right, "addtmp");
-	if (node->identifier == "-") return this->builder->CreateFSub(left, right, "subtmp");
-	if (node->identifier == "*") return this->builder->CreateFMul(left, right, "multmp");
-	if (node->identifier == "/") return this->builder->CreateFDiv(left, right, "divtmp");
-	if (node->identifier == "<") return this->builder->CreateFCmpOLT(left, right, "cmptmp");
-	if (node->identifier == "<=") return this->builder->CreateFCmpOLE(left, right, "cmptmp");
-	if (node->identifier == ">") return this->builder->CreateFCmpOGT(left, right, "cmptmp");
-	if (node->identifier == ">=") return this->builder->CreateFCmpOGE(left, right, "cmptmp");
+	if (node->identifier->value == "+") return this->builder->CreateFAdd(left, right, "addtmp");
+	if (node->identifier->value == "-") return this->builder->CreateFSub(left, right, "subtmp");
+	if (node->identifier->value == "*") return this->builder->CreateFMul(left, right, "multmp");
+	if (node->identifier->value == "/") return this->builder->CreateFDiv(left, right, "divtmp");
+	if (node->identifier->value == "<") return this->builder->CreateFCmpOLT(left, right, "cmptmp");
+	if (node->identifier->value == "<=") return this->builder->CreateFCmpOLE(left, right, "cmptmp");
+	if (node->identifier->value == ">") return this->builder->CreateFCmpOGT(left, right, "cmptmp");
+	if (node->identifier->value == ">=") return this->builder->CreateFCmpOGE(left, right, "cmptmp");
 	return nullptr;
 }
 

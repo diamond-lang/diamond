@@ -1,3 +1,2 @@
-a be 4 + 5
-b be 5 * a + c
-c  * 5
+a be 4 < 5
+b be a + 23

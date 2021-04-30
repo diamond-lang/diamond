@@ -58,7 +58,6 @@ ParserResult<Ast::Node*> parse::assignment(Source source) {
 	auto identifier = parse::identifier(source);
 	if (identifier.error()) return identifier;
 	source = identifier.source;
-	std::string identifier_str = ((Ast::Identifier*) identifier.value)->value;
 
 	auto be = parse::token(source, "be");
 	if (be.error()) return ParserResult<Ast::Node*>(be.source, be.error_message);
@@ -68,7 +67,7 @@ ParserResult<Ast::Node*> parse::assignment(Source source) {
 	if (expression.error()) return expression;
 	source = expression.source;
 
-	auto node = new Ast::Assignment(identifier_str, expression.value, source.line, source.col, source.file);
+	auto node = new Ast::Assignment((Ast::Identifier*) identifier.value, expression.value, source.line, source.col, source.file);
 	return ParserResult<Ast::Node*>(node, source);
 }
 
@@ -97,15 +96,15 @@ ParserResult<Ast::Node*> parse::binary(Source source, int precedence) {
 		source = left.source;
 
 		while (true) {
-			auto op = parse::token(source, "(\\+|-|\\*|\\/|<=|<|>=|>)");
-			if (op.error() || bin_op_precedence[op.value] != precedence) break;
+			auto op = parse::op(source);
+			if (op.error() || bin_op_precedence[((Ast::Identifier*) op.value)->value] != precedence) break;
 			source = op.source;
 
 			auto right = parse::binary(source, precedence + 1);
 			if (right.error()) return right;
 			source = right.source;
 
-			std::string identifier = op.value;
+			Ast::Identifier* identifier = (Ast::Identifier*) op.value;
 			std::vector<Ast::Node*> args;
 			args.push_back(left.value);
 			args.push_back(right.value);
@@ -119,12 +118,13 @@ ParserResult<Ast::Node*> parse::binary(Source source, int precedence) {
 ParserResult<Ast::Node*> parse::unary(Source source) {
 	if (!parse::number(source).error()) return parse::number(source);
 	if (!parse::identifier(source).error()) return parse::identifier(source);
-	return ParserResult<Ast::Node*>(source, errors::unexpected_character(source));
+	return ParserResult<Ast::Node*>(source, errors::unexpected_character(parse::token(source, "(?=.)").source));
 }
 
 ParserResult<Ast::Node*> parse::number(Source source) {
 	auto result = parse::token(source, "([0-9]*[.])?[0-9]+");
 	if (result.error()) return ParserResult<Ast::Node*>(source, errors::expecting_number(result.source));
+	source = result.source;
 	double value = atof(result.value.c_str());
 	Ast::Number* node = new Ast::Number(value, source.line, source.col, source.file);
 	return ParserResult<Ast::Node*>(node, result.source);
@@ -133,6 +133,15 @@ ParserResult<Ast::Node*> parse::number(Source source) {
 ParserResult<Ast::Node*> parse::identifier(Source source) {
 	auto result = parse::token(source, "[a-zA-Z_][a-zA-Z0-9_]*");
 	if (result.error()) return ParserResult<Ast::Node*>(source, errors::expecting_identifier(result.source));
+	source = parse::token(source, "(?=.)").source;
+	Ast::Identifier* node = new Ast::Identifier(result.value, source.line, source.col, source.file);
+	return ParserResult<Ast::Node*>(node, result.source);
+}
+
+ParserResult<Ast::Node*> parse::op(Source source) {
+	auto result = parse::token(source, "(\\+|-|\\*|\\/|<=|<|>=|>)");
+	if (result.error()) return ParserResult<Ast::Node*>(source, errors::expecting_identifier(result.source));
+	source = parse::token(source, "(?=.)").source;
 	Ast::Identifier* node = new Ast::Identifier(result.value, source.line, source.col, source.file);
 	return ParserResult<Ast::Node*>(node, result.source);
 }

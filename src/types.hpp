@@ -38,11 +38,24 @@ struct ParserResult {
 };
 
 // Ast
+struct Type {
+	std::string name;
+	std::vector<Type> parameters;
+
+	Type() : name("") {}
+	Type(std::string name) : name(name) {}
+	Type(std::string name, std::vector<Type> parameters) : name(name), parameters(parameters) {}
+	bool operator==(const Type &t) const;
+	bool operator!=(const Type &t) const;
+	std::string to_str(std::string output = "") const;
+};
+
 namespace Ast {
 	struct Node {
 		size_t line;
 		size_t col;
 		std::string file;
+		Type type;
 
 		Node(size_t line, size_t col, std::string file): line(line), col(col), file(file) {}
 		virtual ~Node() {}
@@ -57,20 +70,28 @@ namespace Ast {
 		virtual void print(size_t indent_level = 0);
 	};
 
+	struct Identifier : Node {
+		std::string value;
+
+		Identifier(std::string value, size_t line, size_t col, std::string file) : Node(line, col, file), value(value) {}
+		virtual ~Identifier();
+		virtual void print(size_t indent_level = 0);
+	};
+
 	struct Call : Node {
-		std::string identifier;
+		Ast::Identifier* identifier;
 		std::vector<Ast::Node*> args;
 
-		Call(std::string identifier, std::vector<Ast::Node*> args, size_t line, size_t col, std::string file) : Node(line, col, file), identifier(identifier), args(args) {}
+		Call(Ast::Identifier* identifier, std::vector<Ast::Node*> args, size_t line, size_t col, std::string file) : Node(line, col, file), identifier(identifier), args(args) {}
 		virtual ~Call();
 		virtual void print(size_t indent_level = 0);
 	};
 
 	struct Assignment : Node {
-		std::string identifier;
+		Ast::Identifier* identifier;
 		Ast::Node* expression;
 
-		Assignment(std::string identifier, Ast::Node* expression, size_t line, size_t col, std::string file) : Node(line, col, file), identifier(identifier), expression(expression) {}
+		Assignment(Ast::Identifier* identifier, Ast::Node* expression, size_t line, size_t col, std::string file) : Node(line, col, file), identifier(identifier), expression(expression) {}
 		virtual ~Assignment();
 		virtual void print(size_t indent_level = 0);
 	};
@@ -80,14 +101,6 @@ namespace Ast {
 
 		Number(double value, size_t line, size_t col, std::string file) : Node(line, col, file), value(value) {}
 		virtual ~Number();
-		virtual void print(size_t indent_level = 0);
-	};
-
-	struct Identifier : Node {
-		std::string value;
-
-		Identifier(std::string value, size_t line, size_t col, std::string file) : Node(line, col, file), value(value) {}
-		virtual ~Identifier();
 		virtual void print(size_t indent_level = 0);
 	};
 }

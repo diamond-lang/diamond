@@ -5,6 +5,7 @@
 #include "errors.hpp"
 #include "utilities.hpp"
 #include "parser.hpp"
+#include "semantic.hpp"
 #include "codegen.hpp"
 
 // Prototypes
@@ -32,6 +33,9 @@ int main(int argc, char *argv[]) {
 	// Parse
 	auto ast = parse::program(Source(argv[1], file.begin(), file.end()));
 	ast.print();
+
+	// Analyze
+	analyze(&ast);
 
 	// Generate executable
 	//generate_executable(ast, get_executable_name(argv[1]));
