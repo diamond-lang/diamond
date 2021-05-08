@@ -60,6 +60,7 @@ namespace Ast {
 		Node(size_t line, size_t col, std::string file): line(line), col(col), file(file) {}
 		virtual ~Node() {}
 		virtual void print(size_t indent_level = 0) = 0;
+		bool is_expression();
 	};
 
 	struct Program : Node {
