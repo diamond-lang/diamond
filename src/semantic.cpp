@@ -34,7 +34,7 @@ void analyze(Ast::Program* program) {
 		std::string error;
 
 		if      (dynamic_cast<Ast::Assignment*>(node)) error = context.analyze(dynamic_cast<Ast::Assignment*>(node));
-		else if (dynamic_cast<Ast::Assignment*>(node)) error = context.analyze_expression(node);
+		else if (node->is_expression()) error = context.analyze_expression(node);
 
 		if (error.size() != 0) std::cout << error << '\n';
 	}
