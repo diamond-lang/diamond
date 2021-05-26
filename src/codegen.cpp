@@ -117,6 +117,8 @@ void Codegen::codegen(Ast::Program* node) {
 	// Create global string for printing doubles
 	llvm::Value* format_float = this->builder->CreateGlobalStringPtr("%g\n");
 	llvm::Value* format_integer = this->builder->CreateGlobalStringPtr("%d\n");
+	llvm::Value* format_true = this->builder->CreateGlobalStringPtr("true\n");
+	llvm::Value* format_false = this->builder->CreateGlobalStringPtr("false\n");
 	llvm::Function* print_function = this->module->getFunction("printf");
 
 	if (!print_function) {
@@ -126,17 +128,42 @@ void Codegen::codegen(Ast::Program* node) {
 	for (size_t i = 0; i < node->statements.size(); i++) {
 		llvm::Value* value = this->codegen_expression(node->statements[i]);
 
-		std::vector<llvm::Value*> printArgs;
 		if (value != nullptr) {
 			if (value->getType()->isDoubleTy()) {
+				std::vector<llvm::Value*> printArgs;
 				printArgs.push_back(format_float);
 				printArgs.push_back(value);
 				this->builder->CreateCall(this->module->getFunction("printf"), printArgs);
 			}
 			else if (value->getType()->isIntegerTy(1)) {
-				printArgs.push_back(format_integer);
-				printArgs.push_back(value);
+				std::vector<llvm::Value*> printArgs;
+
+				llvm::Function *current_function = this->builder->GetInsertBlock()->getParent();
+				llvm::BasicBlock *then_block = llvm::BasicBlock::Create(*(this->context), "then", current_function);
+				llvm::BasicBlock *else_block = llvm::BasicBlock::Create(*(this->context), "else");
+				llvm::BasicBlock *merge = llvm::BasicBlock::Create(*(this->context), "ifcont");
+				this->builder->CreateCondBr(value, then_block, else_block);
+
+				// Create then branch
+				this->builder->SetInsertPoint(then_block);
+				printArgs.push_back(format_true);
 				this->builder->CreateCall(this->module->getFunction("printf"), printArgs);
+				this->builder->CreateBr(merge);
+				then_block = this->builder->GetInsertBlock();
+
+				printArgs.clear();
+
+				// Create else branch
+				current_function->getBasicBlockList().push_back(else_block);
+				this->builder->SetInsertPoint(else_block);
+				printArgs.push_back(format_false);
+				this->builder->CreateCall(this->module->getFunction("printf"), printArgs);
+				this->builder->CreateBr(merge);
+				else_block = this->builder->GetInsertBlock();
+
+				// Merge  block
+				current_function->getBasicBlockList().push_back(merge);
+				this->builder->SetInsertPoint(merge);
 			}
 		}
 	}

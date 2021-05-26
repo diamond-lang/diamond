@@ -77,16 +77,16 @@ ParserResult<Ast::Node*> parse::expression(Source source) {
 
 ParserResult<Ast::Node*> parse::binary(Source source, int precedence) {
 	static std::map<std::string, int> bin_op_precedence;
-	bin_op_precedence["+"] = 1;
-	bin_op_precedence["-"] = 1;
-	bin_op_precedence["*"] = 2;
-	bin_op_precedence["/"] = 2;
-	bin_op_precedence["<"] = 3;
-	bin_op_precedence["<="] = 3;
-	bin_op_precedence[">"] = 3;
-	bin_op_precedence[">="] = 3;
+	bin_op_precedence["<"] = 1;
+	bin_op_precedence["<="] = 1;
+	bin_op_precedence[">"] = 1;
+	bin_op_precedence[">="] = 1;
+	bin_op_precedence["+"] = 2;
+	bin_op_precedence["-"] = 2;
+	bin_op_precedence["*"] = 3;
+	bin_op_precedence["/"] = 3;
 
-	if (precedence > std::get<1>(*std::max_element(bin_op_precedence.begin(), bin_op_precedence.end()))) {
+	if (precedence > std::max_element(bin_op_precedence.begin(), bin_op_precedence.end(), [] (auto a, auto b) { return a.second < b.second;})->second) {
 		return parse::unary(source);
 	}
 	else {
