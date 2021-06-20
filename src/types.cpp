@@ -1,4 +1,5 @@
 #include <iostream>
+#include <assert.h>
 
 #include "types.hpp"
 
@@ -86,8 +87,13 @@ void put_indent_level(size_t indent_level) {
 bool Ast::Node::is_expression() {
 	if (dynamic_cast<Ast::Number*>(this))     return true;
 	if (dynamic_cast<Ast::Identifier*>(this)) return true;
+	if (dynamic_cast<Ast::Boolean*>(this))    return true;
 	if (dynamic_cast<Ast::Call*>(this))       return true;
-	else                                      return false;
+	if (dynamic_cast<Ast::Program*>(this))    return false;
+	if (dynamic_cast<Ast::Assignment*>(this)) return false;
+
+	assert(false);
+	return false;
 }
 
 // Program
