@@ -104,6 +104,14 @@ namespace Ast {
 		virtual ~Number();
 		virtual void print(size_t indent_level = 0);
 	};
+
+	struct Boolean : Node {
+		bool value;
+
+		Boolean(bool value, size_t line, size_t col, std::string file) : Node(line, col, file), value(value) {}
+		virtual ~Boolean();
+		virtual void print(size_t indent_level = 0);
+	};
 }
 
 #endif

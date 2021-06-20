@@ -46,6 +46,10 @@ Ast::Program parse::program(Source source) {
 			}
 		}
 
+		if (!parse::token(source, ".").error() && parse::token(source, ".").value != "\n") {
+			std::cout << errors::unexpected_character(parse::token(source, ".").source) << '\n';
+		}
+
 		// Advance until new line
 		while (current(source) != '\n') source = source + 1;
 		while (current(source) == '\n') source = source + 1; // Eat new lines
@@ -77,14 +81,15 @@ ParserResult<Ast::Node*> parse::expression(Source source) {
 
 ParserResult<Ast::Node*> parse::binary(Source source, int precedence) {
 	static std::map<std::string, int> bin_op_precedence;
-	bin_op_precedence["<"] = 1;
-	bin_op_precedence["<="] = 1;
-	bin_op_precedence[">"] = 1;
-	bin_op_precedence[">="] = 1;
-	bin_op_precedence["+"] = 2;
-	bin_op_precedence["-"] = 2;
-	bin_op_precedence["*"] = 3;
-	bin_op_precedence["/"] = 3;
+	bin_op_precedence["=="] = 1;
+	bin_op_precedence["<"] = 2;
+	bin_op_precedence["<="] = 2;
+	bin_op_precedence[">"] = 2;
+	bin_op_precedence[">="] = 2;
+	bin_op_precedence["+"] = 3;
+	bin_op_precedence["-"] = 3;
+	bin_op_precedence["*"] = 4;
+	bin_op_precedence["/"] = 4;
 
 	if (precedence > std::max_element(bin_op_precedence.begin(), bin_op_precedence.end(), [] (auto a, auto b) { return a.second < b.second;})->second) {
 		return parse::unary(source);
@@ -134,12 +139,18 @@ ParserResult<Ast::Node*> parse::identifier(Source source) {
 	auto result = parse::token(source, "[a-zA-Z_][a-zA-Z0-9_]*");
 	if (result.error()) return ParserResult<Ast::Node*>(source, errors::expecting_identifier(result.source));
 	source = parse::token(source, "(?=.)").source;
-	Ast::Identifier* node = new Ast::Identifier(result.value, source.line, source.col, source.file);
-	return ParserResult<Ast::Node*>(node, result.source);
+	if (result.value == "false" || result.value == "true") {
+		Ast::Boolean* node = new Ast::Boolean(result.value == "false" ? false : true, source.line, source.col, source.file);
+		return ParserResult<Ast::Node*>(node, result.source);
+	}
+	else {
+		Ast::Identifier* node = new Ast::Identifier(result.value, source.line, source.col, source.file);
+		return ParserResult<Ast::Node*>(node, result.source);
+	}
 }
 
 ParserResult<Ast::Node*> parse::op(Source source) {
-	auto result = parse::token(source, "(\\+|-|\\*|\\/|<=|<|>=|>)");
+	auto result = parse::token(source, "(\\+|-|\\*|\\/|<=|<|>=|>|==)");
 	if (result.error()) return ParserResult<Ast::Node*>(source, errors::expecting_identifier(result.source));
 	source = parse::token(source, "(?=.)").source;
 	Ast::Identifier* node = new Ast::Identifier(result.value, source.line, source.col, source.file);

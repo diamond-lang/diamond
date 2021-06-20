@@ -1,4 +1,3 @@
-a be 3 < 5
-a
-b be 3 + 56
-b < 100
+a be true == false
+a == false
+4.5 == 1.5 + 3

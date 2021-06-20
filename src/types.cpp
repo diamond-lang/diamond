@@ -148,3 +148,11 @@ void Ast::Identifier::print(size_t indent_level) {
 }
 
 Ast::Identifier::~Identifier() {}
+
+// Boolean
+void Ast::Boolean::print(size_t indent_level) {
+	put_indent_level(indent_level);
+	std::cout << (this->value ? "true" : "false") << '\n';
+}
+
+Ast::Boolean::~Boolean() {}

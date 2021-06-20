@@ -1,3 +1,7 @@
+#include <iostream>
+#include <unordered_map>
+#include <assert.h>
+
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/STLExtras.h"
@@ -19,11 +23,9 @@
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Target/TargetOptions.h"
-#include <iostream>
 
 #include "codegen.hpp"
-#include <iostream>
-#include <unordered_map>
+
 
 struct Codegen {
 	llvm::LLVMContext* context;
@@ -43,6 +45,7 @@ struct Codegen {
 	llvm::Value* codegen(Ast::Call* node);
 	llvm::Value* codegen(Ast::Number* node);
 	llvm::Value* codegen(Ast::Identifier* node);
+	llvm::Value* codegen(Ast::Boolean* node);
 };
 
 void generate_executable(Ast::Program &program, std::string executable_name) {
@@ -196,10 +199,10 @@ llvm::Value* Codegen::codegen_expression(Ast::Node* node) {
 	if      (dynamic_cast<Ast::Call*>(node))       return this->codegen(dynamic_cast<Ast::Call*>(node));
 	else if (dynamic_cast<Ast::Number*>(node))     return this->codegen(dynamic_cast<Ast::Number*>(node));
 	else if (dynamic_cast<Ast::Identifier*>(node)) return this->codegen(dynamic_cast<Ast::Identifier*>(node));
-	else {
-		std::cout << "Shouln't arrive here :(" << '\n';
-		return nullptr;
-	}
+	else if (dynamic_cast<Ast::Boolean*>(node))    return this->codegen(dynamic_cast<Ast::Boolean*>(node));
+
+	assert(false);
+	return nullptr;
 }
 
 llvm::Value* Codegen::codegen(Ast::Call* node) {
@@ -209,10 +212,20 @@ llvm::Value* Codegen::codegen(Ast::Call* node) {
 	if (node->identifier->value == "-") return this->builder->CreateFSub(left, right, "subtmp");
 	if (node->identifier->value == "*") return this->builder->CreateFMul(left, right, "multmp");
 	if (node->identifier->value == "/") return this->builder->CreateFDiv(left, right, "divtmp");
-	if (node->identifier->value == "<") return this->builder->CreateFCmpOLT(left, right, "cmptmp");
-	if (node->identifier->value == "<=") return this->builder->CreateFCmpOLE(left, right, "cmptmp");
-	if (node->identifier->value == ">") return this->builder->CreateFCmpOGT(left, right, "cmptmp");
-	if (node->identifier->value == ">=") return this->builder->CreateFCmpOGE(left, right, "cmptmp");
+	if (node->identifier->value == "<") return this->builder->CreateFCmpULT(left, right, "cmptmp");
+	if (node->identifier->value == "<=") return this->builder->CreateFCmpULE(left, right, "cmptmp");
+	if (node->identifier->value == ">") return this->builder->CreateFCmpUGT(left, right, "cmptmp");
+	if (node->identifier->value == ">=") return this->builder->CreateFCmpUGE(left, right, "cmptmp");
+	if (node->identifier->value == "==") {
+		if (left->getType()->isIntegerTy(1) && right->getType()->isIntegerTy(1)) {
+			return this->builder->CreateICmpEQ(left, right, "eqtmp");
+		}
+		else if (left->getType()->isDoubleTy() && right->getType()->isDoubleTy()) {
+			return this->builder->CreateFCmpUEQ(left, right, "eqtmp");
+		}
+	}
+
+	assert(false);
 	return nullptr;
 }
 
@@ -222,4 +235,8 @@ llvm::Value* Codegen::codegen(Ast::Number* node) {
 
 llvm::Value* Codegen::codegen(Ast::Identifier* node) {
 	return this->scope[node->value];
+}
+
+llvm::Value* Codegen::codegen(Ast::Boolean* node) {
+	return llvm::ConstantInt::getBool(*(this->context), node->value);
 }

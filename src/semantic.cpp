@@ -1,5 +1,6 @@
 #include <iostream>
 #include <unordered_map>
+#include <assert.h>
 
 #include "errors.hpp"
 #include "semantic.hpp"
@@ -19,6 +20,7 @@ struct Context {
 	std::string analyze(Ast::Call* node);
 	std::string analyze(Ast::Number* node);
 	std::string analyze(Ast::Identifier* node);
+	std::string analyze(Ast::Boolean* node);
 
 	Binding* get_binding(std::string identifier);
 };
@@ -65,6 +67,8 @@ std::string Context::analyze_expression(Ast::Node* node) {
 	if      (dynamic_cast<Ast::Call*>(node))       return this->analyze(dynamic_cast<Ast::Call*>(node));
 	else if (dynamic_cast<Ast::Number*>(node))     return this->analyze(dynamic_cast<Ast::Number*>(node));
 	else if (dynamic_cast<Ast::Identifier*>(node)) return this->analyze(dynamic_cast<Ast::Identifier*>(node));
+	else if (dynamic_cast<Ast::Boolean*>(node))    return this->analyze(dynamic_cast<Ast::Boolean*>(node));
+	else assert(false);
 	return "Error: This shouldn't happen";
 }
 
@@ -78,16 +82,29 @@ std::string Context::analyze(Ast::Call* node) {
 	if (node->identifier->value == "+" || node->identifier->value == "-" || node->identifier->value == "*" || node->identifier->value == "/") {
 		if (node->args[0]->type == Type("float64") && node->args[1]->type == Type("float64")) {
 			node->type = Type("float64");
-		} else {
+		}
+		else {
 			return errors::operation_not_defined_for(node, node->args[0]->type.to_str(), node->args[1]->type.to_str());
 		}
 	}
 	else if (node->identifier->value == "<" || node->identifier->value == "<=" || node->identifier->value == ">" || node->identifier->value == ">=") {
 		if (node->args[0]->type == Type("float64") && node->args[1]->type == Type("float64")) {
 			node->type = Type("bool");
-		} else {
+		}
+		else {
 			return errors::operation_not_defined_for(node, node->args[0]->type.to_str(), node->args[1]->type.to_str());
 		}
+	}
+	else if (node->identifier->value == "==") {
+		if (node->args[0]->type == node->args[1]->type) {
+			node->type = Type("bool");
+		}
+		else {
+			return errors::operation_not_defined_for(node, node->args[0]->type.to_str(), node->args[1]->type.to_str());
+		}
+	}
+	else {
+		assert(false);
 	}
 
 	return "";
@@ -107,6 +124,11 @@ std::string Context::analyze(Ast::Identifier* node) {
 		node->type = binding->type;
 		return "";
 	}
+}
+
+std::string Context::analyze(Ast::Boolean* node) {
+	node->type = Type("bool");
+	return "";
 }
 
 Binding* Context::get_binding(std::string identifier) {
