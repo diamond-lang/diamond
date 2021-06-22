@@ -75,6 +75,8 @@ std::string errors::file_couldnt_be_found(std::string path) {
 std::string current_line(Source source)   {return current_line(source.line, source.file);}
 std::string current_line(std::shared_ptr<Ast::Node> node) {return current_line(node->line, node->file);}
 std::string current_line(size_t line, std::string file_path) {
+	if (file_path == "") return "";
+
 	// Read file
 	std::string file = utilities::read_file(file_path).get_value();
 
