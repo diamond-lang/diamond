@@ -43,7 +43,14 @@ int main(int argc, char *argv[]) {
 	ast->print();
 
 	// Analyze
-	analyze(ast);
+	auto analyze_result = semantic::analyze(ast);
+	if (analyze_result.is_error()) {
+		std::vector<Error> error = analyze_result.get_error();
+		for (size_t i = 0; i < error.size(); i++) {
+			std::cout << error[i].error_message << '\n';
+		}
+		exit(EXIT_FAILURE);
+	}
 
 	// Generate executable
 	generate_executable(ast, get_executable_name(argv[1]));

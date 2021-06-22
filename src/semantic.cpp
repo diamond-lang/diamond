@@ -15,12 +15,12 @@ struct Context {
 	std::string file;
 	std::unordered_map<std::string, Binding> scope;
 
-	std::string analyze(std::shared_ptr<Ast::Assignment> assignment);
-	std::string analyze_expression(std::shared_ptr<Ast::Node> node);
-	std::string analyze(std::shared_ptr<Ast::Call> node);
-	std::string analyze(std::shared_ptr<Ast::Number> node);
-	std::string analyze(std::shared_ptr<Ast::Identifier> node);
-	std::string analyze(std::shared_ptr<Ast::Boolean> node);
+	Result<Ok, Error> analyze(std::shared_ptr<Ast::Assignment> assignment);
+	Result<Ok, Error> analyze_expression(std::shared_ptr<Ast::Node> node);
+	Result<Ok, Error> analyze(std::shared_ptr<Ast::Call> node);
+	Result<Ok, Error> analyze(std::shared_ptr<Ast::Number> node);
+	Result<Ok, Error> analyze(std::shared_ptr<Ast::Identifier> node);
+	Result<Ok, Error> analyze(std::shared_ptr<Ast::Boolean> node);
 
 	Binding* get_binding(std::string identifier);
 };
@@ -28,55 +28,61 @@ struct Context {
 
 // Implementations
 // ---------------
-void analyze(std::shared_ptr<Ast::Program> program) {
+Result<Ok, std::vector<Error>> semantic::analyze(std::shared_ptr<Ast::Program> program) {
 	Context context;
+	std::vector<Error> errors;
 
 	for (size_t i = 0; i  < program->statements.size(); i++) {
 		std::shared_ptr<Ast::Node> node = program->statements[i];
-		std::string error;
+		Result<Ok, Error> result;
 
-		if      (std::dynamic_pointer_cast<Ast::Assignment>(node)) error = context.analyze(std::dynamic_pointer_cast<Ast::Assignment>(node));
-		else if (node->is_expression()) error = context.analyze_expression(node);
+		if      (std::dynamic_pointer_cast<Ast::Assignment>(node)) result = context.analyze(std::dynamic_pointer_cast<Ast::Assignment>(node));
+		else if (node->is_expression())                            result = context.analyze_expression(node);
 
-		if (error.size() != 0) std::cout << error << '\n';
+		if (result.is_error()) {
+			errors.push_back(result.get_error());
+		}
 	}
+
+	if (errors.size() != 0) return Result<Ok, std::vector<Error>>(errors);
+	else                    return Result<Ok, std::vector<Error>>(Ok());
 }
 
-std::string Context::analyze(std::shared_ptr<Ast::Assignment> assignment) {
+Result<Ok, Error> Context::analyze(std::shared_ptr<Ast::Assignment> assignment) {
 	Binding binding;
 	binding.identifier = assignment->identifier->value;
 	binding.assignment = assignment;
 
 	// Get expression type
-	std::string error = this->analyze_expression(assignment->expression);
-	if (error.size() != 0) return error;
+	auto result = this->analyze_expression(assignment->expression);
+	if (result.is_error()) return result;
 	assignment->type = assignment->expression->type;
 	binding.type = assignment->type;
 
 	// Save it context
 	if (this->get_binding(assignment->identifier->value)) {
-		return errors::reassigning_immutable_variable(assignment->identifier, this->get_binding(assignment->identifier->value)->assignment);
+		return Result<Ok, Error>(Error(errors::reassigning_immutable_variable(assignment->identifier, this->get_binding(assignment->identifier->value)->assignment)));
 	}
 	else {
 		this->scope[assignment->identifier->value] = binding;
-		return "";
+		return Result<Ok, Error>(Ok());
 	}
 }
 
-std::string Context::analyze_expression(std::shared_ptr<Ast::Node> node) {
+Result<Ok, Error> Context::analyze_expression(std::shared_ptr<Ast::Node> node) {
 	if      (std::dynamic_pointer_cast<Ast::Call>(node))       return this->analyze(std::dynamic_pointer_cast<Ast::Call>(node));
 	else if (std::dynamic_pointer_cast<Ast::Number>(node))     return this->analyze(std::dynamic_pointer_cast<Ast::Number>(node));
 	else if (std::dynamic_pointer_cast<Ast::Identifier>(node)) return this->analyze(std::dynamic_pointer_cast<Ast::Identifier>(node));
 	else if (std::dynamic_pointer_cast<Ast::Boolean>(node))    return this->analyze(std::dynamic_pointer_cast<Ast::Boolean>(node));
 	else assert(false);
-	return "Error: This shouldn't happen";
+	return Result<Ok, Error>(Error("Error: This shouldn't happen"));
 }
 
-std::string Context::analyze(std::shared_ptr<Ast::Call> node) {
+Result<Ok, Error> Context::analyze(std::shared_ptr<Ast::Call> node) {
 	// Get types of arguments
 	for (size_t i = 0; i < node->args.size(); i++) {
-		std::string error = this->analyze_expression(node->args[i]);
-		if (error.size() != 0) return error;
+		auto result = this->analyze_expression(node->args[i]);
+		if (result.is_error()) return result;
 	}
 
 	if (node->identifier->value == "+" || node->identifier->value == "-" || node->identifier->value == "*" || node->identifier->value == "/") {
@@ -84,7 +90,7 @@ std::string Context::analyze(std::shared_ptr<Ast::Call> node) {
 			node->type = Type("float64");
 		}
 		else {
-			return errors::operation_not_defined_for(node, node->args[0]->type.to_str(), node->args[1]->type.to_str());
+			return Result<Ok, Error>(Error(errors::operation_not_defined_for(node, node->args[0]->type.to_str(), node->args[1]->type.to_str())));
 		}
 	}
 	else if (node->identifier->value == "<" || node->identifier->value == "<=" || node->identifier->value == ">" || node->identifier->value == ">=") {
@@ -92,7 +98,7 @@ std::string Context::analyze(std::shared_ptr<Ast::Call> node) {
 			node->type = Type("bool");
 		}
 		else {
-			return errors::operation_not_defined_for(node, node->args[0]->type.to_str(), node->args[1]->type.to_str());
+			return Result<Ok, Error>(Error(errors::operation_not_defined_for(node, node->args[0]->type.to_str(), node->args[1]->type.to_str())));
 		}
 	}
 	else if (node->identifier->value == "==") {
@@ -100,35 +106,33 @@ std::string Context::analyze(std::shared_ptr<Ast::Call> node) {
 			node->type = Type("bool");
 		}
 		else {
-			return errors::operation_not_defined_for(node, node->args[0]->type.to_str(), node->args[1]->type.to_str());
+			return Result<Ok, Error>(Error(errors::operation_not_defined_for(node, node->args[0]->type.to_str(), node->args[1]->type.to_str())));
 		}
 	}
-	else {
-		assert(false);
-	}
+	else {assert(false);}
 
-	return "";
+	return Result<Ok, Error>(Ok());
 }
 
-std::string Context::analyze(std::shared_ptr<Ast::Number> node) {
+Result<Ok, Error> Context::analyze(std::shared_ptr<Ast::Number> node) {
 	node->type = Type("float64");
-	return "";
+	return Result<Ok, Error>(Ok());
 }
 
-std::string Context::analyze(std::shared_ptr<Ast::Identifier> node) {
+Result<Ok, Error> Context::analyze(std::shared_ptr<Ast::Identifier> node) {
 	Binding* binding = this->get_binding(node->value);
 	if (!binding) {
-		return errors::undefined_variable(node);
+		return Result<Ok, Error>(Error(errors::undefined_variable(node)));
 	}
 	else {
 		node->type = binding->type;
-		return "";
+		return Result<Ok, Error>(Ok());
 	}
 }
 
-std::string Context::analyze(std::shared_ptr<Ast::Boolean> node) {
+Result<Ok, Error> Context::analyze(std::shared_ptr<Ast::Boolean> node) {
 	node->type = Type("bool");
-	return "";
+	return Result<Ok, Error>(Ok());
 }
 
 Binding* Context::get_binding(std::string identifier) {

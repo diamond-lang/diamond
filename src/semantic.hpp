@@ -3,6 +3,8 @@
 
 #include "types.hpp"
 
-void analyze(std::shared_ptr<Ast::Program> program);
+namespace semantic {
+	Result<Ok, std::vector<Error>> analyze(std::shared_ptr<Ast::Program> program);
+}
 
 #endif

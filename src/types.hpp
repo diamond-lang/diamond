@@ -23,6 +23,11 @@ bool at_end(Source source);
 bool match(Source source, std::string to_match);
 Source operator+(Source source, size_t offset);
 
+struct Ok {
+	Ok() {}
+	~Ok() {}
+};
+
 struct Error {
 	std::string error_message;
 
@@ -52,6 +57,7 @@ template <class T1, class T2>
 struct Result {
 	std::variant<T1, T2> value;
 
+	Result() {}
 	Result(T1 value) : value(value) {}
 	Result(T2 error) : value(error) {}
 	~Result() {}
