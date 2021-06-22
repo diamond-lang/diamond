@@ -16,14 +16,24 @@ std::string get_executable_name(std::string path);
 // Implementantions
 // ----------------
 int main(int argc, char *argv[]) {
-	if (argc < 2) {
+	// Get command line arguments
+	if (argc < 2 || (argv[1] == std::string("run") && argc < 3)) {
 		// Print usage
 		std::cout << errors::usage();
 		exit(EXIT_FAILURE);
 	}
+	bool run = false;
+	std::string file_path;
+	if (argv[1] == std::string("run")) {
+		run = true;
+		file_path = argv[2];
+	} else {
+		file_path = argv[1];
+	}
+	bool existed = utilities::file_exists(get_executable_name(file_path));
 
 	// Read file
-	Result<std::string, Error> result = utilities::read_file(argv[1]);
+	Result<std::string, Error> result = utilities::read_file(file_path);
 	if (result.is_error()) {
 		std::cout << result.get_error().error_message;
 		exit(EXIT_FAILURE);
@@ -31,7 +41,7 @@ int main(int argc, char *argv[]) {
 	std::string file = result.get_value();
 
 	// Parse
-	auto parsing_result = parse::program(Source(argv[1], file.begin(), file.end()));
+	auto parsing_result = parse::program(Source(file_path, file.begin(), file.end()));
 	if (parsing_result.is_error()) {
 		std::vector<Error> error = parsing_result.get_error();
 		for (size_t i = 0; i < error.size(); i++) {
@@ -40,7 +50,7 @@ int main(int argc, char *argv[]) {
 		exit(EXIT_FAILURE);
 	}
 	auto ast = parsing_result.get_value();
-	ast->print();
+	if (!run) ast->print();
 
 	// Analyze
 	auto analyze_result = semantic::analyze(ast);
@@ -53,7 +63,17 @@ int main(int argc, char *argv[]) {
 	}
 
 	// Generate executable
-	generate_executable(ast, get_executable_name(argv[1]));
+	generate_executable(ast, get_executable_name(file_path));
+
+	if (run) {
+		std::string command = "./" + get_executable_name(file_path);
+		system(command.c_str());
+
+		if (!existed) {
+			command = "rm " + get_executable_name(file_path);
+			system(command.c_str());
+		}
+	}
 
 	return 0;
 }
