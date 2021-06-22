@@ -99,9 +99,9 @@ void generate_executable(std::shared_ptr<Ast::Program> program, std::string exec
 	pass.run(*(llvm_ir.module));
 	dest.flush();
 
-	std::string command = "clang-12 -o ";
+	std::string command = "g++ -o";
 	command += executable_name;
-	command += " ";
+	command += " -no-pie ";
 	command += object_file_name;
 	command += " && rm ";
 	command += object_file_name;
