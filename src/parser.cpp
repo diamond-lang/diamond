@@ -16,38 +16,39 @@ bool is_assignment(Source source);
 //  Implementations
 //  ---------------
 
-Ast::Program parse::program(Source source) {
-	std::vector<Ast::Node*> statements;
+Result<std::shared_ptr<Ast::Program>, std::vector<Error>> parse::program(Source source) {
+	std::vector<std::shared_ptr<Ast::Node>> statements;
+	std::vector<Error> errors;
 
 	while (!at_end(source)) {
 		// Parse comment
-		if (!parse::comment(source).error()) {
-			source = parse::comment(source).source;
+		if (!parse::comment(source).is_error()) {
+			source = parse::comment(source).get_source();
 		}
 		else if (is_assignment(source)) {
 			auto result = parse::assignment(source);
-			if (!result.error()) {
-				statements.push_back(result.value);
-				source = result.source;
+			if (result.is_ok()) {
+				statements.push_back(result.get_value());
+				source = result.get_source();
 			}
 			else {
-				std::cout << result.error_message << '\n';
+				errors.push_back(result.get_error());
 			}
 		}
 		else {
 			// Parse expression
 			auto result = parse::expression(source);
-			if (!result.error()) {
-				statements.push_back(result.value);
-				source = result.source;
+			if (!result.is_error()) {
+				statements.push_back(result.get_value());
+				source = result.get_source();
 			}
 			else {
-				std::cout << result.error_message << '\n';
+				errors.push_back(result.get_error());
 			}
 		}
 
-		if (!parse::token(source, ".").error() && parse::token(source, ".").value != "\n") {
-			std::cout << errors::unexpected_character(parse::token(source, ".").source) << '\n';
+		if (!parse::token(source, ".").is_error() && parse::token(source, ".").get_value() != "\n") {
+			errors.push_back(Error(errors::unexpected_character(parse::token(source, ".").get_source())));
 		}
 
 		// Advance until new line
@@ -55,31 +56,32 @@ Ast::Program parse::program(Source source) {
 		while (current(source) == '\n') source = source + 1; // Eat new lines
 	}
 
-	return Ast::Program(statements, 1, 1, source.file);
+	if (errors.size() == 0) return Result<std::shared_ptr<Ast::Program>, std::vector<Error>>(std::make_shared<Ast::Program>(statements, 1, 1, source.file));
+	else                    return Result<std::shared_ptr<Ast::Program>, std::vector<Error>>(errors);
 }
 
-ParserResult<Ast::Node*> parse::assignment(Source source) {
+ParserResult<std::shared_ptr<Ast::Node>> parse::assignment(Source source) {
 	auto identifier = parse::identifier(source);
-	if (identifier.error()) return identifier;
-	source = identifier.source;
+	if (identifier.is_error()) return identifier;
+	source = identifier.get_source();
 
 	auto be = parse::token(source, "be");
-	if (be.error()) return ParserResult<Ast::Node*>(be.source, be.error_message);
-	source = be.source;
+	if (be.is_error()) return ParserResult<std::shared_ptr<Ast::Node>>(be.source, be.error_message);
+	source = be.get_source();
 
 	auto expression = parse::expression(source);
-	if (expression.error()) return expression;
-	source = expression.source;
+	if (expression.is_error()) return expression;
+	source = expression.get_source();
 
-	auto node = new Ast::Assignment((Ast::Identifier*) identifier.value, expression.value, source.line, source.col, source.file);
-	return ParserResult<Ast::Node*>(node, source);
+	auto node = std::make_shared<Ast::Assignment>(std::dynamic_pointer_cast<Ast::Identifier>(identifier.get_value()), expression.get_value(), source.line, source.col, source.file);
+	return ParserResult<std::shared_ptr<Ast::Node>>(node, source);
 }
 
-ParserResult<Ast::Node*> parse::expression(Source source) {
+ParserResult<std::shared_ptr<Ast::Node>> parse::expression(Source source) {
 	return parse::binary(source);
 }
 
-ParserResult<Ast::Node*> parse::binary(Source source, int precedence) {
+ParserResult<std::shared_ptr<Ast::Node>> parse::binary(Source source, int precedence) {
 	static std::map<std::string, int> bin_op_precedence;
 	bin_op_precedence["=="] = 1;
 	bin_op_precedence["<"] = 2;
@@ -97,73 +99,73 @@ ParserResult<Ast::Node*> parse::binary(Source source, int precedence) {
 	else {
 		auto left = parse::binary(source, precedence + 1);
 
-		if (left.error()) return left;
-		source = left.source;
+		if (left.is_error()) return left;
+		source = left.get_source();
 
 		while (true) {
 			auto op = parse::op(source);
-			if (op.error() || bin_op_precedence[((Ast::Identifier*) op.value)->value] != precedence) break;
-			source = op.source;
+			if (op.is_error() || bin_op_precedence[std::dynamic_pointer_cast<Ast::Identifier>(op.get_value())->value] != precedence) break;
+			source = op.get_source();
 
 			auto right = parse::binary(source, precedence + 1);
-			if (right.error()) return right;
-			source = right.source;
+			if (right.is_error()) return right;
+			source = right.get_source();
 
-			Ast::Identifier* identifier = (Ast::Identifier*) op.value;
-			std::vector<Ast::Node*> args;
-			args.push_back(left.value);
-			args.push_back(right.value);
-			left.value = new Ast::Call(identifier, args, source.line, source.col, source.file);
+			auto identifier = std::dynamic_pointer_cast<Ast::Identifier>(op.get_value());
+			std::vector<std::shared_ptr<Ast::Node>> args;
+			args.push_back(left.get_value());
+			args.push_back(right.get_value());
+			left.value = std::make_shared<Ast::Call>(identifier, args, source.line, source.col, source.file);
 		}
 
-		return ParserResult<Ast::Node*>(left.value, source);
+		return ParserResult<std::shared_ptr<Ast::Node>>(left.get_value(), source);
 	}
 }
 
-ParserResult<Ast::Node*> parse::unary(Source source) {
-	if (!parse::number(source).error()) return parse::number(source);
-	if (!parse::identifier(source).error()) return parse::identifier(source);
-	return ParserResult<Ast::Node*>(source, errors::unexpected_character(parse::token(source, "(?=.)").source));
+ParserResult<std::shared_ptr<Ast::Node>> parse::unary(Source source) {
+	if (!parse::number(source).is_error()) return parse::number(source);
+	if (!parse::identifier(source).is_error()) return parse::identifier(source);
+	return ParserResult<std::shared_ptr<Ast::Node>>(source, errors::unexpected_character(parse::token(source, "(?=.)").get_source()));
 }
 
-ParserResult<Ast::Node*> parse::number(Source source) {
+ParserResult<std::shared_ptr<Ast::Node>> parse::number(Source source) {
 	auto result = parse::token(source, "([0-9]*[.])?[0-9]+");
-	if (result.error()) return ParserResult<Ast::Node*>(source, errors::expecting_number(result.source));
-	source = result.source;
-	double value = atof(result.value.c_str());
-	Ast::Number* node = new Ast::Number(value, source.line, source.col, source.file);
-	return ParserResult<Ast::Node*>(node, result.source);
+	if (result.is_error()) return ParserResult<std::shared_ptr<Ast::Node>>(source, errors::expecting_number(result.get_source()));
+	source = result.get_source();
+	double value = atof(result.get_value().c_str());
+	auto node = std::make_shared<Ast::Number>(value, source.line, source.col, source.file);
+	return ParserResult<std::shared_ptr<Ast::Node>>(node, result.get_source());
 }
 
-ParserResult<Ast::Node*> parse::identifier(Source source) {
+ParserResult<std::shared_ptr<Ast::Node>> parse::identifier(Source source) {
 	auto result = parse::token(source, "[a-zA-Z_][a-zA-Z0-9_]*");
-	if (result.error()) return ParserResult<Ast::Node*>(source, errors::expecting_identifier(result.source));
-	source = parse::token(source, "(?=.)").source;
-	if (result.value == "false" || result.value == "true") {
-		Ast::Boolean* node = new Ast::Boolean(result.value == "false" ? false : true, source.line, source.col, source.file);
-		return ParserResult<Ast::Node*>(node, result.source);
+	if (result.is_error()) return ParserResult<std::shared_ptr<Ast::Node>>(source, errors::expecting_identifier(result.get_source()));
+	source = parse::token(source, "(?=.)").get_source();
+	if (result.get_value() == "false" || result.get_value() == "true") {
+		auto node = std::make_shared<Ast::Boolean>(result.get_value() == "false" ? false : true, source.line, source.col, source.file);
+		return ParserResult<std::shared_ptr<Ast::Node>>(node, result.get_source());
 	}
 	else {
-		Ast::Identifier* node = new Ast::Identifier(result.value, source.line, source.col, source.file);
-		return ParserResult<Ast::Node*>(node, result.source);
+		auto node = std::make_shared<Ast::Identifier>(result.get_value(), source.line, source.col, source.file);
+		return ParserResult<std::shared_ptr<Ast::Node>>(node, result.get_source());
 	}
 }
 
-ParserResult<Ast::Node*> parse::op(Source source) {
+ParserResult<std::shared_ptr<Ast::Node>> parse::op(Source source) {
 	auto result = parse::token(source, "(\\+|-|\\*|\\/|<=|<|>=|>|==)");
-	if (result.error()) return ParserResult<Ast::Node*>(source, errors::expecting_identifier(result.source));
-	source = parse::token(source, "(?=.)").source;
-	Ast::Identifier* node = new Ast::Identifier(result.value, source.line, source.col, source.file);
-	return ParserResult<Ast::Node*>(node, result.source);
+	if (result.is_error()) return ParserResult<std::shared_ptr<Ast::Node>>(source, errors::expecting_identifier(result.get_source()));
+	source = parse::token(source, "(?=.)").get_source();
+	auto node = std::make_shared<Ast::Identifier>(result.get_value(), source.line, source.col, source.file);
+	return ParserResult<std::shared_ptr<Ast::Node>>(node, result.get_source());
 }
 
 ParserResult<std::string> parse::token(Source source, std::string regex) {
-	while (!parse::whitespace(source).error() || !parse::comment(source).error()) {
-		if (!parse::whitespace(source).error()) {
-			source = parse::whitespace(source).source;
+	while (!parse::whitespace(source).is_error() || !parse::comment(source).is_error()) {
+		if (!parse::whitespace(source).is_error()) {
+			source = parse::whitespace(source).get_source();
 		}
-		else if (!parse::comment(source).error()) {
-			source = parse::comment(source).source;
+		else if (!parse::comment(source).is_error()) {
+			source = parse::comment(source).get_source();
 		}
 	}
 	return parse::regex(source, regex);
@@ -189,6 +191,6 @@ ParserResult<std::string> parse::regex(Source source, std::string regex) {
 
 bool is_assignment(Source source) {
 	auto result = parse::identifier(source);
-	if (!result.error() && !parse::token(result.source, "be").error()) return true;
-	else                                                               return false;
+	if (result.is_ok() && parse::token(result.get_source(), "be").is_ok()) return true;
+	else                                                                   return false;
 }

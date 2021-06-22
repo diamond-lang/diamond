@@ -23,19 +23,34 @@ int main(int argc, char *argv[]) {
 	}
 
 	// Read file
-	utilities::ReadFileResult result = utilities::read_file(argv[1]);
-	if (result.error) {
-		std::cout << result.error_message;
+	Result<std::string, Error> result = utilities::read_file(argv[1]);
+	if (result.is_error()) {
+		std::cout << result.get_error().error_message;
 		exit(EXIT_FAILURE);
 	}
-	std::string file = result.file;
+	std::string file = result.get_value();
 
 	// Parse
-	auto ast = parse::program(Source(argv[1], file.begin(), file.end()));
-	ast.print();
+	auto parsing_result = parse::program(Source(argv[1], file.begin(), file.end()));
+	if (parsing_result.is_error()) {
+		std::vector<Error> error = parsing_result.get_error();
+		for (size_t i = 0; i < error.size(); i++) {
+			std::cout << error[i].error_message << '\n';
+		}
+		exit(EXIT_FAILURE);
+	}
+	auto ast = parsing_result.get_value();
+	ast->print();
 
 	// Analyze
-	analyze(&ast);
+	auto analyze_result = semantic::analyze(ast);
+	if (analyze_result.is_error()) {
+		std::vector<Error> error = analyze_result.get_error();
+		for (size_t i = 0; i < error.size(); i++) {
+			std::cout << error[i].error_message << '\n';
+		}
+		exit(EXIT_FAILURE);
+	}
 
 	// Generate executable
 	generate_executable(ast, get_executable_name(argv[1]));

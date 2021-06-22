@@ -39,18 +39,18 @@ struct Codegen {
 		this->builder = new llvm::IRBuilder(*(this->context));
 	}
 
-	void codegen(Ast::Program* node);
-	void codegen(Ast::Assignment* node);
-	llvm::Value* codegen_expression(Ast::Node* node);
-	llvm::Value* codegen(Ast::Call* node);
-	llvm::Value* codegen(Ast::Number* node);
-	llvm::Value* codegen(Ast::Identifier* node);
-	llvm::Value* codegen(Ast::Boolean* node);
+	void codegen(std::shared_ptr<Ast::Program> node);
+	void codegen(std::shared_ptr<Ast::Assignment> node);
+	llvm::Value* codegen_expression(std::shared_ptr<Ast::Node> node);
+	llvm::Value* codegen(std::shared_ptr<Ast::Call> node);
+	llvm::Value* codegen(std::shared_ptr<Ast::Number> node);
+	llvm::Value* codegen(std::shared_ptr<Ast::Identifier> node);
+	llvm::Value* codegen(std::shared_ptr<Ast::Boolean> node);
 };
 
-void generate_executable(Ast::Program &program, std::string executable_name) {
+void generate_executable(std::shared_ptr<Ast::Program> program, std::string executable_name) {
 	Codegen llvm_ir;
-	llvm_ir.codegen(&program);
+	llvm_ir.codegen(program);
 
 	// Generate object file
 	auto TargetTriple = llvm::sys::getDefaultTargetTriple();
@@ -108,7 +108,7 @@ void generate_executable(Ast::Program &program, std::string executable_name) {
 	system(command.c_str());
 }
 
-void Codegen::codegen(Ast::Program* node) {
+void Codegen::codegen(std::shared_ptr<Ast::Program> node) {
 	// Declare printf
 	std::vector<llvm::Type*> args;
 	args.push_back(llvm::Type::getInt8PtrTy(*(this->context)));
@@ -178,8 +178,8 @@ void Codegen::codegen(Ast::Program* node) {
 				std::cout << "Value is null :(" << '\n';
 			}
 		}
-		else if (dynamic_cast<Ast::Assignment*>(node->statements[i])) {
-			this->codegen(dynamic_cast<Ast::Assignment*>(node->statements[i]));
+		else if (std::dynamic_pointer_cast<Ast::Assignment>(node->statements[i])) {
+			this->codegen(std::dynamic_pointer_cast<Ast::Assignment>(node->statements[i]));
 		}
 	}
 
@@ -187,7 +187,7 @@ void Codegen::codegen(Ast::Program* node) {
 	this->builder->CreateRet(llvm::ConstantInt::get(*(this->context), llvm::APInt(32, 0)));
 }
 
-void Codegen::codegen(Ast::Assignment* node) {
+void Codegen::codegen(std::shared_ptr<Ast::Assignment> node) {
 	// Generate value of expression
 	llvm::Value* expr = this->codegen_expression(node->expression);
 
@@ -195,17 +195,17 @@ void Codegen::codegen(Ast::Assignment* node) {
 	this->scope[node->identifier->value] = expr;
 }
 
-llvm::Value* Codegen::codegen_expression(Ast::Node* node) {
-	if      (dynamic_cast<Ast::Call*>(node))       return this->codegen(dynamic_cast<Ast::Call*>(node));
-	else if (dynamic_cast<Ast::Number*>(node))     return this->codegen(dynamic_cast<Ast::Number*>(node));
-	else if (dynamic_cast<Ast::Identifier*>(node)) return this->codegen(dynamic_cast<Ast::Identifier*>(node));
-	else if (dynamic_cast<Ast::Boolean*>(node))    return this->codegen(dynamic_cast<Ast::Boolean*>(node));
+llvm::Value* Codegen::codegen_expression(std::shared_ptr<Ast::Node> node) {
+	if      (std::dynamic_pointer_cast<Ast::Call>(node))       return this->codegen(std::dynamic_pointer_cast<Ast::Call>(node));
+	else if (std::dynamic_pointer_cast<Ast::Number>(node))     return this->codegen(std::dynamic_pointer_cast<Ast::Number>(node));
+	else if (std::dynamic_pointer_cast<Ast::Identifier>(node)) return this->codegen(std::dynamic_pointer_cast<Ast::Identifier>(node));
+	else if (std::dynamic_pointer_cast<Ast::Boolean>(node))    return this->codegen(std::dynamic_pointer_cast<Ast::Boolean>(node));
 
 	assert(false);
 	return nullptr;
 }
 
-llvm::Value* Codegen::codegen(Ast::Call* node) {
+llvm::Value* Codegen::codegen(std::shared_ptr<Ast::Call> node) {
 	llvm::Value* left = this->codegen_expression(node->args[0]);
 	llvm::Value* right = this->codegen_expression(node->args[1]);
 	if (node->identifier->value == "+") return this->builder->CreateFAdd(left, right, "addtmp");
@@ -229,14 +229,14 @@ llvm::Value* Codegen::codegen(Ast::Call* node) {
 	return nullptr;
 }
 
-llvm::Value* Codegen::codegen(Ast::Number* node) {
+llvm::Value* Codegen::codegen(std::shared_ptr<Ast::Number> node) {
 	return llvm::ConstantFP::get(*(this->context), llvm::APFloat(node->value));
 }
 
-llvm::Value* Codegen::codegen(Ast::Identifier* node) {
+llvm::Value* Codegen::codegen(std::shared_ptr<Ast::Identifier> node) {
 	return this->scope[node->value];
 }
 
-llvm::Value* Codegen::codegen(Ast::Boolean* node) {
+llvm::Value* Codegen::codegen(std::shared_ptr<Ast::Boolean> node) {
 	return llvm::ConstantInt::getBool(*(this->context), node->value);
 }

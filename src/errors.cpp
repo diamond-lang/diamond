@@ -14,10 +14,10 @@ std::string make_cyan(std::string str);
 std::string make_red(std::string str);
 std::string make_magenta(std::string str);
 std::string current_line(Source source);
-std::string current_line(Ast::Node* node);
+std::string current_line(std::shared_ptr<Ast::Node> node);
 std::string current_line(size_t line, std::string file_path);
 std::string underline_current_char(Source source);
-std::string underline_identifier(Ast::Identifier* identifier);
+std::string underline_identifier(std::shared_ptr<Ast::Identifier> identifier);
 
 // Implementantions
 // ----------------
@@ -46,13 +46,13 @@ std::string errors::unexpected_character(Source source) {
 	       underline_current_char(source);
 }
 
-std::string errors::undefined_variable(Ast::Identifier* identifier) {
+std::string errors::undefined_variable(std::shared_ptr<Ast::Identifier> identifier) {
 	return make_header("Undefined variable\n\n") +
 	       std::to_string(identifier->line) + "| " + current_line(identifier) + "\n" +
 	       underline_identifier(identifier);
 }
 
-std::string errors::reassigning_immutable_variable(Ast::Identifier* identifier, Ast::Assignment* assignment) {
+std::string errors::reassigning_immutable_variable(std::shared_ptr<Ast::Identifier> identifier, std::shared_ptr<Ast::Assignment> assignment) {
 	return make_header("Trying to re-asssing immutable variable\n\n") +
 	       std::to_string(identifier->line) + "| " + current_line(identifier) + "\n" +
 	       underline_identifier(identifier) + "\n" +
@@ -60,7 +60,7 @@ std::string errors::reassigning_immutable_variable(Ast::Identifier* identifier, 
 		   std::to_string(assignment->line) + "| " + current_line(assignment) + "\n";
 }
 
-std::string errors::operation_not_defined_for(Ast::Call* call, std::string left, std::string right) {
+std::string errors::operation_not_defined_for(std::shared_ptr<Ast::Call> call, std::string left, std::string right) {
 	return make_header("Incompatible types\n\n") +
 		   "Operation " + call->identifier->value + " not defined for " + left + " and " + right + ".\n\n" +
 	       std::to_string(call->line) + "| " + current_line(call) + "\n" +
@@ -73,10 +73,12 @@ std::string errors::file_couldnt_be_found(std::string path) {
 }
 
 std::string current_line(Source source)   {return current_line(source.line, source.file);}
-std::string current_line(Ast::Node* node) {return current_line(node->line, node->file);}
+std::string current_line(std::shared_ptr<Ast::Node> node) {return current_line(node->line, node->file);}
 std::string current_line(size_t line, std::string file_path) {
+	if (file_path == "") return "";
+
 	// Read file
-	std::string file = utilities::read_file(file_path).file;
+	std::string file = utilities::read_file(file_path).get_value();
 
 	// Get line
 	std::string result = "";
@@ -112,7 +114,7 @@ std::string underline_current_char(Source source) {
 	return result;
 }
 
-std::string underline_identifier(Ast::Identifier* identifier) {
+std::string underline_identifier(std::shared_ptr<Ast::Identifier> identifier) {
 	std::string result = "";
 	for (size_t i = 0; i < std::to_string(identifier->line).size(); i++) {
 		result += ' '; // Add space for line number
