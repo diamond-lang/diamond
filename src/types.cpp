@@ -121,6 +121,8 @@ void Ast::Call::print(size_t indent_level) {
 }
 
 Ast::Call::~Call() {
+	delete this->identifier;
+
 	for (size_t i = 0; i < this->args.size(); i++) {
 		delete this->args[i];
 	}
@@ -136,6 +138,7 @@ void Ast::Assignment::print(size_t indent_level) {
 }
 
 Ast::Assignment::~Assignment() {
+	delete this->identifier;
 	delete this->expression;
 }
 

@@ -76,7 +76,7 @@ std::string current_line(Source source)   {return current_line(source.line, sour
 std::string current_line(Ast::Node* node) {return current_line(node->line, node->file);}
 std::string current_line(size_t line, std::string file_path) {
 	// Read file
-	std::string file = utilities::read_file(file_path).file;
+	std::string file = utilities::read_file(file_path).get_value();
 
 	// Get line
 	std::string result = "";

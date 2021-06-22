@@ -4,7 +4,7 @@
 #include "types.hpp"
 
 namespace parse {
-	Ast::Program program(Source source);
+	Result<Ast::Program*, std::vector<Error>> program(Source source);
 	ParserResult<Ast::Node*> assignment(Source source);
 	ParserResult<Ast::Node*> expression(Source source);
 	ParserResult<Ast::Node*> binary(Source source, int precedence = 1);

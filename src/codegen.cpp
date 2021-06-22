@@ -48,9 +48,9 @@ struct Codegen {
 	llvm::Value* codegen(Ast::Boolean* node);
 };
 
-void generate_executable(Ast::Program &program, std::string executable_name) {
+void generate_executable(Ast::Program* program, std::string executable_name) {
 	Codegen llvm_ir;
-	llvm_ir.codegen(&program);
+	llvm_ir.codegen(program);
 
 	// Generate object file
 	auto TargetTriple = llvm::sys::getDefaultTargetTriple();

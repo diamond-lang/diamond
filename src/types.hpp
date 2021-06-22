@@ -4,6 +4,8 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include <variant>
+#include <cassert>
 
 // Source file
 struct Source {
@@ -35,6 +37,28 @@ struct ParserResult {
 
 	ParserResult<T>(T value, Source source, std::string error_message = "") : value(value), source(source), error_message(error_message) {}
 	ParserResult<T>(Source source, std::string error_message) : source(source), error_message(error_message) {}
+};
+
+template <class T1, class T2>
+struct Result {
+	std::variant<T1, T2> value;
+
+	Result(T1 value) : value(value) {}
+	Result(T2 error) : value(error) {}
+	~Result() {}
+
+	bool is_ok()    {return std::holds_alternative<T1>(this->value);}
+	bool is_error() {return !std::holds_alternative<T1>(this->value);}
+	T1 get_value()  {return std::get<T1>(this->value);}
+	T2 get_error()  {return std::get<T2>(this->value);}
+};
+
+struct Error {
+	std::string error_message;
+
+	Error() {}
+	Error(std::string error_message) : error_message(error_message) {}
+	~Error() {}
 };
 
 // Ast

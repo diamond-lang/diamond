@@ -16,8 +16,9 @@ bool is_assignment(Source source);
 //  Implementations
 //  ---------------
 
-Ast::Program parse::program(Source source) {
+Result<Ast::Program*, std::vector<Error>> parse::program(Source source) {
 	std::vector<Ast::Node*> statements;
+	std::vector<Error> errors;
 
 	while (!at_end(source)) {
 		// Parse comment
@@ -31,7 +32,7 @@ Ast::Program parse::program(Source source) {
 				source = result.source;
 			}
 			else {
-				std::cout << result.error_message << '\n';
+				errors.push_back(Error(result.error_message));
 			}
 		}
 		else {
@@ -42,12 +43,12 @@ Ast::Program parse::program(Source source) {
 				source = result.source;
 			}
 			else {
-				std::cout << result.error_message << '\n';
+				errors.push_back(Error(result.error_message));
 			}
 		}
 
 		if (!parse::token(source, ".").error() && parse::token(source, ".").value != "\n") {
-			std::cout << errors::unexpected_character(parse::token(source, ".").source) << '\n';
+			errors.push_back(Error(errors::unexpected_character(parse::token(source, ".").source)));
 		}
 
 		// Advance until new line
@@ -55,7 +56,8 @@ Ast::Program parse::program(Source source) {
 		while (current(source) == '\n') source = source + 1; // Eat new lines
 	}
 
-	return Ast::Program(statements, 1, 1, source.file);
+	if (errors.size() == 0) return Result<Ast::Program*, std::vector<Error>>(new Ast::Program(statements, 1, 1, source.file));
+	else                    return Result<Ast::Program*, std::vector<Error>>(errors);
 }
 
 ParserResult<Ast::Node*> parse::assignment(Source source) {
