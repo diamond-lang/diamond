@@ -105,26 +105,12 @@ void Ast::Program::print(size_t indent_level) {
 	}
 }
 
-Ast::Program::~Program() {
-	for (size_t i = 0; i < this->statements.size(); i++) {
-		delete this->statements[i];
-	}
-}
-
 // Call
 void Ast::Call::print(size_t indent_level) {
 	put_indent_level(indent_level);
 	std::cout << this->identifier->value << '\n';
 	for (size_t i = 0; i < this->args.size(); i++) {
 		this->args[i]->print(indent_level + 1);
-	}
-}
-
-Ast::Call::~Call() {
-	delete this->identifier;
-
-	for (size_t i = 0; i < this->args.size(); i++) {
-		delete this->args[i];
 	}
 }
 
@@ -137,18 +123,11 @@ void Ast::Assignment::print(size_t indent_level) {
 	this->expression->print(indent_level + 1);
 }
 
-Ast::Assignment::~Assignment() {
-	delete this->identifier;
-	delete this->expression;
-}
-
 // Number
 void Ast::Number::print(size_t indent_level) {
 	put_indent_level(indent_level);
 	std::cout << this->value << '\n';
 }
-
-Ast::Number::~Number() {}
 
 // Identifier
 void Ast::Identifier::print(size_t indent_level) {
@@ -156,12 +135,8 @@ void Ast::Identifier::print(size_t indent_level) {
 	std::cout << this->value << '\n';
 }
 
-Ast::Identifier::~Identifier() {}
-
 // Boolean
 void Ast::Boolean::print(size_t indent_level) {
 	put_indent_level(indent_level);
 	std::cout << (this->value ? "true" : "false") << '\n';
 }
-
-Ast::Boolean::~Boolean() {}

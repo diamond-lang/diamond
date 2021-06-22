@@ -7,7 +7,7 @@
 
 struct Binding {
 	std::string identifier;
-	Ast::Assignment* assignment;
+	std::shared_ptr<Ast::Assignment> assignment;
 	Type type;
 };
 
@@ -15,12 +15,12 @@ struct Context {
 	std::string file;
 	std::unordered_map<std::string, Binding> scope;
 
-	std::string analyze(Ast::Assignment* assignment);
-	std::string analyze_expression(Ast::Node* node);
-	std::string analyze(Ast::Call* node);
-	std::string analyze(Ast::Number* node);
-	std::string analyze(Ast::Identifier* node);
-	std::string analyze(Ast::Boolean* node);
+	std::string analyze(std::shared_ptr<Ast::Assignment> assignment);
+	std::string analyze_expression(std::shared_ptr<Ast::Node> node);
+	std::string analyze(std::shared_ptr<Ast::Call> node);
+	std::string analyze(std::shared_ptr<Ast::Number> node);
+	std::string analyze(std::shared_ptr<Ast::Identifier> node);
+	std::string analyze(std::shared_ptr<Ast::Boolean> node);
 
 	Binding* get_binding(std::string identifier);
 };
@@ -28,21 +28,21 @@ struct Context {
 
 // Implementations
 // ---------------
-void analyze(Ast::Program* program) {
+void analyze(std::shared_ptr<Ast::Program> program) {
 	Context context;
 
 	for (size_t i = 0; i  < program->statements.size(); i++) {
-		Ast::Node* node = program->statements[i];
+		std::shared_ptr<Ast::Node> node = program->statements[i];
 		std::string error;
 
-		if      (dynamic_cast<Ast::Assignment*>(node)) error = context.analyze(dynamic_cast<Ast::Assignment*>(node));
+		if      (std::dynamic_pointer_cast<Ast::Assignment>(node)) error = context.analyze(std::dynamic_pointer_cast<Ast::Assignment>(node));
 		else if (node->is_expression()) error = context.analyze_expression(node);
 
 		if (error.size() != 0) std::cout << error << '\n';
 	}
 }
 
-std::string Context::analyze(Ast::Assignment* assignment) {
+std::string Context::analyze(std::shared_ptr<Ast::Assignment> assignment) {
 	Binding binding;
 	binding.identifier = assignment->identifier->value;
 	binding.assignment = assignment;
@@ -63,16 +63,16 @@ std::string Context::analyze(Ast::Assignment* assignment) {
 	}
 }
 
-std::string Context::analyze_expression(Ast::Node* node) {
-	if      (dynamic_cast<Ast::Call*>(node))       return this->analyze(dynamic_cast<Ast::Call*>(node));
-	else if (dynamic_cast<Ast::Number*>(node))     return this->analyze(dynamic_cast<Ast::Number*>(node));
-	else if (dynamic_cast<Ast::Identifier*>(node)) return this->analyze(dynamic_cast<Ast::Identifier*>(node));
-	else if (dynamic_cast<Ast::Boolean*>(node))    return this->analyze(dynamic_cast<Ast::Boolean*>(node));
+std::string Context::analyze_expression(std::shared_ptr<Ast::Node> node) {
+	if      (std::dynamic_pointer_cast<Ast::Call>(node))       return this->analyze(std::dynamic_pointer_cast<Ast::Call>(node));
+	else if (std::dynamic_pointer_cast<Ast::Number>(node))     return this->analyze(std::dynamic_pointer_cast<Ast::Number>(node));
+	else if (std::dynamic_pointer_cast<Ast::Identifier>(node)) return this->analyze(std::dynamic_pointer_cast<Ast::Identifier>(node));
+	else if (std::dynamic_pointer_cast<Ast::Boolean>(node))    return this->analyze(std::dynamic_pointer_cast<Ast::Boolean>(node));
 	else assert(false);
 	return "Error: This shouldn't happen";
 }
 
-std::string Context::analyze(Ast::Call* node) {
+std::string Context::analyze(std::shared_ptr<Ast::Call> node) {
 	// Get types of arguments
 	for (size_t i = 0; i < node->args.size(); i++) {
 		std::string error = this->analyze_expression(node->args[i]);
@@ -110,12 +110,12 @@ std::string Context::analyze(Ast::Call* node) {
 	return "";
 }
 
-std::string Context::analyze(Ast::Number* node) {
+std::string Context::analyze(std::shared_ptr<Ast::Number> node) {
 	node->type = Type("float64");
 	return "";
 }
 
-std::string Context::analyze(Ast::Identifier* node) {
+std::string Context::analyze(std::shared_ptr<Ast::Identifier> node) {
 	Binding* binding = this->get_binding(node->value);
 	if (!binding) {
 		return errors::undefined_variable(node);
@@ -126,7 +126,7 @@ std::string Context::analyze(Ast::Identifier* node) {
 	}
 }
 
-std::string Context::analyze(Ast::Boolean* node) {
+std::string Context::analyze(std::shared_ptr<Ast::Boolean> node) {
 	node->type = Type("bool");
 	return "";
 }

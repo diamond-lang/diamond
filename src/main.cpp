@@ -39,11 +39,8 @@ int main(int argc, char *argv[]) {
 		}
 		exit(EXIT_FAILURE);
 	}
-	Ast::Program* ast = parsing_result.get_value();
+	auto ast = parsing_result.get_value();
 	ast->print();
-
-	delete ast;
-	return 0;
 
 	// Analyze
 	analyze(ast);
@@ -51,7 +48,6 @@ int main(int argc, char *argv[]) {
 	// Generate executable
 	generate_executable(ast, get_executable_name(argv[1]));
 
-	delete ast;
 	return 0;
 }
 

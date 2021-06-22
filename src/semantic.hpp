@@ -3,6 +3,6 @@
 
 #include "types.hpp"
 
-void analyze(Ast::Program* program);
+void analyze(std::shared_ptr<Ast::Program> program);
 
 #endif
