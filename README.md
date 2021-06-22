@@ -43,6 +43,6 @@ sudo ninja uninstall
 
 ## Usage
 ```
-diamond [program file]      # Compiles the program
-diamond run [program file]  # Runs the program
+diamond [program file]      # Compiles a program
+diamond run [program file]  # Runs a program
 ```
