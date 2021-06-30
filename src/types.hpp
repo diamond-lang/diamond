@@ -64,8 +64,14 @@ struct Result {
 
 	bool is_ok()    {return std::holds_alternative<T1>(this->value);}
 	bool is_error() {return !std::holds_alternative<T1>(this->value);}
-	T1 get_value()  {return std::get<T1>(this->value);}
-	T2 get_error()  {return std::get<T2>(this->value);}
+	T1 get_value()  {
+		assert(this->is_ok() == true);
+		return std::get<T1>(this->value);
+	}
+	T2 get_error()  {
+		assert(this->is_error() == true);
+		return std::get<T2>(this->value);
+	}
 };
 
 // Ast
