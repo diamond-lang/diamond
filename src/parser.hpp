@@ -5,6 +5,8 @@
 
 namespace parse {
 	Result<std::shared_ptr<Ast::Program>, std::vector<Error>> program(Source source);
+	ParserResult<std::shared_ptr<Ast::Node>> function(Source source);
+	ParserResult<std::shared_ptr<Ast::Node>> call(Source source);
 	ParserResult<std::shared_ptr<Ast::Node>> assignment(Source source);
 	ParserResult<std::shared_ptr<Ast::Node>> expression(Source source);
 	ParserResult<std::shared_ptr<Ast::Node>> binary(Source source, int precedence = 1);

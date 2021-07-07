@@ -100,19 +100,25 @@ namespace Ast {
 		bool is_expression();
 	};
 
+	struct Identifier;
+	struct Function;
+
 	struct Program : Node {
 		std::vector<std::shared_ptr<Ast::Node>> statements;
+		std::vector<std::shared_ptr<Ast::Function>> functions;
 
-		Program(std::vector<std::shared_ptr<Ast::Node>> statements, size_t line, size_t col, std::string file) : Node(line, col, file), statements(statements) {}
+		Program(std::vector<std::shared_ptr<Ast::Node>> statements, std::vector<std::shared_ptr<Ast::Function>> functions, size_t line, size_t col, std::string file) : Node(line, col, file), statements(statements), functions(functions) {}
 		virtual ~Program() {}
 		virtual void print(size_t indent_level = 0);
 	};
 
-	struct Identifier : Node {
-		std::string value;
+	struct Function : Node {
+		std::shared_ptr<Ast::Identifier> identifier;
+		std::vector<std::shared_ptr<Ast::Identifier>> args;
+		std::shared_ptr<Ast::Node> body;
 
-		Identifier(std::string value, size_t line, size_t col, std::string file) : Node(line, col, file), value(value) {}
-		virtual ~Identifier() {}
+		Function(std::shared_ptr<Ast::Identifier> identifier, std::vector<std::shared_ptr<Ast::Identifier>> args, std::shared_ptr<Ast::Node> body, size_t line, size_t col, std::string file) :  Node(line, col, file), identifier(identifier), args(args), body(body) {}
+		virtual ~Function() {}
 		virtual void print(size_t indent_level = 0);
 	};
 
@@ -131,6 +137,14 @@ namespace Ast {
 
 		Assignment(std::shared_ptr<Ast::Identifier> identifier, std::shared_ptr<Ast::Node> expression, size_t line, size_t col, std::string file) : Node(line, col, file), identifier(identifier), expression(expression) {}
 		virtual ~Assignment() {}
+		virtual void print(size_t indent_level = 0);
+	};
+
+	struct Identifier : Node {
+		std::string value;
+
+		Identifier(std::string value, size_t line, size_t col, std::string file) : Node(line, col, file), value(value) {}
+		virtual ~Identifier() {}
 		virtual void print(size_t indent_level = 0);
 	};
 

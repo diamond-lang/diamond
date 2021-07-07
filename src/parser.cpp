@@ -18,12 +18,23 @@ bool is_assignment(Source source);
 
 Result<std::shared_ptr<Ast::Program>, std::vector<Error>> parse::program(Source source) {
 	std::vector<std::shared_ptr<Ast::Node>> statements;
+	std::vector<std::shared_ptr<Ast::Function>> functions;
 	std::vector<Error> errors;
 
 	while (!at_end(source)) {
 		// Parse comment
-		if (!parse::comment(source).is_error()) {
+		if (parse::comment(source).is_ok()) {
 			source = parse::comment(source).get_source();
+		}
+		else if (parse::function(source).is_ok()) {
+			auto result = parse::function(source);
+			if (result.is_ok()) {
+				functions.push_back(std::dynamic_pointer_cast<Ast::Function>(result.get_value()));
+				source = result.get_source();
+			}
+			else {
+				errors.push_back(result.get_error());
+			}
 		}
 		else if (is_assignment(source)) {
 			auto result = parse::assignment(source);
@@ -56,8 +67,72 @@ Result<std::shared_ptr<Ast::Program>, std::vector<Error>> parse::program(Source 
 		while (current(source) == '\n') source = source + 1; // Eat new lines
 	}
 
-	if (errors.size() == 0) return Result<std::shared_ptr<Ast::Program>, std::vector<Error>>(std::make_shared<Ast::Program>(statements, 1, 1, source.file));
+	if (errors.size() == 0) return Result<std::shared_ptr<Ast::Program>, std::vector<Error>>(std::make_shared<Ast::Program>(statements, functions, 1, 1, source.file));
 	else                    return Result<std::shared_ptr<Ast::Program>, std::vector<Error>>(errors);
+}
+
+ParserResult<std::shared_ptr<Ast::Node>> parse::function(Source source) {
+	auto identifier = parse::identifier(source);
+	if (identifier.is_error()) return identifier;
+	source = identifier.get_source();
+
+	auto left_paren = parse::token(source, "\\(");
+	if (left_paren.is_error()) return ParserResult<std::shared_ptr<Ast::Node>>(left_paren.get_source(), left_paren.get_error().error_message);
+	source = left_paren.get_source();
+
+	std::vector<std::shared_ptr<Ast::Identifier>> args;
+	while (true) {
+		auto arg_identifier = parse::identifier(source);
+		if (arg_identifier.is_error()) return arg_identifier;
+		source = arg_identifier.get_source();
+		args.push_back(std::dynamic_pointer_cast<Ast::Identifier>(arg_identifier.get_value()));
+
+		if (parse::token(source, ",").is_ok()) source = parse::token(source, ",").get_source();
+		else                                   break;
+	}
+
+	auto right_paren = parse::token(source, "\\)");
+	if (right_paren.is_error()) return ParserResult<std::shared_ptr<Ast::Node>>(right_paren.get_source(), right_paren.get_error().error_message);
+	source = right_paren.get_source();
+
+	auto is = parse::token(source, "is");
+	if (is.is_error()) return ParserResult<std::shared_ptr<Ast::Node>>(is.get_source(), is.get_error().error_message);;
+	source = is.get_source();
+
+	auto expression = parse::expression(source);
+	if (expression.is_error()) return expression;
+	source = expression.get_source();
+
+	auto node = std::make_shared<Ast::Function>(std::dynamic_pointer_cast<Ast::Identifier>(identifier.get_value()), args, expression.get_value(), source.line, source.col, source.file);
+	return ParserResult<std::shared_ptr<Ast::Node>>(node, source);
+}
+
+ParserResult<std::shared_ptr<Ast::Node>> parse::call(Source source) {
+	auto identifier = parse::identifier(source);
+	if (identifier.is_error()) return identifier;
+	source = identifier.get_source();
+
+	auto left_paren = parse::token(source, "\\(");
+	if (left_paren.is_error()) return ParserResult<std::shared_ptr<Ast::Node>>(left_paren.get_source(), left_paren.get_error().error_message);
+	source = left_paren.get_source();
+
+	std::vector<std::shared_ptr<Ast::Node>> args;
+	while (true) {
+		auto arg = parse::expression(source);
+		if (arg.is_error()) return arg;
+		source = arg.get_source();
+		args.push_back(arg.get_value());
+
+		if (parse::token(source, ",").is_ok()) source = parse::token(source, ",").get_source();
+		else                                   break;
+	}
+
+	auto right_paren = parse::token(source, "\\)");
+	if (right_paren.is_error()) return ParserResult<std::shared_ptr<Ast::Node>>(right_paren.get_source(), right_paren.get_error().error_message);
+	source = right_paren.get_source();
+
+	auto node = std::make_shared<Ast::Call>(std::dynamic_pointer_cast<Ast::Identifier>(identifier.get_value()), args, source.line, source.col, source.file);
+	return ParserResult<std::shared_ptr<Ast::Node>>(node, source);
 }
 
 ParserResult<std::shared_ptr<Ast::Node>> parse::assignment(Source source) {
@@ -66,7 +141,7 @@ ParserResult<std::shared_ptr<Ast::Node>> parse::assignment(Source source) {
 	source = identifier.get_source();
 
 	auto be = parse::token(source, "be");
-	if (be.is_error()) return ParserResult<std::shared_ptr<Ast::Node>>(be.source, be.error_message);
+	if (be.is_error()) return ParserResult<std::shared_ptr<Ast::Node>>(be.get_source(), be.get_error().error_message);
 	source = be.get_source();
 
 	auto expression = parse::expression(source);
@@ -123,8 +198,9 @@ ParserResult<std::shared_ptr<Ast::Node>> parse::binary(Source source, int preced
 }
 
 ParserResult<std::shared_ptr<Ast::Node>> parse::unary(Source source) {
-	if (!parse::number(source).is_error()) return parse::number(source);
-	if (!parse::identifier(source).is_error()) return parse::identifier(source);
+	if (parse::number(source).is_ok())     return parse::number(source);
+	if (parse::call(source).is_ok())       return parse::call(source);
+	if (parse::identifier(source).is_ok()) return parse::identifier(source);
 	return ParserResult<std::shared_ptr<Ast::Node>>(source, errors::unexpected_character(parse::token(source, "(?=.)").get_source()));
 }
 

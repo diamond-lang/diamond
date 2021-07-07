@@ -103,6 +103,21 @@ void Ast::Program::print(size_t indent_level) {
 	for (size_t i = 0; i < this->statements.size(); i++) {
 		this->statements[i]->print(indent_level + 1);
 	}
+	for (size_t i = 0; i < this->functions.size(); i++) {
+		this->functions[i]->print(indent_level + 1);
+	}
+}
+
+// Function
+void Ast::Function::print(size_t indent_level) {
+	put_indent_level(indent_level);
+	std::cout << this->identifier->value << '(';
+	for (size_t i = 0; i < this->args.size(); i++) {
+		std::cout << this->args[i]->value;
+		if (i != this->args.size() - 1) std::cout << ", ";
+	}
+	std::cout << ") is\n";
+	this->body->print(indent_level + 1);
 }
 
 // Call
