@@ -23,6 +23,8 @@ struct Context {
 	Result<Ok, Error> analyze(std::shared_ptr<Ast::Boolean> node);
 
 	Binding* get_binding(std::string identifier);
+	Result<Ok, Error> get_type_of_intrinsic(std::shared_ptr<Ast::Call> node);
+	std::vector<Type> get_args_types(std::shared_ptr<Ast::Call> node);
 };
 
 
@@ -85,31 +87,8 @@ Result<Ok, Error> Context::analyze(std::shared_ptr<Ast::Call> node) {
 		if (result.is_error()) return result;
 	}
 
-	if (node->identifier->value == "+" || node->identifier->value == "-" || node->identifier->value == "*" || node->identifier->value == "/") {
-		if (node->args[0]->type == Type("float64") && node->args[1]->type == Type("float64")) {
-			node->type = Type("float64");
-		}
-		else {
-			return Result<Ok, Error>(Error(errors::operation_not_defined_for(node, node->args[0]->type.to_str(), node->args[1]->type.to_str())));
-		}
-	}
-	else if (node->identifier->value == "<" || node->identifier->value == "<=" || node->identifier->value == ">" || node->identifier->value == ">=") {
-		if (node->args[0]->type == Type("float64") && node->args[1]->type == Type("float64")) {
-			node->type = Type("bool");
-		}
-		else {
-			return Result<Ok, Error>(Error(errors::operation_not_defined_for(node, node->args[0]->type.to_str(), node->args[1]->type.to_str())));
-		}
-	}
-	else if (node->identifier->value == "==") {
-		if (node->args[0]->type == node->args[1]->type) {
-			node->type = Type("bool");
-		}
-		else {
-			return Result<Ok, Error>(Error(errors::operation_not_defined_for(node, node->args[0]->type.to_str(), node->args[1]->type.to_str())));
-		}
-	}
-	else {assert(false);}
+	auto result = this->get_type_of_intrinsic(node);
+	if (result.is_error()) assert(false);
 
 	return Result<Ok, Error>(Ok());
 }
@@ -142,4 +121,62 @@ Binding* Context::get_binding(std::string identifier) {
 	else {
 		return nullptr;
 	}
+}
+
+Result<Ok, Error> Context::get_type_of_intrinsic(std::shared_ptr<Ast::Call> node) {
+	static std::unordered_map<std::string, std::vector<std::pair<std::vector<Type>, Type>>> intrinsics = {
+		{"+", {
+			{{Type("float64"), Type("float64")}, Type("float64")}
+		}},
+		{"*", {
+			{{Type("float64"), Type("float64")}, Type("float64")}
+		}},
+		{"/", {
+			{{Type("float64"), Type("float64")}, Type("float64")}
+		}},
+		{"-", {
+			{{Type("float64"), Type("float64")}, Type("float64")}
+		}},
+		{"<", {
+			{{Type("float64"), Type("float64")}, Type("bool")}
+		}},
+		{"<=", {
+			{{Type("float64"), Type("float64")}, Type("bool")}
+		}},
+		{">", {
+			{{Type("float64"), Type("float64")}, Type("bool")}
+		}},
+		{">=", {
+			{{Type("float64"), Type("float64")}, Type("bool")}
+		}},
+		{"==", {
+			{{Type("bool"), Type("bool")}, Type("bool")},
+			{{Type("float64"), Type("float64")}, Type("bool")}
+		}},
+		{"!=", {
+			{{Type("bool"), Type("bool")}, Type("bool")},
+			{{Type("float64"), Type("float64")}, Type("bool")}
+		}}
+	};
+
+	if (intrinsics.find(node->identifier->value) != intrinsics.end()) {
+		auto args = this->get_args_types(node);
+		auto prototypes = intrinsics[node->identifier->value];
+		for (size_t i = 0; i < prototypes.size(); i++) {
+			if (args == prototypes[i].first) {
+				node->type = prototypes[i].second;
+				return Result<Ok, Error>(Ok());
+			}
+		}
+
+	}
+	return Result<Ok, Error>(errors::operation_not_defined_for(node, node->args[0]->type.to_str(), node->args[1]->type.to_str()));
+}
+
+std::vector<Type> Context::get_args_types(std::shared_ptr<Ast::Call> node) {
+	std::vector<Type> types;
+	for (size_t i = 0; i < node->args.size(); i++) {
+		types.push_back(node->args[i]->type);
+	}
+	return types;
 }
