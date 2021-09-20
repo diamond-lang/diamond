@@ -92,12 +92,10 @@ namespace Ast {
 		size_t line;
 		size_t col;
 		std::string file;
-		Type type;
 
 		Node(size_t line, size_t col, std::string file): line(line), col(col), file(file) {}
 		virtual ~Node() {}
 		virtual void print(size_t indent_level = 0) = 0;
-		bool is_expression();
 	};
 
 	struct Identifier;
@@ -131,44 +129,53 @@ namespace Ast {
 		std::shared_ptr<Ast::Node> body;
 	};
 
-	struct Call : Node {
-		std::shared_ptr<Ast::Identifier> identifier;
-		std::vector<std::shared_ptr<Ast::Node>> args;
-
-		Call(std::shared_ptr<Ast::Identifier> identifier, std::vector<std::shared_ptr<Ast::Node>> args, size_t line, size_t col, std::string file) : Node(line, col, file), identifier(identifier), args(args) {}
-		virtual ~Call() {}
-		virtual void print(size_t indent_level = 0);
-	};
+	struct Expression;
 
 	struct Assignment : Node {
 		std::shared_ptr<Ast::Identifier> identifier;
-		std::shared_ptr<Ast::Node> expression;
+		std::shared_ptr<Ast::Expression> expression;
 
-		Assignment(std::shared_ptr<Ast::Identifier> identifier, std::shared_ptr<Ast::Node> expression, size_t line, size_t col, std::string file) : Node(line, col, file), identifier(identifier), expression(expression) {}
+		Assignment(std::shared_ptr<Ast::Identifier> identifier, std::shared_ptr<Ast::Expression> expression, size_t line, size_t col, std::string file) : Node(line, col, file), identifier(identifier), expression(expression) {}
 		virtual ~Assignment() {}
 		virtual void print(size_t indent_level = 0);
 	};
 
-	struct Identifier : Node {
+	struct Expression : Node {
+		Type type;
+
+		Expression(size_t line, size_t col, std::string file) : Node(line, col, file) {}
+		virtual ~Expression() {}
+	};
+
+	struct Call : Expression {
+		std::shared_ptr<Ast::Identifier> identifier;
+		std::vector<std::shared_ptr<Ast::Expression>> args;
+
+		Call(std::shared_ptr<Ast::Identifier> identifier, std::vector<std::shared_ptr<Ast::Expression>> args, size_t line, size_t col, std::string file) : Expression(line, col, file), identifier(identifier), args(args) {}
+		virtual ~Call() {}
+		virtual void print(size_t indent_level = 0);
+	};
+
+	struct Identifier : Expression {
 		std::string value;
 
-		Identifier(std::string value, size_t line, size_t col, std::string file) : Node(line, col, file), value(value) {}
+		Identifier(std::string value, size_t line, size_t col, std::string file) : Expression(line, col, file), value(value) {}
 		virtual ~Identifier() {}
 		virtual void print(size_t indent_level = 0);
 	};
 
-	struct Number : Node {
+	struct Number : Expression {
 		double value;
 
-		Number(double value, size_t line, size_t col, std::string file) : Node(line, col, file), value(value) {}
+		Number(double value, size_t line, size_t col, std::string file) : Expression(line, col, file), value(value) {}
 		virtual ~Number() {}
 		virtual void print(size_t indent_level = 0);
 	};
 
-	struct Boolean : Node {
+	struct Boolean : Expression {
 		bool value;
 
-		Boolean(bool value, size_t line, size_t col, std::string file) : Node(line, col, file), value(value) {}
+		Boolean(bool value, size_t line, size_t col, std::string file) : Expression(line, col, file), value(value) {}
 		virtual ~Boolean() {}
 		virtual void print(size_t indent_level = 0);
 	};

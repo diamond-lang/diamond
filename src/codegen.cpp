@@ -41,7 +41,7 @@ struct Codegen {
 
 	void codegen(std::shared_ptr<Ast::Program> node);
 	void codegen(std::shared_ptr<Ast::Assignment> node);
-	llvm::Value* codegen_expression(std::shared_ptr<Ast::Node> node);
+	llvm::Value* codegen(std::shared_ptr<Ast::Expression> node);
 	llvm::Value* codegen(std::shared_ptr<Ast::Call> node);
 	llvm::Value* codegen(std::shared_ptr<Ast::Number> node);
 	llvm::Value* codegen(std::shared_ptr<Ast::Identifier> node);
@@ -133,8 +133,8 @@ void Codegen::codegen(std::shared_ptr<Ast::Program> node) {
 	}
 
 	for (size_t i = 0; i < node->statements.size(); i++) {
-		if (node->statements[i]->is_expression()) {
-			llvm::Value* value = this->codegen_expression(node->statements[i]);
+		if (std::dynamic_pointer_cast<Ast::Expression>(node->statements[i])) {
+			llvm::Value* value = this->codegen(std::dynamic_pointer_cast<Ast::Expression>(node->statements[i]));
 
 			if (value != nullptr) {
 				if (value->getType()->isDoubleTy()) {
@@ -189,13 +189,13 @@ void Codegen::codegen(std::shared_ptr<Ast::Program> node) {
 
 void Codegen::codegen(std::shared_ptr<Ast::Assignment> node) {
 	// Generate value of expression
-	llvm::Value* expr = this->codegen_expression(node->expression);
+	llvm::Value* expr = this->codegen(node->expression);
 
 	// Add it to the scope
 	this->scope[node->identifier->value] = expr;
 }
 
-llvm::Value* Codegen::codegen_expression(std::shared_ptr<Ast::Node> node) {
+llvm::Value* Codegen::codegen(std::shared_ptr<Ast::Expression> node) {
 	if      (std::dynamic_pointer_cast<Ast::Call>(node))       return this->codegen(std::dynamic_pointer_cast<Ast::Call>(node));
 	else if (std::dynamic_pointer_cast<Ast::Number>(node))     return this->codegen(std::dynamic_pointer_cast<Ast::Number>(node));
 	else if (std::dynamic_pointer_cast<Ast::Identifier>(node)) return this->codegen(std::dynamic_pointer_cast<Ast::Identifier>(node));
@@ -206,8 +206,8 @@ llvm::Value* Codegen::codegen_expression(std::shared_ptr<Ast::Node> node) {
 }
 
 llvm::Value* Codegen::codegen(std::shared_ptr<Ast::Call> node) {
-	llvm::Value* left = this->codegen_expression(node->args[0]);
-	llvm::Value* right = this->codegen_expression(node->args[1]);
+	llvm::Value* left = this->codegen(node->args[0]);
+	llvm::Value* right = this->codegen(node->args[1]);
 	if (node->identifier->value == "+") return this->builder->CreateFAdd(left, right, "addtmp");
 	if (node->identifier->value == "-") return this->builder->CreateFSub(left, right, "subtmp");
 	if (node->identifier->value == "*") return this->builder->CreateFMul(left, right, "multmp");

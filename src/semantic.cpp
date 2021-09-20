@@ -21,7 +21,7 @@ struct Binding {
 	Binding(std::string identifier, std::vector<std::shared_ptr<Ast::Function>> function) : identifier(identifier), binding_type(FunctionBinding), function(function) {}
 
 	Type get_type() {
-		if (this->binding_type == VariableBinding) return this->assignment->type;
+		if (this->binding_type == VariableBinding) return this->assignment->expression->type;
 		if (this->binding_type == FunctionBinding) return Type("function");
 		else                                       assert(false);
 	}
@@ -35,7 +35,7 @@ struct Context {
 	std::unordered_map<std::string, Binding> scope;
 
 	Result<Ok, Error> analyze(std::shared_ptr<Ast::Assignment> assignment);
-	Result<Ok, Error> analyze_expression(std::shared_ptr<Ast::Node> node);
+	Result<Ok, Error> analyze(std::shared_ptr<Ast::Expression> node);
 	Result<Ok, Error> analyze(std::shared_ptr<Ast::Call> node);
 	Result<Ok, Error> analyze(std::shared_ptr<Ast::Number> node);
 	Result<Ok, Error> analyze(std::shared_ptr<Ast::Identifier> node);
@@ -59,7 +59,7 @@ Result<Ok, std::vector<Error>> semantic::analyze(std::shared_ptr<Ast::Program> p
 		Result<Ok, Error> result;
 
 		if      (std::dynamic_pointer_cast<Ast::Assignment>(node)) result = context.analyze(std::dynamic_pointer_cast<Ast::Assignment>(node));
-		else if (node->is_expression())                            result = context.analyze_expression(node);
+		else if (std::dynamic_pointer_cast<Ast::Expression>(node)) result = context.analyze(std::dynamic_pointer_cast<Ast::Expression>(node));
 		else                                                       assert(false);
 
 		if (result.is_error()) {
@@ -75,9 +75,8 @@ Result<Ok, Error> Context::analyze(std::shared_ptr<Ast::Assignment> assignment) 
 	Binding binding = Binding(assignment->identifier->value, assignment);
 
 	// Get expression type
-	auto result = this->analyze_expression(assignment->expression);
+	auto result = this->analyze(assignment->expression);
 	if (result.is_error()) return result;
-	assignment->type = assignment->expression->type;
 
 	// Save it context
 	if (this->get_binding(assignment->identifier->value)) {
@@ -89,7 +88,7 @@ Result<Ok, Error> Context::analyze(std::shared_ptr<Ast::Assignment> assignment) 
 	}
 }
 
-Result<Ok, Error> Context::analyze_expression(std::shared_ptr<Ast::Node> node) {
+Result<Ok, Error> Context::analyze(std::shared_ptr<Ast::Expression> node) {
 	if      (std::dynamic_pointer_cast<Ast::Call>(node))       return this->analyze(std::dynamic_pointer_cast<Ast::Call>(node));
 	else if (std::dynamic_pointer_cast<Ast::Number>(node))     return this->analyze(std::dynamic_pointer_cast<Ast::Number>(node));
 	else if (std::dynamic_pointer_cast<Ast::Identifier>(node)) return this->analyze(std::dynamic_pointer_cast<Ast::Identifier>(node));
@@ -101,7 +100,7 @@ Result<Ok, Error> Context::analyze_expression(std::shared_ptr<Ast::Node> node) {
 Result<Ok, Error> Context::analyze(std::shared_ptr<Ast::Call> node) {
 	// Get types of arguments
 	for (size_t i = 0; i < node->args.size(); i++) {
-		auto result = this->analyze_expression(node->args[i]);
+		auto result = this->analyze(node->args[i]);
 		if (result.is_error()) return result;
 	}
 

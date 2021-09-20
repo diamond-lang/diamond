@@ -83,19 +83,6 @@ void put_indent_level(size_t indent_level) {
 	for (size_t i = 0; i < indent_level; i++) std::cout << "    ";
 }
 
-// Node
-bool Ast::Node::is_expression() {
-	if (dynamic_cast<Ast::Number*>(this))     return true;
-	if (dynamic_cast<Ast::Identifier*>(this)) return true;
-	if (dynamic_cast<Ast::Boolean*>(this))    return true;
-	if (dynamic_cast<Ast::Call*>(this))       return true;
-	if (dynamic_cast<Ast::Program*>(this))    return false;
-	if (dynamic_cast<Ast::Assignment*>(this)) return false;
-
-	assert(false);
-	return false;
-}
-
 // Program
 void Ast::Program::print(size_t indent_level) {
 	put_indent_level(indent_level);
