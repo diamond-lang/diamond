@@ -5,10 +5,29 @@
 #include "errors.hpp"
 #include "semantic.hpp"
 
+enum BindingType {
+	VariableBinding,
+	FunctionBinding
+};
+
 struct Binding {
 	std::string identifier;
+	BindingType binding_type;
 	std::shared_ptr<Ast::Assignment> assignment;
-	Type type;
+	std::vector<std::shared_ptr<Ast::Function>> function;
+
+	Binding() {}
+	Binding(std::string identifier, std::shared_ptr<Ast::Assignment> assignment) : identifier(identifier), binding_type(VariableBinding), assignment(assignment) {}
+	Binding(std::string identifier, std::vector<std::shared_ptr<Ast::Function>> function) : identifier(identifier), binding_type(FunctionBinding), function(function) {}
+
+	Type get_type() {
+		if (this->binding_type == VariableBinding) return this->assignment->type;
+		if (this->binding_type == FunctionBinding) return Type("function");
+		else                                       assert(false);
+	}
+
+	bool is_assignment() {return this->binding_type == VariableBinding;}
+	bool is_function() {return this->binding_type == FunctionBinding;}
 };
 
 struct Context {
@@ -24,6 +43,7 @@ struct Context {
 
 	Binding* get_binding(std::string identifier);
 	Result<Ok, Error> get_type_of_intrinsic(std::shared_ptr<Ast::Call> node);
+	Result<Ok, Error> get_type_of_user_defined_function(std::shared_ptr<Ast::Call> node);
 	std::vector<Type> get_args_types(std::shared_ptr<Ast::Call> node);
 };
 
@@ -40,6 +60,7 @@ Result<Ok, std::vector<Error>> semantic::analyze(std::shared_ptr<Ast::Program> p
 
 		if      (std::dynamic_pointer_cast<Ast::Assignment>(node)) result = context.analyze(std::dynamic_pointer_cast<Ast::Assignment>(node));
 		else if (node->is_expression())                            result = context.analyze_expression(node);
+		else                                                       assert(false);
 
 		if (result.is_error()) {
 			errors.push_back(result.get_error());
@@ -51,15 +72,12 @@ Result<Ok, std::vector<Error>> semantic::analyze(std::shared_ptr<Ast::Program> p
 }
 
 Result<Ok, Error> Context::analyze(std::shared_ptr<Ast::Assignment> assignment) {
-	Binding binding;
-	binding.identifier = assignment->identifier->value;
-	binding.assignment = assignment;
+	Binding binding = Binding(assignment->identifier->value, assignment);
 
 	// Get expression type
 	auto result = this->analyze_expression(assignment->expression);
 	if (result.is_error()) return result;
 	assignment->type = assignment->expression->type;
-	binding.type = assignment->type;
 
 	// Save it context
 	if (this->get_binding(assignment->identifier->value)) {
@@ -90,6 +108,9 @@ Result<Ok, Error> Context::analyze(std::shared_ptr<Ast::Call> node) {
 	auto result = this->get_type_of_intrinsic(node);
 	if (result.is_error()) assert(false);
 
+	result = this->get_type_of_user_defined_function(node);
+	if (result.is_error()) return result;
+
 	return Result<Ok, Error>(Ok());
 }
 
@@ -104,7 +125,7 @@ Result<Ok, Error> Context::analyze(std::shared_ptr<Ast::Identifier> node) {
 		return Result<Ok, Error>(Error(errors::undefined_variable(node)));
 	}
 	else {
-		node->type = binding->type;
+		node->type = binding->get_type();
 		return Result<Ok, Error>(Ok());
 	}
 }
@@ -170,7 +191,12 @@ Result<Ok, Error> Context::get_type_of_intrinsic(std::shared_ptr<Ast::Call> node
 		}
 
 	}
+
 	return Result<Ok, Error>(errors::operation_not_defined_for(node, node->args[0]->type.to_str(), node->args[1]->type.to_str()));
+}
+
+Result<Ok, Error> Context::get_type_of_user_defined_function(std::shared_ptr<Ast::Call> node) {
+	return Result<Ok, Error>(Ok());
 }
 
 std::vector<Type> Context::get_args_types(std::shared_ptr<Ast::Call> node) {
