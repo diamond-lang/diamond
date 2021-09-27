@@ -6,28 +6,33 @@
 #include "semantic.hpp"
 
 enum BindingType {
-	VariableBinding,
-	FunctionBinding
+	AssignmentBinding,
+	FunctionBinding,
+	FunctionArgumentBinding
 };
 
 struct Binding {
 	std::string identifier;
 	BindingType binding_type;
 	std::shared_ptr<Ast::Assignment> assignment;
+	std::shared_ptr<Ast::Expression> function_argument;
 	std::vector<std::shared_ptr<Ast::Function>> methods;
 
 	Binding() {}
-	Binding(std::string identifier, std::shared_ptr<Ast::Assignment> assignment) : identifier(identifier), binding_type(VariableBinding), assignment(assignment) {}
+	Binding(std::string identifier, std::shared_ptr<Ast::Assignment> assignment) : identifier(identifier), binding_type(AssignmentBinding), assignment(assignment) {}
+	Binding(std::string identifier, std::shared_ptr<Ast::Expression> function_argument) : identifier(identifier), binding_type(FunctionArgumentBinding), function_argument(function_argument) {}
 	Binding(std::string identifier, std::vector<std::shared_ptr<Ast::Function>> methods) : identifier(identifier), binding_type(FunctionBinding), methods(methods) {}
 
 	Type get_type() {
-		if (this->binding_type == VariableBinding) return this->assignment->expression->type;
+		if (this->binding_type == AssignmentBinding) return this->assignment->expression->type;
+		if (this->binding_type == FunctionArgumentBinding) return this->function_argument->type;
 		if (this->binding_type == FunctionBinding) return Type("function");
 		else                                       assert(false);
 	}
 
-	bool is_assignment() {return this->binding_type == VariableBinding;}
+	bool is_assignment() {return this->binding_type == AssignmentBinding;}
 	bool is_function() {return this->binding_type == FunctionBinding;}
+	bool is_argument() {return this->binding_type == FunctionArgumentBinding;}
 };
 
 struct Context {
@@ -47,6 +52,7 @@ struct Context {
 	Result<Ok, Error> get_type_of_intrinsic(std::shared_ptr<Ast::Call> node);
 	Result<Ok, Error> get_type_of_user_defined_function(std::shared_ptr<Ast::Call> node);
 	std::vector<Type> get_args_types(std::shared_ptr<Ast::Call> node);
+	std::vector<std::unordered_map<std::string, Binding>> get_definitions();
 };
 
 
@@ -160,6 +166,19 @@ Binding* Context::get_binding(std::string identifier) {
 	}
 }
 
+std::vector<std::unordered_map<std::string, Binding>> Context::get_definitions() {
+	std::vector<std::unordered_map<std::string, Binding>> scopes;
+	for (size_t i = 0; i < this->scopes.size(); i++) {
+		scopes.push_back(std::unordered_map<std::string, Binding>());
+		for (auto it = this->scopes[i].begin(); it != this->scopes[i].end(); it++) {
+			if (it->second.is_function()) {
+				scopes[i][it->first] = it->second;
+			}
+		}
+	}
+	return scopes;
+}
+
 Result<Ok, Error> Context::get_type_of_intrinsic(std::shared_ptr<Ast::Call> node) {
 	static std::unordered_map<std::string, std::vector<std::pair<std::vector<Type>, Type>>> intrinsics = {
 		{"+", {
@@ -205,10 +224,18 @@ Result<Ok, Error> Context::get_type_of_intrinsic(std::shared_ptr<Ast::Call> node
 				return Result<Ok, Error>(Ok());
 			}
 		}
-
 	}
 
-	return Result<Ok, Error>(errors::operation_not_defined_for(node, node->args[0]->type.to_str(), node->args[1]->type.to_str()));
+	if (node->args.size() == 2) {
+		return Result<Ok, Error>(errors::operation_not_defined_for(node, node->args[0]->type.to_str(), node->args[1]->type.to_str()));
+	}
+	else {
+		std::vector<std::string> args;
+		for (size_t i = 0; i < node->args.size(); i++) {
+			args.push_back(node->args[i]->type.to_str());
+		}
+		return Result<Ok, Error>(errors::operation_not_defined_for(node, args));
+	}
 }
 
 Result<Ok, Error> Context::get_type_of_user_defined_function(std::shared_ptr<Ast::Call> node) {
@@ -243,7 +270,29 @@ Result<Ok, Error> Context::get_type_of_user_defined_function(std::shared_ptr<Ast
 						auto aux = std::make_shared<Ast::FunctionSpecialization>();
 						specialization = &aux;
 						(*specialization)->args_types = args;
-						//(*specialization)->body = node->body.clone();
+						(*specialization)->body = (*method)->body->clone();
+
+						// Create new context
+						Context context;
+						context.file = this->file;
+						context.scopes = this->get_definitions();
+						context.add_scope();
+
+						// Add arguments to new scope
+						for (size_t i = 0; i != node->args.size(); i++) {
+							auto binding = Binding((*method)->args[i]->value, node->args[i]);
+							context.current_scope()[binding.identifier] = binding;
+						}
+
+						auto result = context.analyze(std::dynamic_pointer_cast<Ast::Expression>((*specialization)->body));
+						if (result.is_ok()) {
+							(*specialization)->valid = true;
+							(*specialization)->return_type = std::dynamic_pointer_cast<Ast::Expression>((*specialization)->body)->type;
+							std::cout << (*specialization)->return_type.to_str() << '\n';
+						}
+						else {
+							std::cout << result.get_error().error_message << '\n';
+						}
 					}
 
 					// If specialization valid

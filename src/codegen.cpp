@@ -206,22 +206,24 @@ llvm::Value* Codegen::codegen(std::shared_ptr<Ast::Expression> node) {
 }
 
 llvm::Value* Codegen::codegen(std::shared_ptr<Ast::Call> node) {
-	llvm::Value* left = this->codegen(node->args[0]);
-	llvm::Value* right = this->codegen(node->args[1]);
-	if (node->identifier->value == "+") return this->builder->CreateFAdd(left, right, "addtmp");
-	if (node->identifier->value == "-") return this->builder->CreateFSub(left, right, "subtmp");
-	if (node->identifier->value == "*") return this->builder->CreateFMul(left, right, "multmp");
-	if (node->identifier->value == "/") return this->builder->CreateFDiv(left, right, "divtmp");
-	if (node->identifier->value == "<") return this->builder->CreateFCmpULT(left, right, "cmptmp");
-	if (node->identifier->value == "<=") return this->builder->CreateFCmpULE(left, right, "cmptmp");
-	if (node->identifier->value == ">") return this->builder->CreateFCmpUGT(left, right, "cmptmp");
-	if (node->identifier->value == ">=") return this->builder->CreateFCmpUGE(left, right, "cmptmp");
-	if (node->identifier->value == "==") {
-		if (left->getType()->isIntegerTy(1) && right->getType()->isIntegerTy(1)) {
-			return this->builder->CreateICmpEQ(left, right, "eqtmp");
-		}
-		else if (left->getType()->isDoubleTy() && right->getType()->isDoubleTy()) {
-			return this->builder->CreateFCmpUEQ(left, right, "eqtmp");
+	if (node->args.size() == 2) {
+		llvm::Value* left = this->codegen(node->args[0]);
+		llvm::Value* right = this->codegen(node->args[1]);
+		if (node->identifier->value == "+") return this->builder->CreateFAdd(left, right, "addtmp");
+		if (node->identifier->value == "-") return this->builder->CreateFSub(left, right, "subtmp");
+		if (node->identifier->value == "*") return this->builder->CreateFMul(left, right, "multmp");
+		if (node->identifier->value == "/") return this->builder->CreateFDiv(left, right, "divtmp");
+		if (node->identifier->value == "<") return this->builder->CreateFCmpULT(left, right, "cmptmp");
+		if (node->identifier->value == "<=") return this->builder->CreateFCmpULE(left, right, "cmptmp");
+		if (node->identifier->value == ">") return this->builder->CreateFCmpUGT(left, right, "cmptmp");
+		if (node->identifier->value == ">=") return this->builder->CreateFCmpUGE(left, right, "cmptmp");
+		if (node->identifier->value == "==") {
+			if (left->getType()->isIntegerTy(1) && right->getType()->isIntegerTy(1)) {
+				return this->builder->CreateICmpEQ(left, right, "eqtmp");
+			}
+			else if (left->getType()->isDoubleTy() && right->getType()->isDoubleTy()) {
+				return this->builder->CreateFCmpUEQ(left, right, "eqtmp");
+			}
 		}
 	}
 
