@@ -104,6 +104,7 @@ ParserResult<std::shared_ptr<Ast::Node>> parse::function(Source source) {
 	source = expression.get_source();
 
 	auto node = std::make_shared<Ast::Function>(std::dynamic_pointer_cast<Ast::Identifier>(identifier.get_value()), args, expression.get_value(), source.line, source.col, source.file);
+	node->generic = true;
 	return ParserResult<std::shared_ptr<Ast::Node>>(node, source);
 }
 

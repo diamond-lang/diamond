@@ -14,11 +14,11 @@ struct Binding {
 	std::string identifier;
 	BindingType binding_type;
 	std::shared_ptr<Ast::Assignment> assignment;
-	std::vector<std::shared_ptr<Ast::Function>> function;
+	std::vector<std::shared_ptr<Ast::Function>> methods;
 
 	Binding() {}
 	Binding(std::string identifier, std::shared_ptr<Ast::Assignment> assignment) : identifier(identifier), binding_type(VariableBinding), assignment(assignment) {}
-	Binding(std::string identifier, std::vector<std::shared_ptr<Ast::Function>> function) : identifier(identifier), binding_type(FunctionBinding), function(function) {}
+	Binding(std::string identifier, std::vector<std::shared_ptr<Ast::Function>> methods) : identifier(identifier), binding_type(FunctionBinding), methods(methods) {}
 
 	Type get_type() {
 		if (this->binding_type == VariableBinding) return this->assignment->expression->type;
@@ -32,7 +32,7 @@ struct Binding {
 
 struct Context {
 	std::string file;
-	std::unordered_map<std::string, Binding> scope;
+	std::vector<std::unordered_map<std::string, Binding>> scopes;
 
 	Result<Ok, Error> analyze(std::shared_ptr<Ast::Assignment> assignment);
 	Result<Ok, Error> analyze(std::shared_ptr<Ast::Expression> node);
@@ -41,6 +41,8 @@ struct Context {
 	Result<Ok, Error> analyze(std::shared_ptr<Ast::Identifier> node);
 	Result<Ok, Error> analyze(std::shared_ptr<Ast::Boolean> node);
 
+	void add_scope() {this->scopes.push_back(std::unordered_map<std::string, Binding>());}
+	std::unordered_map<std::string, Binding>& current_scope() {return this->scopes[this->scopes.size() - 1];}
 	Binding* get_binding(std::string identifier);
 	Result<Ok, Error> get_type_of_intrinsic(std::shared_ptr<Ast::Call> node);
 	Result<Ok, Error> get_type_of_user_defined_function(std::shared_ptr<Ast::Call> node);
@@ -52,7 +54,22 @@ struct Context {
 // ---------------
 Result<Ok, std::vector<Error>> semantic::analyze(std::shared_ptr<Ast::Program> program) {
 	Context context;
+	context.add_scope();
 	std::vector<Error> errors;
+
+	// Add functions to the current scope
+	for (size_t i = 0; i < program->functions.size(); i++) {
+		auto function = program->functions[i];
+
+		auto& scope = context.current_scope();
+		if (scope.find(function->identifier->value) == scope.end()) {
+			auto binding = Binding(function->identifier->value, {function});
+			scope[function->identifier->value] = binding;
+		}
+		else {
+			scope[function->identifier->value].methods.push_back(function);
+		}
+	}
 
 	for (size_t i = 0; i  < program->statements.size(); i++) {
 		std::shared_ptr<Ast::Node> node = program->statements[i];
@@ -83,7 +100,7 @@ Result<Ok, Error> Context::analyze(std::shared_ptr<Ast::Assignment> assignment) 
 		return Result<Ok, Error>(Error(errors::reassigning_immutable_variable(assignment->identifier, this->get_binding(assignment->identifier->value)->assignment)));
 	}
 	else {
-		this->scope[assignment->identifier->value] = binding;
+		this->current_scope()[assignment->identifier->value] = binding;
 		return Result<Ok, Error>(Ok());
 	}
 }
@@ -105,10 +122,10 @@ Result<Ok, Error> Context::analyze(std::shared_ptr<Ast::Call> node) {
 	}
 
 	auto result = this->get_type_of_intrinsic(node);
-	if (result.is_error()) assert(false);
-
-	result = this->get_type_of_user_defined_function(node);
-	if (result.is_error()) return result;
+	if (result.is_error()) {
+		result = this->get_type_of_user_defined_function(node);
+		if (result.is_error()) return result;
+	}
 
 	return Result<Ok, Error>(Ok());
 }
@@ -135,8 +152,8 @@ Result<Ok, Error> Context::analyze(std::shared_ptr<Ast::Boolean> node) {
 }
 
 Binding* Context::get_binding(std::string identifier) {
-	if (this->scope.find(identifier) != this->scope.end()) {
-		return &(this->scope[identifier]);
+	if (this->current_scope().find(identifier) != this->current_scope().end()) {
+		return &(this->current_scope()[identifier]);
 	}
 	else {
 		return nullptr;
@@ -195,6 +212,55 @@ Result<Ok, Error> Context::get_type_of_intrinsic(std::shared_ptr<Ast::Call> node
 }
 
 Result<Ok, Error> Context::get_type_of_user_defined_function(std::shared_ptr<Ast::Call> node) {
+	// If function binding exists
+	auto binding = this->get_binding(node->identifier->value);
+	if (binding
+	&& binding->is_function()) {
+
+		// Find method with that match arguments types
+		auto methods = binding->methods;
+		for (auto method = methods.begin(); method != methods.end(); method++) {
+
+			// If the method has the same argument size as the call
+			if ((*method)->args.size() == node->args.size()) {
+
+				// If method is generic
+				if ((*method)->generic) {
+
+					// Check if there is a specialization that match arguments types
+					auto args = this->get_args_types(node);
+					std::shared_ptr<Ast::FunctionSpecialization>* specialization = nullptr;
+					for (auto it = (*method)->specializations.begin(); it != (*method)->specializations.end(); it++) {
+						if ((*it)->args_types == args) {
+							specialization = &(*it);
+							break;
+						}
+					}
+
+					// If no specialization was founded
+					if (!specialization) {
+						// Add new specialization
+						auto aux = std::make_shared<Ast::FunctionSpecialization>();
+						specialization = &aux;
+						(*specialization)->args_types = args;
+						//(*specialization)->body = node->body.clone();
+					}
+
+					// If specialization valid
+					if ((*specialization)->valid) {
+						node->type = (*specialization)->return_type;
+						return Result<Ok, Error>(Ok());
+					}
+				}
+				else {
+					assert(false);
+				}
+			}
+		}
+	}
+	else {
+		return Result<Ok, Error>(errors::undefined_variable(node->identifier));
+	}
 	return Result<Ok, Error>(Ok());
 }
 

@@ -118,6 +118,8 @@ namespace Ast {
 		std::shared_ptr<Ast::Node> body;
 
 		bool generic = false;
+		std::vector<Type> args_types;
+		Type return_type;
 		std::vector<std::shared_ptr<Ast::FunctionSpecialization>> specializations;
 
 		Function(std::shared_ptr<Ast::Identifier> identifier, std::vector<std::shared_ptr<Ast::Identifier>> args, std::shared_ptr<Ast::Node> body, size_t line, size_t col, std::string file) :  Node(line, col, file), identifier(identifier), args(args), body(body) {}
@@ -125,7 +127,10 @@ namespace Ast {
 		virtual void print(size_t indent_level = 0);
 	};
 
-	struct FunctionSpecialization : Node {
+	struct FunctionSpecialization {
+		bool valid = false;
+		std::vector<Type> args_types;
+		Type return_type;
 		std::shared_ptr<Ast::Node> body;
 	};
 
