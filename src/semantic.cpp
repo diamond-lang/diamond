@@ -288,10 +288,7 @@ Result<Ok, Error> Context::get_type_of_user_defined_function(std::shared_ptr<Ast
 						if (result.is_ok()) {
 							(*specialization)->valid = true;
 							(*specialization)->return_type = std::dynamic_pointer_cast<Ast::Expression>((*specialization)->body)->type;
-							std::cout << (*specialization)->return_type.to_str() << '\n';
-						}
-						else {
-							std::cout << result.get_error().error_message << '\n';
+							(*method)->specializations.push_back(*specialization);
 						}
 					}
 

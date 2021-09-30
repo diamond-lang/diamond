@@ -45,4 +45,6 @@ test("booleans.dm", "true\n" + \
                     "true\n")
 
 test("functions.dm", "10\n" + \
-                     "15\n")
+                     "0.875\n" + \
+                     "5\n" + \
+                     "false\n")
