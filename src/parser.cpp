@@ -72,6 +72,10 @@ Result<std::shared_ptr<Ast::Program>, std::vector<Error>> parse::program(Source 
 }
 
 ParserResult<std::shared_ptr<Ast::Node>> parse::function(Source source) {
+	auto keyword = parse::token(source, "function");
+	if (keyword.is_error()) return ParserResult<std::shared_ptr<Ast::Node>>(keyword.get_source(), keyword.get_error().error_message);
+	source = keyword.get_source();
+
 	auto identifier = parse::identifier(source);
 	if (identifier.is_error()) return ParserResult<std::shared_ptr<Ast::Node>>(identifier.get_source(), identifier.get_error().error_message);
 	source = identifier.get_source();
@@ -94,10 +98,6 @@ ParserResult<std::shared_ptr<Ast::Node>> parse::function(Source source) {
 	auto right_paren = parse::token(source, "\\)");
 	if (right_paren.is_error()) return ParserResult<std::shared_ptr<Ast::Node>>(right_paren.get_source(), right_paren.get_error().error_message);
 	source = right_paren.get_source();
-
-	auto is = parse::token(source, "is");
-	if (is.is_error()) return ParserResult<std::shared_ptr<Ast::Node>>(is.get_source(), is.get_error().error_message);;
-	source = is.get_source();
 
 	auto expression = parse::expression(source);
 	if (expression.is_error()) return ParserResult<std::shared_ptr<Ast::Node>>(expression.get_source(), expression.get_error().error_message);
