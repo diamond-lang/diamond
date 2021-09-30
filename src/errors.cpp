@@ -62,7 +62,23 @@ std::string errors::reassigning_immutable_variable(std::shared_ptr<Ast::Identifi
 
 std::string errors::operation_not_defined_for(std::shared_ptr<Ast::Call> call, std::string left, std::string right) {
 	return make_header("Incompatible types\n\n") +
-		   "Operation " + call->identifier->value + " not defined for " + left + " and " + right + ".\n\n" +
+	      "Operation " + call->identifier->value + " not defined for " + left + " and " + right + ".\n\n" +
+	       std::to_string(call->line) + "| " + current_line(call) + "\n" +
+	       underline_identifier(call->identifier);
+}
+
+std::string join(std::vector<std::string> strings) {
+	std::string result = "";
+	if (strings.size() >= 1) result += strings[0];
+	for (size_t i = 1; i < strings.size(); i++) {
+		result += ", " + strings[i];
+	}
+	return result;
+}
+
+std::string errors::operation_not_defined_for(std::shared_ptr<Ast::Call> call, std::vector<std::string> args) {
+	return make_header("Incompatible types\n\n") +
+	       "Operation " + call->identifier->value + " not defined for " + join(args) + ".\n\n" +
 	       std::to_string(call->line) + "| " + current_line(call) + "\n" +
 	       underline_identifier(call->identifier);
 }

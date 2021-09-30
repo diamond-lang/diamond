@@ -10,7 +10,7 @@ def print_expected_vs_result(expected, result):
     result = result.split("\n")
     print("  Result:")
     for line in result:
-        print(str("    " + line))
+        print("    " + line)
 
 def test(file, expected):
     print(f"testing {file}... ", end='')
@@ -43,3 +43,8 @@ test("assignments.dm", "113\n" + \
 
 test("booleans.dm", "true\n" + \
                     "true\n")
+
+test("functions.dm", "10\n" + \
+                     "0.875\n" + \
+                     "5\n" + \
+                     "false\n")
