@@ -2,8 +2,9 @@
 import os
 import platform
 
+# Configuration
+# -------------
 name = 'diamond'
-
 source_files = [
 	'src/main.cpp',
 	'src/parser.cpp',
@@ -13,26 +14,65 @@ source_files = [
 	'src/utilities.cpp',
 	'src/types.cpp'
 ]
-
 cpp_version = 'c++17'
 
-def build_object_files(compiler, compiler_flags, llvm_path):
+# Getters (Platform specific)
+# ---------------------------
+def get_name():
+	if   platform.system() == 'Linux': return name
+	elif platform.system() == 'Windows': return name + ".exe"
+	else: assert False
+
+def get_source_files():
+	if   platform.system() == 'Linux': return source_files
+	elif platform.system() == 'Windows': return list(map(lambda file: file.replace('/', '\\'), source_files))
+	else: assert False
+
+def get_compiler():
+	if   platform.system() == 'Linux': return 'c++'
+	elif platform.system() == 'Windows': return 'cl'
+	else: assert False
+
+def get_cpp_version():
+	if   platform.system() == 'Linux': return '-std=' + cpp_version
+	elif platform.system() == 'Windows': return '/std:' + cpp_version
+	else: assert False
+
+def get_object_file_extension():
+	if   platform.system() == 'Linux': return '.o'
+	elif platform.system() == 'Windows': return '.obj'
+	else: assert False
+
+def get_flags_to_make_object_file():
+	if   platform.system() == 'Linux': return '-c -o'
+	elif platform.system() == 'Windows': return '/Fo'
+	else: assert False
+
+def get_llvm_include_path(llvm_path):
+	if   platform.system() == 'Linux': return llvm_path + '/include'
+	elif platform.system() == 'Windows': return f'"{llvm_path}\\include"'
+	else: assert False
+
+# Builders
+# --------
+def build_object_files(llvm_path):
+	# Make cache dir if not exists
 	if not os.path.exists('cache'):
 		os.mkdir('cache')
 
-	for i in range(len(source_files)):
-		source_file = source_files[i]
-		source_file_o = 'cache/' + source_file.split('/')[-1].split('.')[0] + '.o'
+	# For file in source files
+	for source_file in get_source_files():
+		source_file_o = os.path.basename(source_file).split('.')[0] + get_object_file_extension()
+		source_file_o = os.path.join('cache', source_file_o)
+		print(source_file_o)
 
 		if not os.path.exists(source_file_o) or os.path.getmtime(source_file) > os.path.getmtime(source_file_o):
-			command = f'{compiler} {compiler_flags} {source_file} -c -o {source_file_o} -I {llvm_path}/include'
+			command = f'{get_compiler()} {get_cpp_version()} {source_file} {get_flags_to_make_object_file()}{source_file_o} -I {get_llvm_include_path(llvm_path)}'
 			print(command)
 			output = os.popen(command).read()
 
 def buid_on_linux():
-	compiler = 'c++'
 	llvm_path = '/usr/lib/llvm-12'
-	compiler_flags = f'-std={cpp_version}'
 
 	# Get llvm libs
 	command = f'{llvm_path}/bin/llvm-config --libs --link-static'
@@ -40,49 +80,45 @@ def buid_on_linux():
 	llvm_libs = llvm_libs.strip()
 
 	# Build object files
-	build_object_files(compiler, compiler_flags, llvm_path)
+	build_object_files(llvm_path)
 	objects_files = list(map(lambda file: 'cache/' + file, os.listdir('cache')))
 	objects_files = ' '.join(objects_files)
 
 	# Build diamond
-	command = f'{compiler} {compiler_flags} {objects_files} -o {name} -I{llvm_path}/include -L{llvm_path}/lib {llvm_libs} -lrt -ldl -lpthread -lm -lz -ltinfo'
+	command = f'{get_compiler()} {get_cpp_version()} {objects_files} -o {name} -I{llvm_path}/include -L{llvm_path}/lib {llvm_libs} -lrt -ldl -lpthread -lm -lz -ltinfo'
 	print("Linking...")
 	output = os.popen(command).read()
 	print(output)
 
 def build_on_windows():
+	llvm_path = 'C:\\Program Files\\LLVM'
+
 	# Get libs
-	command = '"C:\\Program Files\\LLVM\\bin\\llvm-config.exe" --libs'
+	command = f'"{llvm_path}\\bin\\llvm-config.exe" --libs'
 	output = os.popen(command).read()
 	output = output.split(' ')
 	output = list(map(lambda i: output[i] + ' ' + output[i + 1], range(0, len(output) - 1, 2)))
 	libs = list(map(lambda lib: '"' + lib + '"', output))
+	libs = ' '.join(libs)
 
-	# Get cpp flags
-	command = '"C:\\Program Files\\LLVM\\bin\\llvm-config.exe" --cxxflags'
-	output = os.popen(command).read()
-	output = output.split(' ')
-	cpp_flags = output
+	# Build object files
+	build_object_files(llvm_path)
+	objects_files = list(map(lambda file: 'cache\\' + file, os.listdir('cache')))
+	objects_files = ' '.join(objects_files)
 
-	# Get system libs
-	command = '"C:\\Program Files\\LLVM\\bin\\llvm-config.exe" --system-libs'
-	output = os.popen(command).read()
-	output = output.split(' ')
-	system_libs = output
-
-
-	command = 'cl src/main.cpp src/parser.cpp src/semantic.cpp src/codegen.cpp src/errors.cpp src/utilities.cpp src/types.cpp /std:c++17 /I "C:\Program Files\LLVM/include" /Fe:diamond.exe /link ' + ' '.join(libs)
-	print(command)
+	# Build diamond
+	command = f'cl {objects_files} {get_cpp_version()} /I "{llvm_path}\\include" /Fe:{get_name()} /link  {libs}'
+	print("Linking...")
 	output = os.popen(command).read()
 	print(output)
 
 def need_to_recompile():
-	if not os.path.exists(name):
+	if not os.path.exists(get_name()):
 		return True
 
 	files = os.listdir('src')
-	for i in range(len(files)):
-		if os.path.getmtime('src/' + files[i]) > os.path.getmtime(name):
+	for file in files:
+		if os.path.getmtime(os.path.join('src', file)) > os.path.getmtime(get_name()):
 			return True
 
 	return False
