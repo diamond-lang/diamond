@@ -64,7 +64,6 @@ def build_object_files(llvm_path):
 	for source_file in get_source_files():
 		source_file_o = os.path.basename(source_file).split('.')[0] + get_object_file_extension()
 		source_file_o = os.path.join('cache', source_file_o)
-		print(source_file_o)
 
 		if not os.path.exists(source_file_o) or os.path.getmtime(source_file) > os.path.getmtime(source_file_o):
 			command = f'{get_compiler()} {get_cpp_version()} {source_file} {get_flags_to_make_object_file()}{source_file_o} -I {get_llvm_include_path(llvm_path)}'
