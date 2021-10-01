@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import os
 import platform
+import sys
 
 # Configuration
 # -------------
@@ -55,7 +56,7 @@ def get_llvm_include_path(llvm_path):
 
 def get_lld_libraries():
 	if   platform.system() == 'Linux': return '-llldDriver -llldCore -llldELF -llldCommon'
-	elif platform.system() == 'Windows': return ''
+	elif platform.system() == 'Windows': return 'lldDriver.lib lldCore.lib lldELF.lib lldCommon.lib'
 	else: assert False
 
 # Builders
@@ -76,7 +77,9 @@ def build_object_files(llvm_path):
 			output = os.popen(command).read()
 
 def buid_on_linux():
-	llvm_path = '/usr/lib/llvm-12'
+	llvm_path = '/usr/lib/llvm'
+	if len(sys.argv) > 1:
+		llvm_path = sys.argv[1]
 
 	# Get llvm libs
 	command = f'{llvm_path}/bin/llvm-config --libs --link-static'
@@ -96,22 +99,24 @@ def buid_on_linux():
 
 def build_on_windows():
 	llvm_path = 'C:\\Program Files\\LLVM'
-
-	# Get libs
-	command = f'"{llvm_path}\\bin\\llvm-config.exe" --libs'
-	output = os.popen(command).read()
-	output = output.split(' ')
-	output = list(map(lambda i: output[i] + ' ' + output[i + 1], range(0, len(output) - 1, 2)))
-	libs = list(map(lambda lib: '"' + lib + '"', output))
-	libs = ' '.join(libs)
+	if len(sys.argv) > 1:
+		llvm_path = sys.argv[1]
 
 	# Build object files
 	build_object_files(llvm_path)
 	objects_files = list(map(lambda file: 'cache\\' + file, os.listdir('cache')))
 	objects_files = ' '.join(objects_files)
 
+	# Get libs
+	command = f'"{llvm_path}\\bin\\llvm-config.exe" --libs'
+	output = os.popen(command).read()
+	output = output.split('C:\\')
+	output = list(map(lambda lib: 'C:\\' + lib, output))
+	output = list(map(lambda lib: os.path.basename(lib).strip(), output))
+	libs = ' '.join(output)
+
 	# Build diamond
-	command = f'cl {objects_files} {get_cpp_version()} /I "{llvm_path}\\include" /Fe:{get_name()} /link  {libs}'
+	command = f'cl {objects_files} {get_cpp_version()} /I {get_llvm_include_path(llvm_path)} /Fe:{get_name()} /link /LIBPATH:"{llvm_path}\lib" {libs} {get_lld_libraries()}'
 	print("Linking...")
 	output = os.popen(command).read()
 	print(output)
