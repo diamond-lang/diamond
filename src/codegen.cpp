@@ -1,4 +1,5 @@
 #include <iostream>
+#include <cstdio>
 #include <unordered_map>
 #include <assert.h>
 
@@ -23,6 +24,8 @@
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Target/TargetOptions.h"
+
+#include "lld/Common/Driver.h"
 
 #include "codegen.hpp"
 
@@ -107,13 +110,29 @@ void generate_executable(std::shared_ptr<Ast::Program> program, std::string exec
 	pass.run(*(llvm_ir.module));
 	dest.flush();
 
-	std::string command = "g++ -o";
-	command += executable_name;
-	command += " -no-pie ";
-	command += object_file_name;
-	command += " && rm ";
-	command += object_file_name;
-	system(command.c_str());
+	// Linking
+	std::string name = "-o" + executable_name;
+	std::vector<const char*> args = {
+		"lld",
+		object_file_name.c_str(),
+		name.c_str(),
+		"-dynamic-linker",
+		"/lib64/ld-linux-x86-64.so.2",
+		"-L/usr/lib/x86_64-linux-gnu",
+		"-lc",
+		"/usr/lib/x86_64-linux-gnu/crt1.o",
+		"/usr/lib/x86_64-linux-gnu/crti.o",
+		"/usr/lib/x86_64-linux-gnu/crtn.o"
+	};
+
+	std::string output = "";
+	std::string errors = "";
+	llvm::raw_string_ostream output_stream(output);
+	llvm::raw_string_ostream errors_stream(errors);
+
+	bool result = lld::elf::link(args, false, output_stream, errors_stream);
+
+	remove(object_file_name.c_str());
 }
 
 void Codegen::codegen(std::shared_ptr<Ast::Program> node) {

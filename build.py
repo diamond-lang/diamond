@@ -53,6 +53,11 @@ def get_llvm_include_path(llvm_path):
 	elif platform.system() == 'Windows': return f'"{llvm_path}\\include"'
 	else: assert False
 
+def get_lld_libraries():
+	if   platform.system() == 'Linux': return '-llldDriver -llldCore -llldELF -llldCommon'
+	elif platform.system() == 'Windows': return ''
+	else: assert False
+
 # Builders
 # --------
 def build_object_files(llvm_path):
@@ -84,7 +89,7 @@ def buid_on_linux():
 	objects_files = ' '.join(objects_files)
 
 	# Build diamond
-	command = f'{get_compiler()} {get_cpp_version()} {objects_files} -o {name} -I{llvm_path}/include -L{llvm_path}/lib {llvm_libs} -lrt -ldl -lpthread -lm -lz -ltinfo'
+	command = f'{get_compiler()} {get_cpp_version()} {objects_files} -o {name} -I{llvm_path}/include -L{llvm_path}/lib {get_lld_libraries()} {llvm_libs} -lrt -ldl -lpthread -lm -lz -ltinfo'
 	print("Linking...")
 	output = os.popen(command).read()
 	print(output)
