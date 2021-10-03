@@ -2,6 +2,8 @@
 import os
 import platform
 import sys
+import multiprocessing
+import joblib
 
 # Configuration
 # -------------
@@ -67,7 +69,7 @@ def build_object_files(llvm_path):
 		os.mkdir('cache')
 
 	# For file in source files
-	for source_file in get_source_files():
+	def build_object_file(source_file):
 		source_file_o = os.path.basename(source_file).split('.')[0] + get_object_file_extension()
 		source_file_o = os.path.join('cache', source_file_o)
 
@@ -75,6 +77,9 @@ def build_object_files(llvm_path):
 			command = f'{get_compiler()} {get_cpp_version()} {source_file} {get_flags_to_make_object_file()}{source_file_o} -I {get_llvm_include_path(llvm_path)}'
 			print(command)
 			output = os.popen(command).read()
+
+	num_cores = multiprocessing.cpu_count()
+	joblib.Parallel(n_jobs = num_cores)(joblib.delayed(build_object_file)(source_file) for source_file in get_source_files())
 
 def buid_on_linux():
 	llvm_path = '/usr/lib/llvm'
