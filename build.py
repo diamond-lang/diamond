@@ -3,7 +3,7 @@ import os
 import platform
 import sys
 import multiprocessing
-import joblib
+from functools import partial
 
 # Configuration
 # -------------
@@ -63,23 +63,23 @@ def get_lld_libraries():
 
 # Builders
 # --------
+def build_object_file(source_file, llvm_path):
+	source_file_o = os.path.basename(source_file).split('.')[0] + get_object_file_extension()
+	source_file_o = os.path.join('cache', source_file_o)
+
+	if not os.path.exists(source_file_o) or os.path.getmtime(source_file) > os.path.getmtime(source_file_o):
+		command = f'{get_compiler()} {get_cpp_version()} {source_file} {get_flags_to_make_object_file()}{source_file_o} -I {get_llvm_include_path(llvm_path)}'
+		print(command)
+		output = os.popen(command).read()
+
 def build_object_files(llvm_path):
 	# Make cache dir if not exists
 	if not os.path.exists('cache'):
 		os.mkdir('cache')
 
-	# For file in source files
-	def build_object_file(source_file):
-		source_file_o = os.path.basename(source_file).split('.')[0] + get_object_file_extension()
-		source_file_o = os.path.join('cache', source_file_o)
-
-		if not os.path.exists(source_file_o) or os.path.getmtime(source_file) > os.path.getmtime(source_file_o):
-			command = f'{get_compiler()} {get_cpp_version()} {source_file} {get_flags_to_make_object_file()}{source_file_o} -I {get_llvm_include_path(llvm_path)}'
-			print(command)
-			output = os.popen(command).read()
-
 	num_cores = multiprocessing.cpu_count()
-	joblib.Parallel(n_jobs = num_cores)(joblib.delayed(build_object_file)(source_file) for source_file in get_source_files())
+	pool = multiprocessing.Pool(num_cores)
+	_ = pool.map(partial(build_object_file, llvm_path=llvm_path), get_source_files())
 
 def buid_on_linux():
 	llvm_path = '/usr/lib/llvm'
@@ -93,7 +93,7 @@ def buid_on_linux():
 
 	# Build object files
 	build_object_files(llvm_path)
-	objects_files = list(map(lambda file: 'cache/' + file, os.listdir('cache')))
+	objects_files = list(map(lambda file: os.path.join('cache', file), os.listdir('cache')))
 	objects_files = ' '.join(objects_files)
 
 	# Build diamond
@@ -130,8 +130,16 @@ def need_to_recompile():
 	if not os.path.exists(get_name()):
 		return True
 
-	files = os.listdir('src')
-	for file in files:
+	if not os.path.exists('cache'):
+		return True
+
+	# for file in src
+	for file in os.listdir('src'):
+		# Check associated object file exists
+		if not os.path.exists(os.path.join('cache', file.split('.')[0] + get_object_file_extension())):
+			return True
+
+		# Check if source file was edited after creation of diamond executable
 		if os.path.getmtime(os.path.join('src', file)) > os.path.getmtime(get_name()):
 			return True
 
