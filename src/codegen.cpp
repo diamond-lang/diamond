@@ -1,4 +1,5 @@
 #include <iostream>
+#include <cstdio>
 #include <unordered_map>
 #include <assert.h>
 
@@ -24,8 +25,10 @@
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Target/TargetOptions.h"
 
-#include "codegen.hpp"
+#include "lld/Common/Driver.h"
 
+#include "codegen.hpp"
+#include "utilities.hpp"
 
 struct Codegen {
 	llvm::LLVMContext* context;
@@ -56,7 +59,13 @@ struct Codegen {
 	void remove_scope();
 };
 
-void generate_executable(std::shared_ptr<Ast::Program> program, std::string executable_name) {
+
+// Linking
+// -------
+static std::string get_object_file_name(std::string executable_name);
+static void link(std::string executable_name, std::string object_file_name);
+
+void generate_executable(std::shared_ptr<Ast::Program> program, std::string program_name) {
 	Codegen llvm_ir;
 	llvm_ir.codegen(program);
 
@@ -88,7 +97,8 @@ void generate_executable(std::shared_ptr<Ast::Program> program, std::string exec
 	llvm_ir.module->setDataLayout(TargetMachine->createDataLayout());
 	llvm_ir.module->setTargetTriple(TargetTriple);
 
-	std::string object_file_name = executable_name + ".o";
+	// Generate object code
+	std::string object_file_name = get_object_file_name(program_name);
 
 	std::error_code EC;
 	llvm::raw_fd_ostream dest(object_file_name, EC, llvm::sys::fs::OF_None);
@@ -107,15 +117,70 @@ void generate_executable(std::shared_ptr<Ast::Program> program, std::string exec
 	pass.run(*(llvm_ir.module));
 	dest.flush();
 
-	std::string command = "g++ -o";
-	command += executable_name;
-	command += " -no-pie ";
-	command += object_file_name;
-	command += " && rm ";
-	command += object_file_name;
-	system(command.c_str());
+	// Link
+	link(utilities::get_executable_name(program_name), object_file_name);
+
+	// Remove generated object file
+	remove(object_file_name.c_str());
 }
 
+#ifdef __linux__
+	static std::string get_object_file_name(std::string executable_name) {
+		return executable_name + ".o";
+	}
+
+	static void link(std::string executable_name, std::string object_file_name) {
+		std::string name = "-o" + executable_name;
+		std::vector<const char*> args = {
+			"lld",
+			object_file_name.c_str(),
+			name.c_str(),
+			"-dynamic-linker",
+			"/lib64/ld-linux-x86-64.so.2",
+			"-L/usr/lib/x86_64-linux-gnu",
+			"-lc",
+			"/usr/lib/x86_64-linux-gnu/crt1.o",
+			"/usr/lib/x86_64-linux-gnu/crti.o",
+			"/usr/lib/x86_64-linux-gnu/crtn.o"
+		};
+
+		std::string output = "";
+		std::string errors = "";
+		llvm::raw_string_ostream output_stream(output);
+		llvm::raw_string_ostream errors_stream(errors);
+
+		bool result = lld::elf::link(args, false, output_stream, errors_stream);
+
+		remove(object_file_name.c_str());
+	}
+#elif _WIN32
+	static std::string get_object_file_name(std::string executable_name) {
+		return executable_name + ".obj";
+	}
+
+	static void link(std::string executable_name, std::string object_file_name) {
+		std::string name = "-out:" + executable_name;
+		std::vector<const char*> args = {
+			"lld",
+			object_file_name.c_str(),
+			"-defaultlib:libcmt",
+			"-defaultlib:oldnames",
+			"-nologo",
+			name.c_str()
+		};
+
+		std::string output = "";
+		std::string errors = "";
+		llvm::raw_string_ostream output_stream(output);
+		llvm::raw_string_ostream errors_stream(errors);
+
+		bool result = lld::coff::link(args, false, output_stream, errors_stream);
+	}
+#endif
+
+
+// Codegeneration
+// --------------
 void Codegen::codegen(std::shared_ptr<Ast::Program> node) {
 	// Declare printf
 	std::vector<llvm::Type*> args;

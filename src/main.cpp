@@ -8,13 +8,6 @@
 #include "semantic.hpp"
 #include "codegen.hpp"
 
-// Prototypes
-// ----------
-std::string get_executable_name(std::string path);
-
-
-// Implementantions
-// ----------------
 int main(int argc, char *argv[]) {
 	// Get command line arguments
 	if (argc < 2 || (argv[1] == std::string("run") && argc < 3)) {
@@ -30,7 +23,8 @@ int main(int argc, char *argv[]) {
 	} else {
 		file_path = argv[1];
 	}
-	bool existed = utilities::file_exists(get_executable_name(file_path));
+	std::string program_name = utilities::get_program_name(file_path);
+	bool executable_already_existed = utilities::file_exists(utilities::get_executable_name(program_name));
 
 	// Read file
 	Result<std::string, Error> result = utilities::read_file(file_path);
@@ -63,31 +57,15 @@ int main(int argc, char *argv[]) {
 	}
 
 	// Generate executable
-	generate_executable(ast, get_executable_name(file_path));
+	generate_executable(ast, program_name);
 
 	if (run) {
-		std::string command = "./" + get_executable_name(file_path);
-		system(command.c_str());
+		system(utilities::get_run_command(program_name).c_str());
 
-		if (!existed) {
-			command = "rm " + get_executable_name(file_path);
-			system(command.c_str());
+		if (!executable_already_existed) {
+			remove(utilities::get_executable_name(program_name).c_str());
 		}
 	}
 
 	return 0;
-}
-
-std::string get_executable_name(std::string path) {
-	size_t i = path.length() - 1;
-	while (path[i] != '/' && i > 0) {
-		i--;
-	}
-	if (i > 0) i++;
-	std::string name = "";
-	while (i < path.length() && path[i] != '.') {
-		name += path[i];
-		i++;
-	}
-	return name;
 }
