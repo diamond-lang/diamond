@@ -58,7 +58,7 @@ def get_llvm_include_path(llvm_path):
 
 def get_lld_libraries():
 	if   platform.system() == 'Linux': return '-llldDriver -llldCore -llldELF -llldCommon'
-	elif platform.system() == 'Windows': return 'lldDriver.lib lldCore.lib lldELF.lib lldCommon.lib'
+	elif platform.system() == 'Windows': return 'lldDriver.lib lldCore.lib lldCOFF.lib lldCommon.lib'
 	else: assert False
 
 # Builders

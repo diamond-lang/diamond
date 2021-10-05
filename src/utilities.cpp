@@ -1,5 +1,6 @@
 #include <iostream>
 #include <fstream>
+#include <filesystem>
 
 #include "utilities.hpp"
 #include "errors.hpp"
@@ -30,3 +31,26 @@ bool utilities::file_exists(std::string path) {
 		return false;
 	}
 }
+
+std::string utilities::get_program_name(std::string path) {
+	return std::filesystem::path(path).stem().string();
+}
+
+#ifdef __linux__
+	std::string utilities::get_executable_name(std::string program_name) {
+		return program_name;
+	}
+
+	std::string utilities::get_run_command(std::string program_name) {
+		return "./" + utilities::get_executable_name(program_name);
+	}
+
+#elif _WIN32
+	std::string utilities::get_executable_name(std::string program_name) {
+		return program_name + ".exe";
+	}
+
+	std::string utilities::get_run_command(std::string program_name) {
+		return ".\\" + utilities::get_executable_name(program_name);
+	}
+#endif
