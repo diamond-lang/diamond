@@ -13,6 +13,7 @@ diamond run [program file]  # Runs a program
 diamond uses the following dependencies:
 - LLD 12
 - LLVM 12
+- Python 3 (for build.py and test.py)
 
 ## Building on ubuntu
 
