@@ -360,8 +360,11 @@ llvm::Value* Codegen::codegen(std::shared_ptr<Ast::Call> node) {
 	if (node->args.size() == 1) {
 		if (node->identifier->value == "-") {
 			llvm::Value* arg = this->codegen(node->args[0]);
-			llvm::Value* minus_one = llvm::ConstantFP::get(*(this->context), llvm::APFloat(-1.0));
-			return this->builder->CreateFMul(arg, minus_one);
+			return this->builder->CreateFNeg(arg, "negation");
+		}
+		if (node->identifier->value == "not") {
+			llvm::Value* arg = this->codegen(node->args[0]);
+			return this->builder->CreateNot(arg, "not");
 		}
 	}
 

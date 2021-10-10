@@ -48,7 +48,10 @@ test("assignments.dm", "113\n" + \
                        "true\n")
 
 test("booleans.dm", "true\n" + \
-                    "true\n")
+                    "true\n" + \
+                    "true\n" + \
+                    "true\n" + \
+                    "false\n")
 
 test("functions.dm", "10\n" + \
                      "0.875\n" + \

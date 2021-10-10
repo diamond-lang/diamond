@@ -213,6 +213,9 @@ Result<Ok, Error> Context::get_type_of_intrinsic(std::shared_ptr<Ast::Call> node
 		{"!=", {
 			{{Type("bool"), Type("bool")}, Type("bool")},
 			{{Type("float64"), Type("float64")}, Type("bool")}
+		}},
+		{"not", {
+			{{Type("bool")}, Type("bool")}
 		}}
 	};
 

@@ -147,6 +147,20 @@ ParserResult<std::shared_ptr<Ast::Expression>> parse::call(Source source) {
 }
 
 ParserResult<std::shared_ptr<Ast::Expression>> parse::expression(Source source) {
+	auto op = parse::identifier(source);
+	if (op.is_ok() && std::dynamic_pointer_cast<Ast::Identifier>(op.get_value())->value == "not") {
+		source = op.get_source();
+
+		auto expression = parse::binary(source);
+		if (expression.is_error()) return expression;
+		source = expression.get_source();
+
+		std::vector<std::shared_ptr<Ast::Expression>> args;
+		args.push_back(expression.get_value());
+		auto node = std::make_shared<Ast::Call>(std::dynamic_pointer_cast<Ast::Identifier>(op.get_value()), args, source.line, source.col, source.file);
+		return ParserResult<std::shared_ptr<Ast::Expression>>(node, source);
+	}
+
 	return parse::binary(source);
 }
 
