@@ -7,14 +7,7 @@
 #include "errors.hpp"
 #include "parser.hpp"
 
-// Prototypes
-// ----------
-
 bool is_assignment(Source source);
-
-
-//  Implementations
-//  ---------------
 
 Result<std::shared_ptr<Ast::Program>, std::vector<Error>> parse::program(Source source) {
 	std::vector<std::shared_ptr<Ast::Node>> statements;
@@ -199,6 +192,24 @@ ParserResult<std::shared_ptr<Ast::Expression>> parse::binary(Source source, int 
 }
 
 ParserResult<std::shared_ptr<Ast::Expression>> parse::unary(Source source) {
+	auto op = parse::op(source);
+	if (op.is_ok() && std::dynamic_pointer_cast<Ast::Identifier>(op.get_value())->value == "-") {
+		source = op.get_source();
+
+		auto expression = parse::unary(source);
+		if (expression.is_error()) return expression;
+		source = expression.get_source();
+
+		std::vector<std::shared_ptr<Ast::Expression>> args;
+		args.push_back(expression.get_value());
+		auto node = std::make_shared<Ast::Call>(std::dynamic_pointer_cast<Ast::Identifier>(op.get_value()), args, source.line, source.col, source.file);
+		return ParserResult<std::shared_ptr<Ast::Expression>>(node, source);
+	}
+
+	return parse::primary(source);
+}
+
+ParserResult<std::shared_ptr<Ast::Expression>> parse::primary(Source source) {
 	if (parse::number(source).is_ok())     return parse::number(source);
 	if (parse::call(source).is_ok())       return parse::call(source);
 	if (parse::identifier(source).is_ok()) return parse::identifier(source);

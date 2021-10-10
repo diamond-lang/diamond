@@ -31,7 +31,9 @@ test("floats.dm", "4.3\n" + \
                   "0.8\n" + \
                   "0.33333\n")
 
-test("arithmetic_expressions.dm", "16\n")
+test("arithmetic_expressions.dm", "16\n" + \
+                                  "-3\n" + \
+                                  "-7.5\n")
 
 test("comparison_expressions.dm", "false\n" + \
                                   "true\n" + \

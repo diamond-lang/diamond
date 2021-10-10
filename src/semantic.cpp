@@ -191,6 +191,7 @@ Result<Ok, Error> Context::get_type_of_intrinsic(std::shared_ptr<Ast::Call> node
 			{{Type("float64"), Type("float64")}, Type("float64")}
 		}},
 		{"-", {
+			{{Type("float64")}, Type("float64")},
 			{{Type("float64"), Type("float64")}, Type("float64")}
 		}},
 		{"<", {
