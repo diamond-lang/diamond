@@ -33,7 +33,10 @@ test("floats.dm", "4.3\n" + \
 
 test("arithmetic_expressions.dm", "16\n" + \
                                   "-3\n" + \
-                                  "-7.5\n")
+                                  "-7.5\n" +
+                                  "6\n" + \
+                                  "30\n" + \
+                                  "-2\n")
 
 test("comparison_expressions.dm", "false\n" + \
                                   "true\n" + \

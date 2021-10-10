@@ -12,6 +12,7 @@ namespace parse {
 	ParserResult<std::shared_ptr<Ast::Expression>> binary(Source source, int precedence = 1);
 	ParserResult<std::shared_ptr<Ast::Expression>> unary(Source source);
 	ParserResult<std::shared_ptr<Ast::Expression>> primary(Source source);
+	ParserResult<std::shared_ptr<Ast::Expression>> grouping(Source source);
 	ParserResult<std::shared_ptr<Ast::Expression>> number(Source source);
 	ParserResult<std::shared_ptr<Ast::Expression>> identifier(Source source);
 	ParserResult<std::shared_ptr<Ast::Node>> op(Source source);

@@ -210,10 +210,27 @@ ParserResult<std::shared_ptr<Ast::Expression>> parse::unary(Source source) {
 }
 
 ParserResult<std::shared_ptr<Ast::Expression>> parse::primary(Source source) {
+	if (parse::token(source, "\\(").is_ok()) return parse::grouping(source);
 	if (parse::number(source).is_ok())     return parse::number(source);
 	if (parse::call(source).is_ok())       return parse::call(source);
 	if (parse::identifier(source).is_ok()) return parse::identifier(source);
 	return ParserResult<std::shared_ptr<Ast::Expression>>(source, errors::unexpected_character(parse::token(source, "(?=.)").get_source()));
+}
+
+ParserResult<std::shared_ptr<Ast::Expression>> parse::grouping(Source source) {
+	auto left_paren = parse::token(source, "\\(");
+	if (left_paren.is_error()) return ParserResult<std::shared_ptr<Ast::Expression>>(left_paren.get_source(), left_paren.get_error().error_message);
+	source = left_paren.get_source();
+
+	auto expression = parse::expression(source);
+	if (expression.is_error()) return expression;
+	source = expression.get_source();
+
+	auto right_paren = parse::token(source, "\\)");
+	if (right_paren.is_error()) return ParserResult<std::shared_ptr<Ast::Expression>>(right_paren.get_source(), right_paren.get_error().error_message);
+	source = right_paren.get_source();
+
+	return ParserResult<std::shared_ptr<Ast::Expression>>(expression.get_value(), source);
 }
 
 ParserResult<std::shared_ptr<Ast::Expression>> parse::number(Source source) {
