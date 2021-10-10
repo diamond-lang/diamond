@@ -14,6 +14,7 @@ namespace parse {
 	ParserResult<std::shared_ptr<Ast::Expression>> primary(Source source);
 	ParserResult<std::shared_ptr<Ast::Expression>> grouping(Source source);
 	ParserResult<std::shared_ptr<Ast::Expression>> number(Source source);
+	ParserResult<std::shared_ptr<Ast::Expression>> boolean(Source source);
 	ParserResult<std::shared_ptr<Ast::Expression>> identifier(Source source);
 	ParserResult<std::shared_ptr<Ast::Node>> op(Source source);
 	ParserResult<std::string> token(Source source, std::string regex);
