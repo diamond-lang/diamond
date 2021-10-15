@@ -6,6 +6,7 @@
 #include <memory>
 #include <variant>
 #include <cassert>
+#include <cstdint>
 
 // Source file
 struct Source {
@@ -172,6 +173,15 @@ namespace Ast {
 
 		Number(double value, size_t line, size_t col, std::string file) : Expression(line, col, file), value(value) {}
 		virtual ~Number() {}
+		virtual void print(size_t indent_level = 0);
+		virtual std::shared_ptr<Node> clone();
+	};
+
+	struct Integer : Expression {
+		int64_t value;
+
+		Integer(int64_t value, size_t line, size_t col, std::string file) : Expression(line, col, file), value(value) {}
+		virtual ~Integer() {}
 		virtual void print(size_t indent_level = 0);
 		virtual std::shared_ptr<Node> clone();
 	};

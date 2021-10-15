@@ -167,6 +167,16 @@ std::shared_ptr<Ast::Node> Ast::Number::clone() {
 	return std::make_shared<Ast::Number>(this->value, this->line, this->col, this->file);
 }
 
+// Integer
+void Ast::Integer::print(size_t indent_level) {
+	put_indent_level(indent_level);
+	std::cout << this->value << '\n';
+}
+
+std::shared_ptr<Ast::Node> Ast::Integer::clone() {
+	return std::make_shared<Ast::Integer>(this->value, this->line, this->col, this->file);
+}
+
 // Identifier
 void Ast::Identifier::print(size_t indent_level) {
 	put_indent_level(indent_level);

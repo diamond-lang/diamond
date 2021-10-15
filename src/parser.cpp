@@ -226,6 +226,7 @@ ParserResult<std::shared_ptr<Ast::Expression>> parse::unary(Source source) {
 ParserResult<std::shared_ptr<Ast::Expression>> parse::primary(Source source) {
 	if (parse::token(source, "\\(").is_ok()) return parse::grouping(source);
 	if (parse::number(source).is_ok())       return parse::number(source);
+	if (parse::integer(source).is_ok())      return parse::integer(source);
 	if (parse::call(source).is_ok())         return parse::call(source);
 	if (parse::boolean(source).is_ok())      return parse::boolean(source);
 	if (parse::identifier(source).is_ok())   return parse::identifier(source);
@@ -249,11 +250,21 @@ ParserResult<std::shared_ptr<Ast::Expression>> parse::grouping(Source source) {
 }
 
 ParserResult<std::shared_ptr<Ast::Expression>> parse::number(Source source) {
-	auto result = parse::token(source, "([0-9]*[.])?[0-9]+");
+	auto result = parse::token(source, "([0-9]*)?[.][0-9]+");
 	if (result.is_error()) return ParserResult<std::shared_ptr<Ast::Expression>>(source, errors::expecting_number(result.get_source()));
 	source = result.get_source();
 	double value = atof(result.get_value().c_str());
 	auto node = std::make_shared<Ast::Number>(value, source.line, source.col, source.file);
+	return ParserResult<std::shared_ptr<Ast::Expression>>(node, result.get_source());
+}
+
+ParserResult<std::shared_ptr<Ast::Expression>> parse::integer(Source source) {
+	auto result = parse::token(source, "[0-9]+");
+	if (result.is_error()) return ParserResult<std::shared_ptr<Ast::Expression>>(source, errors::expecting_number(result.get_source()));
+	source = result.get_source();
+	char* ptr;
+	int64_t value = strtol(result.get_value().c_str(), &ptr, 10);
+	auto node = std::make_shared<Ast::Integer>(value, source.line, source.col, source.file);
 	return ParserResult<std::shared_ptr<Ast::Expression>>(node, result.get_source());
 }
 
