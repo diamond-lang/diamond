@@ -48,6 +48,7 @@ struct Codegen {
 	llvm::Value* codegen(std::shared_ptr<Ast::Expression> node);
 	llvm::Value* codegen(std::shared_ptr<Ast::Call> node);
 	llvm::Value* codegen(std::shared_ptr<Ast::Number> node);
+	llvm::Value* codegen(std::shared_ptr<Ast::Integer> node);
 	llvm::Value* codegen(std::shared_ptr<Ast::Identifier> node);
 	llvm::Value* codegen(std::shared_ptr<Ast::Boolean> node);
 
@@ -224,6 +225,12 @@ void Codegen::codegen(std::shared_ptr<Ast::Program> node) {
 					printArgs.push_back(value);
 					this->builder->CreateCall(this->module->getFunction("printf"), printArgs);
 				}
+				else if (value->getType()->isIntegerTy(64)) {
+					std::vector<llvm::Value*> printArgs;
+					printArgs.push_back(format_integer);
+					printArgs.push_back(value);
+					this->builder->CreateCall(this->module->getFunction("printf"), printArgs);
+				}
 				else if (value->getType()->isIntegerTy(1)) {
 					std::vector<llvm::Value*> printArgs;
 
@@ -254,8 +261,11 @@ void Codegen::codegen(std::shared_ptr<Ast::Program> node) {
 					current_function->getBasicBlockList().push_back(merge);
 					this->builder->SetInsertPoint(merge);
 				}
+				else {
+					assert(false);
+				}
 			}
-			else {
+			else  {
 				std::cout << "Value is null :(" << '\n';
 			}
 		}
@@ -329,6 +339,7 @@ void Codegen::codegen(std::shared_ptr<Ast::Assignment> node) {
 llvm::Value* Codegen::codegen(std::shared_ptr<Ast::Expression> node) {
 	if      (std::dynamic_pointer_cast<Ast::Call>(node))       return this->codegen(std::dynamic_pointer_cast<Ast::Call>(node));
 	else if (std::dynamic_pointer_cast<Ast::Number>(node))     return this->codegen(std::dynamic_pointer_cast<Ast::Number>(node));
+	else if (std::dynamic_pointer_cast<Ast::Integer>(node))     return this->codegen(std::dynamic_pointer_cast<Ast::Integer>(node));
 	else if (std::dynamic_pointer_cast<Ast::Identifier>(node)) return this->codegen(std::dynamic_pointer_cast<Ast::Identifier>(node));
 	else if (std::dynamic_pointer_cast<Ast::Boolean>(node))    return this->codegen(std::dynamic_pointer_cast<Ast::Boolean>(node));
 
@@ -337,34 +348,100 @@ llvm::Value* Codegen::codegen(std::shared_ptr<Ast::Expression> node) {
 }
 
 llvm::Value* Codegen::codegen(std::shared_ptr<Ast::Call> node) {
+	// Codegen args
+	std::vector<llvm::Value*> args;
+	for (size_t i = 0; i < node->args.size(); i++) {
+		args.push_back(this->codegen(node->args[i]));
+	}
+
 	if (node->args.size() == 2) {
-		llvm::Value* left = this->codegen(node->args[0]);
-		llvm::Value* right = this->codegen(node->args[1]);
-		if (node->identifier->value == "+") return this->builder->CreateFAdd(left, right, "addtmp");
-		if (node->identifier->value == "-") return this->builder->CreateFSub(left, right, "subtmp");
-		if (node->identifier->value == "*") return this->builder->CreateFMul(left, right, "multmp");
-		if (node->identifier->value == "/") return this->builder->CreateFDiv(left, right, "divtmp");
-		if (node->identifier->value == "<") return this->builder->CreateFCmpULT(left, right, "cmptmp");
-		if (node->identifier->value == "<=") return this->builder->CreateFCmpULE(left, right, "cmptmp");
-		if (node->identifier->value == ">") return this->builder->CreateFCmpUGT(left, right, "cmptmp");
-		if (node->identifier->value == ">=") return this->builder->CreateFCmpUGE(left, right, "cmptmp");
-		if (node->identifier->value == "==") {
-			if (left->getType()->isIntegerTy(1) && right->getType()->isIntegerTy(1)) {
-				return this->builder->CreateICmpEQ(left, right, "eqtmp");
+		if (node->identifier->value == "+") {
+			if (args[0]->getType()->isDoubleTy() && args[1]->getType()->isDoubleTy()) {
+				return this->builder->CreateFAdd(args[0], args[1], "addtmp");
 			}
-			else if (left->getType()->isDoubleTy() && right->getType()->isDoubleTy()) {
-				return this->builder->CreateFCmpUEQ(left, right, "eqtmp");
+			if (args[0]->getType()->isIntegerTy(64) && args[1]->getType()->isIntegerTy(64)) {
+				return this->builder->CreateAdd(args[0], args[1], "addtmp");
+			}
+		}
+		if (node->identifier->value == "-") {
+			if (args[0]->getType()->isDoubleTy() && args[1]->getType()->isDoubleTy()) {
+				return this->builder->CreateFSub(args[0], args[1], "subtmp");
+			}
+			if (args[0]->getType()->isIntegerTy(64) && args[1]->getType()->isIntegerTy(64)) {
+				return this->builder->CreateSub(args[0], args[1], "addtmp");
+			}
+		}
+		if (node->identifier->value == "*") {
+			if (args[0]->getType()->isDoubleTy() && args[1]->getType()->isDoubleTy()) {
+				return this->builder->CreateFMul(args[0], args[1], "multmp");
+			}
+			if (args[0]->getType()->isIntegerTy(64) && args[1]->getType()->isIntegerTy(64)) {
+				return this->builder->CreateMul(args[0], args[1], "addtmp");
+			}
+		}
+		if (node->identifier->value == "/") {
+			if (args[0]->getType()->isDoubleTy() && args[1]->getType()->isDoubleTy()) {
+				return this->builder->CreateFDiv(args[0], args[1], "divtmp");
+			}
+			if (args[0]->getType()->isIntegerTy(64) && args[1]->getType()->isIntegerTy(64)) {
+				return this->builder->CreateSDiv(args[0], args[1], "addtmp");
+			}
+		}
+		if (node->identifier->value == "<") {
+			if (args[0]->getType()->isDoubleTy() && args[1]->getType()->isDoubleTy()) {
+				return this->builder->CreateFCmpULT(args[0], args[1], "cmptmp");
+			}
+			if (args[0]->getType()->isIntegerTy(64) && args[1]->getType()->isIntegerTy(64)) {
+				return this->builder->CreateICmpULT(args[0], args[1], "addtmp");
+			}
+		}
+		if (node->identifier->value == "<=") {
+			if (args[0]->getType()->isDoubleTy() && args[1]->getType()->isDoubleTy()) {
+				return this->builder->CreateFCmpULE(args[0], args[1], "cmptmp");
+			}
+			if (args[0]->getType()->isIntegerTy(64) && args[1]->getType()->isIntegerTy(64)) {
+				return this->builder->CreateICmpULE(args[0], args[1], "addtmp");
+			}
+		}
+		if (node->identifier->value == ">") {
+			if (args[0]->getType()->isDoubleTy() && args[1]->getType()->isDoubleTy()) {
+				return this->builder->CreateFCmpUGT(args[0], args[1], "cmptmp");
+			}
+			if (args[0]->getType()->isIntegerTy(64) && args[1]->getType()->isIntegerTy(64)) {
+				return this->builder->CreateICmpUGT(args[0], args[1], "addtmp");
+			}
+		}
+		if (node->identifier->value == ">=") {
+			if (args[0]->getType()->isDoubleTy() && args[1]->getType()->isDoubleTy()) {
+				return this->builder->CreateFCmpUGE(args[0], args[1], "cmptmp");
+			}
+			if (args[0]->getType()->isIntegerTy(64) && args[1]->getType()->isIntegerTy(64)) {
+				return this->builder->CreateICmpUGE(args[0], args[1], "addtmp");
+			}
+		}
+		if (node->identifier->value == "==") {
+			if (args[0]->getType()->isDoubleTy() && args[1]->getType()->isDoubleTy()) {
+				return this->builder->CreateFCmpUEQ(args[0], args[1], "eqtmp");
+			}
+			if (args[0]->getType()->isIntegerTy(1) && args[1]->getType()->isIntegerTy(1)) {
+				return this->builder->CreateICmpEQ(args[0], args[1], "eqtmp");
+			}
+			if (args[0]->getType()->isIntegerTy(64) && args[1]->getType()->isIntegerTy(64)) {
+				return this->builder->CreateICmpEQ(args[0], args[1], "addtmp");
 			}
 		}
 	}
 	if (node->args.size() == 1) {
 		if (node->identifier->value == "-") {
-			llvm::Value* arg = this->codegen(node->args[0]);
-			return this->builder->CreateFNeg(arg, "negation");
+			if (args[0]->getType()->isDoubleTy()) {
+				return this->builder->CreateFNeg(args[0], "negation");
+			}
+			if (args[0]->getType()->isIntegerTy(64)) {
+				return this->builder->CreateNeg(args[0], "negation");
+			}
 		}
 		if (node->identifier->value == "not") {
-			llvm::Value* arg = this->codegen(node->args[0]);
-			return this->builder->CreateNot(arg, "not");
+			return this->builder->CreateNot(args[0], "not");
 		}
 	}
 
@@ -374,16 +451,15 @@ llvm::Value* Codegen::codegen(std::shared_ptr<Ast::Call> node) {
 	assert(function);
 
 	// Make call
-	std::vector<llvm::Value*> args;
-	for (size_t i = 0; i < node->args.size(); i++) {
-		args.push_back(this->codegen(node->args[i]));
-	}
-
 	return this->builder->CreateCall(function, args, "calltmp");
 }
 
 llvm::Value* Codegen::codegen(std::shared_ptr<Ast::Number> node) {
 	return llvm::ConstantFP::get(*(this->context), llvm::APFloat(node->value));
+}
+
+llvm::Value* Codegen::codegen(std::shared_ptr<Ast::Integer> node) {
+	return llvm::ConstantInt::get(*(this->context), llvm::APInt(64, node->value, true));
 }
 
 llvm::Value* Codegen::codegen(std::shared_ptr<Ast::Identifier> node) {
@@ -396,6 +472,7 @@ llvm::Value* Codegen::codegen(std::shared_ptr<Ast::Boolean> node) {
 
 llvm::Type* Codegen::as_llvm_type(Type type) {
 	if      (type == Type("float64")) return llvm::Type::getDoubleTy(*(this->context));
+	else if (type == Type("int64"))   return llvm::Type::getInt64Ty(*(this->context));
 	else if (type == Type("bool"))    return llvm::Type::getInt1Ty(*(this->context));
 	else                              assert(false);
 }
