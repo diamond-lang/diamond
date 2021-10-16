@@ -43,6 +43,7 @@ struct Context {
 	Result<Ok, Error> analyze(std::shared_ptr<Ast::Expression> node);
 	Result<Ok, Error> analyze(std::shared_ptr<Ast::Call> node);
 	Result<Ok, Error> analyze(std::shared_ptr<Ast::Number> node);
+	Result<Ok, Error> analyze(std::shared_ptr<Ast::Integer> node);
 	Result<Ok, Error> analyze(std::shared_ptr<Ast::Identifier> node);
 	Result<Ok, Error> analyze(std::shared_ptr<Ast::Boolean> node);
 
@@ -114,6 +115,7 @@ Result<Ok, Error> Context::analyze(std::shared_ptr<Ast::Assignment> assignment) 
 Result<Ok, Error> Context::analyze(std::shared_ptr<Ast::Expression> node) {
 	if      (std::dynamic_pointer_cast<Ast::Call>(node))       return this->analyze(std::dynamic_pointer_cast<Ast::Call>(node));
 	else if (std::dynamic_pointer_cast<Ast::Number>(node))     return this->analyze(std::dynamic_pointer_cast<Ast::Number>(node));
+	else if (std::dynamic_pointer_cast<Ast::Integer>(node))     return this->analyze(std::dynamic_pointer_cast<Ast::Integer>(node));
 	else if (std::dynamic_pointer_cast<Ast::Identifier>(node)) return this->analyze(std::dynamic_pointer_cast<Ast::Identifier>(node));
 	else if (std::dynamic_pointer_cast<Ast::Boolean>(node))    return this->analyze(std::dynamic_pointer_cast<Ast::Boolean>(node));
 	else assert(false);
@@ -138,6 +140,11 @@ Result<Ok, Error> Context::analyze(std::shared_ptr<Ast::Call> node) {
 
 Result<Ok, Error> Context::analyze(std::shared_ptr<Ast::Number> node) {
 	node->type = Type("float64");
+	return Result<Ok, Error>(Ok());
+}
+
+Result<Ok, Error> Context::analyze(std::shared_ptr<Ast::Integer> node) {
+	node->type = Type("int64");
 	return Result<Ok, Error>(Ok());
 }
 
@@ -182,37 +189,48 @@ std::vector<std::unordered_map<std::string, Binding>> Context::get_definitions()
 Result<Ok, Error> Context::get_type_of_intrinsic(std::shared_ptr<Ast::Call> node) {
 	static std::unordered_map<std::string, std::vector<std::pair<std::vector<Type>, Type>>> intrinsics = {
 		{"+", {
-			{{Type("float64"), Type("float64")}, Type("float64")}
+			{{Type("float64"), Type("float64")}, Type("float64")},
+			{{Type("int64"), Type("int64")}, Type("int64")}
 		}},
 		{"*", {
-			{{Type("float64"), Type("float64")}, Type("float64")}
+			{{Type("float64"), Type("float64")}, Type("float64")},
+			{{Type("int64"), Type("int64")}, Type("int64")}
 		}},
 		{"/", {
-			{{Type("float64"), Type("float64")}, Type("float64")}
+			{{Type("float64"), Type("float64")}, Type("float64")},
+			{{Type("int64"), Type("int64")}, Type("int64")}
 		}},
 		{"-", {
 			{{Type("float64")}, Type("float64")},
-			{{Type("float64"), Type("float64")}, Type("float64")}
+			{{Type("int64")}, Type("int64")},
+			{{Type("float64"), Type("float64")}, Type("float64")},
+			{{Type("int64"), Type("int64")}, Type("int64")},
 		}},
 		{"<", {
-			{{Type("float64"), Type("float64")}, Type("bool")}
+			{{Type("float64"), Type("float64")}, Type("bool")},
+			{{Type("int64"), Type("int64")}, Type("bool")}
 		}},
 		{"<=", {
-			{{Type("float64"), Type("float64")}, Type("bool")}
+			{{Type("float64"), Type("float64")}, Type("bool")},
+			{{Type("int64"), Type("int64")}, Type("bool")}
 		}},
 		{">", {
-			{{Type("float64"), Type("float64")}, Type("bool")}
+			{{Type("float64"), Type("float64")}, Type("bool")},
+			{{Type("int64"), Type("int64")}, Type("bool")}
 		}},
 		{">=", {
-			{{Type("float64"), Type("float64")}, Type("bool")}
+			{{Type("float64"), Type("float64")}, Type("bool")},
+			{{Type("int64"), Type("int64")}, Type("bool")}
 		}},
 		{"==", {
 			{{Type("bool"), Type("bool")}, Type("bool")},
-			{{Type("float64"), Type("float64")}, Type("bool")}
+			{{Type("float64"), Type("float64")}, Type("bool")},
+			{{Type("int64"), Type("int64")}, Type("bool")}
 		}},
 		{"!=", {
 			{{Type("bool"), Type("bool")}, Type("bool")},
-			{{Type("float64"), Type("float64")}, Type("bool")}
+			{{Type("float64"), Type("float64")}, Type("bool")},
+			{{Type("int64"), Type("int64")}, Type("bool")}
 		}},
 		{"not", {
 			{{Type("bool")}, Type("bool")}
