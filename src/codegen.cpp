@@ -472,6 +472,7 @@ llvm::Value* Codegen::codegen(std::shared_ptr<Ast::Boolean> node) {
 
 llvm::Type* Codegen::as_llvm_type(Type type) {
 	if      (type == Type("float64")) return llvm::Type::getDoubleTy(*(this->context));
+	else if (type == Type("int64"))   return llvm::Type::getInt64Ty(*(this->context));
 	else if (type == Type("bool"))    return llvm::Type::getInt1Ty(*(this->context));
 	else                              assert(false);
 }
