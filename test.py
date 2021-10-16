@@ -57,3 +57,9 @@ test("functions.dm", "10\n" + \
                      "0.875\n" + \
                      "5\n" + \
                      "false\n")
+
+test("integers.dm", "5\n" + \
+                    "6\n" + \
+                    "-13\n" + \
+                    "5\n" + \
+                    "1\n")
