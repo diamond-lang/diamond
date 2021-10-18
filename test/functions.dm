@@ -7,3 +7,11 @@ identity(64)
 function add(a, b) a + b
 function div(a, b) a / b
 function identity(x) x
+
+--- Output
+10
+0.875
+5
+false
+64
+---

@@ -4,3 +4,11 @@ a == false
 not false
 not 3.0 == 5.0
 not true
+
+--- Output
+true
+true
+true
+true
+false
+---
