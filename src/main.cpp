@@ -8,7 +8,20 @@
 #include "semantic.hpp"
 #include "codegen.hpp"
 
+#ifdef _WIN32
+#include <Windows.h>
+
+void enable_colored_text() {
+	HANDLE handle = GetStdHandle(STD_OUTPUT_HANDLE);
+	SetConsoleMode(handle, ENABLE_PROCESSED_OUTPUT | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
+}
+#endif
+
 int main(int argc, char *argv[]) {
+	#ifdef _WIN32
+		enable_colored_text();
+	#endif
+
 	// Get command line arguments
 	if (argc < 2 || (argv[1] == std::string("run") && argc < 3)) {
 		// Print usage

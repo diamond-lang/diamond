@@ -11,6 +11,7 @@ std::string make_header(std::string str);
 std::string make_bold(std::string str);
 std::string make_underline(std::string str);
 std::string make_cyan(std::string str);
+std::string make_bright_cyan(std::string str);
 std::string make_red(std::string str);
 std::string make_magenta(std::string str);
 std::string current_line(Source source);
@@ -151,9 +152,10 @@ std::string underline_identifier(std::shared_ptr<Ast::Identifier> identifier) {
 	return result;
 }
 
-std::string make_header(std::string str)    {return make_cyan(str);}
-std::string make_bold(std::string str)      {return "\u001b[1m" + str + "\x1b[0m";}
-std::string make_underline(std::string str) {return "\u001b[4m" + str + "\x1b[0m";}
-std::string make_cyan(std::string str)      {return "\u001b[36m" + str + "\x1b[0m";}
-std::string make_red(std::string str)       {return "\x1b[31m" + str + "\x1b[0m";}
-std::string make_magenta(std::string str)   {return "\u001b[35;1m" + str + "\x1b[0m";}
+std::string make_header(std::string str)      {return make_cyan(str);}
+std::string make_bold(std::string str)        {return "\u001b[1m" + str + "\x1b[0m";}
+std::string make_underline(std::string str)   {return "\u001b[4m" + str + "\x1b[0m";}
+std::string make_cyan(std::string str)        {return "\u001b[36m" + str + "\x1b[0m";}
+std::string make_bright_cyan(std::string str) {return "\u001b[96m" + str + "\x1b[0m";}
+std::string make_red(std::string str)         {return "\x1b[31m" + str + "\x1b[0m";}
+std::string make_magenta(std::string str)     {return "\u001b[35;1m" + str + "\x1b[0m";}

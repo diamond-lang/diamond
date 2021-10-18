@@ -97,7 +97,7 @@ def buid_on_linux():
 	objects_files = ' '.join(objects_files)
 
 	# Build diamond
-	command = f'{get_compiler()} {get_cpp_version()} {objects_files} -o {name} -I{llvm_path}/include -L{llvm_path}/lib {get_lld_libraries()} {llvm_libs} -lrt -ldl -lpthread -lm -lz -ltinfo'
+	command = f'{get_compiler()} {get_cpp_version()} {objects_files} -o {name} -L{llvm_path}/lib {get_lld_libraries()} {llvm_libs} -lrt -ldl -lpthread -lm -lz -ltinfo'
 	print("Linking...")
 	output = os.popen(command).read()
 	print(output)
@@ -121,7 +121,7 @@ def build_on_windows():
 	libs = ' '.join(output)
 
 	# Build diamond
-	command = f'cl {objects_files} {get_cpp_version()} /I {get_llvm_include_path(llvm_path)} /Fe:{get_name()} /link /LIBPATH:"{llvm_path}\lib" {libs} {get_lld_libraries()}'
+	command = f'cl {objects_files} {get_cpp_version()} /Fe:{get_name()} /link /LIBPATH:"{llvm_path}\lib" {libs} {get_lld_libraries()}'
 	print("Linking...")
 	output = os.popen(command).read()
 	print(output)
