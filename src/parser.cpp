@@ -14,7 +14,10 @@ Result<std::shared_ptr<Ast::Program>, std::vector<Error>> parse::program(Source 
 	std::vector<std::shared_ptr<Ast::Function>> functions;
 	std::vector<Error> errors;
 
+	bool there_was_an_error;
 	while (!at_end(source)) {
+		there_was_an_error = false;
+
 		// Parse comment
 		if (parse::comment(source).is_ok()) {
 			source = parse::comment(source).get_source();
@@ -27,6 +30,7 @@ Result<std::shared_ptr<Ast::Program>, std::vector<Error>> parse::program(Source 
 			}
 			else {
 				errors.push_back(result.get_error());
+				there_was_an_error = true;
 			}
 		}
 		else if (is_assignment(source)) {
@@ -37,6 +41,7 @@ Result<std::shared_ptr<Ast::Program>, std::vector<Error>> parse::program(Source 
 			}
 			else {
 				errors.push_back(result.get_error());
+				there_was_an_error = true;
 			}
 		}
 		else {
@@ -48,16 +53,17 @@ Result<std::shared_ptr<Ast::Program>, std::vector<Error>> parse::program(Source 
 			}
 			else {
 				errors.push_back(result.get_error());
+				there_was_an_error = true;
 			}
 		}
 
-		if (!parse::token(source, ".").is_error() && parse::token(source, ".").get_value() != "\n") {
-			errors.push_back(Error(errors::unexpected_character(parse::token(source, ".").get_source())));
+		if (!there_was_an_error && !parse::token(source, ".").is_error() && parse::token(source, ".").get_value() != "\n") {
+			errors.push_back(Error(errors::unexpected_character(parse::token(source, ".").get_source()))); // tested in test/errors/expecting_line_ending.dm
 		}
 
 		// Advance until new line
 		while (current(source) != '\n') source = source + 1;
-		while (current(source) == '\n') source = source + 1; // Eat new lines
+		while (current(source) == '\n') source = source + 1;
 	}
 
 	if (errors.size() == 0) return Result<std::shared_ptr<Ast::Program>, std::vector<Error>>(std::make_shared<Ast::Program>(statements, functions, 1, 1, source.file));
@@ -230,7 +236,7 @@ ParserResult<std::shared_ptr<Ast::Expression>> parse::primary(Source source) {
 	if (parse::call(source).is_ok())         return parse::call(source);
 	if (parse::boolean(source).is_ok())      return parse::boolean(source);
 	if (parse::identifier(source).is_ok())   return parse::identifier(source);
-	return ParserResult<std::shared_ptr<Ast::Expression>>(source, errors::unexpected_character(parse::token(source, "(?=.)").get_source()));
+	return ParserResult<std::shared_ptr<Ast::Expression>>(source, errors::unexpected_character(parse::token(source, "(?=.)").get_source())); // tested in test/errors/expecting_primary.dm
 }
 
 ParserResult<std::shared_ptr<Ast::Expression>> parse::grouping(Source source) {
@@ -251,7 +257,7 @@ ParserResult<std::shared_ptr<Ast::Expression>> parse::grouping(Source source) {
 
 ParserResult<std::shared_ptr<Ast::Expression>> parse::number(Source source) {
 	auto result = parse::token(source, "([0-9]*)?[.][0-9]+");
-	if (result.is_error()) return ParserResult<std::shared_ptr<Ast::Expression>>(source, errors::expecting_number(result.get_source()));
+	if (result.is_error()) return ParserResult<std::shared_ptr<Ast::Expression>>(source, result.get_error().error_message);
 	source = result.get_source();
 	double value = atof(result.get_value().c_str());
 	auto node = std::make_shared<Ast::Number>(value, source.line, source.col, source.file);
@@ -260,7 +266,7 @@ ParserResult<std::shared_ptr<Ast::Expression>> parse::number(Source source) {
 
 ParserResult<std::shared_ptr<Ast::Expression>> parse::integer(Source source) {
 	auto result = parse::token(source, "[0-9]+");
-	if (result.is_error()) return ParserResult<std::shared_ptr<Ast::Expression>>(source, errors::expecting_number(result.get_source()));
+	if (result.is_error()) return ParserResult<std::shared_ptr<Ast::Expression>>(source, result.get_error().error_message);
 	source = result.get_source();
 	char* ptr;
 	int64_t value = strtol(result.get_value().c_str(), &ptr, 10);
@@ -270,7 +276,7 @@ ParserResult<std::shared_ptr<Ast::Expression>> parse::integer(Source source) {
 
 ParserResult<std::shared_ptr<Ast::Expression>> parse::boolean(Source source) {
 	auto result = parse::token(source, "(false|true)");
-	if (result.is_error()) return ParserResult<std::shared_ptr<Ast::Expression>>(source, errors::expecting_identifier(result.get_source()));
+	if (result.is_error()) return ParserResult<std::shared_ptr<Ast::Expression>>(source, result.get_error().error_message);
 	source = result.get_source();
 	auto node = std::make_shared<Ast::Boolean>(result.get_value() == "false" ? false : true, source.line, source.col, source.file);
 	return ParserResult<std::shared_ptr<Ast::Expression>>(node, result.get_source());
@@ -278,7 +284,7 @@ ParserResult<std::shared_ptr<Ast::Expression>> parse::boolean(Source source) {
 
 ParserResult<std::shared_ptr<Ast::Expression>> parse::identifier(Source source) {
 	auto result = parse::token(source, "[a-zA-Z_][a-zA-Z0-9_]*");
-	if (result.is_error()) return ParserResult<std::shared_ptr<Ast::Expression>>(source, errors::expecting_identifier(result.get_source()));
+	if (result.is_error()) return ParserResult<std::shared_ptr<Ast::Expression>>(source, result.get_error().error_message);
 	source = result.get_source();
 	auto node = std::make_shared<Ast::Identifier>(result.get_value(), source.line, source.col, source.file);
 	return ParserResult<std::shared_ptr<Ast::Expression>>(node, result.get_source());
@@ -286,7 +292,7 @@ ParserResult<std::shared_ptr<Ast::Expression>> parse::identifier(Source source) 
 
 ParserResult<std::shared_ptr<Ast::Node>> parse::op(Source source) {
 	auto result = parse::token(source, "(\\+|-|\\*|\\/|<=|<|>=|>|==)");
-	if (result.is_error()) return ParserResult<std::shared_ptr<Ast::Node>>(source, errors::expecting_identifier(result.get_source()));
+	if (result.is_error()) return ParserResult<std::shared_ptr<Ast::Node>>(source, result.get_error().error_message);
 	source = parse::token(source, "(?=.)").get_source();
 	auto node = std::make_shared<Ast::Identifier>(result.get_value(), source.line, source.col, source.file);
 	return ParserResult<std::shared_ptr<Ast::Node>>(node, result.get_source());

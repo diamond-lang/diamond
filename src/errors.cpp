@@ -30,18 +30,6 @@ std::string errors::usage() {
 	                 "    Runs a program.\n\n";
 }
 
-std::string errors::expecting_number(Source source) {
-	return make_header("Expecting number\n\n") +
-	       std::to_string(source.line) + "| " + current_line(source) + "\n" +
-	       underline_current_char(source);
-}
-
-std::string errors::expecting_identifier(Source source) {
-	return make_header("Expecting identifier\n\n") +
-	       std::to_string(source.line) + "| " + current_line(source) + "\n" +
-	       underline_current_char(source);
-}
-
 std::string errors::unexpected_character(Source source) {
 	return make_header("Unexpected character\n\n") +
 	       std::to_string(source.line) + "| " + current_line(source) + "\n" +
