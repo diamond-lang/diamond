@@ -309,7 +309,8 @@ ParserResult<std::string> parse::whitespace(Source source) {
 }
 
 ParserResult<std::string> parse::comment(Source source) {
-	return parse::regex(source, "(--).*");
+	if (parse::regex(source, "(---)(.|\\n|[\\r\\n])*(---)").is_ok()) return parse::regex(source, "(---)(.|\\n|[\\r\\n])*(---)"); // Multiline comment
+	else                                                             return parse::regex(source, "(--).*"); // Single line comment
 }
 
 ParserResult<std::string> parse::regex(Source source, std::string regex) {
