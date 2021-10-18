@@ -104,7 +104,7 @@ Result<Ok, Error> Context::analyze(std::shared_ptr<Ast::Assignment> assignment) 
 
 	// Save it context
 	if (this->get_binding(assignment->identifier->value)) {
-		return Result<Ok, Error>(Error(errors::reassigning_immutable_variable(assignment->identifier, this->get_binding(assignment->identifier->value)->assignment)));
+		return Result<Ok, Error>(Error(errors::reassigning_immutable_variable(assignment->identifier, this->get_binding(assignment->identifier->value)->assignment))); // tested in test/errors/reassigning_immutable_variable.dm
 	}
 	else {
 		this->current_scope()[assignment->identifier->value] = binding;
@@ -151,7 +151,7 @@ Result<Ok, Error> Context::analyze(std::shared_ptr<Ast::Integer> node) {
 Result<Ok, Error> Context::analyze(std::shared_ptr<Ast::Identifier> node) {
 	Binding* binding = this->get_binding(node->value);
 	if (!binding) {
-		return Result<Ok, Error>(Error(errors::undefined_variable(node)));
+		return Result<Ok, Error>(Error(errors::undefined_variable(node))); // tested in test/errors/undefined_variable.dm
 	}
 	else {
 		node->type = binding->get_type();

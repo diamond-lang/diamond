@@ -30,20 +30,21 @@ def test(file, expected):
 		print_expected_vs_result(expected, result)
 		quit()
 
-def get_all_files(folder, file_paths = []):
+def get_all_files(folder):
+	files = []
 	for file in os.listdir(folder):
 		path = os.path.join(folder, file)
 		if os.path.isdir(path):
-			file_paths += get_all_files(path)
+			files += get_all_files(path)
 		else:
-			file_paths.append(path)
+			files.append(path)
 
-	return file_paths
+	return files
 
 def main():
 	for file in get_all_files('test'):
 		content = open(file).read()
-		expected = re.search("(?<=--- Output)(.|\n|\r\n)*(?=---)", content).group(0).strip() + '\n'
+		expected = re.search("(?<=--- Output\n)(.|\n)*(?=---)", content).group(0)
 		test(file, expected)
 
 if __name__ == "__main__":

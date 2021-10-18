@@ -43,11 +43,11 @@ std::string errors::undefined_variable(std::shared_ptr<Ast::Identifier> identifi
 }
 
 std::string errors::reassigning_immutable_variable(std::shared_ptr<Ast::Identifier> identifier, std::shared_ptr<Ast::Assignment> assignment) {
-	return make_header("Trying to re-asssing immutable variable\n\n") +
+	return make_header("Trying to reassign immutable variable\n\n") +
 	       std::to_string(identifier->line) + "| " + current_line(identifier) + "\n" +
 	       underline_identifier(identifier) + "\n" +
-		   "Previosly defined here:\n\n" +
-		   std::to_string(assignment->line) + "| " + current_line(assignment) + "\n";
+	       "Previously defined here:\n\n" +
+	       std::to_string(assignment->line) + "| " + current_line(assignment);
 }
 
 std::string errors::operation_not_defined_for(std::shared_ptr<Ast::Call> call, std::string left, std::string right) {
@@ -123,17 +123,18 @@ std::string underline_current_char(Source source) {
 std::string underline_identifier(std::shared_ptr<Ast::Identifier> identifier) {
 	std::string result = "";
 	for (size_t i = 0; i < std::to_string(identifier->line).size(); i++) {
-		result += ' '; // Add space for line number
+		result += " "; // Add space for line number
 	}
-	result += "  "; // Add space for | character after number
+	result += " "; // Add space for |
+	result += " "; // Add space for space after |
 
 	std::string line = current_line(identifier);
-	size_t col = identifier->col - 1;
+	size_t col = 1;
 	for (auto it = line.begin(); it != line.end(); it++) {
-		if (col <= 0)    break;
-		if (*it == '\t') result += *it;
-		else             result += ' ';
-		col -= 1;
+		if (col == identifier->col) break;
+		if (*it == '\t')            result += '\t';
+		else                        result += " ";
+		col += 1;
 	}
 	for (size_t i = 0; i < identifier->value.size(); i++) {
 		result += make_red("^");
