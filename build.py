@@ -145,12 +145,16 @@ def need_to_recompile():
 
 	return False
 
-if need_to_recompile():
-	if platform.system() == 'Linux':
-		buid_on_linux()
+def main():
+	if need_to_recompile():
+		if platform.system() == 'Linux':
+			buid_on_linux()
 
-	elif platform.system() == 'Windows':
-		build_on_windows()
+		elif platform.system() == 'Windows':
+			build_on_windows()
 
-else:
-	print("Nothing to do...")
+	else:
+		print("Nothing to do...")
+
+if __name__ == "__main__":
+	main()
