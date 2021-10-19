@@ -73,6 +73,12 @@ std::string errors::undefined_function(std::shared_ptr<Ast::Call> call) {
 	       underline_identifier(call->identifier);
 }
 
+std::string errors::unhandled_return_value(std::shared_ptr<Ast::Call> call) {
+	return make_header("Unhandled return value\n\n") +
+	       std::to_string(call->line) + "| " + current_line(call) + "\n" +
+	       underline_identifier(call->identifier);
+}
+
 std::string errors::file_couldnt_be_found(std::string path) {
 	return make_header("File not found\n\n") +
 	       "\"" + path + "\"" + " couldn't be found." + "\n";

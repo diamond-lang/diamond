@@ -99,7 +99,7 @@ ParserResult<std::shared_ptr<Ast::Node>> parse::statement(Source source) {
 		auto result = parse::call(source);
 		return ParserResult<std::shared_ptr<Ast::Node>>(std::dynamic_pointer_cast<Ast::Node>(result.get_value()), result.get_source());
 	}
-	return ParserResult<std::shared_ptr<Ast::Node>>(source, errors::expecting_statement(source));
+	return ParserResult<std::shared_ptr<Ast::Node>>(source, errors::expecting_statement(source)); // tested in test/errors/expecting_statement.dm
 }
 
 ParserResult<std::shared_ptr<Ast::Node>> parse::assignment(Source source) {
