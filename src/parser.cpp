@@ -7,8 +7,6 @@
 #include "errors.hpp"
 #include "parser.hpp"
 
-bool is_assignment(Source source);
-
 Result<std::shared_ptr<Ast::Program>, std::vector<Error>> parse::program(Source source) {
 	std::vector<std::shared_ptr<Ast::Node>> statements;
 	std::vector<std::shared_ptr<Ast::Function>> functions;
@@ -22,7 +20,7 @@ Result<std::shared_ptr<Ast::Program>, std::vector<Error>> parse::program(Source 
 		if (parse::comment(source).is_ok()) {
 			source = parse::comment(source).get_source();
 		}
-		else if (parse::function(source).is_ok()) {
+		else if (match(source, "function ")) {
 			auto result = parse::function(source);
 			if (result.is_ok()) {
 				functions.push_back(std::dynamic_pointer_cast<Ast::Function>(result.get_value()));
@@ -33,8 +31,8 @@ Result<std::shared_ptr<Ast::Program>, std::vector<Error>> parse::program(Source 
 				there_was_an_error = true;
 			}
 		}
-		else if (is_assignment(source)) {
-			auto result = parse::assignment(source);
+		else {
+			auto result = parse::statement(source);
 			if (result.is_ok()) {
 				statements.push_back(result.get_value());
 				source = result.get_source();
@@ -44,12 +42,7 @@ Result<std::shared_ptr<Ast::Program>, std::vector<Error>> parse::program(Source 
 				there_was_an_error = true;
 			}
 		}
-		else if (parse::expression(source).is_ok()) {
-			auto result = parse::expression(source);
-			statements.push_back(result.get_value());
-			source = result.get_source();
-		}
-
+	
 		if (!there_was_an_error && !parse::token(source, ".").is_error() && parse::token(source, ".").get_value() != "\n") {
 			errors.push_back(Error(errors::unexpected_character(parse::token(source, ".").get_source()))); // tested in test/errors/expecting_line_ending.dm
 		}
@@ -98,6 +91,15 @@ ParserResult<std::shared_ptr<Ast::Node>> parse::function(Source source) {
 	auto node = std::make_shared<Ast::Function>(std::dynamic_pointer_cast<Ast::Identifier>(identifier.get_value()), args, expression.get_value(), source.line, source.col, source.file);
 	node->generic = true;
 	return ParserResult<std::shared_ptr<Ast::Node>>(node, source);
+}
+
+ParserResult<std::shared_ptr<Ast::Node>> parse::statement(Source source) {
+	if (parse::assignment(source).is_ok()) return parse::assignment(source);
+	if (parse::call(source).is_ok()) {
+		auto result = parse::call(source);
+		return ParserResult<std::shared_ptr<Ast::Node>>(std::dynamic_pointer_cast<Ast::Node>(result.get_value()), result.get_source());
+	}
+	return ParserResult<std::shared_ptr<Ast::Node>>(source, errors::expecting_statement(source));
 }
 
 ParserResult<std::shared_ptr<Ast::Node>> parse::assignment(Source source) {
@@ -320,10 +322,4 @@ ParserResult<std::string> parse::regex(Source source, std::string regex) {
 	else {
 		return ParserResult<std::string>(source, "Expecting \"" + regex + "\"");
 	}
-}
-
-bool is_assignment(Source source) {
-	auto result = parse::identifier(source);
-	if (result.is_ok() && parse::token(result.get_source(), "be").is_ok()) return true;
-	else                                                                   return false;
 }
