@@ -19,6 +19,7 @@ std::string current_line(Source source);
 std::string current_line(std::shared_ptr<Ast::Node> node);
 std::string current_line(size_t line, std::string file_path);
 std::string underline_current_char(Source source);
+std::string underline_current_line(Source source);
 std::string underline_identifier(std::shared_ptr<Ast::Identifier> identifier);
 
 // Implementantions
@@ -34,6 +35,12 @@ std::string errors::unexpected_character(Source source) {
 	return make_header("Unexpected character\n\n") +
 	       std::to_string(source.line) + "| " + current_line(source) + "\n" +
 	       underline_current_char(source);
+}
+
+std::string errors::expecting_statement(Source source) {
+	return make_header("Expecting a statement\n\n") +
+	       std::to_string(source.line) + "| " + current_line(source) + "\n" +
+	       underline_current_line(source);
 }
 
 std::string errors::undefined_variable(std::shared_ptr<Ast::Identifier> identifier) {
@@ -62,6 +69,12 @@ std::string format_args(std::vector<std::shared_ptr<Ast::Expression>> args) {
 std::string errors::undefined_function(std::shared_ptr<Ast::Call> call) {
 	return make_header("Undefined function\n\n") +
 	       call->identifier->value + "(" + format_args(call->args) + ") is not defined.\n\n" +
+	       std::to_string(call->line) + "| " + current_line(call) + "\n" +
+	       underline_identifier(call->identifier);
+}
+
+std::string errors::unhandled_return_value(std::shared_ptr<Ast::Call> call) {
+	return make_header("Unhandled return value\n\n") +
 	       std::to_string(call->line) + "| " + current_line(call) + "\n" +
 	       underline_identifier(call->identifier);
 }
@@ -110,6 +123,20 @@ std::string underline_current_char(Source source) {
 		col -= 1;
 	}
 	result += make_red("^");
+	return result;
+}
+
+std::string underline_current_line(Source source) {
+	std::string result = "";
+	for (size_t i = 0; i < std::to_string(source.line).size(); i++) {
+		result += ' '; // Add space for line number
+	}
+	result += "  "; // Add space for | and space after
+
+	std::string line = current_line(source);
+	for (auto it = line.begin(); it != line.end(); it++) {
+		result += make_red("^");	
+	}
 	return result;
 }
 

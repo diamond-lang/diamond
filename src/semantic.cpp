@@ -82,9 +82,18 @@ Result<Ok, std::vector<Error>> semantic::analyze(std::shared_ptr<Ast::Program> p
 		std::shared_ptr<Ast::Node> node = program->statements[i];
 		Result<Ok, Error> result;
 
-		if      (std::dynamic_pointer_cast<Ast::Assignment>(node)) result = context.analyze(std::dynamic_pointer_cast<Ast::Assignment>(node));
-		else if (std::dynamic_pointer_cast<Ast::Expression>(node)) result = context.analyze(std::dynamic_pointer_cast<Ast::Expression>(node));
-		else                                                       assert(false);
+		if (std::dynamic_pointer_cast<Ast::Assignment>(node)) {
+			result = context.analyze(std::dynamic_pointer_cast<Ast::Assignment>(node));
+		}
+		else if (std::dynamic_pointer_cast<Ast::Call>(node)) {
+			result = context.analyze(std::dynamic_pointer_cast<Ast::Call>(node));
+			if (result.is_ok() && std::dynamic_pointer_cast<Ast::Call>(node)->type != Type("void")) {
+				result = Result<Ok, Error>(Error(errors::unhandled_return_value(std::dynamic_pointer_cast<Ast::Call>(node)))); // tested in test/errors/unhandled_return_value.dm
+			}
+		}
+		else  {
+			assert(false);
+		}
 
 		if (result.is_error()) {
 			errors.push_back(result.get_error());
@@ -234,6 +243,11 @@ Result<Ok, Error> Context::get_type_of_intrinsic(std::shared_ptr<Ast::Call> node
 		}},
 		{"not", {
 			{{Type("bool")}, Type("bool")}
+		}},
+		{"print", {
+			{{Type("float64")}, Type("void")},
+			{{Type("int64")}, Type("void")},
+			{{Type("bool")}, Type("void")}
 		}}
 	};
 

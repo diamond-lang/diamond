@@ -1,9 +1,9 @@
 a be true == false
-a == false
-4.5 == 1.5 + 3.0
-not false
-not 3.0 == 5.0
-not true
+print(a == false)
+print(4.5 == 1.5 + 3.0)
+print(not false)
+print(not 3.0 == 5.0)
+print(not true)
 
 --- Output
 true

@@ -1,8 +1,8 @@
-5
-5 + 1
--6 - 7
-10 / 2
-3 / 2
+print(5)
+print(5 + 1)
+print(-6 - 7)
+print(10 / 2)
+print(3 / 2)
 
 --- Output
 5
