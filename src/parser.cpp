@@ -12,6 +12,9 @@ Result<std::shared_ptr<Ast::Program>, std::vector<Error>> parse::program(Source 
 	std::vector<std::shared_ptr<Ast::Function>> functions;
 	std::vector<Error> errors;
 
+	// Advance until new line
+	while (current(source) == '\n') source = source + 1;
+
 	bool there_was_an_error;
 	while (!at_end(source)) {
 		there_was_an_error = false;
@@ -93,8 +96,14 @@ ParserResult<std::shared_ptr<Ast::Node>> parse::function(Source source) {
 	return ParserResult<std::shared_ptr<Ast::Node>>(node, source);
 }
 
+static bool is_assignment(Source source) {
+	auto result = parse::identifier(source);
+	if (result.is_ok() && parse::token(result.get_source(), "be").is_ok()) return true;
+	else                                                                   return false;
+}
+
 ParserResult<std::shared_ptr<Ast::Node>> parse::statement(Source source) {
-	if (parse::assignment(source).is_ok()) return parse::assignment(source);
+	if (is_assignment(source)) return parse::assignment(source);
 	if (parse::call(source).is_ok()) {
 		auto result = parse::call(source);
 		return ParserResult<std::shared_ptr<Ast::Node>>(std::dynamic_pointer_cast<Ast::Node>(result.get_value()), result.get_source());

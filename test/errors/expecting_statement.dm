@@ -4,5 +4,5 @@
 Expecting a statement
 
 1| 2 + 2
-   ^
+   ^^^^^
 ---

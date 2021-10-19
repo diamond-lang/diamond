@@ -87,7 +87,7 @@ Result<Ok, std::vector<Error>> semantic::analyze(std::shared_ptr<Ast::Program> p
 		}
 		else if (std::dynamic_pointer_cast<Ast::Call>(node)) {
 			result = context.analyze(std::dynamic_pointer_cast<Ast::Call>(node));
-			if (std::dynamic_pointer_cast<Ast::Call>(node)->type != Type("void")) {
+			if (result.is_ok() && std::dynamic_pointer_cast<Ast::Call>(node)->type != Type("void")) {
 				result = Result<Ok, Error>(Error(errors::unhandled_return_value(std::dynamic_pointer_cast<Ast::Call>(node)))); // tested in test/errors/unhandled_return_value.dm
 			}
 		}
