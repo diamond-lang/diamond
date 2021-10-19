@@ -132,7 +132,7 @@ Result<Ok, Error> Context::analyze(std::shared_ptr<Ast::Call> node) {
 	auto result = this->get_type_of_intrinsic(node);
 	if (result.is_error()) {
 		result = this->get_type_of_user_defined_function(node);
-		if (result.is_error()) return result;
+		if (result.is_error()) return Result<Ok, Error>(Error(errors::undefined_function(node))); // tested in test/errors/undefined_function.dm
 	}
 
 	return Result<Ok, Error>(Ok());
@@ -248,16 +248,15 @@ Result<Ok, Error> Context::get_type_of_intrinsic(std::shared_ptr<Ast::Call> node
 		}
 	}
 
-	if (node->args.size() == 2) {
-		return Result<Ok, Error>(errors::operation_not_defined_for(node, node->args[0]->type.to_str(), node->args[1]->type.to_str()));
-	}
-	else {
-		std::vector<std::string> args;
-		for (size_t i = 0; i < node->args.size(); i++) {
-			args.push_back(node->args[i]->type.to_str());
+	std::string error_message = node->identifier->value + "(";
+	for (size_t i = 0; i < node->args.size(); i++) {
+		error_message += node->args[i]->type.to_str();
+		if (i != node->args.size() - 1) {
+			error_message += ", ";
 		}
-		return Result<Ok, Error>(errors::operation_not_defined_for(node, args));
 	}
+	error_message += ") is not an intrinsic function";
+	return Result<Ok, Error>(Error(error_message));
 }
 
 Result<Ok, Error> Context::get_type_of_user_defined_function(std::shared_ptr<Ast::Call> node) {
@@ -327,7 +326,15 @@ Result<Ok, Error> Context::get_type_of_user_defined_function(std::shared_ptr<Ast
 		}
 	}
 	else {
-		return Result<Ok, Error>(errors::undefined_variable(node->identifier));
+		std::string error_message = node->identifier->value + "(";
+		for (size_t i = 0; i < node->args.size(); i++) {
+			error_message += node->args[i]->type.to_str();
+			if (i != node->args.size() - 1) {
+			 	error_message += ", ";
+			}
+		}
+		error_message += ") is not defined by the user\n";
+		return Result<Ok, Error>(Error(error_message));
 	}
 	return Result<Ok, Error>(Ok());
 }
