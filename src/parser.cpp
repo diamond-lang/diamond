@@ -8,9 +8,25 @@
 #include "parser.hpp"
 
 Result<std::shared_ptr<Ast::Program>, std::vector<Error>> parse::program(Source source) {
+	auto result = parse::block(source);
+	if (result.is_error()) return Result<std::shared_ptr<Ast::Program>, std::vector<Error>>(result.get_error());
+	else                   return Result<std::shared_ptr<Ast::Program>, std::vector<Error>>(std::dynamic_pointer_cast<Ast::Program>(result.get_value()));
+}
+
+Result<std::shared_ptr<Ast::Block>, std::vector<Error>> parse::block(Source source, size_t previous_indentation) {
+	// Create variables to store statements and functions
 	std::vector<std::shared_ptr<Ast::Node>> statements;
 	std::vector<std::shared_ptr<Ast::Function>> functions;
 	std::vector<Error> errors;
+
+	// Set indentation level
+	Source aux = parse::indent(source).get_source();
+	size_t indentation_level = aux.col;
+	if (previous_indentation == 1 && indentation_level != 1) {
+		errors.push_back(Error(errors::unexpected_indent(source))); // tested in test/errors/unexpected_indentation_1.dm
+		return errors;
+	}
+	source = aux;
 
 	// Advance until new line
 	while (current(source) == '\n') source = source + 1;
@@ -23,31 +39,48 @@ Result<std::shared_ptr<Ast::Program>, std::vector<Error>> parse::program(Source 
 		if (parse::comment(source).is_ok()) {
 			source = parse::comment(source).get_source();
 		}
-		else if (match(source, "function ")) {
-			auto result = parse::function(source);
-			if (result.is_ok()) {
-				functions.push_back(std::dynamic_pointer_cast<Ast::Function>(result.get_value()));
-				source = result.get_source();
-			}
-			else {
-				errors.push_back(result.get_error());
-				there_was_an_error = true;
-			}
-		}
 		else {
-			auto result = parse::statement(source);
-			if (result.is_ok()) {
-				statements.push_back(result.get_value());
-				source = result.get_source();
+			Source aux = parse::indent(source).get_source();
+			if (aux.col != indentation_level) {
+				if (aux.col < indentation_level) break;
+				else {
+					if (previous_indentation == 1) {
+						errors.push_back(Error(errors::unexpected_indent(source))); // tested in test/errors/unexpected_indentation_2.dm
+					}
+					else {
+						errors.push_back(Error(errors::unexpected_indent(source + indentation_level + 1)));
+					}
+					there_was_an_error = true;
+				}
 			}
 			else {
-				errors.push_back(result.get_error());
-				there_was_an_error = true;
+				if (match(source, "function ")) {
+					auto result = parse::function(source);
+					if (result.is_ok()) {
+						functions.push_back(std::dynamic_pointer_cast<Ast::Function>(result.get_value()));
+						source = result.get_source();
+					}
+					else {
+						errors.push_back(result.get_error());
+						there_was_an_error = true;
+					}
+				}
+				else {
+					auto result = parse::statement(source);
+					if (result.is_ok()) {
+						statements.push_back(result.get_value());
+						source = result.get_source();
+					}
+					else {
+						errors.push_back(result.get_error());
+						there_was_an_error = true;
+					}
+				}
 			}
 		}
-	
-		if (!there_was_an_error && !parse::token(source, ".").is_error() && parse::token(source, ".").get_value() != "\n") {
-			errors.push_back(Error(errors::unexpected_character(parse::token(source, ".").get_source()))); // tested in test/errors/expecting_line_ending.dm
+
+		if (!there_was_an_error && !at_end(source) && current(source) != '\n') {
+			errors.push_back(Error(errors::unexpected_character(parse::whitespace(source).get_source()))); // tested in test/errors/expecting_line_ending.dm
 		}
 
 		// Advance until new line
@@ -55,8 +88,8 @@ Result<std::shared_ptr<Ast::Program>, std::vector<Error>> parse::program(Source 
 		while (current(source) == '\n') source = source + 1;
 	}
 
-	if (errors.size() == 0) return Result<std::shared_ptr<Ast::Program>, std::vector<Error>>(std::make_shared<Ast::Program>(statements, functions, 1, 1, source.file));
-	else                    return Result<std::shared_ptr<Ast::Program>, std::vector<Error>>(errors);
+	if (errors.size() == 0) return Result<std::shared_ptr<Ast::Block>, std::vector<Error>>(std::make_shared<Ast::Block>(statements, functions, 1, 1, source.file));
+	else                    return Result<std::shared_ptr<Ast::Block>, std::vector<Error>>(errors);
 }
 
 ParserResult<std::shared_ptr<Ast::Node>> parse::function(Source source) {
@@ -303,11 +336,11 @@ ParserResult<std::shared_ptr<Ast::Node>> parse::op(Source source) {
 }
 
 ParserResult<std::string> parse::token(Source source, std::string regex) {
-	while (!parse::whitespace(source).is_error() || !parse::comment(source).is_error()) {
-		if (!parse::whitespace(source).is_error()) {
+	while (parse::whitespace(source).is_ok() || parse::comment(source).is_ok()) {
+		if (parse::whitespace(source).is_ok()) {
 			source = parse::whitespace(source).get_source();
 		}
-		else if (!parse::comment(source).is_error()) {
+		else if (parse::comment(source).is_ok()) {
 			source = parse::comment(source).get_source();
 		}
 	}
@@ -319,6 +352,8 @@ ParserResult<std::string> parse::whitespace(Source source) {
 }
 
 ParserResult<std::string> parse::comment(Source source) {
+	auto result = parse::whitespace(source);
+	if (result.is_ok()) source = result.get_source(); // Ignore white space before comment
 	if (parse::regex(source, "(---)(.|\\n|[\\r\\n])*(---)").is_ok()) return parse::regex(source, "(---)(.|\\n|[\\r\\n])*(---)"); // Multiline comment
 	else                                                             return parse::regex(source, "(--).*"); // Single line comment
 }
@@ -331,4 +366,9 @@ ParserResult<std::string> parse::regex(Source source, std::string regex) {
 	else {
 		return ParserResult<std::string>(source, "Expecting \"" + regex + "\"");
 	}
+}
+
+ParserResult<void*> parse::indent(Source source) {
+	while (current(source) == ' ') source = source + 1;
+	return ParserResult<void*>(nullptr, source);
 }

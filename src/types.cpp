@@ -107,6 +107,30 @@ std::shared_ptr<Ast::Node> Ast::Program::clone() {
 	return std::make_shared<Ast::Program>(statements, functions, this->line, this->col, this->file);
 }
 
+// Block
+void Ast::Block::print(size_t indent_level) {
+	put_indent_level(indent_level);
+	std::cout << "Block" << '\n';
+	for (size_t i = 0; i < this->statements.size(); i++) {
+		this->statements[i]->print(indent_level + 1);
+	}
+	for (size_t i = 0; i < this->functions.size(); i++) {
+		this->functions[i]->print(indent_level + 1);
+	}
+}
+
+std::shared_ptr<Ast::Node> Ast::Block::clone() {
+	std::vector<std::shared_ptr<Ast::Node>> statements;
+	for (size_t i = 0; i < this->statements.size(); i++) {
+		statements.push_back(this->statements[i]->clone());
+	}
+	std::vector<std::shared_ptr<Ast::Function>> functions;
+	for (size_t i = 0; i < this->functions.size(); i++) {
+		functions.push_back(std::dynamic_pointer_cast<Ast::Function>(this->functions[i]->clone()));
+	}
+	return std::make_shared<Ast::Block>(statements, functions, this->line, this->col, this->file);
+}
+
 // Function
 void Ast::Function::print(size_t indent_level) {
 	put_indent_level(indent_level);

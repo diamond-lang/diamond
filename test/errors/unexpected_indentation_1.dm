@@ -1,0 +1,9 @@
+  print(10)
+print(20)
+
+--- Output
+Unexpected indent
+
+1|   print(10)
+   ^
+---

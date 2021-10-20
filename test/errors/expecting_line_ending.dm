@@ -4,5 +4,5 @@ a be 5 + 7 false
 Unexpected character
 
 1| a be 5 + 7 false
-               ^
+              ^
 ---

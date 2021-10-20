@@ -37,6 +37,12 @@ std::string errors::unexpected_character(Source source) {
 	       underline_current_char(source);
 }
 
+std::string errors::unexpected_indent(Source source) {
+	return make_header("Unexpected indent\n\n") +
+	       std::to_string(source.line) + "| " + current_line(source) + "\n" +
+	       underline_current_char(source);
+}
+
 std::string errors::expecting_statement(Source source) {
 	return make_header("Expecting a statement\n\n") +
 	       std::to_string(source.line) + "| " + current_line(source) + "\n" +

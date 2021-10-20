@@ -113,6 +113,13 @@ namespace Ast {
 		virtual std::shared_ptr<Node> clone();
 	};
 
+	struct Block : Program {
+		Block(std::vector<std::shared_ptr<Ast::Node>> statements, std::vector<std::shared_ptr<Ast::Function>> functions, size_t line, size_t col, std::string file) : Program(statements, functions, line, col, file) {}
+		virtual ~Block() {}
+		virtual void print(size_t indent_level = 0);
+		virtual std::shared_ptr<Node> clone();
+	};
+
 	struct FunctionSpecialization;
 
 	struct Function : Node {

@@ -5,6 +5,7 @@
 
 namespace parse {
 	Result<std::shared_ptr<Ast::Program>, std::vector<Error>> program(Source source);
+	Result<std::shared_ptr<Ast::Block>, std::vector<Error>> block(Source source, size_t previous_indetation = 1);
 	ParserResult<std::shared_ptr<Ast::Node>> function(Source source);
 	ParserResult<std::shared_ptr<Ast::Node>> statement(Source source);
 	ParserResult<std::shared_ptr<Ast::Node>> assignment(Source source);
@@ -23,6 +24,7 @@ namespace parse {
 	ParserResult<std::string> whitespace(Source source);
 	ParserResult<std::string> comment(Source source);
 	ParserResult<std::string> regex(Source source, std::string regex);
+	ParserResult<void*> indent(Source source);
 };
 
 #endif
