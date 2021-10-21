@@ -12,6 +12,7 @@
 struct Source {
 	size_t line;
 	size_t col;
+	size_t indentation_level = 1;
 	std::string file;
 	std::string::iterator it;
 	std::string::iterator end;

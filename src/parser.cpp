@@ -13,20 +13,21 @@ Result<std::shared_ptr<Ast::Program>, std::vector<Error>> parse::program(Source 
 	else                   return Result<std::shared_ptr<Ast::Program>, std::vector<Error>>(std::dynamic_pointer_cast<Ast::Program>(result.get_value()));
 }
 
-Result<std::shared_ptr<Ast::Block>, std::vector<Error>> parse::block(Source source, size_t previous_indentation) {
+Result<std::shared_ptr<Ast::Block>, std::vector<Error>> parse::block(Source source) {
 	// Create variables to store statements and functions
 	std::vector<std::shared_ptr<Ast::Node>> statements;
 	std::vector<std::shared_ptr<Ast::Function>> functions;
 	std::vector<Error> errors;
 
 	// Set indentation level
+	size_t previous_indentation = source.indentation_level;
 	Source aux = parse::indent(source).get_source();
-	size_t indentation_level = aux.col;
-	if (previous_indentation == 1 && indentation_level != 1) {
+	if (previous_indentation == 1 && aux.col != 1) {
 		errors.push_back(Error(errors::unexpected_indent(source))); // tested in test/errors/unexpected_indentation_1.dm
 		return errors;
 	}
 	source = aux;
+	source.indentation_level = source.col;
 
 	// Advance until new line
 	while (current(source) == '\n') source = source + 1;
@@ -41,14 +42,14 @@ Result<std::shared_ptr<Ast::Block>, std::vector<Error>> parse::block(Source sour
 		}
 		else {
 			Source aux = parse::indent(source).get_source();
-			if (aux.col != indentation_level) {
-				if (aux.col < indentation_level) break;
+			if (aux.col != source.indentation_level) {
+				if (aux.col < source.indentation_level) break;
 				else {
 					if (previous_indentation == 1) {
 						errors.push_back(Error(errors::unexpected_indent(source))); // tested in test/errors/unexpected_indentation_2.dm
 					}
 					else {
-						errors.push_back(Error(errors::unexpected_indent(source + indentation_level + 1)));
+						errors.push_back(Error(errors::unexpected_indent(source + source.indentation_level + 1)));
 					}
 					there_was_an_error = true;
 				}
