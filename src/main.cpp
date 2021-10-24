@@ -42,7 +42,7 @@ int main(int argc, char *argv[]) {
 	// Read file
 	Result<std::string, Error> result = utilities::read_file(file_path);
 	if (result.is_error()) {
-		std::cout << result.get_error().error_message;
+		std::cout << result.get_error().message;
 		exit(EXIT_FAILURE);
 	}
 	std::string file = result.get_value();
@@ -52,7 +52,7 @@ int main(int argc, char *argv[]) {
 	if (parsing_result.is_error()) {
 		std::vector<Error> error = parsing_result.get_error();
 		for (size_t i = 0; i < error.size(); i++) {
-			std::cout << error[i].error_message << '\n';
+			std::cout << error[i].message << '\n';
 		}
 		exit(EXIT_FAILURE);
 	}
@@ -64,7 +64,7 @@ int main(int argc, char *argv[]) {
 	if (analyze_result.is_error()) {
 		std::vector<Error> error = analyze_result.get_error();
 		for (size_t i = 0; i < error.size(); i++) {
-			std::cout << error[i].error_message << '\n';
+			std::cout << error[i].message << '\n';
 		}
 		exit(EXIT_FAILURE);
 	}

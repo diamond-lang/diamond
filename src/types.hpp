@@ -31,28 +31,40 @@ struct Ok {
 };
 
 struct Error {
-	std::string error_message;
+	std::string message;
 
 	Error() {}
-	Error(std::string error_message) : error_message(error_message) {}
+	Error(std::string message) : message(message) {}
 	~Error() {}
 };
+
+using Errors = std::vector<Error>;
 
 // Parser result
 template <class T>
 struct ParserResult {
+	bool ok;
 	T value;
 	Source source;
-	std::string error_message;
+	Errors errors;
 
-	ParserResult<T>(T value, Source source, std::string error_message = "") : value(value), source(source), error_message(error_message) {}
-	ParserResult<T>(Source source, std::string error_message) : source(source), error_message(error_message) {}
+	ParserResult<T>(T value, Source source) : ok(true), value(value), source(source) {}
+	ParserResult<T>(Errors errors) : ok(false), errors(errors) {}
 
-	bool is_ok()        {return this->error_message.size() == 0;}
+	bool is_ok() {return this->ok;}
 	bool is_error()     {return !this->is_ok();}
-	T get_value()       {return this->value;}
-	Source get_source() {return this->source;}
-	Error get_error()   {return Error(this->error_message);}
+	T get_value()       {
+		assert(this->ok);
+		return this->value;
+	}
+	Source get_source() {
+		assert(this->ok);
+		return this->source;
+	}
+	Errors get_errors() {
+		assert(!(this->ok));
+		return this->errors;
+	}
 };
 
 template <class T1, class T2>
