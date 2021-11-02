@@ -5,7 +5,7 @@
 
 namespace parse {
 	Result<std::shared_ptr<Ast::Program>, Errors> program(Source source);
-	Result<std::shared_ptr<Ast::Block>, Errors> block(Source source);
+	ParserResult<std::shared_ptr<Ast::Block>> block(Source source);
 	ParserResult<std::shared_ptr<Ast::Node>> function(Source source);
 	ParserResult<std::shared_ptr<Ast::Node>> statement(Source source);
 	ParserResult<std::shared_ptr<Ast::Node>> assignment(Source source);

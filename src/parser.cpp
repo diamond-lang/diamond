@@ -9,11 +9,11 @@
 
 Result<std::shared_ptr<Ast::Program>, std::vector<Error>> parse::program(Source source) {
 	auto result = parse::block(source);
-	if (result.is_error()) return Result<std::shared_ptr<Ast::Program>, Errors>(result.get_error());
+	if (result.is_error()) return Result<std::shared_ptr<Ast::Program>, Errors>(result.get_errors());
 	else                   return Result<std::shared_ptr<Ast::Program>, Errors>(std::dynamic_pointer_cast<Ast::Program>(result.get_value()));
 }
 
-Result<std::shared_ptr<Ast::Block>, std::vector<Error>> parse::block(Source source) {
+ParserResult<std::shared_ptr<Ast::Block>> parse::block(Source source) {
 	// Create variables to store statements and functions
 	std::vector<std::shared_ptr<Ast::Node>> statements;
 	std::vector<std::shared_ptr<Ast::Function>> functions;
@@ -23,7 +23,7 @@ Result<std::shared_ptr<Ast::Block>, std::vector<Error>> parse::block(Source sour
 	size_t previous_indentation = source.indentation_level;
 	Source aux = parse::indent(source).get_source();
 	if (previous_indentation == 1 && aux.col != 1) {
-		errors.push_back(Error(errors::unexpected_indent(source))); // tested in test/errors/unexpected_indentation_1.dm
+		errors.push_back(errors::unexpected_indent(source)); // tested in test/errors/unexpected_indentation_1.dm
 		return errors;
 	}
 	source = aux;
@@ -46,10 +46,10 @@ Result<std::shared_ptr<Ast::Block>, std::vector<Error>> parse::block(Source sour
 				if (aux.col < source.indentation_level) break;
 				else {
 					if (previous_indentation == 1) {
-						errors.push_back(Error(errors::unexpected_indent(source))); // tested in test/errors/unexpected_indentation_2.dm
+						errors.push_back(errors::unexpected_indent(source)); // tested in test/errors/unexpected_indentation_2.dm
 					}
 					else {
-						errors.push_back(Error(errors::unexpected_indent(source + source.indentation_level + 1)));
+						errors.push_back(errors::unexpected_indent(source + source.indentation_level + 1));
 					}
 					there_was_an_error = true;
 				}
@@ -91,8 +91,8 @@ Result<std::shared_ptr<Ast::Block>, std::vector<Error>> parse::block(Source sour
 		while (current(source) == '\n') source = source + 1;
 	}
 
-	if (errors.size() == 0) return Result<std::shared_ptr<Ast::Block>, std::vector<Error>>(std::make_shared<Ast::Block>(statements, functions, 1, 1, source.file));
-	else                    return Result<std::shared_ptr<Ast::Block>, std::vector<Error>>(errors);
+	if (errors.size() == 0) return ParserResult<std::shared_ptr<Ast::Block>>(std::make_shared<Ast::Block>(statements, functions, 1, 1, source.file), source);
+	else                    return ParserResult<std::shared_ptr<Ast::Block>>(errors);
 }
 
 ParserResult<std::shared_ptr<Ast::Node>> parse::function(Source source) {
