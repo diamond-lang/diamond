@@ -110,7 +110,7 @@ std::shared_ptr<Ast::Node> Ast::Program::clone() {
 // Block
 void Ast::Block::print(size_t indent_level) {
 	put_indent_level(indent_level);
-	std::cout << "Block" << '\n';
+	std::cout << "block" << '\n';
 	for (size_t i = 0; i < this->statements.size(); i++) {
 		this->statements[i]->print(indent_level + 1);
 	}

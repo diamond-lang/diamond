@@ -10,7 +10,11 @@
 Result<std::shared_ptr<Ast::Program>, std::vector<Error>> parse::program(Source source) {
 	auto result = parse::block(source);
 	if (result.is_error()) return Result<std::shared_ptr<Ast::Program>, Errors>(result.get_errors());
-	else                   return Result<std::shared_ptr<Ast::Program>, Errors>(std::dynamic_pointer_cast<Ast::Program>(result.get_value()));
+	else {
+		auto block = result.get_value();
+		auto program = std::make_shared<Ast::Program>(block->statements, block->functions, block->line, block->col, block->file);
+		return Result<std::shared_ptr<Ast::Program>, Errors>(program);
+	}
 }
 
 ParserResult<std::shared_ptr<Ast::Block>> parse::block(Source source) {
@@ -36,7 +40,7 @@ ParserResult<std::shared_ptr<Ast::Block>> parse::block(Source source) {
 				break;
 			}
 			else {
-				errors.push_back(errors::unexpected_indent(source)); // tested in test/errors/unexpected_indentation_2.dm
+				errors.push_back(errors::unexpected_indent(source)); // tested in test/errors/unexpected_indentation_1.dm and test/errors/unexpected_indentation_2.dm
 				while (current(source) != '\n') source = source + 1; // advances until new line
 				continue;
 			}
