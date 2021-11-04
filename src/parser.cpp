@@ -34,7 +34,7 @@ ParserResult<std::shared_ptr<Ast::Block>> parse::block(Source source) {
 		if (indent.col > source.indentation_level) {
 			source.indentation_level = indent.col;
 		}
-		else return ParserResult<std::shared_ptr<Ast::Block>>(Errors{errors::expecting_new_indentation_level(source)});
+		else return ParserResult<std::shared_ptr<Ast::Block>>(Errors{errors::expecting_new_indentation_level(source)}); // tested in errors/expecting_new_indentation_level.dm
 	}
 	size_t indentation_level = source.indentation_level;
 
@@ -83,12 +83,7 @@ ParserResult<std::shared_ptr<Ast::Block>> parse::block(Source source) {
 			}
 
 			if (!at_end(source) && current(source) != '\n') {
-				if (parse::whitespace(source).is_ok()) {
-					errors.push_back(errors::unexpected_character(parse::whitespace(source).get_source())); // tested in test/errors/expecting_line_ending.dm
-				}
-				else {
-					errors.push_back(errors::unexpected_character(source));
-				}
+				errors.push_back(errors::unexpected_character(parse::regex(source, "[ \\r\\t]*").get_source())); // tested in test/errors/expecting_line_ending.dm
 			}
 		}
 		else {
@@ -166,7 +161,7 @@ ParserResult<std::shared_ptr<Ast::Node>> parse::function(Source source) {
 		return ParserResult<std::shared_ptr<Ast::Node>>(node, source);
 	}
 
-	return ParserResult<std::shared_ptr<Ast::Node>>(Errors{errors::expecting_block_or_expression(source)});
+	return ParserResult<std::shared_ptr<Ast::Node>>(block.get_errors());
 }
 
 ParserResult<std::shared_ptr<Ast::Node>> parse::assignment(Source source) {

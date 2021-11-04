@@ -49,14 +49,9 @@ std::string errors::expecting_statement(Source source) {
 	       underline_current_line(source);
 }
 
-std::string errors::expecting_block_or_expression(Source source) {
-	return make_header("Expecting block or expression\n\n") +
-	       std::to_string(source.line) + "| " + current_line(source) + "\n" +
-	       underline_current_char(source);
-}
-
 std::string errors::expecting_new_indentation_level(Source source) {
 	return make_header("Expecting new indentation level\n\n") +
+		   std::to_string(source.line - 1) + "| " + current_line(source.line - 1, source.file) + "\n" +
 	       std::to_string(source.line) + "| " + current_line(source) + "\n" +
 	       underline_current_char(source);
 }
@@ -102,7 +97,8 @@ std::string errors::file_couldnt_be_found(std::string path) {
 	       "\"" + path + "\"" + " couldn't be found." + "\n";
 }
 
-std::string current_line(Source source)   {return current_line(source.line, source.file);}
+std::string current(size_t line, std::string file_path) {return current_line(line, file_path);} 
+std::string current_line(Source source) {return current_line(source.line, source.file);}
 std::string current_line(std::shared_ptr<Ast::Node> node) {return current_line(node->line, node->file);}
 std::string current_line(size_t line, std::string file_path) {
 	if (file_path == "") return "";
