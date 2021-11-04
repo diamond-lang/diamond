@@ -9,6 +9,7 @@ namespace parse {
 	ParserResult<std::shared_ptr<Ast::Node>> function(Source source);
 	ParserResult<std::shared_ptr<Ast::Node>> statement(Source source);
 	ParserResult<std::shared_ptr<Ast::Node>> assignment(Source source);
+	ParserResult<std::shared_ptr<Ast::Node>> return_stmt(Source source);
 	ParserResult<std::shared_ptr<Ast::Expression>> call(Source source);
 	ParserResult<std::shared_ptr<Ast::Expression>> expression(Source source);
 	ParserResult<std::shared_ptr<Ast::Expression>> binary(Source source, int precedence = 1);

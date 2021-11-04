@@ -49,6 +49,18 @@ std::string errors::expecting_statement(Source source) {
 	       underline_current_line(source);
 }
 
+std::string errors::expecting_block_or_expression(Source source) {
+	return make_header("Expecting block or expression\n\n") +
+	       std::to_string(source.line) + "| " + current_line(source) + "\n" +
+	       underline_current_char(source);
+}
+
+std::string errors::expecting_new_indentation_level(Source source) {
+	return make_header("Expecting new indentation level\n\n") +
+	       std::to_string(source.line) + "| " + current_line(source) + "\n" +
+	       underline_current_char(source);
+}
+
 std::string errors::undefined_variable(std::shared_ptr<Ast::Identifier> identifier) {
 	return make_header("Undefined variable\n\n") +
 	       std::to_string(identifier->line) + "| " + current_line(identifier) + "\n" +

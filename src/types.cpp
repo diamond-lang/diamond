@@ -109,13 +109,11 @@ std::shared_ptr<Ast::Node> Ast::Program::clone() {
 
 // Block
 void Ast::Block::print(size_t indent_level) {
-	put_indent_level(indent_level);
-	std::cout << "block" << '\n';
 	for (size_t i = 0; i < this->statements.size(); i++) {
-		this->statements[i]->print(indent_level + 1);
+		this->statements[i]->print(indent_level);
 	}
 	for (size_t i = 0; i < this->functions.size(); i++) {
-		this->functions[i]->print(indent_level + 1);
+		this->functions[i]->print(indent_level);
 	}
 }
 
@@ -134,12 +132,12 @@ std::shared_ptr<Ast::Node> Ast::Block::clone() {
 // Function
 void Ast::Function::print(size_t indent_level) {
 	put_indent_level(indent_level);
-	std::cout << this->identifier->value << '(';
+	std::cout << "function " << this->identifier->value << '(';
 	for (size_t i = 0; i < this->args.size(); i++) {
 		std::cout << this->args[i]->value;
 		if (i != this->args.size() - 1) std::cout << ", ";
 	}
-	std::cout << ") is\n";
+	std::cout << ")\n";
 	this->body->print(indent_level + 1);
 }
 
@@ -162,6 +160,17 @@ void Ast::Assignment::print(size_t indent_level) {
 
 std::shared_ptr<Ast::Node> Ast::Assignment::clone() {
 	return std::make_shared<Ast::Assignment>(std::dynamic_pointer_cast<Ast::Identifier>(this->identifier->clone()), std::dynamic_pointer_cast<Expression>(this->expression->clone()), this->line, this->col, this->file);
+}
+
+// Assignment
+void Ast::Return::print(size_t indent_level) {
+	put_indent_level(indent_level);
+	std::cout << "return" << '\n';
+	this->expression->print(indent_level + 1);
+}
+
+std::shared_ptr<Ast::Node> Ast::Return::clone() {
+	return std::make_shared<Ast::Return>(std::dynamic_pointer_cast<Expression>(this->expression->clone()), this->line, this->col, this->file);
 }
 
 // Call

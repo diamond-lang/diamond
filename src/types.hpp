@@ -12,7 +12,7 @@
 struct Source {
 	size_t line;
 	size_t col;
-	size_t indentation_level = 1;
+	size_t indentation_level = -1;
 	std::string file;
 	std::string::iterator it;
 	std::string::iterator end;
@@ -169,6 +169,15 @@ namespace Ast {
 
 		Assignment(std::shared_ptr<Ast::Identifier> identifier, std::shared_ptr<Ast::Expression> expression, size_t line, size_t col, std::string file) : Node(line, col, file), identifier(identifier), expression(expression) {}
 		virtual ~Assignment() {}
+		virtual void print(size_t indent_level = 0);
+		virtual std::shared_ptr<Node> clone();
+	};
+
+	struct Return : Node {
+		std::shared_ptr<Ast::Expression> expression;
+
+		Return(std::shared_ptr<Ast::Expression> expression, size_t line, size_t col, std::string file) : Node(line, col, file), expression(expression) {}
+		virtual ~Return() {}
 		virtual void print(size_t indent_level = 0);
 		virtual std::shared_ptr<Node> clone();
 	};
