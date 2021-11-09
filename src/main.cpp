@@ -50,9 +50,9 @@ int main(int argc, char *argv[]) {
 	// Parse
 	auto parsing_result = parse::program(Source(file_path, file.begin(), file.end()));
 	if (parsing_result.is_error()) {
-		std::vector<Error> error = parsing_result.get_error();
-		for (size_t i = 0; i < error.size(); i++) {
-			std::cout << error[i].message << '\n';
+		std::vector<Error> errors = parsing_result.get_errors();
+		for (size_t i = 0; i < errors.size(); i++) {
+			std::cout << errors[i].message << '\n';
 		}
 		exit(EXIT_FAILURE);
 	}
@@ -62,7 +62,7 @@ int main(int argc, char *argv[]) {
 	// Analyze
 	auto analyze_result = semantic::analyze(ast);
 	if (analyze_result.is_error()) {
-		std::vector<Error> error = analyze_result.get_error();
+		std::vector<Error> error = analyze_result.get_errors();
 		for (size_t i = 0; i < error.size(); i++) {
 			std::cout << error[i].message << '\n';
 		}

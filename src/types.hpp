@@ -82,7 +82,11 @@ struct Result {
 		assert(this->is_ok() == true);
 		return std::get<T1>(this->value);
 	}
-	T2 get_error()  {
+	T2 get_error() {
+		assert(this->is_error() == true);
+		return std::get<T2>(this->value);
+	}
+	T2 get_errors()  {
 		assert(this->is_error() == true);
 		return std::get<T2>(this->value);
 	}
