@@ -49,8 +49,10 @@ struct Codegen {
 	}
 
 	void codegen(std::shared_ptr<Ast::Program> node);
+	void codegen(std::shared_ptr<Ast::Block> node);
 	void codegen(std::shared_ptr<Ast::Function> node);
 	void codegen(std::shared_ptr<Ast::Assignment> node);
+	void codegen(std::shared_ptr<Ast::Return> node);
 	llvm::Value* codegen(std::shared_ptr<Ast::Expression> node);
 	llvm::Value* codegen(std::shared_ptr<Ast::Call> node);
 	llvm::Value* codegen(std::shared_ptr<Ast::Number> node);
@@ -228,10 +230,30 @@ void Codegen::codegen(std::shared_ptr<Ast::Program> node) {
 		else if (std::dynamic_pointer_cast<Ast::Call>(node->statements[i])) {
 			this->codegen(std::dynamic_pointer_cast<Ast::Call>(node->statements[i]));
 		}
+		else {
+			assert(false);
+		}
 	}
 
 	// Create return statement
 	this->builder->CreateRet(llvm::ConstantInt::get(*(this->context), llvm::APInt(32, 0)));
+}
+
+void Codegen::codegen(std::shared_ptr<Ast::Block> node) {
+	for (size_t i = 0; i < node->statements.size(); i++) {
+		if (std::dynamic_pointer_cast<Ast::Assignment>(node->statements[i])) {
+			this->codegen(std::dynamic_pointer_cast<Ast::Assignment>(node->statements[i]));
+		}
+		else if (std::dynamic_pointer_cast<Ast::Call>(node->statements[i])) {
+			this->codegen(std::dynamic_pointer_cast<Ast::Call>(node->statements[i]));
+		}
+		else if (std::dynamic_pointer_cast<Ast::Return>(node->statements[i])) {
+			this->codegen(std::dynamic_pointer_cast<Ast::Return>(node->statements[i]));
+		}
+		else {
+			assert(false);
+		}
+	}
 }
 
 void Codegen::codegen(std::shared_ptr<Ast::Function> node) {
@@ -269,13 +291,20 @@ void Codegen::codegen(std::shared_ptr<Ast::Function> node) {
 			}
 
 			// Codegen body
-			assert(std::dynamic_pointer_cast<Ast::Expression>(node->body));
-			llvm::Value* result = this->codegen(std::dynamic_pointer_cast<Ast::Expression>(node->body));
-			if (result) {
-				this->builder->CreateRet(result);
-				llvm::verifyFunction(*f);
+			if (std::dynamic_pointer_cast<Ast::Expression>(node->body)) {
+				llvm::Value* result = this->codegen(std::dynamic_pointer_cast<Ast::Expression>(node->body));
+				if (result) {
+					this->builder->CreateRet(result);
+				}
+			}
+			else if (std::dynamic_pointer_cast<Ast::Block>(node->body)) {
+				this->codegen(std::dynamic_pointer_cast<Ast::Block>(node->body));
+			}
+			else {
+				assert(false);
 			}
 
+			llvm::verifyFunction(*f);
 			this->remove_scope();
 		}
 	}
@@ -290,6 +319,15 @@ void Codegen::codegen(std::shared_ptr<Ast::Assignment> node) {
 
 	// Add it to the scope
 	this->current_scope()[node->identifier->value] = expr;
+}
+
+void Codegen::codegen(std::shared_ptr<Ast::Return> node) {
+	// Generate value of expression
+	llvm::Value* expr = this->codegen(node->expression);
+
+	// Create return value
+	assert(expr);
+	this->builder->CreateRet(expr);
 }
 
 llvm::Value* Codegen::codegen(std::shared_ptr<Ast::Expression> node) {
