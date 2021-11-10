@@ -39,7 +39,9 @@ struct Context {
 	std::string file;
 	std::vector<std::unordered_map<std::string, Binding>> scopes;
 
+	Result<Ok, Errors> analyze(std::shared_ptr<Ast::Block> block);
 	Result<Ok, Errors> analyze(std::shared_ptr<Ast::Assignment> assignment);
+	Result<Ok, Errors> analyze(std::shared_ptr<Ast::Return> node);
 	Result<Ok, Errors> analyze(std::shared_ptr<Ast::Expression> node);
 	Result<Ok, Errors> analyze(std::shared_ptr<Ast::Call> node);
 	Result<Ok, Errors> analyze(std::shared_ptr<Ast::Number> node);
@@ -62,13 +64,19 @@ struct Context {
 Result<Ok, Errors> semantic::analyze(std::shared_ptr<Ast::Program> program) {
 	Context context;
 	context.add_scope();
+	auto block = std::make_shared<Ast::Block>(program->statements, program->functions, program->line, program->col, program->file);
+	return context.analyze(block);
+}
+
+Result<Ok, Errors> Context::analyze(std::shared_ptr<Ast::Block> block) {
+	block->type = Type("void");;
 	Errors errors;
 
 	// Add functions to the current scope
-	for (size_t i = 0; i < program->functions.size(); i++) {
-		auto function = program->functions[i];
+	for (size_t i = 0; i < block->functions.size(); i++) {
+		auto function = block->functions[i];
 
-		auto& scope = context.current_scope();
+		auto& scope = this->current_scope();
 		if (scope.find(function->identifier->value) == scope.end()) {
 			auto binding = Binding(function->identifier->value, {function});
 			scope[function->identifier->value] = binding;
@@ -78,17 +86,25 @@ Result<Ok, Errors> semantic::analyze(std::shared_ptr<Ast::Program> program) {
 		}
 	}
 
-	for (size_t i = 0; i  < program->statements.size(); i++) {
-		std::shared_ptr<Ast::Node> node = program->statements[i];
+	for (size_t i = 0; i  < block->statements.size(); i++) {
+		std::shared_ptr<Ast::Node> node = block->statements[i];
 		Result<Ok, Errors> result;
-
+		
 		if (std::dynamic_pointer_cast<Ast::Assignment>(node)) {
-			result = context.analyze(std::dynamic_pointer_cast<Ast::Assignment>(node));
+			result = this->analyze(std::dynamic_pointer_cast<Ast::Assignment>(node));
 		}
 		else if (std::dynamic_pointer_cast<Ast::Call>(node)) {
-			result = context.analyze(std::dynamic_pointer_cast<Ast::Call>(node));
+			result = this->analyze(std::dynamic_pointer_cast<Ast::Call>(node));
 			if (result.is_ok() && std::dynamic_pointer_cast<Ast::Call>(node)->type != Type("void")) {
 				result = Result<Ok, Errors>(Errors{errors::unhandled_return_value(std::dynamic_pointer_cast<Ast::Call>(node))}); // tested in test/errors/unhandled_return_value.dm
+			}
+		}
+		else if (std::dynamic_pointer_cast<Ast::Return>(node)) {
+			result = this->analyze(std::dynamic_pointer_cast<Ast::Return>(node));
+			if (std::dynamic_pointer_cast<Ast::Return>(node)->expression) {
+				if (result.is_ok() && block->type == Type("void")) {
+					block->type = std::dynamic_pointer_cast<Ast::Return>(node)->expression->type;
+				}
 			}
 		}
 		else  {
@@ -105,27 +121,37 @@ Result<Ok, Errors> semantic::analyze(std::shared_ptr<Ast::Program> program) {
 	else                    return Result<Ok, std::vector<Error>>(Ok());
 }
 
-Result<Ok, Errors> Context::analyze(std::shared_ptr<Ast::Assignment> assignment) {
-	Binding binding = Binding(assignment->identifier->value, assignment);
+Result<Ok, Errors> Context::analyze(std::shared_ptr<Ast::Assignment> node) {
+	Binding binding = Binding(node->identifier->value, node);
 
 	// Get expression type
-	auto result = this->analyze(assignment->expression);
+	auto result = this->analyze(node->expression);
 	if (result.is_error()) return result;
 
 	// Save it context
-	if (this->get_binding(assignment->identifier->value)) {
-		return Result<Ok, Errors>(Errors{errors::reassigning_immutable_variable(assignment->identifier, this->get_binding(assignment->identifier->value)->assignment)}); // tested in test/errors/reassigning_immutable_variable.dm
+	if (this->get_binding(node->identifier->value)) {
+		return Result<Ok, Errors>(Errors{errors::reassigning_immutable_variable(node->identifier, this->get_binding(node->identifier->value)->assignment)}); // tested in test/errors/reassigning_immutable_variable.dm
 	}
 	else {
-		this->current_scope()[assignment->identifier->value] = binding;
+		this->current_scope()[node->identifier->value] = binding;
 		return Result<Ok, Errors>(Ok());
 	}
+}
+
+Result<Ok, Errors> Context::analyze(std::shared_ptr<Ast::Return> node) {
+	// Get expression type
+	if (node->expression) {
+		auto result = this->analyze(node->expression);
+		if (result.is_error()) return result;
+	}
+
+	return Result<Ok, Errors>(Ok());
 }
 
 Result<Ok, Errors> Context::analyze(std::shared_ptr<Ast::Expression> node) {
 	if      (std::dynamic_pointer_cast<Ast::Call>(node))       return this->analyze(std::dynamic_pointer_cast<Ast::Call>(node));
 	else if (std::dynamic_pointer_cast<Ast::Number>(node))     return this->analyze(std::dynamic_pointer_cast<Ast::Number>(node));
-	else if (std::dynamic_pointer_cast<Ast::Integer>(node))     return this->analyze(std::dynamic_pointer_cast<Ast::Integer>(node));
+	else if (std::dynamic_pointer_cast<Ast::Integer>(node))    return this->analyze(std::dynamic_pointer_cast<Ast::Integer>(node));
 	else if (std::dynamic_pointer_cast<Ast::Identifier>(node)) return this->analyze(std::dynamic_pointer_cast<Ast::Identifier>(node));
 	else if (std::dynamic_pointer_cast<Ast::Boolean>(node))    return this->analyze(std::dynamic_pointer_cast<Ast::Boolean>(node));
 	else assert(false);
@@ -320,11 +346,25 @@ Result<Ok, Errors> Context::get_type_of_user_defined_function(std::shared_ptr<As
 							context.current_scope()[binding.identifier] = binding;
 						}
 
-						auto result = context.analyze(std::dynamic_pointer_cast<Ast::Expression>((*specialization)->body));
-						if (result.is_ok()) {
-							(*specialization)->valid = true;
-							(*specialization)->return_type = std::dynamic_pointer_cast<Ast::Expression>((*specialization)->body)->type;
-							(*method)->specializations.push_back(*specialization);
+					
+						if (std::dynamic_pointer_cast<Ast::Expression>((*specialization)->body)) {
+							auto result = context.analyze(std::dynamic_pointer_cast<Ast::Expression>((*specialization)->body));
+							if (result.is_ok()) {
+								(*specialization)->valid = true;
+								(*specialization)->return_type = std::dynamic_pointer_cast<Ast::Expression>((*specialization)->body)->type;
+								(*method)->specializations.push_back(*specialization);
+							}
+						}
+						else if (std::dynamic_pointer_cast<Ast::Block>((*specialization)->body)) {
+							auto result = context.analyze(std::dynamic_pointer_cast<Ast::Block>((*specialization)->body));
+							if (result.is_ok()) {
+								(*specialization)->valid = true;
+								(*specialization)->return_type = std::dynamic_pointer_cast<Ast::Block>((*specialization)->body)->type;
+								(*method)->specializations.push_back(*specialization);
+							}
+						}
+						else {
+							assert(false);
 						}
 					}
 

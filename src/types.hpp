@@ -133,6 +133,7 @@ namespace Ast {
 	struct Block : Node {
 		std::vector<std::shared_ptr<Ast::Node>> statements;
 		std::vector<std::shared_ptr<Ast::Function>> functions;
+		Type type;
 
 		Block(std::vector<std::shared_ptr<Ast::Node>> statements, std::vector<std::shared_ptr<Ast::Function>> functions, size_t line, size_t col, std::string file) : Node(line, col, file), statements(statements), functions(functions) {}
 		virtual ~Block() {}
