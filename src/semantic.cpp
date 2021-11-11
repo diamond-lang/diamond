@@ -201,12 +201,12 @@ Result<Ok, Errors> Context::analyze(std::shared_ptr<Ast::Boolean> node) {
 }
 
 Binding* Context::get_binding(std::string identifier) {
-	if (this->current_scope().find(identifier) != this->current_scope().end()) {
-		return &(this->current_scope()[identifier]);
+	for (auto scope = this->scopes.rbegin(); scope != this->scopes.rend(); scope++) {
+		if (scope->find(identifier) != scope->end()) {
+			return &(*scope)[identifier];
+		}
 	}
-	else {
-		return nullptr;
-	}
+	return nullptr;
 }
 
 std::vector<std::unordered_map<std::string, Binding>> Context::get_definitions() {
@@ -303,8 +303,7 @@ Result<Ok, Errors> Context::get_type_of_intrinsic(std::shared_ptr<Ast::Call> nod
 Result<Ok, Errors> Context::get_type_of_user_defined_function(std::shared_ptr<Ast::Call> node) {
 	// If function binding exists
 	auto binding = this->get_binding(node->identifier->value);
-	if (binding
-	&& binding->is_function()) {
+	if (binding && binding->is_function()) {
 
 		// Find method with that match arguments types
 		auto methods = binding->methods;
@@ -312,86 +311,76 @@ Result<Ok, Errors> Context::get_type_of_user_defined_function(std::shared_ptr<As
 
 			// If the method has the same argument size as the call
 			if ((*method)->args.size() == node->args.size()) {
+				assert((*method)->generic);
 
-				// If method is generic
-				if ((*method)->generic) {
-
-					// Check if there is a specialization that match arguments types
-					auto args = this->get_args_types(node);
-					std::shared_ptr<Ast::FunctionSpecialization>* specialization = nullptr;
-					for (auto it = (*method)->specializations.begin(); it != (*method)->specializations.end(); it++) {
-						if ((*it)->args_types == args) {
-							specialization = &(*it);
-							break;
-						}
-					}
-
-					// If no specialization was founded
-					if (!specialization) {
-						// Add new specialization
-						auto aux = std::make_shared<Ast::FunctionSpecialization>();
-						specialization = &aux;
-						(*specialization)->args_types = args;
-						(*specialization)->body = (*method)->body->clone();
-
-						// Create new context
-						Context context;
-						context.file = this->file;
-						context.scopes = this->get_definitions();
-						context.add_scope();
-
-						// Add arguments to new scope
-						for (size_t i = 0; i != node->args.size(); i++) {
-							auto binding = Binding((*method)->args[i]->value, node->args[i]);
-							context.current_scope()[binding.identifier] = binding;
-						}
-
-					
-						if (std::dynamic_pointer_cast<Ast::Expression>((*specialization)->body)) {
-							auto result = context.analyze(std::dynamic_pointer_cast<Ast::Expression>((*specialization)->body));
-							if (result.is_ok()) {
-								(*specialization)->valid = true;
-								(*specialization)->return_type = std::dynamic_pointer_cast<Ast::Expression>((*specialization)->body)->type;
-								(*method)->specializations.push_back(*specialization);
-							}
-						}
-						else if (std::dynamic_pointer_cast<Ast::Block>((*specialization)->body)) {
-							auto result = context.analyze(std::dynamic_pointer_cast<Ast::Block>((*specialization)->body));
-							if (result.is_ok()) {
-								(*specialization)->valid = true;
-								(*specialization)->return_type = std::dynamic_pointer_cast<Ast::Block>((*specialization)->body)->type;
-								(*method)->specializations.push_back(*specialization);
-							}
-						}
-						else {
-							assert(false);
-						}
-					}
-
-					// If specialization valid
-					if ((*specialization)->valid) {
-						node->type = (*specialization)->return_type;
-						return Result<Ok, Errors>(Ok());
+				// Check if there is a specialization that match arguments types
+				auto args = this->get_args_types(node);
+				std::shared_ptr<Ast::FunctionSpecialization>* specialization = nullptr;
+				for (auto it = (*method)->specializations.begin(); it != (*method)->specializations.end(); it++) {
+					if ((*it)->args_types == args) {
+						specialization = &(*it);
+						break;
 					}
 				}
-				else {
-					assert(false);
+
+				// If no specialization was founded
+				if (!specialization) {
+					// Add new specialization
+					auto aux = std::make_shared<Ast::FunctionSpecialization>();
+					specialization = &aux;
+					(*specialization)->args_types = args;
+					(*specialization)->body = (*method)->body->clone();
+
+					// Create new context
+					Context context;
+					context.file = this->file;
+					context.scopes = this->get_definitions();
+					context.add_scope();
+
+					// Add arguments to new scope
+					for (size_t i = 0; i != node->args.size(); i++) {
+						auto binding = Binding((*method)->args[i]->value, node->args[i]);
+						context.current_scope()[binding.identifier] = binding;
+					}
+
+				
+					if (std::dynamic_pointer_cast<Ast::Expression>((*specialization)->body)) {
+						auto result = context.analyze(std::dynamic_pointer_cast<Ast::Expression>((*specialization)->body));
+						if (result.is_ok()) {
+							(*specialization)->valid = true;
+							(*specialization)->return_type = std::dynamic_pointer_cast<Ast::Expression>((*specialization)->body)->type;
+							(*method)->specializations.push_back(*specialization);
+						}
+					}
+					else if (std::dynamic_pointer_cast<Ast::Block>((*specialization)->body)) {
+						auto result = context.analyze(std::dynamic_pointer_cast<Ast::Block>((*specialization)->body));
+						if (result.is_ok()) {
+							(*specialization)->valid = true;
+							(*specialization)->return_type = std::dynamic_pointer_cast<Ast::Block>((*specialization)->body)->type;
+							(*method)->specializations.push_back(*specialization);
+						}
+					}
+					else assert(false);
+				}
+
+				// If specialization valid
+				if ((*specialization)->valid) {
+					node->type = (*specialization)->return_type;
+					return Result<Ok, Errors>(Ok());
 				}
 			}
 		}
 	}
-	else {
-		std::string error_message = node->identifier->value + "(";
-		for (size_t i = 0; i < node->args.size(); i++) {
-			error_message += node->args[i]->type.to_str();
-			if (i != node->args.size() - 1) {
-			 	error_message += ", ";
-			}
+
+	std::string error_message = node->identifier->value + "(";
+	for (size_t i = 0; i < node->args.size(); i++) {
+		error_message += node->args[i]->type.to_str();
+		if (i != node->args.size() - 1) {
+			error_message += ", ";
 		}
-		error_message += ") is not defined by the user\n";
-		return Result<Ok, Errors>(Errors{error_message});
 	}
-	return Result<Ok, Errors>(Ok());
+	error_message += ") is not defined by the user\n";
+	return Result<Ok, Errors>(Errors{error_message});
 }
 
 std::vector<Type> Context::get_args_types(std::shared_ptr<Ast::Call> node) {

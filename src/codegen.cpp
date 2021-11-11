@@ -301,14 +301,14 @@ void Codegen::codegen(std::vector<std::shared_ptr<Ast::Function>> functions) {
 			}
 
 			// Codegen body
-			if (std::dynamic_pointer_cast<Ast::Expression>(node->body)) {
-				llvm::Value* result = this->codegen(std::dynamic_pointer_cast<Ast::Expression>(node->body));
+			if (std::dynamic_pointer_cast<Ast::Expression>(specialization->body)) {
+				llvm::Value* result = this->codegen(std::dynamic_pointer_cast<Ast::Expression>(specialization->body));
 				if (result) {
 					this->builder->CreateRet(result);
 				}
 			}
-			else if (std::dynamic_pointer_cast<Ast::Block>(node->body)) {
-				this->codegen(std::dynamic_pointer_cast<Ast::Block>(node->body));
+			else if (std::dynamic_pointer_cast<Ast::Block>(specialization->body)) {
+				this->codegen(std::dynamic_pointer_cast<Ast::Block>(specialization->body));
 			}
 			else {
 				assert(false);
