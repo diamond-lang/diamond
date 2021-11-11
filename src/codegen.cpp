@@ -50,7 +50,7 @@ struct Codegen {
 
 	void codegen(std::shared_ptr<Ast::Program> node);
 	void codegen(std::shared_ptr<Ast::Block> node);
-	void codegen(std::shared_ptr<Ast::Function> node);
+	void codegen(std::vector<std::shared_ptr<Ast::Function>> functions);
 	void codegen(std::shared_ptr<Ast::Assignment> node);
 	void codegen(std::shared_ptr<Ast::Return> node);
 	llvm::Value* codegen(std::shared_ptr<Ast::Expression> node);
@@ -198,9 +198,7 @@ void Codegen::codegen(std::shared_ptr<Ast::Program> node) {
 	llvm::Function::Create(printfType, llvm::Function::ExternalLinkage, "printf", this->module);
 
 	// Codegen functions
-	for (size_t i = 0; i < node->functions.size(); i++) {
-		this->codegen(node->functions[i]);
-	}
+	this->codegen(node->functions);
 
 	// Crate main function
 	llvm::FunctionType* mainType = llvm::FunctionType::get(this->builder->getInt32Ty(), false);
@@ -256,8 +254,11 @@ void Codegen::codegen(std::shared_ptr<Ast::Block> node) {
 	}
 }
 
-void Codegen::codegen(std::shared_ptr<Ast::Function> node) {
-	if (node->generic) {
+void Codegen::codegen(std::vector<std::shared_ptr<Ast::Function>> functions) {
+	for (size_t i = 0; i < functions.size(); i++) {
+		auto& node = functions[i];
+
+		// Generate prototypes
 		for (size_t i = 0; i < node->specializations.size(); i++) {
 			auto& specialization = node->specializations[i];
 			assert(specialization->valid);
@@ -277,6 +278,15 @@ void Codegen::codegen(std::shared_ptr<Ast::Function> node) {
 				arg.setName(node->args[j]->value);
 				j++;
 			}
+		}
+
+		// Generate functions
+		for (size_t i = 0; i < node->specializations.size(); i++) {
+			auto& specialization = node->specializations[i];
+			assert(specialization->valid);
+
+			std::string name = node->identifier->value + "_" + specialization->return_type.to_str();
+			llvm::Function* f = this->module->getFunction(name);
 
 			// Create the body of the function
 			llvm::BasicBlock *body = llvm::BasicBlock::Create(*(this->context), "entry", f);
@@ -284,7 +294,7 @@ void Codegen::codegen(std::shared_ptr<Ast::Function> node) {
 
 			// Add arguments to scope
 			this->add_scope();
-			j = 0;
+			size_t j = 0;
 			for (auto &arg : f->args()) {
 				this->current_scope()[node->args[j]->value] = &arg;
 				j++;
@@ -308,9 +318,6 @@ void Codegen::codegen(std::shared_ptr<Ast::Function> node) {
 			this->remove_scope();
 		}
 	}
-	else {
-		assert(false);
-	}
 }
 
 void Codegen::codegen(std::shared_ptr<Ast::Assignment> node) {
@@ -333,7 +340,7 @@ void Codegen::codegen(std::shared_ptr<Ast::Return> node) {
 llvm::Value* Codegen::codegen(std::shared_ptr<Ast::Expression> node) {
 	if      (std::dynamic_pointer_cast<Ast::Call>(node))       return this->codegen(std::dynamic_pointer_cast<Ast::Call>(node));
 	else if (std::dynamic_pointer_cast<Ast::Number>(node))     return this->codegen(std::dynamic_pointer_cast<Ast::Number>(node));
-	else if (std::dynamic_pointer_cast<Ast::Integer>(node))     return this->codegen(std::dynamic_pointer_cast<Ast::Integer>(node));
+	else if (std::dynamic_pointer_cast<Ast::Integer>(node))    return this->codegen(std::dynamic_pointer_cast<Ast::Integer>(node));
 	else if (std::dynamic_pointer_cast<Ast::Identifier>(node)) return this->codegen(std::dynamic_pointer_cast<Ast::Identifier>(node));
 	else if (std::dynamic_pointer_cast<Ast::Boolean>(node))    return this->codegen(std::dynamic_pointer_cast<Ast::Boolean>(node));
 
@@ -514,6 +521,7 @@ llvm::Type* Codegen::as_llvm_type(Type type) {
 	if      (type == Type("float64")) return llvm::Type::getDoubleTy(*(this->context));
 	else if (type == Type("int64"))   return llvm::Type::getInt64Ty(*(this->context));
 	else if (type == Type("bool"))    return llvm::Type::getInt1Ty(*(this->context));
+	else if (type == Type("void"))    return llvm::Type::getVoidTy(*(this->context));
 	else                              assert(false);
 }
 
