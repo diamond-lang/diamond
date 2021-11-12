@@ -97,7 +97,7 @@ def buid_on_linux():
 	objects_files = ' '.join(objects_files)
 
 	# Build diamond
-	command = f'{get_compiler()} {get_cpp_version()} {objects_files} -o {name} -L{llvm_path}/lib {get_lld_libraries()} {llvm_libs} -lrt -ldl -lpthread -lm -lz -ltinfo'
+	command = f'{get_compiler()} {get_cpp_version()} {objects_files} -o {name} -L{llvm_path}/lib {get_lld_libraries()} {llvm_libs} -lrt -ldl -lpthread -lm -ltinfo'
 	print("Linking...")
 	output = os.popen(command).read()
 	print(output)
