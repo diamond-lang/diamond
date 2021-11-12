@@ -15,40 +15,56 @@ diamond uses the following dependencies:
 - LLVM 12
 - Python 3 (for build.py and test.py)
 
-## Building on ubuntu
+Also you need to have a system capable of compiling C++.
 
-On ubuntu LLVM 12 can be installed following the instructions on this [link](https://apt.llvm.org/).
-
-Namely adding the LLVM software repository, then adding the public key, updating the package repository, and finally installing LLVM and LLD:
-
+On Ubuntu this can be achieved with the following command:
 ```
-sudo apt-get install llvm-12-dev liblld-12-dev
+sudo apt-get install build-essential
 ```
 
-Then to build diamond:
+And on Windows you have to download [Build Tools fo Visual Studio 2019](https://visualstudio.microsoft.com/downloads/) and install. On the installation you should mark "Desktop Development with C++".
 
+## Building on Ubuntu
+
+To get LLVM you can run `get_llvm.py`. This script download LLVM prebuilt binaries, extract them and save them in `deps` inside `llvm`.
+
+This script download LLVM from
+[https://github.com/llvm/llvm-project/releases](https://github.com/llvm/llvm-project/releases).
+
+Then to build diamond you can use `build.py`. This script assumes there is a `llvm` folder inside `deps` with the prebuilt binaries.
+
+So to install llvm you would run:
 ```
-./build.py /usr/lib/llvm-12
+./get_llvm.py
 ```
 
-(Where `/usr/lib/llvm-12` is the path where llvm is installed, by default the script assumes llvm is installed in `/usr/lib/llvm`)
+And to build diamond:
+```
+./build.py
+```
+
+Optionally you can pass to `build.py` a path to a `llvm-config` binary. This way you
+can use a LLVM installation build from source, or a LLVM installation installed with
+a package manager.
 
 ## Building on Windows
 
-The easiest way to obtain LLVM and LLD on windows is to download a prebuilt version of LLVM.
+To get LLVM you can run `get_llvm.py`. This script download LLVM prebuilt binaries, extract them and save them in `deps/` inside `llvm/`.
 
-In this case we are going to use one provided by [Zig](https://ziglang.org/).
-
-Download the following package and then extract it:
-
+This script downloads a prebuilt version of LLVM provided by [Zig](https://ziglang.org/). So far is the easiest way I have found to use LLVM on Windows without having to built it from scratch.
 - [llvm+clang+lld-12.0.1-rc1-x86_64-windows-msvc-release-mt.tar.xz](https://ziglang.org/deps/llvm%2bclang%2blld-12.0.1-rc1-x86_64-windows-msvc-release-mt.tar.xz)
 
-Then to build diamond:
+Then to build diamond you can use `build.py`. This script assumes there is a `llvm` folder inside `deps` with the prebuilt binaries.
+
+So to install llvm you would run:
 ```
-.\build.py path\to\extracted\llvm\after\download
+.\get_llvm.py
 ```
 
-The command should by something like this:
+And to build diamond:
 ```
-.\build.py C:\Users\alonso\Downloads\llvm+clang+lld-12.0.1-rc1-x86_64-windows-msvc-release-mt
+.\build.py
 ```
+
+Optionally you can pass to `build.py` a path to a `llvm-config` binary. This way you
+can use a LLVM installation build from source.
