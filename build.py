@@ -47,7 +47,7 @@ def get_object_file_extension():
 	else: assert False
 
 def get_flags_to_make_object_file():
-	if   platform.system() == 'Linux': return '-c -o'
+	if   platform.system() == 'Linux': return '-c -o '
 	elif platform.system() == 'Windows': return '/Fo'
 	else: assert False
 
@@ -82,7 +82,7 @@ def build_object_files(llvm_path):
 	_ = pool.map(partial(build_object_file, llvm_path=llvm_path), get_source_files())
 
 def buid_on_linux():
-	llvm_path = '/usr/lib/llvm'
+	llvm_path = 'deps/llvm'
 	if len(sys.argv) > 1:
 		llvm_path = sys.argv[1]
 
@@ -103,7 +103,7 @@ def buid_on_linux():
 	print(output)
 
 def build_on_windows():
-	llvm_path = 'C:\\Program Files\\LLVM'
+	llvm_path = 'deps\\llvm'
 	if len(sys.argv) > 1:
 		llvm_path = sys.argv[1]
 
