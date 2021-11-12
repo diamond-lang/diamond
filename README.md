@@ -28,10 +28,10 @@ sudo apt-get install llvm-12-dev liblld-12-dev
 Then to build diamond:
 
 ```
-./build.py /usr/bin/llvm-12
+./build.py /usr/lib/llvm-12
 ```
 
-(Where `/usr/bin/llvm-12` is the path where llvm is installed, by default the script assumes llvm is installed in `/usr/bin/llvm`)
+(Where `/usr/lib/llvm-12` is the path where llvm is installed, by default the script assumes llvm is installed in `/usr/lib/llvm`)
 
 ## Building on Windows
 
