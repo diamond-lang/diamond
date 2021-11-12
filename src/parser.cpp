@@ -131,7 +131,7 @@ ParserResult<std::shared_ptr<Ast::Node>> parse::function(Source source) {
 	source = left_paren.get_source();
 
 	std::vector<std::shared_ptr<Ast::Identifier>> args;
-	while (true) {
+	while (current(source) != ')') {
 		auto arg_identifier = parse::identifier(source);
 		if (arg_identifier.is_error()) return ParserResult<std::shared_ptr<Ast::Node>>(arg_identifier.get_errors());
 		source = arg_identifier.get_source();
@@ -187,10 +187,13 @@ ParserResult<std::shared_ptr<Ast::Node>> parse::return_stmt(Source source) {
 	source = keyword.get_source();
 
 	auto expression = parse::expression(source);
-	if (expression.is_error()) return ParserResult<std::shared_ptr<Ast::Node>>(expression.get_errors());
-	source = expression.get_source();
-
-	auto node = std::make_shared<Ast::Return>(expression.get_value(), source.line, source.col, source.file);
+	if (expression.is_ok()) {
+		source = expression.get_source();
+		auto node = std::make_shared<Ast::Return>(expression.get_value(), source.line, source.col, source.file);
+		return ParserResult<std::shared_ptr<Ast::Node>>(node, source);
+	}
+	
+	auto node = std::make_shared<Ast::Return>(nullptr, source.line, source.col, source.file);
 	return ParserResult<std::shared_ptr<Ast::Node>>(node, source);
 }
 
@@ -204,7 +207,7 @@ ParserResult<std::shared_ptr<Ast::Expression>> parse::call(Source source) {
 	source = left_paren.get_source();
 
 	std::vector<std::shared_ptr<Ast::Expression>> args;
-	while (true) {
+	while (current(source) != ')') {
 		auto arg = parse::expression(source);
 		if (arg.is_error()) return arg;
 		source = arg.get_source();

@@ -162,15 +162,18 @@ std::shared_ptr<Ast::Node> Ast::Assignment::clone() {
 	return std::make_shared<Ast::Assignment>(std::dynamic_pointer_cast<Ast::Identifier>(this->identifier->clone()), std::dynamic_pointer_cast<Expression>(this->expression->clone()), this->line, this->col, this->file);
 }
 
-// Assignment
+// Return
 void Ast::Return::print(size_t indent_level) {
 	put_indent_level(indent_level);
 	std::cout << "return" << '\n';
-	this->expression->print(indent_level + 1);
+	if (this->expression) {
+		this->expression->print(indent_level + 1);
+	}
 }
 
 std::shared_ptr<Ast::Node> Ast::Return::clone() {
-	return std::make_shared<Ast::Return>(std::dynamic_pointer_cast<Expression>(this->expression->clone()), this->line, this->col, this->file);
+	if (this->expression) return std::make_shared<Ast::Return>(std::dynamic_pointer_cast<Expression>(this->expression->clone()), this->line, this->col, this->file);
+	else                  return std::make_shared<Ast::Return>(nullptr, this->line, this->col, this->file);
 }
 
 // Call

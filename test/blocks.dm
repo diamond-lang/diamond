@@ -4,14 +4,23 @@ function add20(a)
 
 function add10(a)
     ten be 10
-    print(40)
     return add20(a) - ten
+
+function say23()
+    print(23)
+    return
+
+function say76()
+    print(76)
 
 print(add10(50))
 print(add20(50))
+say23()
+say76()
 
 --- Output
-40
 60
 70
+23
+76
 ---

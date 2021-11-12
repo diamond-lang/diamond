@@ -292,10 +292,12 @@ void Codegen::codegen(std::vector<std::shared_ptr<Ast::Function>> functions) {
 			}
 			else if (std::dynamic_pointer_cast<Ast::Block>(specialization->body)) {
 				this->codegen(std::dynamic_pointer_cast<Ast::Block>(specialization->body));
+				
+				if (specialization->return_type == Type("void")) {
+					this->builder->CreateRetVoid();
+				}
 			}
-			else {
-				assert(false);
-			}
+			else assert(false);
 
 			llvm::verifyFunction(*f);
 			this->remove_scope();
@@ -312,12 +314,16 @@ void Codegen::codegen(std::shared_ptr<Ast::Assignment> node) {
 }
 
 void Codegen::codegen(std::shared_ptr<Ast::Return> node) {
-	// Generate value of expression
-	llvm::Value* expr = this->codegen(node->expression);
+	if (node->expression) {
+		// Generate value of expression
+		llvm::Value* expr = this->codegen(node->expression);
 
-	// Create return value
-	assert(expr);
-	this->builder->CreateRet(expr);
+		// Create return value
+		this->builder->CreateRet(expr);
+	}
+	else {
+		this->builder->CreateRetVoid();
+	}
 }
 
 llvm::Value* Codegen::codegen(std::shared_ptr<Ast::Expression> node) {
