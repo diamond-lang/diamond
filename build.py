@@ -47,13 +47,13 @@ def get_object_file_extension():
 	else: assert False
 
 def get_flags_to_make_object_file():
-	if   platform.system() == 'Linux': return '-c -o '
+	if   platform.system() == 'Linux': return '-c -o'
 	elif platform.system() == 'Windows': return '/Fo'
 	else: assert False
 
 def get_llvm_include_path(llvm_path):
-	if   platform.system() == 'Linux': return llvm_path + '/include'
-	elif platform.system() == 'Windows': return f'"{llvm_path}\\include"'
+	if   platform.system() == 'Linux': return '-I ' + llvm_path
+	elif platform.system() == 'Windows': return '/' + llvm_path
 	else: assert False
 
 def get_lld_libraries():
@@ -63,47 +63,61 @@ def get_lld_libraries():
 
 # Builders
 # --------
-def build_object_file(source_file, llvm_path):
+def build_object_file(source_file, llvm_config):
 	source_file_o = os.path.basename(source_file).split('.')[0] + get_object_file_extension()
 	source_file_o = os.path.join('cache', source_file_o)
 
+	# Get llvm include path
+	command =f'{llvm_config} --includedir'
+	llvm_include_path = os.popen(command).read().strip()
+	llvm_include_path = get_llvm_include_path(llvm_include_path)
+
 	if not os.path.exists(source_file_o) or os.path.getmtime(source_file) > os.path.getmtime(source_file_o):
-		command = f'{get_compiler()} {get_cpp_version()} {source_file} {get_flags_to_make_object_file()}{source_file_o} -I {get_llvm_include_path(llvm_path)}'
+		command = f'{get_compiler()} {get_cpp_version()} {source_file} {get_flags_to_make_object_file()} {source_file_o} {llvm_include_path}'
 		print(command)
 		output = os.popen(command).read()
 
-def build_object_files(llvm_path):
+def build_object_files(llvm_config):
 	# Make cache dir if not exists
 	if not os.path.exists('cache'):
 		os.mkdir('cache')
 
 	num_cores = multiprocessing.cpu_count()
 	pool = multiprocessing.Pool(num_cores)
-	_ = pool.map(partial(build_object_file, llvm_path=llvm_path), get_source_files())
+	_ = pool.map(partial(build_object_file, llvm_config=llvm_config), get_source_files())
 
 def buid_on_linux():
-	llvm_path = 'deps/llvm'
+	llvm_config = 'deps/llvm/bin/llvm-config'
 	if len(sys.argv) > 1:
-		llvm_path = sys.argv[1]
+		llvm_config = sys.argv[1]
+	
+	# Check llvm-config exists
+	if not os.path.exists(llvm_config):
+		print(f'Couldn\'t found llvm-config in {os.path.dirname(llvm_config)} :(')
+		return
 
 	# Get llvm libs
-	command = f'{llvm_path}/bin/llvm-config --libs --link-static'
+	command = f'{llvm_config} --libs --link-static'
 	llvm_libs = os.popen(command).read()
 	llvm_libs = llvm_libs.strip()
 
 	# Build object files
-	build_object_files(llvm_path)
+	build_object_files(llvm_config)
 	objects_files = list(map(lambda file: os.path.join('cache', file), os.listdir('cache')))
 	objects_files = ' '.join(objects_files)
 
+	# Get libs path
+	command = f'{llvm_config} --link-static --ldflags'
+	libpath = os.popen(command).read().strip()
+
 	# Build diamond
-	command = f'{get_compiler()} {get_cpp_version()} {objects_files} -o {name} -L{llvm_path}/lib {get_lld_libraries()} {llvm_libs} -lrt -ldl -lpthread -lm -ltinfo'
+	command = f'{get_compiler()} {get_cpp_version()} {objects_files} -o {name} {libpath} {get_lld_libraries()} {llvm_libs} -lrt -ldl -lpthread -lm -ltinfo'
 	print("Linking...")
 	output = os.popen(command).read()
 	print(output)
 
 def build_on_windows():
-	llvm_path = 'deps\\llvm'
+	llvm_path = 'C:\\Program Files\\LLVM'
 	if len(sys.argv) > 1:
 		llvm_path = sys.argv[1]
 
