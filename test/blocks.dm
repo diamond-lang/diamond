@@ -4,12 +4,14 @@ function add20(a)
 
 function add10(a)
     ten be 10
+    print(40)
     return add20(a) - ten
 
 print(add10(50))
 print(add20(50))
 
 --- Output
+40
 60
 70
 ---

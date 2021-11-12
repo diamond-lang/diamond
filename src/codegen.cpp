@@ -35,12 +35,6 @@ struct Codegen {
 	llvm::Module* module;
 	llvm::IRBuilder<>* builder;
 	std::vector<std::unordered_map<std::string, llvm::Value*>> scopes;
-	struct {
-		llvm::Value* format_float;
-		llvm::Value* format_integer;
-		llvm::Value* format_true;
-		llvm::Value* format_false;
-	} format_strings;
 
 	Codegen() {
 		this->context = new llvm::LLVMContext();
@@ -208,17 +202,6 @@ void Codegen::codegen(std::shared_ptr<Ast::Program> node) {
 
 	// Add new scope
 	this->add_scope();
-
-	// Create global string for print
-	this->format_strings.format_float = this->builder->CreateGlobalStringPtr("%g\n");
-	this->format_strings.format_integer = this->builder->CreateGlobalStringPtr("%d\n");
-	this->format_strings.format_true = this->builder->CreateGlobalStringPtr("true\n");
-	this->format_strings.format_false = this->builder->CreateGlobalStringPtr("false\n");
-
-	// Check if we have printf
-	if (!this->module->getFunction("printf")) {
-		std::cout << "No print funciont :(" << '\n';
-	}
 
 	// Codegen statements
 	for (size_t i = 0; i < node->statements.size(); i++) {
@@ -448,14 +431,14 @@ llvm::Value* Codegen::codegen(std::shared_ptr<Ast::Call> node) {
 	if (node->identifier->value == "print") {
 		if (args[0]->getType()->isDoubleTy()) {
 			std::vector<llvm::Value*> printArgs;
-			printArgs.push_back(this->format_strings.format_float);
+			printArgs.push_back(this->builder->CreateGlobalStringPtr("%g\n"));
 			printArgs.push_back(args[0]);
 			this->builder->CreateCall(this->module->getFunction("printf"), printArgs);
 			return nullptr;
 		}
 		if (args[0]->getType()->isIntegerTy(64)) {
 			std::vector<llvm::Value*> printArgs;
-			printArgs.push_back(this->format_strings.format_integer);
+			printArgs.push_back(this->builder->CreateGlobalStringPtr("%d\n"));
 			printArgs.push_back(args[0]);
 			this->builder->CreateCall(this->module->getFunction("printf"), printArgs);
 			return nullptr;
@@ -470,7 +453,7 @@ llvm::Value* Codegen::codegen(std::shared_ptr<Ast::Call> node) {
 
 			// Create then branch
 			this->builder->SetInsertPoint(then_block);
-			printArgs.push_back(this->format_strings.format_true);
+			printArgs.push_back(this->builder->CreateGlobalStringPtr("true\n"));
 			this->builder->CreateCall(this->module->getFunction("printf"), printArgs);
 			this->builder->CreateBr(merge);
 			then_block = this->builder->GetInsertBlock();
@@ -480,7 +463,7 @@ llvm::Value* Codegen::codegen(std::shared_ptr<Ast::Call> node) {
 			// Create else branch
 			current_function->getBasicBlockList().push_back(else_block);
 			this->builder->SetInsertPoint(else_block);
-			printArgs.push_back(this->format_strings.format_false);
+			printArgs.push_back(this->builder->CreateGlobalStringPtr("false\n"));
 			this->builder->CreateCall(this->module->getFunction("printf"), printArgs);
 			this->builder->CreateBr(merge);
 			else_block = this->builder->GetInsertBlock();
