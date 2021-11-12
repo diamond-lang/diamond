@@ -107,15 +107,37 @@ std::shared_ptr<Ast::Node> Ast::Program::clone() {
 	return std::make_shared<Ast::Program>(statements, functions, this->line, this->col, this->file);
 }
 
+// Block
+void Ast::Block::print(size_t indent_level) {
+	for (size_t i = 0; i < this->statements.size(); i++) {
+		this->statements[i]->print(indent_level);
+	}
+	for (size_t i = 0; i < this->functions.size(); i++) {
+		this->functions[i]->print(indent_level);
+	}
+}
+
+std::shared_ptr<Ast::Node> Ast::Block::clone() {
+	std::vector<std::shared_ptr<Ast::Node>> statements;
+	for (size_t i = 0; i < this->statements.size(); i++) {
+		statements.push_back(this->statements[i]->clone());
+	}
+	std::vector<std::shared_ptr<Ast::Function>> functions;
+	for (size_t i = 0; i < this->functions.size(); i++) {
+		functions.push_back(std::dynamic_pointer_cast<Ast::Function>(this->functions[i]->clone()));
+	}
+	return std::make_shared<Ast::Block>(statements, functions, this->line, this->col, this->file);
+}
+
 // Function
 void Ast::Function::print(size_t indent_level) {
 	put_indent_level(indent_level);
-	std::cout << this->identifier->value << '(';
+	std::cout << "function " << this->identifier->value << '(';
 	for (size_t i = 0; i < this->args.size(); i++) {
 		std::cout << this->args[i]->value;
 		if (i != this->args.size() - 1) std::cout << ", ";
 	}
-	std::cout << ") is\n";
+	std::cout << ")\n";
 	this->body->print(indent_level + 1);
 }
 
@@ -138,6 +160,20 @@ void Ast::Assignment::print(size_t indent_level) {
 
 std::shared_ptr<Ast::Node> Ast::Assignment::clone() {
 	return std::make_shared<Ast::Assignment>(std::dynamic_pointer_cast<Ast::Identifier>(this->identifier->clone()), std::dynamic_pointer_cast<Expression>(this->expression->clone()), this->line, this->col, this->file);
+}
+
+// Return
+void Ast::Return::print(size_t indent_level) {
+	put_indent_level(indent_level);
+	std::cout << "return" << '\n';
+	if (this->expression) {
+		this->expression->print(indent_level + 1);
+	}
+}
+
+std::shared_ptr<Ast::Node> Ast::Return::clone() {
+	if (this->expression) return std::make_shared<Ast::Return>(std::dynamic_pointer_cast<Expression>(this->expression->clone()), this->line, this->col, this->file);
+	else                  return std::make_shared<Ast::Return>(nullptr, this->line, this->col, this->file);
 }
 
 // Call

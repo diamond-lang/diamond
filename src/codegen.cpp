@@ -35,12 +35,6 @@ struct Codegen {
 	llvm::Module* module;
 	llvm::IRBuilder<>* builder;
 	std::vector<std::unordered_map<std::string, llvm::Value*>> scopes;
-	struct {
-		llvm::Value* format_float;
-		llvm::Value* format_integer;
-		llvm::Value* format_true;
-		llvm::Value* format_false;
-	} format_strings;
 
 	Codegen() {
 		this->context = new llvm::LLVMContext();
@@ -49,8 +43,10 @@ struct Codegen {
 	}
 
 	void codegen(std::shared_ptr<Ast::Program> node);
-	void codegen(std::shared_ptr<Ast::Function> node);
+	void codegen(std::shared_ptr<Ast::Block> node);
+	void codegen(std::vector<std::shared_ptr<Ast::Function>> functions);
 	void codegen(std::shared_ptr<Ast::Assignment> node);
+	void codegen(std::shared_ptr<Ast::Return> node);
 	llvm::Value* codegen(std::shared_ptr<Ast::Expression> node);
 	llvm::Value* codegen(std::shared_ptr<Ast::Call> node);
 	llvm::Value* codegen(std::shared_ptr<Ast::Number> node);
@@ -196,9 +192,7 @@ void Codegen::codegen(std::shared_ptr<Ast::Program> node) {
 	llvm::Function::Create(printfType, llvm::Function::ExternalLinkage, "printf", this->module);
 
 	// Codegen functions
-	for (size_t i = 0; i < node->functions.size(); i++) {
-		this->codegen(node->functions[i]);
-	}
+	this->codegen(node->functions);
 
 	// Crate main function
 	llvm::FunctionType* mainType = llvm::FunctionType::get(this->builder->getInt32Ty(), false);
@@ -209,17 +203,6 @@ void Codegen::codegen(std::shared_ptr<Ast::Program> node) {
 	// Add new scope
 	this->add_scope();
 
-	// Create global string for print
-	this->format_strings.format_float = this->builder->CreateGlobalStringPtr("%g\n");
-	this->format_strings.format_integer = this->builder->CreateGlobalStringPtr("%d\n");
-	this->format_strings.format_true = this->builder->CreateGlobalStringPtr("true\n");
-	this->format_strings.format_false = this->builder->CreateGlobalStringPtr("false\n");
-
-	// Check if we have printf
-	if (!this->module->getFunction("printf")) {
-		std::cout << "No print funciont :(" << '\n';
-	}
-
 	// Codegen statements
 	for (size_t i = 0; i < node->statements.size(); i++) {
 		if (std::dynamic_pointer_cast<Ast::Assignment>(node->statements[i])) {
@@ -228,14 +211,37 @@ void Codegen::codegen(std::shared_ptr<Ast::Program> node) {
 		else if (std::dynamic_pointer_cast<Ast::Call>(node->statements[i])) {
 			this->codegen(std::dynamic_pointer_cast<Ast::Call>(node->statements[i]));
 		}
+		else {
+			assert(false);
+		}
 	}
 
 	// Create return statement
 	this->builder->CreateRet(llvm::ConstantInt::get(*(this->context), llvm::APInt(32, 0)));
 }
 
-void Codegen::codegen(std::shared_ptr<Ast::Function> node) {
-	if (node->generic) {
+void Codegen::codegen(std::shared_ptr<Ast::Block> node) {
+	for (size_t i = 0; i < node->statements.size(); i++) {
+		if (std::dynamic_pointer_cast<Ast::Assignment>(node->statements[i])) {
+			this->codegen(std::dynamic_pointer_cast<Ast::Assignment>(node->statements[i]));
+		}
+		else if (std::dynamic_pointer_cast<Ast::Call>(node->statements[i])) {
+			this->codegen(std::dynamic_pointer_cast<Ast::Call>(node->statements[i]));
+		}
+		else if (std::dynamic_pointer_cast<Ast::Return>(node->statements[i])) {
+			this->codegen(std::dynamic_pointer_cast<Ast::Return>(node->statements[i]));
+		}
+		else {
+			assert(false);
+		}
+	}
+}
+
+void Codegen::codegen(std::vector<std::shared_ptr<Ast::Function>> functions) {
+	for (size_t i = 0; i < functions.size(); i++) {
+		auto& node = functions[i];
+
+		// Generate prototypes
 		for (size_t i = 0; i < node->specializations.size(); i++) {
 			auto& specialization = node->specializations[i];
 			assert(specialization->valid);
@@ -255,6 +261,15 @@ void Codegen::codegen(std::shared_ptr<Ast::Function> node) {
 				arg.setName(node->args[j]->value);
 				j++;
 			}
+		}
+
+		// Generate functions
+		for (size_t i = 0; i < node->specializations.size(); i++) {
+			auto& specialization = node->specializations[i];
+			assert(specialization->valid);
+
+			std::string name = node->identifier->value + "_" + specialization->return_type.to_str();
+			llvm::Function* f = this->module->getFunction(name);
 
 			// Create the body of the function
 			llvm::BasicBlock *body = llvm::BasicBlock::Create(*(this->context), "entry", f);
@@ -262,25 +277,31 @@ void Codegen::codegen(std::shared_ptr<Ast::Function> node) {
 
 			// Add arguments to scope
 			this->add_scope();
-			j = 0;
+			size_t j = 0;
 			for (auto &arg : f->args()) {
 				this->current_scope()[node->args[j]->value] = &arg;
 				j++;
 			}
 
 			// Codegen body
-			assert(std::dynamic_pointer_cast<Ast::Expression>(node->body));
-			llvm::Value* result = this->codegen(std::dynamic_pointer_cast<Ast::Expression>(node->body));
-			if (result) {
-				this->builder->CreateRet(result);
-				llvm::verifyFunction(*f);
+			if (std::dynamic_pointer_cast<Ast::Expression>(specialization->body)) {
+				llvm::Value* result = this->codegen(std::dynamic_pointer_cast<Ast::Expression>(specialization->body));
+				if (result) {
+					this->builder->CreateRet(result);
+				}
 			}
+			else if (std::dynamic_pointer_cast<Ast::Block>(specialization->body)) {
+				this->codegen(std::dynamic_pointer_cast<Ast::Block>(specialization->body));
+				
+				if (specialization->return_type == Type("void")) {
+					this->builder->CreateRetVoid();
+				}
+			}
+			else assert(false);
 
+			llvm::verifyFunction(*f);
 			this->remove_scope();
 		}
-	}
-	else {
-		assert(false);
 	}
 }
 
@@ -292,10 +313,23 @@ void Codegen::codegen(std::shared_ptr<Ast::Assignment> node) {
 	this->current_scope()[node->identifier->value] = expr;
 }
 
+void Codegen::codegen(std::shared_ptr<Ast::Return> node) {
+	if (node->expression) {
+		// Generate value of expression
+		llvm::Value* expr = this->codegen(node->expression);
+
+		// Create return value
+		this->builder->CreateRet(expr);
+	}
+	else {
+		this->builder->CreateRetVoid();
+	}
+}
+
 llvm::Value* Codegen::codegen(std::shared_ptr<Ast::Expression> node) {
 	if      (std::dynamic_pointer_cast<Ast::Call>(node))       return this->codegen(std::dynamic_pointer_cast<Ast::Call>(node));
 	else if (std::dynamic_pointer_cast<Ast::Number>(node))     return this->codegen(std::dynamic_pointer_cast<Ast::Number>(node));
-	else if (std::dynamic_pointer_cast<Ast::Integer>(node))     return this->codegen(std::dynamic_pointer_cast<Ast::Integer>(node));
+	else if (std::dynamic_pointer_cast<Ast::Integer>(node))    return this->codegen(std::dynamic_pointer_cast<Ast::Integer>(node));
 	else if (std::dynamic_pointer_cast<Ast::Identifier>(node)) return this->codegen(std::dynamic_pointer_cast<Ast::Identifier>(node));
 	else if (std::dynamic_pointer_cast<Ast::Boolean>(node))    return this->codegen(std::dynamic_pointer_cast<Ast::Boolean>(node));
 
@@ -403,14 +437,14 @@ llvm::Value* Codegen::codegen(std::shared_ptr<Ast::Call> node) {
 	if (node->identifier->value == "print") {
 		if (args[0]->getType()->isDoubleTy()) {
 			std::vector<llvm::Value*> printArgs;
-			printArgs.push_back(this->format_strings.format_float);
+			printArgs.push_back(this->builder->CreateGlobalStringPtr("%g\n"));
 			printArgs.push_back(args[0]);
 			this->builder->CreateCall(this->module->getFunction("printf"), printArgs);
 			return nullptr;
 		}
 		if (args[0]->getType()->isIntegerTy(64)) {
 			std::vector<llvm::Value*> printArgs;
-			printArgs.push_back(this->format_strings.format_integer);
+			printArgs.push_back(this->builder->CreateGlobalStringPtr("%d\n"));
 			printArgs.push_back(args[0]);
 			this->builder->CreateCall(this->module->getFunction("printf"), printArgs);
 			return nullptr;
@@ -425,7 +459,7 @@ llvm::Value* Codegen::codegen(std::shared_ptr<Ast::Call> node) {
 
 			// Create then branch
 			this->builder->SetInsertPoint(then_block);
-			printArgs.push_back(this->format_strings.format_true);
+			printArgs.push_back(this->builder->CreateGlobalStringPtr("true\n"));
 			this->builder->CreateCall(this->module->getFunction("printf"), printArgs);
 			this->builder->CreateBr(merge);
 			then_block = this->builder->GetInsertBlock();
@@ -435,7 +469,7 @@ llvm::Value* Codegen::codegen(std::shared_ptr<Ast::Call> node) {
 			// Create else branch
 			current_function->getBasicBlockList().push_back(else_block);
 			this->builder->SetInsertPoint(else_block);
-			printArgs.push_back(this->format_strings.format_false);
+			printArgs.push_back(this->builder->CreateGlobalStringPtr("false\n"));
 			this->builder->CreateCall(this->module->getFunction("printf"), printArgs);
 			this->builder->CreateBr(merge);
 			else_block = this->builder->GetInsertBlock();
@@ -476,6 +510,7 @@ llvm::Type* Codegen::as_llvm_type(Type type) {
 	if      (type == Type("float64")) return llvm::Type::getDoubleTy(*(this->context));
 	else if (type == Type("int64"))   return llvm::Type::getInt64Ty(*(this->context));
 	else if (type == Type("bool"))    return llvm::Type::getInt1Ty(*(this->context));
+	else if (type == Type("void"))    return llvm::Type::getVoidTy(*(this->context));
 	else                              assert(false);
 }
 

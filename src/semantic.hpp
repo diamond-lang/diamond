@@ -4,7 +4,7 @@
 #include "types.hpp"
 
 namespace semantic {
-	Result<Ok, std::vector<Error>> analyze(std::shared_ptr<Ast::Program> program);
+	Result<Ok, Errors> analyze(std::shared_ptr<Ast::Program> program);
 }
 
 #endif

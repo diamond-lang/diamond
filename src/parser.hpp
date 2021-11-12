@@ -4,10 +4,12 @@
 #include "types.hpp"
 
 namespace parse {
-	Result<std::shared_ptr<Ast::Program>, std::vector<Error>> program(Source source);
+	Result<std::shared_ptr<Ast::Program>, Errors> program(Source source);
+	ParserResult<std::shared_ptr<Ast::Block>> block(Source source);
 	ParserResult<std::shared_ptr<Ast::Node>> function(Source source);
 	ParserResult<std::shared_ptr<Ast::Node>> statement(Source source);
 	ParserResult<std::shared_ptr<Ast::Node>> assignment(Source source);
+	ParserResult<std::shared_ptr<Ast::Node>> return_stmt(Source source);
 	ParserResult<std::shared_ptr<Ast::Expression>> call(Source source);
 	ParserResult<std::shared_ptr<Ast::Expression>> expression(Source source);
 	ParserResult<std::shared_ptr<Ast::Expression>> binary(Source source, int precedence = 1);
@@ -18,11 +20,13 @@ namespace parse {
 	ParserResult<std::shared_ptr<Ast::Expression>> integer(Source source);
 	ParserResult<std::shared_ptr<Ast::Expression>> boolean(Source source);
 	ParserResult<std::shared_ptr<Ast::Expression>> identifier(Source source);
+	ParserResult<std::shared_ptr<Ast::Expression>> identifier(Source source, std::string identifier);
 	ParserResult<std::shared_ptr<Ast::Node>> op(Source source);
 	ParserResult<std::string> token(Source source, std::string regex);
 	ParserResult<std::string> whitespace(Source source);
 	ParserResult<std::string> comment(Source source);
 	ParserResult<std::string> regex(Source source, std::string regex);
+	ParserResult<void*> indent(Source source);
 };
 
 #endif

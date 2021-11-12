@@ -12,6 +12,7 @@
 struct Source {
 	size_t line;
 	size_t col;
+	size_t indentation_level = -1;
 	std::string file;
 	std::string::iterator it;
 	std::string::iterator end;
@@ -30,28 +31,40 @@ struct Ok {
 };
 
 struct Error {
-	std::string error_message;
+	std::string message;
 
 	Error() {}
-	Error(std::string error_message) : error_message(error_message) {}
+	Error(std::string message) : message(message) {}
 	~Error() {}
 };
+
+using Errors = std::vector<Error>;
 
 // Parser result
 template <class T>
 struct ParserResult {
+	bool ok;
 	T value;
 	Source source;
-	std::string error_message;
+	Errors errors;
 
-	ParserResult<T>(T value, Source source, std::string error_message = "") : value(value), source(source), error_message(error_message) {}
-	ParserResult<T>(Source source, std::string error_message) : source(source), error_message(error_message) {}
+	ParserResult<T>(T value, Source source) : ok(true), value(value), source(source) {}
+	ParserResult<T>(Errors errors) : ok(false), errors(errors) {}
 
-	bool is_ok()        {return this->error_message.size() == 0;}
+	bool is_ok() {return this->ok;}
 	bool is_error()     {return !this->is_ok();}
-	T get_value()       {return this->value;}
-	Source get_source() {return this->source;}
-	Error get_error()   {return Error(this->error_message);}
+	T get_value()       {
+		assert(this->ok);
+		return this->value;
+	}
+	Source get_source() {
+		assert(this->ok);
+		return this->source;
+	}
+	Errors get_errors() {
+		assert(!(this->ok));
+		return this->errors;
+	}
 };
 
 template <class T1, class T2>
@@ -69,7 +82,11 @@ struct Result {
 		assert(this->is_ok() == true);
 		return std::get<T1>(this->value);
 	}
-	T2 get_error()  {
+	T2 get_error() {
+		assert(this->is_error() == true);
+		return std::get<T2>(this->value);
+	}
+	T2 get_errors()  {
 		assert(this->is_error() == true);
 		return std::get<T2>(this->value);
 	}
@@ -113,6 +130,17 @@ namespace Ast {
 		virtual std::shared_ptr<Node> clone();
 	};
 
+	struct Block : Node {
+		std::vector<std::shared_ptr<Ast::Node>> statements;
+		std::vector<std::shared_ptr<Ast::Function>> functions;
+		Type type;
+
+		Block(std::vector<std::shared_ptr<Ast::Node>> statements, std::vector<std::shared_ptr<Ast::Function>> functions, size_t line, size_t col, std::string file) : Node(line, col, file), statements(statements), functions(functions) {}
+		virtual ~Block() {}
+		virtual void print(size_t indent_level = 0);
+		virtual std::shared_ptr<Node> clone();
+	};
+
 	struct FunctionSpecialization;
 
 	struct Function : Node {
@@ -146,6 +174,15 @@ namespace Ast {
 
 		Assignment(std::shared_ptr<Ast::Identifier> identifier, std::shared_ptr<Ast::Expression> expression, size_t line, size_t col, std::string file) : Node(line, col, file), identifier(identifier), expression(expression) {}
 		virtual ~Assignment() {}
+		virtual void print(size_t indent_level = 0);
+		virtual std::shared_ptr<Node> clone();
+	};
+
+	struct Return : Node {
+		std::shared_ptr<Ast::Expression> expression;
+
+		Return(std::shared_ptr<Ast::Expression> expression, size_t line, size_t col, std::string file) : Node(line, col, file), expression(expression) {}
+		virtual ~Return() {}
 		virtual void print(size_t indent_level = 0);
 		virtual std::shared_ptr<Node> clone();
 	};

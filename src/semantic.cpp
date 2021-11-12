@@ -39,19 +39,21 @@ struct Context {
 	std::string file;
 	std::vector<std::unordered_map<std::string, Binding>> scopes;
 
-	Result<Ok, Error> analyze(std::shared_ptr<Ast::Assignment> assignment);
-	Result<Ok, Error> analyze(std::shared_ptr<Ast::Expression> node);
-	Result<Ok, Error> analyze(std::shared_ptr<Ast::Call> node);
-	Result<Ok, Error> analyze(std::shared_ptr<Ast::Number> node);
-	Result<Ok, Error> analyze(std::shared_ptr<Ast::Integer> node);
-	Result<Ok, Error> analyze(std::shared_ptr<Ast::Identifier> node);
-	Result<Ok, Error> analyze(std::shared_ptr<Ast::Boolean> node);
+	Result<Ok, Errors> analyze(std::shared_ptr<Ast::Block> block);
+	Result<Ok, Errors> analyze(std::shared_ptr<Ast::Assignment> assignment);
+	Result<Ok, Errors> analyze(std::shared_ptr<Ast::Return> node);
+	Result<Ok, Errors> analyze(std::shared_ptr<Ast::Expression> node);
+	Result<Ok, Errors> analyze(std::shared_ptr<Ast::Call> node);
+	Result<Ok, Errors> analyze(std::shared_ptr<Ast::Number> node);
+	Result<Ok, Errors> analyze(std::shared_ptr<Ast::Integer> node);
+	Result<Ok, Errors> analyze(std::shared_ptr<Ast::Identifier> node);
+	Result<Ok, Errors> analyze(std::shared_ptr<Ast::Boolean> node);
 
 	void add_scope() {this->scopes.push_back(std::unordered_map<std::string, Binding>());}
 	std::unordered_map<std::string, Binding>& current_scope() {return this->scopes[this->scopes.size() - 1];}
 	Binding* get_binding(std::string identifier);
-	Result<Ok, Error> get_type_of_intrinsic(std::shared_ptr<Ast::Call> node);
-	Result<Ok, Error> get_type_of_user_defined_function(std::shared_ptr<Ast::Call> node);
+	Result<Ok, Errors> get_type_of_intrinsic(std::shared_ptr<Ast::Call> node);
+	Result<Ok, Errors> get_type_of_user_defined_function(std::shared_ptr<Ast::Call> node);
 	std::vector<Type> get_args_types(std::shared_ptr<Ast::Call> node);
 	std::vector<std::unordered_map<std::string, Binding>> get_definitions();
 };
@@ -59,16 +61,22 @@ struct Context {
 
 // Implementations
 // ---------------
-Result<Ok, std::vector<Error>> semantic::analyze(std::shared_ptr<Ast::Program> program) {
+Result<Ok, Errors> semantic::analyze(std::shared_ptr<Ast::Program> program) {
 	Context context;
 	context.add_scope();
-	std::vector<Error> errors;
+	auto block = std::make_shared<Ast::Block>(program->statements, program->functions, program->line, program->col, program->file);
+	return context.analyze(block);
+}
+
+Result<Ok, Errors> Context::analyze(std::shared_ptr<Ast::Block> block) {
+	block->type = Type("void");;
+	Errors errors;
 
 	// Add functions to the current scope
-	for (size_t i = 0; i < program->functions.size(); i++) {
-		auto function = program->functions[i];
+	for (size_t i = 0; i < block->functions.size(); i++) {
+		auto function = block->functions[i];
 
-		auto& scope = context.current_scope();
+		auto& scope = this->current_scope();
 		if (scope.find(function->identifier->value) == scope.end()) {
 			auto binding = Binding(function->identifier->value, {function});
 			scope[function->identifier->value] = binding;
@@ -78,17 +86,25 @@ Result<Ok, std::vector<Error>> semantic::analyze(std::shared_ptr<Ast::Program> p
 		}
 	}
 
-	for (size_t i = 0; i  < program->statements.size(); i++) {
-		std::shared_ptr<Ast::Node> node = program->statements[i];
-		Result<Ok, Error> result;
-
+	for (size_t i = 0; i  < block->statements.size(); i++) {
+		std::shared_ptr<Ast::Node> node = block->statements[i];
+		Result<Ok, Errors> result;
+		
 		if (std::dynamic_pointer_cast<Ast::Assignment>(node)) {
-			result = context.analyze(std::dynamic_pointer_cast<Ast::Assignment>(node));
+			result = this->analyze(std::dynamic_pointer_cast<Ast::Assignment>(node));
 		}
 		else if (std::dynamic_pointer_cast<Ast::Call>(node)) {
-			result = context.analyze(std::dynamic_pointer_cast<Ast::Call>(node));
+			result = this->analyze(std::dynamic_pointer_cast<Ast::Call>(node));
 			if (result.is_ok() && std::dynamic_pointer_cast<Ast::Call>(node)->type != Type("void")) {
-				result = Result<Ok, Error>(Error(errors::unhandled_return_value(std::dynamic_pointer_cast<Ast::Call>(node)))); // tested in test/errors/unhandled_return_value.dm
+				result = Result<Ok, Errors>(Errors{errors::unhandled_return_value(std::dynamic_pointer_cast<Ast::Call>(node))}); // tested in test/errors/unhandled_return_value.dm
+			}
+		}
+		else if (std::dynamic_pointer_cast<Ast::Return>(node)) {
+			result = this->analyze(std::dynamic_pointer_cast<Ast::Return>(node));
+			if (std::dynamic_pointer_cast<Ast::Return>(node)->expression) {
+				if (result.is_ok() && block->type == Type("void")) {
+					block->type = std::dynamic_pointer_cast<Ast::Return>(node)->expression->type;
+				}
 			}
 		}
 		else  {
@@ -96,7 +112,8 @@ Result<Ok, std::vector<Error>> semantic::analyze(std::shared_ptr<Ast::Program> p
 		}
 
 		if (result.is_error()) {
-			errors.push_back(result.get_error());
+			auto result_errors = result.get_errors();
+			errors.insert(errors.begin(), result_errors.begin(), result_errors.end());
 		}
 	}
 
@@ -104,34 +121,44 @@ Result<Ok, std::vector<Error>> semantic::analyze(std::shared_ptr<Ast::Program> p
 	else                    return Result<Ok, std::vector<Error>>(Ok());
 }
 
-Result<Ok, Error> Context::analyze(std::shared_ptr<Ast::Assignment> assignment) {
-	Binding binding = Binding(assignment->identifier->value, assignment);
+Result<Ok, Errors> Context::analyze(std::shared_ptr<Ast::Assignment> node) {
+	Binding binding = Binding(node->identifier->value, node);
 
 	// Get expression type
-	auto result = this->analyze(assignment->expression);
+	auto result = this->analyze(node->expression);
 	if (result.is_error()) return result;
 
 	// Save it context
-	if (this->get_binding(assignment->identifier->value)) {
-		return Result<Ok, Error>(Error(errors::reassigning_immutable_variable(assignment->identifier, this->get_binding(assignment->identifier->value)->assignment))); // tested in test/errors/reassigning_immutable_variable.dm
+	if (this->get_binding(node->identifier->value)) {
+		return Result<Ok, Errors>(Errors{errors::reassigning_immutable_variable(node->identifier, this->get_binding(node->identifier->value)->assignment)}); // tested in test/errors/reassigning_immutable_variable.dm
 	}
 	else {
-		this->current_scope()[assignment->identifier->value] = binding;
-		return Result<Ok, Error>(Ok());
+		this->current_scope()[node->identifier->value] = binding;
+		return Result<Ok, Errors>(Ok());
 	}
 }
 
-Result<Ok, Error> Context::analyze(std::shared_ptr<Ast::Expression> node) {
+Result<Ok, Errors> Context::analyze(std::shared_ptr<Ast::Return> node) {
+	// Get expression type
+	if (node->expression) {
+		auto result = this->analyze(node->expression);
+		if (result.is_error()) return result;
+	}
+
+	return Result<Ok, Errors>(Ok());
+}
+
+Result<Ok, Errors> Context::analyze(std::shared_ptr<Ast::Expression> node) {
 	if      (std::dynamic_pointer_cast<Ast::Call>(node))       return this->analyze(std::dynamic_pointer_cast<Ast::Call>(node));
 	else if (std::dynamic_pointer_cast<Ast::Number>(node))     return this->analyze(std::dynamic_pointer_cast<Ast::Number>(node));
-	else if (std::dynamic_pointer_cast<Ast::Integer>(node))     return this->analyze(std::dynamic_pointer_cast<Ast::Integer>(node));
+	else if (std::dynamic_pointer_cast<Ast::Integer>(node))    return this->analyze(std::dynamic_pointer_cast<Ast::Integer>(node));
 	else if (std::dynamic_pointer_cast<Ast::Identifier>(node)) return this->analyze(std::dynamic_pointer_cast<Ast::Identifier>(node));
 	else if (std::dynamic_pointer_cast<Ast::Boolean>(node))    return this->analyze(std::dynamic_pointer_cast<Ast::Boolean>(node));
 	else assert(false);
-	return Result<Ok, Error>(Error("Error: This shouldn't happen"));
+	return Result<Ok, Errors>(Errors{std::string("Error: This shouldn't happen")});
 }
 
-Result<Ok, Error> Context::analyze(std::shared_ptr<Ast::Call> node) {
+Result<Ok, Errors> Context::analyze(std::shared_ptr<Ast::Call> node) {
 	// Get types of arguments
 	for (size_t i = 0; i < node->args.size(); i++) {
 		auto result = this->analyze(node->args[i]);
@@ -141,45 +168,45 @@ Result<Ok, Error> Context::analyze(std::shared_ptr<Ast::Call> node) {
 	auto result = this->get_type_of_intrinsic(node);
 	if (result.is_error()) {
 		result = this->get_type_of_user_defined_function(node);
-		if (result.is_error()) return Result<Ok, Error>(Error(errors::undefined_function(node))); // tested in test/errors/undefined_function.dm
+		if (result.is_error()) return Result<Ok, Errors>(Errors{errors::undefined_function(node)}); // tested in test/errors/undefined_function.dm
 	}
 
-	return Result<Ok, Error>(Ok());
+	return Result<Ok, Errors>(Ok());
 }
 
-Result<Ok, Error> Context::analyze(std::shared_ptr<Ast::Number> node) {
+Result<Ok, Errors> Context::analyze(std::shared_ptr<Ast::Number> node) {
 	node->type = Type("float64");
-	return Result<Ok, Error>(Ok());
+	return Result<Ok, Errors>(Ok());
 }
 
-Result<Ok, Error> Context::analyze(std::shared_ptr<Ast::Integer> node) {
+Result<Ok, Errors> Context::analyze(std::shared_ptr<Ast::Integer> node) {
 	node->type = Type("int64");
-	return Result<Ok, Error>(Ok());
+	return Result<Ok, Errors>(Ok());
 }
 
-Result<Ok, Error> Context::analyze(std::shared_ptr<Ast::Identifier> node) {
+Result<Ok, Errors> Context::analyze(std::shared_ptr<Ast::Identifier> node) {
 	Binding* binding = this->get_binding(node->value);
 	if (!binding) {
-		return Result<Ok, Error>(Error(errors::undefined_variable(node))); // tested in test/errors/undefined_variable.dm
+		return Result<Ok, Errors>(Errors{errors::undefined_variable(node)}); // tested in test/errors/undefined_variable.dm
 	}
 	else {
 		node->type = binding->get_type();
-		return Result<Ok, Error>(Ok());
+		return Result<Ok, Errors>(Ok());
 	}
 }
 
-Result<Ok, Error> Context::analyze(std::shared_ptr<Ast::Boolean> node) {
+Result<Ok, Errors> Context::analyze(std::shared_ptr<Ast::Boolean> node) {
 	node->type = Type("bool");
-	return Result<Ok, Error>(Ok());
+	return Result<Ok, Errors>(Ok());
 }
 
 Binding* Context::get_binding(std::string identifier) {
-	if (this->current_scope().find(identifier) != this->current_scope().end()) {
-		return &(this->current_scope()[identifier]);
+	for (auto scope = this->scopes.rbegin(); scope != this->scopes.rend(); scope++) {
+		if (scope->find(identifier) != scope->end()) {
+			return &(*scope)[identifier];
+		}
 	}
-	else {
-		return nullptr;
-	}
+	return nullptr;
 }
 
 std::vector<std::unordered_map<std::string, Binding>> Context::get_definitions() {
@@ -195,7 +222,7 @@ std::vector<std::unordered_map<std::string, Binding>> Context::get_definitions()
 	return scopes;
 }
 
-Result<Ok, Error> Context::get_type_of_intrinsic(std::shared_ptr<Ast::Call> node) {
+Result<Ok, Errors> Context::get_type_of_intrinsic(std::shared_ptr<Ast::Call> node) {
 	static std::unordered_map<std::string, std::vector<std::pair<std::vector<Type>, Type>>> intrinsics = {
 		{"+", {
 			{{Type("float64"), Type("float64")}, Type("float64")},
@@ -257,7 +284,7 @@ Result<Ok, Error> Context::get_type_of_intrinsic(std::shared_ptr<Ast::Call> node
 		for (size_t i = 0; i < prototypes.size(); i++) {
 			if (args == prototypes[i].first) {
 				node->type = prototypes[i].second;
-				return Result<Ok, Error>(Ok());
+				return Result<Ok, Errors>(Ok());
 			}
 		}
 	}
@@ -270,14 +297,13 @@ Result<Ok, Error> Context::get_type_of_intrinsic(std::shared_ptr<Ast::Call> node
 		}
 	}
 	error_message += ") is not an intrinsic function";
-	return Result<Ok, Error>(Error(error_message));
+	return Result<Ok, Errors>(Errors{error_message});
 }
 
-Result<Ok, Error> Context::get_type_of_user_defined_function(std::shared_ptr<Ast::Call> node) {
+Result<Ok, Errors> Context::get_type_of_user_defined_function(std::shared_ptr<Ast::Call> node) {
 	// If function binding exists
 	auto binding = this->get_binding(node->identifier->value);
-	if (binding
-	&& binding->is_function()) {
+	if (binding && binding->is_function()) {
 
 		// Find method with that match arguments types
 		auto methods = binding->methods;
@@ -285,40 +311,40 @@ Result<Ok, Error> Context::get_type_of_user_defined_function(std::shared_ptr<Ast
 
 			// If the method has the same argument size as the call
 			if ((*method)->args.size() == node->args.size()) {
+				assert((*method)->generic);
 
-				// If method is generic
-				if ((*method)->generic) {
+				// Check if there is a specialization that match arguments types
+				auto args = this->get_args_types(node);
+				std::shared_ptr<Ast::FunctionSpecialization>* specialization = nullptr;
+				for (auto it = (*method)->specializations.begin(); it != (*method)->specializations.end(); it++) {
+					if ((*it)->args_types == args) {
+						specialization = &(*it);
+						break;
+					}
+				}
 
-					// Check if there is a specialization that match arguments types
-					auto args = this->get_args_types(node);
-					std::shared_ptr<Ast::FunctionSpecialization>* specialization = nullptr;
-					for (auto it = (*method)->specializations.begin(); it != (*method)->specializations.end(); it++) {
-						if ((*it)->args_types == args) {
-							specialization = &(*it);
-							break;
-						}
+				// If no specialization was founded
+				if (!specialization) {
+					// Add new specialization
+					auto aux = std::make_shared<Ast::FunctionSpecialization>();
+					specialization = &aux;
+					(*specialization)->args_types = args;
+					(*specialization)->body = (*method)->body->clone();
+
+					// Create new context
+					Context context;
+					context.file = this->file;
+					context.scopes = this->get_definitions();
+					context.add_scope();
+
+					// Add arguments to new scope
+					for (size_t i = 0; i != node->args.size(); i++) {
+						auto binding = Binding((*method)->args[i]->value, node->args[i]);
+						context.current_scope()[binding.identifier] = binding;
 					}
 
-					// If no specialization was founded
-					if (!specialization) {
-						// Add new specialization
-						auto aux = std::make_shared<Ast::FunctionSpecialization>();
-						specialization = &aux;
-						(*specialization)->args_types = args;
-						(*specialization)->body = (*method)->body->clone();
-
-						// Create new context
-						Context context;
-						context.file = this->file;
-						context.scopes = this->get_definitions();
-						context.add_scope();
-
-						// Add arguments to new scope
-						for (size_t i = 0; i != node->args.size(); i++) {
-							auto binding = Binding((*method)->args[i]->value, node->args[i]);
-							context.current_scope()[binding.identifier] = binding;
-						}
-
+				
+					if (std::dynamic_pointer_cast<Ast::Expression>((*specialization)->body)) {
 						auto result = context.analyze(std::dynamic_pointer_cast<Ast::Expression>((*specialization)->body));
 						if (result.is_ok()) {
 							(*specialization)->valid = true;
@@ -326,31 +352,35 @@ Result<Ok, Error> Context::get_type_of_user_defined_function(std::shared_ptr<Ast
 							(*method)->specializations.push_back(*specialization);
 						}
 					}
-
-					// If specialization valid
-					if ((*specialization)->valid) {
-						node->type = (*specialization)->return_type;
-						return Result<Ok, Error>(Ok());
+					else if (std::dynamic_pointer_cast<Ast::Block>((*specialization)->body)) {
+						auto result = context.analyze(std::dynamic_pointer_cast<Ast::Block>((*specialization)->body));
+						if (result.is_ok()) {
+							(*specialization)->valid = true;
+							(*specialization)->return_type = std::dynamic_pointer_cast<Ast::Block>((*specialization)->body)->type;
+							(*method)->specializations.push_back(*specialization);
+						}
 					}
+					else assert(false);
 				}
-				else {
-					assert(false);
+
+				// If specialization valid
+				if ((*specialization)->valid) {
+					node->type = (*specialization)->return_type;
+					return Result<Ok, Errors>(Ok());
 				}
 			}
 		}
 	}
-	else {
-		std::string error_message = node->identifier->value + "(";
-		for (size_t i = 0; i < node->args.size(); i++) {
-			error_message += node->args[i]->type.to_str();
-			if (i != node->args.size() - 1) {
-			 	error_message += ", ";
-			}
+
+	std::string error_message = node->identifier->value + "(";
+	for (size_t i = 0; i < node->args.size(); i++) {
+		error_message += node->args[i]->type.to_str();
+		if (i != node->args.size() - 1) {
+			error_message += ", ";
 		}
-		error_message += ") is not defined by the user\n";
-		return Result<Ok, Error>(Error(error_message));
 	}
-	return Result<Ok, Error>(Ok());
+	error_message += ") is not defined by the user\n";
+	return Result<Ok, Errors>(Errors{error_message});
 }
 
 std::vector<Type> Context::get_args_types(std::shared_ptr<Ast::Call> node) {
