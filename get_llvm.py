@@ -14,7 +14,7 @@ def get_url():
 
 def get_local_file_name():
 	if   platform.system() == 'Linux': return 'clang+llvm-12.0.1-x86_64-linux-gnu-ubuntu-16.04.tar.xz'
-	elif platform.system() == 'Windows': return 'llvm%2bclang%2blld-12.0.1-rc1-x86_64-windows-msvc-release-mt.tar.xz'
+	elif platform.system() == 'Windows': return 'llvm+clang+lld-12.0.1-rc1-x86_64-windows-msvc-release-mt.tar'
 	else: assert False
 
 # Create deps directory if not exists
@@ -26,7 +26,7 @@ response = request.urlopen(get_url())
 length = int(response.getheader('content-length'))
 buffer = io.BytesIO()
 while True:
-	aux = response.read(4096)
+	aux = response.read(max(4096, length // 20))
 	if not aux:
 		print()
 		break
@@ -36,8 +36,9 @@ while True:
 	print(f'downloading LLVM... {percent}%', end='\r')
 
 # Write to disk
-with open(os.path.join('deps', get_local_file_name()), "wb") as f:
-	f.write(buffer.getbuffer())
+file = open(os.path.join('deps', get_local_file_name()), "wb")
+file.write(buffer.getvalue())
+file.close()
 
 # Extract file
 def track_progress(members):
@@ -56,8 +57,8 @@ def track_progress(members):
 print('\rextracting LLVM.', end='\r')
 tarball = tarfile.open(os.path.join('deps', get_local_file_name()), 'r')
 tarball.extractall('deps', members = track_progress(tarball))
+tarball.close()
 print('\rextracting LLVM...')
-
 
 # Delete downloaded file
 os.remove(os.path.join('deps', get_local_file_name()))
