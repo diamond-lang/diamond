@@ -110,8 +110,12 @@ def buid_on_linux():
 	command = f'{llvm_config} --link-static --ldflags'
 	libpath = os.popen(command).read().strip()
 
+	# Get system libs
+	command = f'{llvm_config} --link-static --system-libs'
+	system_libs = os.popen(command).read().strip()
+
 	# Build diamond
-	command = f'{get_compiler()} {get_cpp_version()} {objects_files} -o {name} {libpath} {get_lld_libraries()} {llvm_libs} -lrt -ldl -lpthread -lm -ltinfo'
+	command = f'{get_compiler()} {get_cpp_version()} {objects_files} -o {name} {libpath} {get_lld_libraries()} {llvm_libs} {system_libs}'
 	print("Linking...")
 	output = os.popen(command).read()
 	print(output)
