@@ -187,6 +187,18 @@ namespace Ast {
 		virtual std::shared_ptr<Node> clone();
 	};
 
+	struct IfElseStmt : Node {
+		std::shared_ptr<Ast::Expression> condition;
+		std::shared_ptr<Ast::Block> block;
+		std::shared_ptr<Ast::Block> else_block;
+
+		IfElseStmt(std::shared_ptr<Ast::Expression> condition, std::shared_ptr<Ast::Block> block, size_t line, size_t col, std::string file) : Node(line, col, file), condition(condition), block(block), else_block(nullptr) {}
+		IfElseStmt(std::shared_ptr<Ast::Expression> condition, std::shared_ptr<Ast::Block> block, std::shared_ptr<Ast::Block> else_block, size_t line, size_t col, std::string file) : Node(line, col, file), condition(condition), block(block), else_block(else_block) {}
+		virtual ~IfElseStmt() {}
+		virtual void print(size_t indent_level = 0);
+		virtual std::shared_ptr<Node> clone();
+	};
+
 	struct Expression : Node {
 		Type type;
 

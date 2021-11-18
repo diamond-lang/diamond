@@ -109,6 +109,7 @@ static bool is_assignment(Source source) {
 ParserResult<std::shared_ptr<Ast::Node>> parse::statement(Source source) {
 	if (parse::identifier(source, "function").is_ok()) return parse::function(source);
 	if (parse::identifier(source, "return").is_ok())   return parse::return_stmt(source);
+	if (parse::identifier(source, "if").is_ok())       return parse::if_else_stmt(source);
 	if (is_assignment(source)) return parse::assignment(source);
 	if (parse::call(source).is_ok()) {
 		auto result = parse::call(source);
@@ -194,6 +195,52 @@ ParserResult<std::shared_ptr<Ast::Node>> parse::return_stmt(Source source) {
 	}
 	
 	auto node = std::make_shared<Ast::Return>(nullptr, source.line, source.col, source.file);
+	return ParserResult<std::shared_ptr<Ast::Node>>(node, source);
+}
+
+ParserResult<std::shared_ptr<Ast::Node>> parse::if_else_stmt(Source source) {
+	size_t indentation_level = source.col;
+
+	auto keyword = parse::identifier(source, "if");
+	if (keyword.is_error()) return ParserResult<std::shared_ptr<Ast::Node>>(keyword.get_errors());
+	source = keyword.get_source();
+
+	auto condition = parse::expression(source);
+	if (condition.is_error()) return condition.get_errors();
+	source = condition.get_source();
+		
+	auto block = parse::block(source);
+	if (block.is_error()) return block.get_errors();
+	source = block.get_source();
+
+	// Adance until new statement
+	Source aux = source;
+
+	while (current(aux) == '\n' || parse::comment(aux).is_ok()) {
+		if (current(aux) == '\n') aux = aux + 1;
+		else                      aux = parse::comment(aux).get_source();
+	}
+
+	// Match indentation
+	Source indent = parse::indent(aux).get_source();
+	if (indent.col == indentation_level) {
+		aux = indent;
+		aux.indentation_level = indentation_level;
+
+		// Match else
+		auto keyword_else = parse::identifier(aux, "else");
+		if (keyword_else.is_ok()) {
+			aux = keyword_else.get_source();
+			auto else_block = parse::block(aux);
+			if (else_block.is_error()) return else_block.get_errors();
+			aux = else_block.get_source();
+			auto node = std::make_shared<Ast::IfElseStmt>(condition.get_value(), block.get_value(), else_block.get_value(), aux.line, aux.col, aux.file);
+			return ParserResult<std::shared_ptr<Ast::Node>>(node, aux);
+		}
+	}
+
+	// Return 
+	auto node = std::make_shared<Ast::IfElseStmt>(condition.get_value(), block.get_value(), source.line, source.col, source.file);
 	return ParserResult<std::shared_ptr<Ast::Node>>(node, source);
 }
 
