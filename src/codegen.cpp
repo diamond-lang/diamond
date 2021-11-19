@@ -204,17 +204,7 @@ void Codegen::codegen(std::shared_ptr<Ast::Program> node) {
 	this->add_scope();
 
 	// Codegen statements
-	for (size_t i = 0; i < node->statements.size(); i++) {
-		if (std::dynamic_pointer_cast<Ast::Assignment>(node->statements[i])) {
-			this->codegen(std::dynamic_pointer_cast<Ast::Assignment>(node->statements[i]));
-		}
-		else if (std::dynamic_pointer_cast<Ast::Call>(node->statements[i])) {
-			this->codegen(std::dynamic_pointer_cast<Ast::Call>(node->statements[i]));
-		}
-		else {
-			assert(false);
-		}
-	}
+	this->codegen(std::make_shared<Ast::Block>(node->statements, node->functions, node->line, node->col, node->file));
 
 	// Create return statement
 	this->builder->CreateRet(llvm::ConstantInt::get(*(this->context), llvm::APInt(32, 0)));
