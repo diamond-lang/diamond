@@ -133,7 +133,7 @@ namespace Ast {
 	struct Block : Node {
 		std::vector<std::shared_ptr<Ast::Node>> statements;
 		std::vector<std::shared_ptr<Ast::Function>> functions;
-		Type type;
+		Type type = Type("");
 
 		Block(std::vector<std::shared_ptr<Ast::Node>> statements, std::vector<std::shared_ptr<Ast::Function>> functions, size_t line, size_t col, std::string file) : Node(line, col, file), statements(statements), functions(functions) {}
 		virtual ~Block() {}
@@ -191,7 +191,6 @@ namespace Ast {
 		std::shared_ptr<Ast::Expression> condition;
 		std::shared_ptr<Ast::Block> block;
 		std::shared_ptr<Ast::Block> else_block;
-		Type type;
 
 		IfElseStmt(std::shared_ptr<Ast::Expression> condition, std::shared_ptr<Ast::Block> block, size_t line, size_t col, std::string file) : Node(line, col, file), condition(condition), block(block), else_block(nullptr) {}
 		IfElseStmt(std::shared_ptr<Ast::Expression> condition, std::shared_ptr<Ast::Block> block, std::shared_ptr<Ast::Block> else_block, size_t line, size_t col, std::string file) : Node(line, col, file), condition(condition), block(block), else_block(else_block) {}

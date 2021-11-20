@@ -322,46 +322,55 @@ void Codegen::codegen(std::shared_ptr<Ast::Return> node) {
 
 void Codegen::codegen(std::shared_ptr<Ast::IfElseStmt> node) {
 	llvm::Function *current_function = this->builder->GetInsertBlock()->getParent();
+	llvm::BasicBlock *block = llvm::BasicBlock::Create(*(this->context), "then", current_function);
+	llvm::BasicBlock *else_block = llvm::BasicBlock::Create(*(this->context), "else");
+	llvm::BasicBlock *merge_block = llvm::BasicBlock::Create(*(this->context), "merge");
 
 	// If theres no else block
 	if (!node->else_block) {
-		llvm::BasicBlock *block = llvm::BasicBlock::Create(*(this->context), "then", current_function);
-		llvm::BasicBlock *merge_block = llvm::BasicBlock::Create(*(this->context), "merge");
-		this->builder->CreateCondBr(this->codegen(node->condition), block, merge_block); // jump to if block or merge block depending of the condition
+		// Jump to if block or merge block depending of the condition
+		this->builder->CreateCondBr(this->codegen(node->condition), block, merge_block); 
 
 		// Create if block
 		this->builder->SetInsertPoint(block);
 		this->codegen(node->block);
-		if (node->type == Type("void")) this->builder->CreateBr(merge_block);
+		
+		// Jump to merge block if if does not return (Type("") means the if does not return)
+		if (node->block->type == Type("")) {
+			this->builder->CreateBr(merge_block);
+		}
 
 		// Create merge block
-		if (node->type == Type("void")) {
-			current_function->getBasicBlockList().push_back(merge_block);
-			this->builder->SetInsertPoint(merge_block);
-		}
+		current_function->getBasicBlockList().push_back(merge_block);
+		this->builder->SetInsertPoint(merge_block);
 	}
 	else {
-		llvm::BasicBlock *block = llvm::BasicBlock::Create(*(this->context), "then", current_function);
-		llvm::BasicBlock *else_block = llvm::BasicBlock::Create(*(this->context), "else");
-		llvm::BasicBlock *merge_block = llvm::BasicBlock::Create(*(this->context), "merge");
-		this->builder->CreateCondBr(this->codegen(node->condition), block, else_block); // jump to if block or else block depending of the condition
+		// Jump to if block or else block depending of the condition
+		this->builder->CreateCondBr(this->codegen(node->condition), block, else_block);
 
 		// Create if block
 		this->builder->SetInsertPoint(block);
 		this->codegen(node->block);
-		if (node->type == Type("void")) this->builder->CreateBr(merge_block);
+		
+		// Jump to merge block if if does not return (Type("") means the block does not return)
+		if (node->block->type == Type("")) {
+			this->builder->CreateBr(merge_block);
+		}
 
 		// Create else block
 		current_function->getBasicBlockList().push_back(else_block);
 		this->builder->SetInsertPoint(else_block);
 		this->codegen(node->else_block);
-		if (node->type == Type("void")) this->builder->CreateBr(merge_block);
+		
+
+		// Jump to merge block if else does not return (Type("") means the block does not return)
+		if (node->else_block->type == Type("")) {
+			this->builder->CreateBr(merge_block);
+		}
 
 		// Create merge block
-		if (node->type == Type("void")) {
-			current_function->getBasicBlockList().push_back(merge_block);
-			this->builder->SetInsertPoint(merge_block);
-		}
+		current_function->getBasicBlockList().push_back(merge_block);
+		this->builder->SetInsertPoint(merge_block);
 	}
 }
 
