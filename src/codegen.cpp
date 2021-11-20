@@ -47,6 +47,7 @@ struct Codegen {
 	void codegen(std::vector<std::shared_ptr<Ast::Function>> functions);
 	void codegen(std::shared_ptr<Ast::Assignment> node);
 	void codegen(std::shared_ptr<Ast::Return> node);
+	void codegen(std::shared_ptr<Ast::IfElseStmt> node);
 	llvm::Value* codegen(std::shared_ptr<Ast::Expression> node);
 	llvm::Value* codegen(std::shared_ptr<Ast::Call> node);
 	llvm::Value* codegen(std::shared_ptr<Ast::Number> node);
@@ -116,7 +117,7 @@ void generate_executable(std::shared_ptr<Ast::Program> program, std::string prog
 	if (TargetMachine->addPassesToEmitFile(pass, dest, nullptr, FileType)) {
 		llvm::errs() << "TargetMachine can't emit a file of this type";
 	}
-
+	
 	pass.run(*(llvm_ir.module));
 	dest.flush();
 
@@ -221,6 +222,9 @@ void Codegen::codegen(std::shared_ptr<Ast::Block> node) {
 		else if (std::dynamic_pointer_cast<Ast::Return>(node->statements[i])) {
 			this->codegen(std::dynamic_pointer_cast<Ast::Return>(node->statements[i]));
 		}
+		else if (std::dynamic_pointer_cast<Ast::IfElseStmt>(node->statements[i])) {
+			this->codegen(std::dynamic_pointer_cast<Ast::IfElseStmt>(node->statements[i]));
+		}
 		else {
 			assert(false);
 		}
@@ -314,6 +318,35 @@ void Codegen::codegen(std::shared_ptr<Ast::Return> node) {
 	else {
 		this->builder->CreateRetVoid();
 	}
+}
+
+void Codegen::codegen(std::shared_ptr<Ast::IfElseStmt> node) {
+	llvm::Function *current_function = this->builder->GetInsertBlock()->getParent();
+	llvm::BasicBlock *block = llvm::BasicBlock::Create(*(this->context), "then", current_function);
+	llvm::BasicBlock *else_block = llvm::BasicBlock::Create(*(this->context), "else");
+	llvm::BasicBlock *merge = llvm::BasicBlock::Create(*(this->context), "ifcont");
+	this->builder->CreateCondBr(this->codegen(node->condition), block, else_block);
+
+	// Generate if block
+	this->builder->SetInsertPoint(block);
+	this->codegen(node->block);
+	this->builder->CreateBr(merge);
+	block = this->builder->GetInsertBlock();
+
+	// Generate else block
+	current_function->getBasicBlockList().push_back(else_block);
+	this->builder->SetInsertPoint(else_block);
+
+	if (node->else_block) {
+		this->codegen(node->else_block);
+	}
+	
+	this->builder->CreateBr(merge);
+	else_block = this->builder->GetInsertBlock();
+
+	// Merge block
+	current_function->getBasicBlockList().push_back(merge);
+	this->builder->SetInsertPoint(merge);
 }
 
 llvm::Value* Codegen::codegen(std::shared_ptr<Ast::Expression> node) {
