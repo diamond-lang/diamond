@@ -199,7 +199,7 @@ ParserResult<std::shared_ptr<Ast::Node>> parse::return_stmt(Source source) {
 }
 
 ParserResult<std::shared_ptr<Ast::Node>> parse::if_else_stmt(Source source) {
-	size_t indentation_level = source.col;
+	size_t indentation_level = source.indentation_level;
 
 	auto keyword = parse::identifier(source, "if");
 	if (keyword.is_error()) return ParserResult<std::shared_ptr<Ast::Node>>(keyword.get_errors());
