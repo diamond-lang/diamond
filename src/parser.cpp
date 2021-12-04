@@ -17,26 +17,47 @@ Result<std::shared_ptr<Ast::Program>, std::vector<Error>> parse::program(Source 
 	}
 }
 
-ParserResult<std::shared_ptr<Ast::Block>> parse::block(Source source) {
-	// Set new indentation level
+Source eat_indentation(Source source) {
+	while(current(source) == ' ' || current(source) == '\t') {
+		source = source + 1;
+	}
+	return source;
+}
+
+size_t new_indentation_level(Source source) {
 	if (source.indentation_level == -1) {
 		source.indentation_level = 1;
 	}
 	else {
-		// Eat new lines or comments
-		while (current(source) == '\n' || parse::comment(source).is_ok()) {
-			if (current(source) == '\n') source = source + 1;
-			else                         source = parse::comment(source).get_source();
-		}
-
 		// Set indentation or error
-		Source indent = parse::indent(source).get_source();
+		Source indent = eat_indentation(source);
 		if (indent.col > source.indentation_level) {
 			source.indentation_level = indent.col;
 		}
-		else return ParserResult<std::shared_ptr<Ast::Block>>(Errors{errors::expecting_new_indentation_level(source)}); // tested in errors/expecting_new_indentation_level.dm
+		else {
+			source.indentation_level = -1;
+		}
 	}
-	size_t indentation_level = source.indentation_level;
+	return source.indentation_level;
+}
+
+Source advance_until_next_statement(Source source) {
+	while (current(source) == '\n' || parse::comment(source).is_ok()) {
+		if (current(source) == '\n') source = source + 1;
+		else                         source = parse::comment(source).get_source();
+	}
+
+	return source;
+}
+
+ParserResult<std::shared_ptr<Ast::Block>> parse::block(Source source) {
+	// Advance until next statement
+	source = advance_until_next_statement(source);
+
+	// Set new indentation level
+	size_t indentation_level = new_indentation_level(source);
+	if (indentation_level == -1) return ParserResult<std::shared_ptr<Ast::Block>>(Errors{errors::expecting_new_indentation_level(source)}); // tested in errors/expecting_new_indentation_level.dm
+	source.indentation_level = indentation_level;
 
 	// Create variables to store statements and functions
 	std::vector<std::shared_ptr<Ast::Node>> statements;
@@ -47,26 +68,20 @@ ParserResult<std::shared_ptr<Ast::Block>> parse::block(Source source) {
 	while (!at_end(source)) {
 		Source aux = source;
 
-		// Eat new lines or comments
-		while (current(source) == '\n' || parse::comment(source).is_ok()) {
-			if (current(source) == '\n') source = source + 1;
-			else                         source = parse::comment(source).get_source();
-		}
-
+		// Advance until next statement
+		source = advance_until_next_statement(source);
 		if (at_end(source)) break;
 
 		// Check indentation
-		Source indent = parse::indent(source).get_source();
-		if (indent.col != indentation_level) {
-			if (indent.col < indentation_level) {
-				source = aux;
-				break;
-			}
-			else {
-				errors.push_back(errors::unexpected_indent(source)); // tested in test/errors/unexpected_indentation_1.dm and test/errors/unexpected_indentation_2.dm
-				while (current(source) != '\n') source = source + 1; // advances until new line
-				continue;
-			}
+		Source indent = eat_indentation(source);
+		if (indent.col < indentation_level) {
+			source = aux;
+			break;
+		}
+		else if (indent.col > indentation_level) {
+			errors.push_back(errors::unexpected_indent(source)); // tested in test/errors/unexpected_indentation_1.dm and test/errors/unexpected_indentation_2.dm
+			while (current(source) != '\n') source = source + 1; // advances until new line
+			continue;
 		}
 
 		// Parse statement
@@ -74,7 +89,7 @@ ParserResult<std::shared_ptr<Ast::Block>> parse::block(Source source) {
 		if (result.is_ok()) {
 			source = result.get_source();
 			source.indentation_level = indentation_level; // remember indentation level
-		
+
 			if (std::dynamic_pointer_cast<Ast::Function>(result.get_value())) {
 				functions.push_back(std::dynamic_pointer_cast<Ast::Function>(result.get_value()));
 			}
@@ -153,7 +168,7 @@ ParserResult<std::shared_ptr<Ast::Node>> parse::function(Source source) {
 		node->generic = true;
 		return ParserResult<std::shared_ptr<Ast::Node>>(node, source);
 	}
-	
+
 	auto block = parse::block(source);
 	if (block.is_ok()) {
 		source = block.get_source();
@@ -193,7 +208,7 @@ ParserResult<std::shared_ptr<Ast::Node>> parse::return_stmt(Source source) {
 		auto node = std::make_shared<Ast::Return>(expression.get_value(), source.line, source.col, source.file);
 		return ParserResult<std::shared_ptr<Ast::Node>>(node, source);
 	}
-	
+
 	auto node = std::make_shared<Ast::Return>(nullptr, source.line, source.col, source.file);
 	return ParserResult<std::shared_ptr<Ast::Node>>(node, source);
 }
@@ -208,21 +223,16 @@ ParserResult<std::shared_ptr<Ast::Node>> parse::if_else_stmt(Source source) {
 	auto condition = parse::expression(source);
 	if (condition.is_error()) return condition.get_errors();
 	source = condition.get_source();
-		
+
 	auto block = parse::block(source);
 	if (block.is_error()) return block.get_errors();
 	source = block.get_source();
 
 	// Adance until new statement
-	Source aux = source;
-
-	while (current(aux) == '\n' || parse::comment(aux).is_ok()) {
-		if (current(aux) == '\n') aux = aux + 1;
-		else                      aux = parse::comment(aux).get_source();
-	}
+	Source aux = advance_until_next_statement(source);
 
 	// Match indentation
-	Source indent = parse::indent(aux).get_source();
+	Source indent = eat_indentation(aux);
 	if (indent.col == indentation_level) {
 		aux = indent;
 		aux.indentation_level = indentation_level;
@@ -239,7 +249,7 @@ ParserResult<std::shared_ptr<Ast::Node>> parse::if_else_stmt(Source source) {
 		}
 	}
 
-	// Return 
+	// Return
 	auto node = std::make_shared<Ast::IfElseStmt>(condition.get_value(), block.get_value(), source.line, source.col, source.file);
 	return ParserResult<std::shared_ptr<Ast::Node>>(node, source);
 }
@@ -455,9 +465,4 @@ ParserResult<std::string> parse::regex(Source source, std::string regex) {
 	else {
 		return ParserResult<std::string>(Errors{"Expecting \"" + regex + "\""});
 	}
-}
-
-ParserResult<void*> parse::indent(Source source) {
-	while (current(source) == ' ') source = source + 1;
-	return ParserResult<void*>(nullptr, source);
 }

@@ -27,7 +27,6 @@ namespace parse {
 	ParserResult<std::string> whitespace(Source source);
 	ParserResult<std::string> comment(Source source);
 	ParserResult<std::string> regex(Source source, std::string regex);
-	ParserResult<void*> indent(Source source);
 };
 
 #endif
