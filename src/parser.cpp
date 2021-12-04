@@ -115,6 +115,27 @@ ParserResult<std::shared_ptr<Ast::Block>> parse::block(Source source) {
 	else                    return ParserResult<std::shared_ptr<Ast::Block>>(errors);
 }
 
+ParserResult<std::shared_ptr<Ast::Expression>> parse::expression_block(Source source) {
+	// Advance until next statement
+	source = advance_until_next_statement(source);
+
+	// Set new indentation level
+	size_t indentation_level = new_indentation_level(source);
+	if (indentation_level == -1) return ParserResult<std::shared_ptr<Ast::Expression>>(Errors{errors::expecting_new_indentation_level(source)}); // tested in errors/expecting_new_indentation_level.dm
+	source.indentation_level = indentation_level;
+
+	// Parse expression
+	auto expression = parse::expression(source);
+	if (expression.is_error()) return expression;
+	source = expression.get_source();
+
+	if (!at_end(source) && current(source) != '\n') {
+		return ParserResult<std::shared_ptr<Ast::Expression>>(Errors{errors::unexpected_character(parse::regex(source, "[ \\r\\t]*").get_source())});
+	}
+
+	return ParserResult<std::shared_ptr<Ast::Expression>>(expression.get_value(), source);
+}
+
 static bool is_assignment(Source source) {
 	auto result = parse::identifier(source);
 	if (result.is_ok() && parse::token(result.get_source(), "be").is_ok()) return true;
@@ -173,6 +194,14 @@ ParserResult<std::shared_ptr<Ast::Node>> parse::function(Source source) {
 	if (block.is_ok()) {
 		source = block.get_source();
 		auto node = std::make_shared<Ast::Function>(std::dynamic_pointer_cast<Ast::Identifier>(identifier.get_value()), args, block.get_value(), source.line, source.col, source.file);
+		node->generic = true;
+		return ParserResult<std::shared_ptr<Ast::Node>>(node, source);
+	}
+
+	auto expression_block = parse::expression_block(source);
+	if (expression_block.is_ok()) {
+		source = expression_block.get_source();
+		auto node = std::make_shared<Ast::Function>(std::dynamic_pointer_cast<Ast::Identifier>(identifier.get_value()), args, expression_block.get_value(), source.line, source.col, source.file);
 		node->generic = true;
 		return ParserResult<std::shared_ptr<Ast::Node>>(node, source);
 	}
