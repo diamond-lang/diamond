@@ -312,7 +312,57 @@ ParserResult<std::shared_ptr<Ast::Expression>> parse::call(Source source) {
 }
 
 ParserResult<std::shared_ptr<Ast::Expression>> parse::expression(Source source) {
+	if (parse::if_else_expr(source).is_ok()) return parse::if_else_expr(source);
 	return parse::not_expr(source);
+}
+
+ParserResult<std::shared_ptr<Ast::Expression>> parse::if_else_expr(Source source) {
+	auto keyword = parse::identifier(source, "if");
+	if (keyword.is_error()) return ParserResult<std::shared_ptr<Ast::Expression>>(keyword.get_errors());
+	source = keyword.get_source();
+
+	size_t indentation_level = keyword.get_value()->col;
+
+	auto condition = parse::expression(source);
+	if (condition.is_error()) return condition.get_errors();
+	source = condition.get_source();
+
+	auto expression = parse::expression(source);
+	if (expression.is_error()) {
+		expression = parse::expression_block(source);
+		if (expression.is_error()) return parse::expression(source).get_errors();
+	}
+	source = expression.get_source();
+
+	// Adance until new statement
+	Source aux = advance_until_next_statement(source);
+
+	// Match indentation
+	Source indent = eat_indentation(aux);
+	if (indent.col == indentation_level) {
+		aux = indent;
+		aux.indentation_level = indentation_level;
+
+		// Match else
+		auto keyword_else = parse::identifier(aux, "else");
+		if (keyword_else.is_ok()) {
+			aux = keyword_else.get_source();
+
+			auto else_expression = parse::expression(aux);
+			if (else_expression.is_error()) {
+				else_expression = parse::expression_block(aux);
+				if (else_expression.is_error()) return parse::expression(aux).get_errors();
+			}
+			aux = else_expression.get_source();
+			
+			auto node = std::make_shared<Ast::IfElseExpr>(condition.get_value(), expression.get_value(), else_expression.get_value(), aux.line, aux.col, aux.file);
+			return ParserResult<std::shared_ptr<Ast::Expression>>(node, aux);
+		}
+	}
+
+	// Return
+	auto node = std::make_shared<Ast::IfElseExpr>(condition.get_value(), expression.get_value(), source.line, source.col, source.file);
+	return ParserResult<std::shared_ptr<Ast::Expression>>(node, source);
 }
 
 ParserResult<std::shared_ptr<Ast::Expression>> parse::not_expr(Source source) {
