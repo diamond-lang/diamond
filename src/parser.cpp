@@ -312,6 +312,10 @@ ParserResult<std::shared_ptr<Ast::Expression>> parse::call(Source source) {
 }
 
 ParserResult<std::shared_ptr<Ast::Expression>> parse::expression(Source source) {
+	return parse::not_expr(source);
+}
+
+ParserResult<std::shared_ptr<Ast::Expression>> parse::not_expr(Source source) {
 	auto op = parse::identifier(source);
 	if (op.is_ok() && std::dynamic_pointer_cast<Ast::Identifier>(op.get_value())->value == "not") {
 		source = op.get_source();

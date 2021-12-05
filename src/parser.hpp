@@ -14,6 +14,7 @@ namespace parse {
 	ParserResult<std::shared_ptr<Ast::Node>> if_else_stmt(Source source);
 	ParserResult<std::shared_ptr<Ast::Expression>> call(Source source);
 	ParserResult<std::shared_ptr<Ast::Expression>> expression(Source source);
+	ParserResult<std::shared_ptr<Ast::Expression>> not_expr(Source source);
 	ParserResult<std::shared_ptr<Ast::Expression>> binary(Source source, int precedence = 1);
 	ParserResult<std::shared_ptr<Ast::Expression>> unary(Source source);
 	ParserResult<std::shared_ptr<Ast::Expression>> primary(Source source);
