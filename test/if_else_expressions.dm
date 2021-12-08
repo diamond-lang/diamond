@@ -1,24 +1,26 @@
-function is_odd(n)
-    if n / 2.0 == 0.0 false
-    else            true
-
-function is_odd2(n)
-    if n / 2.0 == 0.0
-        false
+function is_four(n)
+    if n == 4.0
+        return true
     else
+        return false
+
+function is_four2(n)
+    if n == 4.0
         true
+    else
+        false
 
-function is_odd3(n) if n / 2.0 == 0.0 false
-                    else            true
+function is_four3(n) if n == 4.0 true
+                     else        false
 
-print(is_odd(4.0))
-print(is_odd(7.0))
+print(is_four(4.0))
+print(is_four(7.0))
 
-print(is_odd2(4.0))
-print(is_odd2(7.0))
+print(is_four2(4.0))
+print(is_four2(7.0))
 
-print(is_odd3(4.0))
-print(is_odd3(7.0))
+print(is_four3(4.0))
+print(is_four3(7.0))
 
 --- Output
 true

@@ -182,6 +182,7 @@ Result<Ok, Errors> Context::analyze(std::shared_ptr<Ast::Return> node) {
 Result<Ok, Errors> Context::analyze(std::shared_ptr<Ast::IfElseStmt> node) {
 	auto codition = this->analyze(node->condition);
 	if (codition.is_error()) return codition;
+	if (node->condition->type != Type("bool")) return Result<Ok, Errors>(Errors{std::string("The condition in a if must be boolean")});
 
 	auto block = this->analyze(node->block);
 	if (block.is_error()) return block;
@@ -224,6 +225,7 @@ Result<Ok, Errors> Context::analyze(std::shared_ptr<Ast::Call> node) {
 Result<Ok, Errors> Context::analyze(std::shared_ptr<Ast::IfElseExpr> node) {
 	auto codition = this->analyze(node->condition);
 	if (codition.is_error()) return codition;
+	if (node->condition->type != Type("bool")) return Result<Ok, Errors>(Errors{std::string("The condition in a if must be boolean")});
 
 	auto expression = this->analyze(node->expression);
 	if (expression.is_error()) return expression;
