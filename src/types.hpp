@@ -133,7 +133,7 @@ namespace Ast {
 	struct Block : Node {
 		std::vector<std::shared_ptr<Ast::Node>> statements;
 		std::vector<std::shared_ptr<Ast::Function>> functions;
-		Type type;
+		Type type = Type("");
 
 		Block(std::vector<std::shared_ptr<Ast::Node>> statements, std::vector<std::shared_ptr<Ast::Function>> functions, size_t line, size_t col, std::string file) : Node(line, col, file), statements(statements), functions(functions) {}
 		virtual ~Block() {}
@@ -187,12 +187,35 @@ namespace Ast {
 		virtual std::shared_ptr<Node> clone();
 	};
 
+	struct IfElseStmt : Node {
+		std::shared_ptr<Ast::Expression> condition;
+		std::shared_ptr<Ast::Block> block;
+		std::shared_ptr<Ast::Block> else_block;
+
+		IfElseStmt(std::shared_ptr<Ast::Expression> condition, std::shared_ptr<Ast::Block> block, size_t line, size_t col, std::string file) : Node(line, col, file), condition(condition), block(block), else_block(nullptr) {}
+		IfElseStmt(std::shared_ptr<Ast::Expression> condition, std::shared_ptr<Ast::Block> block, std::shared_ptr<Ast::Block> else_block, size_t line, size_t col, std::string file) : Node(line, col, file), condition(condition), block(block), else_block(else_block) {}
+		virtual ~IfElseStmt() {}
+		virtual void print(size_t indent_level = 0);
+		virtual std::shared_ptr<Node> clone();
+	};
+
 	struct Expression : Node {
 		Type type;
 
 		Expression(size_t line, size_t col, std::string file) : Node(line, col, file) {}
 		virtual ~Expression() {}
 		virtual std::shared_ptr<Node> clone() = 0;
+	};
+
+	struct IfElseExpr : Expression {
+		std::shared_ptr<Ast::Expression> condition;
+		std::shared_ptr<Ast::Expression> expression;
+		std::shared_ptr<Ast::Expression> else_expression;
+		
+		IfElseExpr(std::shared_ptr<Ast::Expression> condition, std::shared_ptr<Ast::Expression> expression, std::shared_ptr<Ast::Expression> else_expression, size_t line, size_t col, std::string file) : Expression(line, col, file), condition(condition), expression(expression), else_expression(else_expression) {}
+		virtual ~IfElseExpr() {}
+		virtual void print(size_t indent_level = 0);
+		virtual std::shared_ptr<Node> clone();
 	};
 
 	struct Call : Expression {

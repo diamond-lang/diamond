@@ -42,8 +42,10 @@ struct Context {
 	Result<Ok, Errors> analyze(std::shared_ptr<Ast::Block> block);
 	Result<Ok, Errors> analyze(std::shared_ptr<Ast::Assignment> assignment);
 	Result<Ok, Errors> analyze(std::shared_ptr<Ast::Return> node);
+	Result<Ok, Errors> analyze(std::shared_ptr<Ast::IfElseStmt> node);
 	Result<Ok, Errors> analyze(std::shared_ptr<Ast::Expression> node);
 	Result<Ok, Errors> analyze(std::shared_ptr<Ast::Call> node);
+	Result<Ok, Errors> analyze(std::shared_ptr<Ast::IfElseExpr> node);
 	Result<Ok, Errors> analyze(std::shared_ptr<Ast::Number> node);
 	Result<Ok, Errors> analyze(std::shared_ptr<Ast::Integer> node);
 	Result<Ok, Errors> analyze(std::shared_ptr<Ast::Identifier> node);
@@ -69,7 +71,7 @@ Result<Ok, Errors> semantic::analyze(std::shared_ptr<Ast::Program> program) {
 }
 
 Result<Ok, Errors> Context::analyze(std::shared_ptr<Ast::Block> block) {
-	block->type = Type("void");;
+	block->type = Type("");;
 	Errors errors;
 
 	// Add functions to the current scope
@@ -87,23 +89,52 @@ Result<Ok, Errors> Context::analyze(std::shared_ptr<Ast::Block> block) {
 	}
 
 	for (size_t i = 0; i  < block->statements.size(); i++) {
-		std::shared_ptr<Ast::Node> node = block->statements[i];
+		std::shared_ptr<Ast::Node> stmt = block->statements[i];
 		Result<Ok, Errors> result;
 		
-		if (std::dynamic_pointer_cast<Ast::Assignment>(node)) {
-			result = this->analyze(std::dynamic_pointer_cast<Ast::Assignment>(node));
+		if (std::dynamic_pointer_cast<Ast::Assignment>(stmt)) {
+			result = this->analyze(std::dynamic_pointer_cast<Ast::Assignment>(stmt));
 		}
-		else if (std::dynamic_pointer_cast<Ast::Call>(node)) {
-			result = this->analyze(std::dynamic_pointer_cast<Ast::Call>(node));
-			if (result.is_ok() && std::dynamic_pointer_cast<Ast::Call>(node)->type != Type("void")) {
-				result = Result<Ok, Errors>(Errors{errors::unhandled_return_value(std::dynamic_pointer_cast<Ast::Call>(node))}); // tested in test/errors/unhandled_return_value.dm
+		else if (std::dynamic_pointer_cast<Ast::Call>(stmt)) {
+			auto node = std::dynamic_pointer_cast<Ast::Call>(stmt);
+			result = this->analyze(node);
+			if (result.is_ok() && node->type != Type("void")) {
+				result = Result<Ok, Errors>(Errors{errors::unhandled_return_value(node)}); // tested in test/errors/unhandled_return_value.dm
 			}
 		}
-		else if (std::dynamic_pointer_cast<Ast::Return>(node)) {
-			result = this->analyze(std::dynamic_pointer_cast<Ast::Return>(node));
-			if (std::dynamic_pointer_cast<Ast::Return>(node)->expression) {
-				if (result.is_ok() && block->type == Type("void")) {
-					block->type = std::dynamic_pointer_cast<Ast::Return>(node)->expression->type;
+		else if (std::dynamic_pointer_cast<Ast::Return>(stmt)) {
+			auto node = std::dynamic_pointer_cast<Ast::Return>(stmt);
+			result = this->analyze(node);
+			if (result.is_ok()) {
+				auto return_type = node->expression ? node->expression->type : Type("void");
+				if (block->type == Type("")) {
+					block->type = return_type;
+				}
+				else if (block->type != return_type) {
+					result = Result<Ok, Errors>(Errors{std::string("Error: Incompatible return types")});
+				}	
+			}
+		}
+		else if (std::dynamic_pointer_cast<Ast::IfElseStmt>(stmt)) {
+			auto node = std::dynamic_pointer_cast<Ast::IfElseStmt>(stmt);
+			result = this->analyze(node);
+			if (result.is_ok()) {
+				if (node->block->type != Type("")) {
+					if (block->type == Type("")) {
+						block->type = node->block->type;
+					}
+					else if (block->type != node->block->type) {
+						result = Result<Ok, Errors>(Errors{std::string("Error: Incompatible return types")});
+					}
+				}
+
+				if (node->else_block && node->else_block->type != Type("")) {
+					if (block->type == Type("")) {
+						block->type = node->else_block->type;
+					}
+					else if (block->type != node->else_block->type) {
+						result = Result<Ok, Errors>(Errors{std::string("Error: Incompatible return types")});
+					}
 				}
 			}
 		}
@@ -148,8 +179,25 @@ Result<Ok, Errors> Context::analyze(std::shared_ptr<Ast::Return> node) {
 	return Result<Ok, Errors>(Ok());
 }
 
+Result<Ok, Errors> Context::analyze(std::shared_ptr<Ast::IfElseStmt> node) {
+	auto codition = this->analyze(node->condition);
+	if (codition.is_error()) return codition;
+	if (node->condition->type != Type("bool")) return Result<Ok, Errors>(Errors{std::string("The condition in a if must be boolean")});
+
+	auto block = this->analyze(node->block);
+	if (block.is_error()) return block;
+
+	if (node->else_block) {
+		auto else_block = this->analyze(node->else_block);
+		if (else_block.is_error()) return else_block;
+	}
+
+	return Result<Ok, Errors>(Ok());
+}
+
 Result<Ok, Errors> Context::analyze(std::shared_ptr<Ast::Expression> node) {
 	if      (std::dynamic_pointer_cast<Ast::Call>(node))       return this->analyze(std::dynamic_pointer_cast<Ast::Call>(node));
+	if      (std::dynamic_pointer_cast<Ast::IfElseExpr>(node)) return this->analyze(std::dynamic_pointer_cast<Ast::IfElseExpr>(node));
 	else if (std::dynamic_pointer_cast<Ast::Number>(node))     return this->analyze(std::dynamic_pointer_cast<Ast::Number>(node));
 	else if (std::dynamic_pointer_cast<Ast::Integer>(node))    return this->analyze(std::dynamic_pointer_cast<Ast::Integer>(node));
 	else if (std::dynamic_pointer_cast<Ast::Identifier>(node)) return this->analyze(std::dynamic_pointer_cast<Ast::Identifier>(node));
@@ -170,6 +218,27 @@ Result<Ok, Errors> Context::analyze(std::shared_ptr<Ast::Call> node) {
 		result = this->get_type_of_user_defined_function(node);
 		if (result.is_error()) return Result<Ok, Errors>(Errors{errors::undefined_function(node)}); // tested in test/errors/undefined_function.dm
 	}
+
+	return Result<Ok, Errors>(Ok());
+}
+
+Result<Ok, Errors> Context::analyze(std::shared_ptr<Ast::IfElseExpr> node) {
+	auto codition = this->analyze(node->condition);
+	if (codition.is_error()) return codition;
+	if (node->condition->type != Type("bool")) return Result<Ok, Errors>(Errors{std::string("The condition in a if must be boolean")});
+
+	auto expression = this->analyze(node->expression);
+	if (expression.is_error()) return expression;
+
+	assert(node->else_expression);
+	auto else_expression = this->analyze(node->else_expression);
+	if (else_expression.is_error()) return else_expression;
+
+	if (node->expression->type != node->else_expression->type) {
+		return Result<Ok, Errors>(Errors{std::string("Then and else branch type are not the same")});
+	}
+
+	node->type = node->expression->type;
 
 	return Result<Ok, Errors>(Ok());
 }
@@ -357,6 +426,9 @@ Result<Ok, Errors> Context::get_type_of_user_defined_function(std::shared_ptr<As
 						if (result.is_ok()) {
 							(*specialization)->valid = true;
 							(*specialization)->return_type = std::dynamic_pointer_cast<Ast::Block>((*specialization)->body)->type;
+							if ((*specialization)->return_type == Type("")) {
+								(*specialization)->return_type = Type("void");	
+							}
 							(*method)->specializations.push_back(*specialization);
 						}
 					}

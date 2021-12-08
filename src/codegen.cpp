@@ -47,8 +47,10 @@ struct Codegen {
 	void codegen(std::vector<std::shared_ptr<Ast::Function>> functions);
 	void codegen(std::shared_ptr<Ast::Assignment> node);
 	void codegen(std::shared_ptr<Ast::Return> node);
+	void codegen(std::shared_ptr<Ast::IfElseStmt> node);
 	llvm::Value* codegen(std::shared_ptr<Ast::Expression> node);
 	llvm::Value* codegen(std::shared_ptr<Ast::Call> node);
+	llvm::Value* codegen(std::shared_ptr<Ast::IfElseExpr> node);
 	llvm::Value* codegen(std::shared_ptr<Ast::Number> node);
 	llvm::Value* codegen(std::shared_ptr<Ast::Integer> node);
 	llvm::Value* codegen(std::shared_ptr<Ast::Identifier> node);
@@ -204,17 +206,7 @@ void Codegen::codegen(std::shared_ptr<Ast::Program> node) {
 	this->add_scope();
 
 	// Codegen statements
-	for (size_t i = 0; i < node->statements.size(); i++) {
-		if (std::dynamic_pointer_cast<Ast::Assignment>(node->statements[i])) {
-			this->codegen(std::dynamic_pointer_cast<Ast::Assignment>(node->statements[i]));
-		}
-		else if (std::dynamic_pointer_cast<Ast::Call>(node->statements[i])) {
-			this->codegen(std::dynamic_pointer_cast<Ast::Call>(node->statements[i]));
-		}
-		else {
-			assert(false);
-		}
-	}
+	this->codegen(std::make_shared<Ast::Block>(node->statements, node->functions, node->line, node->col, node->file));
 
 	// Create return statement
 	this->builder->CreateRet(llvm::ConstantInt::get(*(this->context), llvm::APInt(32, 0)));
@@ -230,6 +222,9 @@ void Codegen::codegen(std::shared_ptr<Ast::Block> node) {
 		}
 		else if (std::dynamic_pointer_cast<Ast::Return>(node->statements[i])) {
 			this->codegen(std::dynamic_pointer_cast<Ast::Return>(node->statements[i]));
+		}
+		else if (std::dynamic_pointer_cast<Ast::IfElseStmt>(node->statements[i])) {
+			this->codegen(std::dynamic_pointer_cast<Ast::IfElseStmt>(node->statements[i]));
 		}
 		else {
 			assert(false);
@@ -326,8 +321,63 @@ void Codegen::codegen(std::shared_ptr<Ast::Return> node) {
 	}
 }
 
+void Codegen::codegen(std::shared_ptr<Ast::IfElseStmt> node) {
+	llvm::Function *current_function = this->builder->GetInsertBlock()->getParent();
+	llvm::BasicBlock *block = llvm::BasicBlock::Create(*(this->context), "then", current_function);
+	llvm::BasicBlock *else_block = llvm::BasicBlock::Create(*(this->context), "else");
+	llvm::BasicBlock *merge_block = llvm::BasicBlock::Create(*(this->context), "merge");
+
+	// If theres no else block
+	if (!node->else_block) {
+		// Jump to if block or merge block depending of the condition
+		this->builder->CreateCondBr(this->codegen(node->condition), block, merge_block); 
+
+		// Create if block
+		this->builder->SetInsertPoint(block);
+		this->codegen(node->block);
+		
+		// Jump to merge block if if does not return (Type("") means the if does not return)
+		if (node->block->type == Type("")) {
+			this->builder->CreateBr(merge_block);
+		}
+
+		// Create merge block
+		current_function->getBasicBlockList().push_back(merge_block);
+		this->builder->SetInsertPoint(merge_block);
+	}
+	else {
+		// Jump to if block or else block depending of the condition
+		this->builder->CreateCondBr(this->codegen(node->condition), block, else_block);
+
+		// Create if block
+		this->builder->SetInsertPoint(block);
+		this->codegen(node->block);
+		
+		// Jump to merge block if if does not return (Type("") means the block does not return)
+		if (node->block->type == Type("")) {
+			this->builder->CreateBr(merge_block);
+		}
+
+		// Create else block
+		current_function->getBasicBlockList().push_back(else_block);
+		this->builder->SetInsertPoint(else_block);
+		this->codegen(node->else_block);
+		
+
+		// Jump to merge block if else does not return (Type("") means the block does not return)
+		if (node->else_block->type == Type("")) {
+			this->builder->CreateBr(merge_block);
+		}
+
+		// Create merge block
+		current_function->getBasicBlockList().push_back(merge_block);
+		this->builder->SetInsertPoint(merge_block);
+	}
+}
+
 llvm::Value* Codegen::codegen(std::shared_ptr<Ast::Expression> node) {
 	if      (std::dynamic_pointer_cast<Ast::Call>(node))       return this->codegen(std::dynamic_pointer_cast<Ast::Call>(node));
+	else if (std::dynamic_pointer_cast<Ast::IfElseExpr>(node)) return this->codegen(std::dynamic_pointer_cast<Ast::IfElseExpr>(node));
 	else if (std::dynamic_pointer_cast<Ast::Number>(node))     return this->codegen(std::dynamic_pointer_cast<Ast::Number>(node));
 	else if (std::dynamic_pointer_cast<Ast::Integer>(node))    return this->codegen(std::dynamic_pointer_cast<Ast::Integer>(node));
 	else if (std::dynamic_pointer_cast<Ast::Identifier>(node)) return this->codegen(std::dynamic_pointer_cast<Ast::Identifier>(node));
@@ -488,6 +538,40 @@ llvm::Value* Codegen::codegen(std::shared_ptr<Ast::Call> node) {
 
 	// Make call
 	return this->builder->CreateCall(function, args, "calltmp");
+}
+
+llvm::Value* Codegen::codegen(std::shared_ptr<Ast::IfElseExpr> node) {
+	llvm::Function *current_function = this->builder->GetInsertBlock()->getParent();
+	llvm::BasicBlock *block = llvm::BasicBlock::Create(*(this->context), "then", current_function);
+	llvm::BasicBlock *else_block = llvm::BasicBlock::Create(*(this->context), "else");
+	llvm::BasicBlock *merge_block = llvm::BasicBlock::Create(*(this->context), "merge");
+
+	// Jump to if block or else block depending of the condition
+	this->builder->CreateCondBr(this->codegen(node->condition), block, else_block);
+
+	// Create if block
+	this->builder->SetInsertPoint(block);
+	auto expr = this->codegen(node->expression);
+	this->builder->CreateBr(merge_block);
+
+	block = this->builder->GetInsertBlock();
+
+	// Create else block
+	current_function->getBasicBlockList().push_back(else_block);
+	this->builder->SetInsertPoint(else_block);
+	auto else_expr = this->codegen(node->else_expression);
+	this->builder->CreateBr(merge_block);
+
+	else_block = this->builder->GetInsertBlock();
+
+	// Create merge block
+	current_function->getBasicBlockList().push_back(merge_block);
+	this->builder->SetInsertPoint(merge_block);
+	llvm::PHINode* phi_node = this->builder->CreatePHI(expr->getType(), 2, "iftmp");
+	phi_node->addIncoming(expr, block);
+	phi_node->addIncoming(else_expr, else_block);
+
+	return phi_node;
 }
 
 llvm::Value* Codegen::codegen(std::shared_ptr<Ast::Number> node) {

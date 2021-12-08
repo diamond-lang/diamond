@@ -176,6 +176,43 @@ std::shared_ptr<Ast::Node> Ast::Return::clone() {
 	else                  return std::make_shared<Ast::Return>(nullptr, this->line, this->col, this->file);
 }
 
+// IfElseStmt
+void Ast::IfElseStmt::print(size_t indent_level) {
+	put_indent_level(indent_level);
+	std::cout << "if" << '\n';
+	this->condition->print(indent_level + 1);
+	this->block->print(indent_level + 1);
+
+	if (this->else_block) {
+		put_indent_level(indent_level);
+		std::cout << "else" << "\n";
+		this->else_block->print(indent_level + 1);
+	}
+}
+
+std::shared_ptr<Ast::Node> Ast::IfElseStmt::clone() {
+	if (this->else_block) return std::make_shared<Ast::IfElseStmt>(std::dynamic_pointer_cast<Ast::Expression>(this->condition->clone()), std::dynamic_pointer_cast<Ast::Block>(this->block->clone()), std::dynamic_pointer_cast<Ast::Block>(this->else_block->clone()), this->line, this->col, this->file);
+	else                  return std::make_shared<Ast::IfElseStmt>(std::dynamic_pointer_cast<Ast::Expression>(this->condition->clone()), std::dynamic_pointer_cast<Ast::Block>(this->block->clone()), this->line, this->col, this->file);
+}
+
+// IfElseExpr
+void Ast::IfElseExpr::print(size_t indent_level) {
+	put_indent_level(indent_level);
+	std::cout << "if" << '\n';
+	this->condition->print(indent_level + 1);
+	this->expression->print(indent_level + 1);
+
+	assert(this->else_expression);
+	put_indent_level(indent_level);
+	std::cout << "else" << "\n";
+	this->else_expression->print(indent_level + 1);
+}
+
+std::shared_ptr<Ast::Node> Ast::IfElseExpr::clone() {
+	assert(this->else_expression);
+	return std::make_shared<Ast::IfElseExpr>(std::dynamic_pointer_cast<Ast::Expression>(this->condition->clone()), std::dynamic_pointer_cast<Ast::Expression>(this->expression->clone()), std::dynamic_pointer_cast<Ast::Expression>(this->else_expression->clone()), this->line, this->col, this->file);
+}
+
 // Call
 void Ast::Call::print(size_t indent_level) {
 	put_indent_level(indent_level);
