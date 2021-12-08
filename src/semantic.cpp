@@ -45,6 +45,7 @@ struct Context {
 	Result<Ok, Errors> analyze(std::shared_ptr<Ast::IfElseStmt> node);
 	Result<Ok, Errors> analyze(std::shared_ptr<Ast::Expression> node);
 	Result<Ok, Errors> analyze(std::shared_ptr<Ast::Call> node);
+	Result<Ok, Errors> analyze(std::shared_ptr<Ast::IfElseExpr> node);
 	Result<Ok, Errors> analyze(std::shared_ptr<Ast::Number> node);
 	Result<Ok, Errors> analyze(std::shared_ptr<Ast::Integer> node);
 	Result<Ok, Errors> analyze(std::shared_ptr<Ast::Identifier> node);
@@ -195,6 +196,7 @@ Result<Ok, Errors> Context::analyze(std::shared_ptr<Ast::IfElseStmt> node) {
 
 Result<Ok, Errors> Context::analyze(std::shared_ptr<Ast::Expression> node) {
 	if      (std::dynamic_pointer_cast<Ast::Call>(node))       return this->analyze(std::dynamic_pointer_cast<Ast::Call>(node));
+	if      (std::dynamic_pointer_cast<Ast::IfElseExpr>(node)) return this->analyze(std::dynamic_pointer_cast<Ast::IfElseExpr>(node));
 	else if (std::dynamic_pointer_cast<Ast::Number>(node))     return this->analyze(std::dynamic_pointer_cast<Ast::Number>(node));
 	else if (std::dynamic_pointer_cast<Ast::Integer>(node))    return this->analyze(std::dynamic_pointer_cast<Ast::Integer>(node));
 	else if (std::dynamic_pointer_cast<Ast::Identifier>(node)) return this->analyze(std::dynamic_pointer_cast<Ast::Identifier>(node));
@@ -215,6 +217,26 @@ Result<Ok, Errors> Context::analyze(std::shared_ptr<Ast::Call> node) {
 		result = this->get_type_of_user_defined_function(node);
 		if (result.is_error()) return Result<Ok, Errors>(Errors{errors::undefined_function(node)}); // tested in test/errors/undefined_function.dm
 	}
+
+	return Result<Ok, Errors>(Ok());
+}
+
+Result<Ok, Errors> Context::analyze(std::shared_ptr<Ast::IfElseExpr> node) {
+	auto codition = this->analyze(node->condition);
+	if (codition.is_error()) return codition;
+
+	auto expression = this->analyze(node->expression);
+	if (expression.is_error()) return expression;
+
+	assert(node->else_expression);
+	auto else_expression = this->analyze(node->else_expression);
+	if (else_expression.is_error()) return else_expression;
+
+	if (node->expression->type != node->else_expression->type) {
+		return Result<Ok, Errors>(Errors{std::string("Then and else branch type are not the same")});
+	}
+
+	node->type = node->expression->type;
 
 	return Result<Ok, Errors>(Ok());
 }

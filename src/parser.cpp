@@ -361,8 +361,7 @@ ParserResult<std::shared_ptr<Ast::Expression>> parse::if_else_expr(Source source
 	}
 
 	// Return
-	auto node = std::make_shared<Ast::IfElseExpr>(condition.get_value(), expression.get_value(), source.line, source.col, source.file);
-	return ParserResult<std::shared_ptr<Ast::Expression>>(node, source);
+	return ParserResult<std::shared_ptr<Ast::Expression>>(Errors{std::string("Expecting else branch in if/else expression")});
 }
 
 ParserResult<std::shared_ptr<Ast::Expression>> parse::not_expr(Source source) {

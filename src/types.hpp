@@ -211,8 +211,7 @@ namespace Ast {
 		std::shared_ptr<Ast::Expression> condition;
 		std::shared_ptr<Ast::Expression> expression;
 		std::shared_ptr<Ast::Expression> else_expression;
-
-		IfElseExpr(std::shared_ptr<Ast::Expression> condition, std::shared_ptr<Ast::Expression> expression, size_t line, size_t col, std::string file) : Expression(line, col, file), condition(condition), expression(expression), else_expression(nullptr) {}
+		
 		IfElseExpr(std::shared_ptr<Ast::Expression> condition, std::shared_ptr<Ast::Expression> expression, std::shared_ptr<Ast::Expression> else_expression, size_t line, size_t col, std::string file) : Expression(line, col, file), condition(condition), expression(expression), else_expression(else_expression) {}
 		virtual ~IfElseExpr() {}
 		virtual void print(size_t indent_level = 0);
