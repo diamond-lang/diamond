@@ -78,20 +78,35 @@ std::string Type::to_str(std::string output) const {
 	return output;
 }
 
+std::vector<bool> append(std::vector<bool> vec, bool val) {
+	vec.push_back(val);
+	return vec;
+}
+
 // For printing
-void put_indent_level(size_t indent_level) {
-	for (size_t i = 0; i < indent_level; i++) std::cout << "    ";
+void put_indent_level(size_t indent_level, std::vector<bool> last) {
+	for (int i = 0; i < indent_level - 1; i++) {
+		if (last[i]) {
+			std::cout << "   ";
+		} else {
+			std::cout << "│  ";
+		}
+	}
+	if (last[indent_level - 1]) {
+		std::cout << "└──"; 
+	} else {
+		std::cout << "├──";
+	}
 }
 
 // Program
-void Ast::Program::print(size_t indent_level) {
-	put_indent_level(indent_level);
+void Ast::Program::print(size_t indent_level, std::vector<bool> last) {
 	std::cout << "program" << '\n';
 	for (size_t i = 0; i < this->statements.size(); i++) {
-		this->statements[i]->print(indent_level + 1);
+		this->statements[i]->print(indent_level + 1, append(last, (this->functions.size() == 0 && i == this->statements.size() - 1)));
 	}
 	for (size_t i = 0; i < this->functions.size(); i++) {
-		this->functions[i]->print(indent_level + 1);
+		this->functions[i]->print(indent_level + 1, append(last, i == this->functions.size() - 1));
 	}
 }
 
@@ -108,12 +123,12 @@ std::shared_ptr<Ast::Node> Ast::Program::clone() {
 }
 
 // Block
-void Ast::Block::print(size_t indent_level) {
+void Ast::Block::print(size_t indent_level, std::vector<bool> last) {
 	for (size_t i = 0; i < this->statements.size(); i++) {
-		this->statements[i]->print(indent_level);
+		this->statements[i]->print(indent_level + 1, append(last, (this->functions.size() == 0 && i == this->statements.size() - 1)));
 	}
 	for (size_t i = 0; i < this->functions.size(); i++) {
-		this->functions[i]->print(indent_level);
+		this->functions[i]->print(indent_level + 1, append(last, i == this->functions.size() - 1));
 	}
 }
 
@@ -130,15 +145,20 @@ std::shared_ptr<Ast::Node> Ast::Block::clone() {
 }
 
 // Function
-void Ast::Function::print(size_t indent_level) {
-	put_indent_level(indent_level);
+void Ast::Function::print(size_t indent_level, std::vector<bool> last) {
+	put_indent_level(indent_level, last);
 	std::cout << "function " << this->identifier->value << '(';
 	for (size_t i = 0; i < this->args.size(); i++) {
 		std::cout << this->args[i]->value;
 		if (i != this->args.size() - 1) std::cout << ", ";
 	}
 	std::cout << ")\n";
-	this->body->print(indent_level + 1);
+	if (std::dynamic_pointer_cast<Ast::Expression>(body)) {
+		this->body->print(indent_level + 1, append(last, true));
+	}
+	else {
+		this->body->print(indent_level, last);
+	}
 }
 
 std::shared_ptr<Ast::Node> Ast::Function::clone() {
@@ -150,12 +170,12 @@ std::shared_ptr<Ast::Node> Ast::Function::clone() {
 }
 
 // Assignment
-void Ast::Assignment::print(size_t indent_level) {
-	put_indent_level(indent_level);
-	std::cout << this->identifier->value << '\n';
-	put_indent_level(indent_level + 1);
+void Ast::Assignment::print(size_t indent_level, std::vector<bool> last) {
+	this->identifier->print(indent_level, last);
+	put_indent_level(indent_level + 1, append(last, false));
 	std::cout << "be" << '\n';
-	this->expression->print(indent_level + 1);
+	
+	this->expression->print(indent_level + 1, append(last, true));
 }
 
 std::shared_ptr<Ast::Node> Ast::Assignment::clone() {
@@ -163,11 +183,11 @@ std::shared_ptr<Ast::Node> Ast::Assignment::clone() {
 }
 
 // Return
-void Ast::Return::print(size_t indent_level) {
-	put_indent_level(indent_level);
+void Ast::Return::print(size_t indent_level, std::vector<bool> last) {
+	put_indent_level(indent_level, last);
 	std::cout << "return" << '\n';
 	if (this->expression) {
-		this->expression->print(indent_level + 1);
+		this->expression->print(indent_level + 1, append(last, true));
 	}
 }
 
@@ -177,16 +197,19 @@ std::shared_ptr<Ast::Node> Ast::Return::clone() {
 }
 
 // IfElseStmt
-void Ast::IfElseStmt::print(size_t indent_level) {
-	put_indent_level(indent_level);
+void Ast::IfElseStmt::print(size_t indent_level, std::vector<bool> last) {
+	bool is_last = last[last.size() - 1];
+	last.pop_back();
+
+	put_indent_level(indent_level, append(last, false));
 	std::cout << "if" << '\n';
-	this->condition->print(indent_level + 1);
-	this->block->print(indent_level + 1);
+	this->condition->print(indent_level + 1, append(append(last, false), false));
+	this->block->print(indent_level, append(last, false));
 
 	if (this->else_block) {
-		put_indent_level(indent_level);
+		put_indent_level(indent_level, append(last, is_last));
 		std::cout << "else" << "\n";
-		this->else_block->print(indent_level + 1);
+		this->else_block->print(indent_level, append(last, true));
 	}
 }
 
@@ -196,16 +219,19 @@ std::shared_ptr<Ast::Node> Ast::IfElseStmt::clone() {
 }
 
 // IfElseExpr
-void Ast::IfElseExpr::print(size_t indent_level) {
-	put_indent_level(indent_level);
+void Ast::IfElseExpr::print(size_t indent_level, std::vector<bool> last) {
+	bool is_last = last[last.size() - 1];
+	last.pop_back();
+
+	put_indent_level(indent_level, append(last, false));
 	std::cout << "if" << '\n';
-	this->condition->print(indent_level + 1);
-	this->expression->print(indent_level + 1);
+	this->condition->print(indent_level + 1, append(append(last, false), false));
+	this->expression->print(indent_level + 1, append(append(last, false), false));
 
 	assert(this->else_expression);
-	put_indent_level(indent_level);
+	put_indent_level(indent_level, append(last, is_last));
 	std::cout << "else" << "\n";
-	this->else_expression->print(indent_level + 1);
+	this->else_expression->print(indent_level + 1, append(append(last, is_last), true));
 }
 
 std::shared_ptr<Ast::Node> Ast::IfElseExpr::clone() {
@@ -214,11 +240,10 @@ std::shared_ptr<Ast::Node> Ast::IfElseExpr::clone() {
 }
 
 // Call
-void Ast::Call::print(size_t indent_level) {
-	put_indent_level(indent_level);
-	std::cout << this->identifier->value << '\n';
+void Ast::Call::print(size_t indent_level, std::vector<bool> last) {
+	this->identifier->print(indent_level, last);
 	for (size_t i = 0; i < this->args.size(); i++) {
-		this->args[i]->print(indent_level + 1);
+		this->args[i]->print(indent_level + 1, append(last, i == this->args.size() - 1));
 	}
 }
 
@@ -231,8 +256,8 @@ std::shared_ptr<Ast::Node> Ast::Call::clone() {
 }
 
 // Number
-void Ast::Number::print(size_t indent_level) {
-	put_indent_level(indent_level);
+void Ast::Number::print(size_t indent_level, std::vector<bool> last) {
+	put_indent_level(indent_level, last);
 	std::cout << this->value << '\n';
 }
 
@@ -241,8 +266,8 @@ std::shared_ptr<Ast::Node> Ast::Number::clone() {
 }
 
 // Integer
-void Ast::Integer::print(size_t indent_level) {
-	put_indent_level(indent_level);
+void Ast::Integer::print(size_t indent_level, std::vector<bool> last) {
+	put_indent_level(indent_level, last);
 	std::cout << this->value << '\n';
 }
 
@@ -251,8 +276,8 @@ std::shared_ptr<Ast::Node> Ast::Integer::clone() {
 }
 
 // Identifier
-void Ast::Identifier::print(size_t indent_level) {
-	put_indent_level(indent_level);
+void Ast::Identifier::print(size_t indent_level, std::vector<bool> last) {
+	put_indent_level(indent_level, last);
 	std::cout << this->value << '\n';
 }
 
@@ -261,8 +286,8 @@ std::shared_ptr<Ast::Node> Ast::Identifier::clone() {
 }
 
 // Boolean
-void Ast::Boolean::print(size_t indent_level) {
-	put_indent_level(indent_level);
+void Ast::Boolean::print(size_t indent_level, std::vector<bool> last) {
+	put_indent_level(indent_level, last);
 	std::cout << (this->value ? "true" : "false") << '\n';
 }
 
