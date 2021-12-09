@@ -28,7 +28,9 @@ std::string errors::usage() {
 	return make_header("diamond [program file]\n") +
 	                 "    Compiles a program.\n\n" +
 	       make_header("diamond run [program file]\n") +
-	                 "    Runs a program.\n\n";
+	                 "    Runs a program.\n\n" +
+		   make_header("diamond emit (--ast or --llvm-ir) [program file]\n") +
+		             "    Emits intermediary representations of the program. Serves for debugging the compiler\n\n";
 }
 
 std::string errors::unexpected_character(Source source) {

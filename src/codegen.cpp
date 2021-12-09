@@ -64,6 +64,11 @@ struct Codegen {
 	void remove_scope();
 };
 
+void print_llvm_ir(std::shared_ptr<Ast::Program> program, std::string program_name) {
+	Codegen llvm_ir;
+	llvm_ir.codegen(program);
+	llvm_ir.module->print(llvm::errs(), nullptr);
+}
 
 // Linking
 // -------

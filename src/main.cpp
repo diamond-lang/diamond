@@ -17,30 +17,42 @@ void enable_colored_text() {
 }
 #endif
 
+enum CommandType {
+	BuildCommand,
+	RunCommand,
+	EmitCommand
+};
+
+struct Command {
+	std::string file;
+	CommandType type;
+	std::vector<std::string> options;
+
+	Command(std::string file, CommandType type) : file(file), type(type) {}
+	Command(std::string file, CommandType type, std::vector<std::string> options) : file(file), type(type), options(options) {}
+	~Command() {}
+};
+
+void print_usage_and_exit();
+void check_usage(int argc, char *argv[]);
+Command get_command(int argc, char *argv[]);
+
 int main(int argc, char *argv[]) {
 	#ifdef _WIN32
 		enable_colored_text();
 	#endif
 
+	// Check usage
+	check_usage(argc, argv);
+
 	// Get command line arguments
-	if (argc < 2 || (argv[1] == std::string("run") && argc < 3)) {
-		// Print usage
-		std::cout << errors::usage();
-		exit(EXIT_FAILURE);
-	}
-	bool run = false;
-	std::string file_path;
-	if (argv[1] == std::string("run")) {
-		run = true;
-		file_path = argv[2];
-	} else {
-		file_path = argv[1];
-	}
-	std::string program_name = utilities::get_program_name(file_path);
+	Command command = get_command(argc, argv);
+
+	std::string program_name = utilities::get_program_name(command.file);
 	bool executable_already_existed = utilities::file_exists(utilities::get_executable_name(program_name));
 
 	// Read file
-	Result<std::string, Error> result = utilities::read_file(file_path);
+	Result<std::string, Error> result = utilities::read_file(command.file);
 	if (result.is_error()) {
 		std::cout << result.get_error().message;
 		exit(EXIT_FAILURE);
@@ -48,7 +60,7 @@ int main(int argc, char *argv[]) {
 	std::string file = result.get_value();
 
 	// Parse
-	auto parsing_result = parse::program(Source(file_path, file.begin(), file.end()));
+	auto parsing_result = parse::program(Source(command.file, file.begin(), file.end()));
 	if (parsing_result.is_error()) {
 		std::vector<Error> errors = parsing_result.get_errors();
 		for (size_t i = 0; i < errors.size(); i++) {
@@ -57,7 +69,11 @@ int main(int argc, char *argv[]) {
 		exit(EXIT_FAILURE);
 	}
 	auto ast = parsing_result.get_value();
-	if (!run) ast->print();
+
+	if (command.type == EmitCommand && command.options[0] == std::string("--ast")) {
+		ast->print();
+		return 0;
+	}
 
 	// Analyze
 	auto analyze_result = semantic::analyze(ast);
@@ -69,10 +85,15 @@ int main(int argc, char *argv[]) {
 		exit(EXIT_FAILURE);
 	}
 
+	if (command.type == EmitCommand && command.options[0] == std::string("--llvm-ir")) {
+		print_llvm_ir(ast, program_name);
+		return 0;
+	}
+
 	// Generate executable
 	generate_executable(ast, program_name);
 
-	if (run) {
+	if (command.type == RunCommand) {
 		system(utilities::get_run_command(program_name).c_str());
 
 		if (!executable_already_existed) {
@@ -81,4 +102,31 @@ int main(int argc, char *argv[]) {
 	}
 
 	return 0;
+}
+
+void print_usage_and_exit() {
+	std::cout << errors::usage();
+	exit(EXIT_FAILURE);
+}
+
+void check_usage(int argc, char *argv[]) {
+	if (argv[1] == std::string("run") && argc < 3) {
+		print_usage_and_exit();
+	}
+	if (argv[1] == std::string("emit") && (argc < 4 || !(argv[2] == std::string("--llvm-ir") || argv[2] == std::string("--ast")))) {
+		print_usage_and_exit();
+	}
+	if (argc < 2) {
+		print_usage_and_exit();
+	}
+};
+
+Command get_command(int argc, char *argv[]) {
+	if (argv[1] == std::string("run")) {
+		return Command(std::string(argv[2]), RunCommand);
+	}
+	if (argv[1] == std::string("emit")) {
+		return Command(std::string(argv[3]), EmitCommand, std::vector<std::string>{argv[2]});
+	}
+	return Command(std::string(argv[2]), BuildCommand);
 }

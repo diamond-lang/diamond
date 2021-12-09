@@ -118,7 +118,8 @@ def buid_on_linux():
 	command = f'{get_compiler()} {get_cpp_version()} {objects_files} -o {name} {libpath} {get_lld_libraries()} {llvm_libs} {system_libs}'
 	print("Linking...")
 	output = os.popen(command).read()
-	print(output)
+	if output != "":
+		print(output)
 
 def build_on_windows():
 	llvm_config = 'deps\\llvm\\bin\\llvm-config.exe'
@@ -151,7 +152,8 @@ def build_on_windows():
 	command = f'cl {objects_files} {get_cpp_version()} /Fe:{get_name()} /link {libpath} {libs} {get_lld_libraries()}'
 	print("Linking...")
 	output = os.popen(command).read()
-	print(output)
+	if output != "":
+		print(output)
 
 def need_to_recompile():
 	if not os.path.exists(get_name()):
