@@ -110,13 +110,13 @@ void print_usage_and_exit() {
 }
 
 void check_usage(int argc, char *argv[]) {
+	if (argc < 2) {
+		print_usage_and_exit();
+	}
 	if (argv[1] == std::string("run") && argc < 3) {
 		print_usage_and_exit();
 	}
 	if (argv[1] == std::string("emit") && (argc < 4 || !(argv[2] == std::string("--llvm-ir") || argv[2] == std::string("--ast")))) {
-		print_usage_and_exit();
-	}
-	if (argc < 2) {
 		print_usage_and_exit();
 	}
 };
