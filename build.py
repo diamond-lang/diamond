@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import os
 import platform
+import re
 import sys
 import multiprocessing
 from functools import partial
@@ -139,7 +140,7 @@ def build_on_windows():
 	# Get llvm libs
 	command = f'"{llvm_config}" --libs'
 	output = os.popen(command).read()
-	output = output.split('C:\\')
+	output = re.split(r'(C:\\|c:\\)', output)
 	output = list(map(lambda lib: 'C:\\' + lib, output))
 	output = list(map(lambda lib: os.path.basename(lib).strip(), output))
 	libs = ' '.join(output)
