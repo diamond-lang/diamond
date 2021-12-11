@@ -204,12 +204,12 @@ void Ast::IfElseStmt::print(size_t indent_level, std::vector<bool> last) {
 	put_indent_level(indent_level, append(last, false));
 	std::cout << "if" << '\n';
 	this->condition->print(indent_level + 1, append(append(last, false), false));
-	this->block->print(indent_level, append(last, false));
+	this->block->print(indent_level, append(last, this->else_block ? false : true));
 
 	if (this->else_block) {
 		put_indent_level(indent_level, append(last, is_last));
 		std::cout << "else" << "\n";
-		this->else_block->print(indent_level, append(last, true));
+		this->else_block->print(indent_level, append(last, is_last));
 	}
 }
 
