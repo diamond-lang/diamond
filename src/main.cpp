@@ -11,9 +11,13 @@
 #ifdef _WIN32
 #include <Windows.h>
 
-void enable_colored_text() {
+void enable_colored_text_and_unicode() {
+	// Colored text
 	HANDLE handle = GetStdHandle(STD_OUTPUT_HANDLE);
 	SetConsoleMode(handle, ENABLE_PROCESSED_OUTPUT | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
+
+	// Unicode
+	SetConsoleOutputCP(65001);
 }
 #endif
 
@@ -39,7 +43,7 @@ Command get_command(int argc, char *argv[]);
 
 int main(int argc, char *argv[]) {
 	#ifdef _WIN32
-		enable_colored_text();
+		enable_colored_text_and_unicode();
 	#endif
 
 	// Check usage
@@ -110,13 +114,13 @@ void print_usage_and_exit() {
 }
 
 void check_usage(int argc, char *argv[]) {
+	if (argc < 2) {
+		print_usage_and_exit();
+	}
 	if (argv[1] == std::string("run") && argc < 3) {
 		print_usage_and_exit();
 	}
 	if (argv[1] == std::string("emit") && (argc < 4 || !(argv[2] == std::string("--llvm-ir") || argv[2] == std::string("--ast")))) {
-		print_usage_and_exit();
-	}
-	if (argc < 2) {
 		print_usage_and_exit();
 	}
 };
