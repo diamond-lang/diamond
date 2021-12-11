@@ -11,9 +11,13 @@
 #ifdef _WIN32
 #include <Windows.h>
 
-void enable_colored_text() {
+void enable_colored_text_and_unicode() {
+	// Colored text
 	HANDLE handle = GetStdHandle(STD_OUTPUT_HANDLE);
 	SetConsoleMode(handle, ENABLE_PROCESSED_OUTPUT | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
+
+	// Unicode
+	SetConsoleOutputCP(65001);
 }
 #endif
 
@@ -39,7 +43,7 @@ Command get_command(int argc, char *argv[]);
 
 int main(int argc, char *argv[]) {
 	#ifdef _WIN32
-		enable_colored_text();
+		enable_colored_text_and_unicode();
 	#endif
 
 	// Check usage
