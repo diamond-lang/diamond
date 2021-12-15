@@ -132,5 +132,5 @@ Command get_command(int argc, char *argv[]) {
 	if (argv[1] == std::string("emit")) {
 		return Command(std::string(argv[3]), EmitCommand, std::vector<std::string>{argv[2]});
 	}
-	return Command(std::string(argv[2]), BuildCommand);
+	return Command(std::string(argv[1]), BuildCommand);
 }
