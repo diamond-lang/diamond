@@ -373,80 +373,7 @@ Result<Ok, Errors> Context::get_type_of_intrinsic(std::shared_ptr<Ast::Call> nod
 }
 
 Result<Ok, Errors> Context::get_type_of_user_defined_function(std::shared_ptr<Ast::Call> node) {
-	// If function binding exists
-	auto binding = this->get_binding(node->identifier->value);
-	if (binding && binding->is_function()) {
-
-		// Find method with that match arguments types
-		auto methods = binding->methods;
-		for (auto method = methods.begin(); method != methods.end(); method++) {
-
-			// If the method has the same argument size as the call
-			if ((*method)->args.size() == node->args.size()) {
-				assert((*method)->generic);
-
-				// Check if there is a specialization that match arguments types
-				auto args = this->get_args_types(node);
-				std::shared_ptr<Ast::FunctionSpecialization>* specialization = nullptr;
-				for (auto it = (*method)->specializations.begin(); it != (*method)->specializations.end(); it++) {
-					if ((*it)->args_types == args) {
-						specialization = &(*it);
-						break;
-					}
-				}
-
-				// If no specialization was founded
-				if (!specialization) {
-					// Add new specialization
-					auto aux = std::make_shared<Ast::FunctionSpecialization>();
-					specialization = &aux;
-					(*specialization)->args_types = args;
-					(*specialization)->body = (*method)->body->clone();
-
-					// Create new context
-					Context context;
-					context.file = this->file;
-					context.scopes = this->get_definitions();
-					context.add_scope();
-
-					// Add arguments to new scope
-					for (size_t i = 0; i != node->args.size(); i++) {
-						auto binding = Binding((*method)->args[i]->value, node->args[i]);
-						context.current_scope()[binding.identifier] = binding;
-					}
-
-				
-					if (std::dynamic_pointer_cast<Ast::Expression>((*specialization)->body)) {
-						auto result = context.analyze(std::dynamic_pointer_cast<Ast::Expression>((*specialization)->body));
-						if (result.is_ok()) {
-							(*specialization)->valid = true;
-							(*specialization)->return_type = std::dynamic_pointer_cast<Ast::Expression>((*specialization)->body)->type;
-							(*method)->specializations.push_back(*specialization);
-						}
-					}
-					else if (std::dynamic_pointer_cast<Ast::Block>((*specialization)->body)) {
-						auto result = context.analyze(std::dynamic_pointer_cast<Ast::Block>((*specialization)->body));
-						if (result.is_ok()) {
-							(*specialization)->valid = true;
-							(*specialization)->return_type = std::dynamic_pointer_cast<Ast::Block>((*specialization)->body)->type;
-							if ((*specialization)->return_type == Type("")) {
-								(*specialization)->return_type = Type("void");	
-							}
-							(*method)->specializations.push_back(*specialization);
-						}
-					}
-					else assert(false);
-				}
-
-				// If specialization valid
-				if ((*specialization)->valid) {
-					node->type = (*specialization)->return_type;
-					return Result<Ok, Errors>(Ok());
-				}
-			}
-		}
-	}
-
+	// Create error message
 	std::string error_message = node->identifier->value + "(";
 	for (size_t i = 0; i < node->args.size(); i++) {
 		error_message += node->args[i]->type.to_str();
@@ -455,6 +382,79 @@ Result<Ok, Errors> Context::get_type_of_user_defined_function(std::shared_ptr<As
 		}
 	}
 	error_message += ") is not defined by the user\n";
+
+	// Check binding exists
+	auto binding = this->get_binding(node->identifier->value);
+	if (!binding || !binding->is_function()) return Result<Ok, Errors>(Errors{error_message});
+
+	// Find functions with same number of arguments
+	std::vector<std::shared_ptr<Ast::Function>> functions_with_same_arg_size = {};
+	for (size_t i = 0; i < binding->methods.size(); i++) {
+		if (binding->methods[i]->args.size() == node->args.size()) {
+			functions_with_same_arg_size.push_back(binding->methods[i]);
+		}
+	}
+
+	// Check specializations
+	for (size_t i = 0; i < functions_with_same_arg_size.size(); i++) {
+		auto args = this->get_args_types(node);
+		std::shared_ptr<Ast::FunctionSpecialization>* specialization = nullptr;
+		for (auto it = functions_with_same_arg_size[i]->specializations.begin(); it != functions_with_same_arg_size[i]->specializations.end(); it++) {
+			if ((*it)->args_types == args) {
+				specialization = &(*it);
+				break;
+			}
+		}
+
+		// If no specialization was found
+		if (!specialization) {
+			// Add new specialization
+			auto aux = std::make_shared<Ast::FunctionSpecialization>();
+			specialization = &aux;
+			(*specialization)->args_types = args;
+			(*specialization)->body = functions_with_same_arg_size[i]->body->clone();
+
+			// Create new context
+			Context context;
+			context.file = this->file;
+			context.scopes = this->get_definitions();
+			context.add_scope();
+
+			// Add arguments to new scope
+			for (size_t j = 0; j != node->args.size(); j++) {
+				auto binding = Binding(functions_with_same_arg_size[i]->args[j]->value, node->args[j]);
+				context.current_scope()[binding.identifier] = binding;
+			}
+		
+			if (std::dynamic_pointer_cast<Ast::Expression>((*specialization)->body)) {
+				auto result = context.analyze(std::dynamic_pointer_cast<Ast::Expression>((*specialization)->body));
+				if (result.is_ok()) {
+					(*specialization)->valid = true;
+					(*specialization)->return_type = std::dynamic_pointer_cast<Ast::Expression>((*specialization)->body)->type;
+					functions_with_same_arg_size[i]->specializations.push_back(*specialization);
+				}
+			}
+			else if (std::dynamic_pointer_cast<Ast::Block>((*specialization)->body)) {
+				auto result = context.analyze(std::dynamic_pointer_cast<Ast::Block>((*specialization)->body));
+				if (result.is_ok()) {
+					(*specialization)->valid = true;
+					(*specialization)->return_type = std::dynamic_pointer_cast<Ast::Block>((*specialization)->body)->type;
+					if ((*specialization)->return_type == Type("")) {
+						(*specialization)->return_type = Type("void");	
+					}
+					functions_with_same_arg_size[i]->specializations.push_back(*specialization);
+				}
+			}
+			else assert(false);
+		}
+
+		// If specialization valid
+		if ((*specialization)->valid) {
+			node->type = (*specialization)->return_type;
+			return Result<Ok, Errors>(Ok());
+		}
+	}
+
 	return Result<Ok, Errors>(Errors{error_message});
 }
 
