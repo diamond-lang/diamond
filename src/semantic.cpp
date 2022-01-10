@@ -213,13 +213,16 @@ Result<Ok, Errors> Context::analyze(std::shared_ptr<Ast::Call> node) {
 		if (result.is_error()) return result;
 	}
 
+	// If is intrinsic
 	auto result = this->get_type_of_intrinsic(node);
-	if (result.is_error()) {
-		result = this->get_type_of_user_defined_function(node);
-		if (result.is_error()) return Result<Ok, Errors>(Errors{errors::undefined_function(node)}); // tested in test/errors/undefined_function.dm
-	}
+	if (result.is_ok()) return Result<Ok, Errors>(Ok());
 
-	return Result<Ok, Errors>(Ok());
+	// If is user defined
+	result = this->get_type_of_user_defined_function(node);
+	if (result.is_ok()) return Result<Ok, Errors>(Ok());
+
+	// Undefined function
+	return Result<Ok, Errors>(Errors{errors::undefined_function(node)}); // tested in test/errors/undefined_function.dmd
 }
 
 Result<Ok, Errors> Context::analyze(std::shared_ptr<Ast::IfElseExpr> node) {
