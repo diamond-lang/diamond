@@ -337,6 +337,7 @@ Result<Ok, Errors> Context::get_type_of_user_defined_function(std::shared_ptr<As
 	std::vector<std::shared_ptr<Ast::Function>> functions_with_same_arg_size = {};
 	for (size_t i = 0; i < binding->methods.size(); i++) {
 		if (binding->methods[i]->args.size() == node->args.size()) {
+			assert(binding->methods[i]->generic);
 			functions_with_same_arg_size.push_back(binding->methods[i]);
 		}
 	}
@@ -344,10 +345,10 @@ Result<Ok, Errors> Context::get_type_of_user_defined_function(std::shared_ptr<As
 	// Check specializations
 	for (size_t i = 0; i < functions_with_same_arg_size.size(); i++) {
 		auto args = this->get_args_types(node);
-		std::shared_ptr<Ast::FunctionSpecialization>* specialization = nullptr;
+		std::shared_ptr<Ast::FunctionSpecialization> specialization = nullptr;
 		for (auto it = functions_with_same_arg_size[i]->specializations.begin(); it != functions_with_same_arg_size[i]->specializations.end(); it++) {
 			if ((*it)->args_types == args) {
-				specialization = &(*it);
+				specialization = *it;
 				break;
 			}
 		}
@@ -356,9 +357,9 @@ Result<Ok, Errors> Context::get_type_of_user_defined_function(std::shared_ptr<As
 		if (!specialization) {
 			// Add new specialization
 			auto aux = std::make_shared<Ast::FunctionSpecialization>();
-			specialization = &aux;
-			(*specialization)->args_types = args;
-			(*specialization)->body = functions_with_same_arg_size[i]->body->clone();
+			specialization = aux;
+			specialization->args_types = args;
+			specialization->body = functions_with_same_arg_size[i]->body->clone();
 
 			// Create new context
 			Context context;
@@ -372,31 +373,31 @@ Result<Ok, Errors> Context::get_type_of_user_defined_function(std::shared_ptr<As
 				context.current_scope()[binding.identifier] = binding;
 			}
 		
-			if (std::dynamic_pointer_cast<Ast::Expression>((*specialization)->body)) {
-				auto result = context.analyze(std::dynamic_pointer_cast<Ast::Expression>((*specialization)->body));
+			if (std::dynamic_pointer_cast<Ast::Expression>(specialization->body)) {
+				auto result = context.analyze(std::dynamic_pointer_cast<Ast::Expression>(specialization->body));
 				if (result.is_ok()) {
-					(*specialization)->valid = true;
-					(*specialization)->return_type = std::dynamic_pointer_cast<Ast::Expression>((*specialization)->body)->type;
-					functions_with_same_arg_size[i]->specializations.push_back(*specialization);
+					specialization->valid = true;
+					specialization->return_type = std::dynamic_pointer_cast<Ast::Expression>(specialization->body)->type;
+					functions_with_same_arg_size[i]->specializations.push_back(specialization);
 				}
 			}
-			else if (std::dynamic_pointer_cast<Ast::Block>((*specialization)->body)) {
-				auto result = context.analyze(std::dynamic_pointer_cast<Ast::Block>((*specialization)->body));
+			else if (std::dynamic_pointer_cast<Ast::Block>(specialization->body)) {
+				auto result = context.analyze(std::dynamic_pointer_cast<Ast::Block>(specialization->body));
 				if (result.is_ok()) {
-					(*specialization)->valid = true;
-					(*specialization)->return_type = std::dynamic_pointer_cast<Ast::Block>((*specialization)->body)->type;
-					if ((*specialization)->return_type == Type("")) {
-						(*specialization)->return_type = Type("void");	
+					specialization->valid = true;
+					specialization->return_type = std::dynamic_pointer_cast<Ast::Block>(specialization->body)->type;
+					if (specialization->return_type == Type("")) {
+						specialization->return_type = Type("void");	
 					}
-					functions_with_same_arg_size[i]->specializations.push_back(*specialization);
+					functions_with_same_arg_size[i]->specializations.push_back(specialization);
 				}
 			}
 			else assert(false);
 		}
 
 		// If specialization valid
-		if ((*specialization)->valid) {
-			node->type = (*specialization)->return_type;
+		if (specialization->valid) {
+			node->type = specialization->return_type;
 			return Result<Ok, Errors>(Ok());
 		}
 	}
