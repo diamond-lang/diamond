@@ -57,6 +57,7 @@ struct Context {
 	Binding* get_binding(std::string identifier);
 	Result<Ok, Errors> get_type_of_intrinsic(std::shared_ptr<Ast::Call> node);
 	Result<Ok, Errors> get_type_of_user_defined_function(std::shared_ptr<Ast::Call> node);
+	std::shared_ptr<Ast::FunctionSpecialization> create_and_analyze_specialization(std::vector<Type> args, std::shared_ptr<Ast::Call> call, std::shared_ptr<Ast::Function> function);
 	std::vector<Type> get_args_types(std::shared_ptr<Ast::Call> node);
 	std::vector<std::unordered_map<std::string, Binding>> get_definitions();
 };
@@ -355,44 +356,7 @@ Result<Ok, Errors> Context::get_type_of_user_defined_function(std::shared_ptr<As
 
 		// If no specialization was found
 		if (!specialization) {
-			// Add new specialization
-			auto aux = std::make_shared<Ast::FunctionSpecialization>();
-			specialization = aux;
-			specialization->args_types = args;
-			specialization->body = functions_with_same_arg_size[i]->body->clone();
-
-			// Create new context
-			Context context;
-			context.file = this->file;
-			context.scopes = this->get_definitions();
-			context.add_scope();
-
-			// Add arguments to new scope
-			for (size_t j = 0; j != node->args.size(); j++) {
-				auto binding = Binding(functions_with_same_arg_size[i]->args[j]->value, node->args[j]);
-				context.current_scope()[binding.identifier] = binding;
-			}
-		
-			if (std::dynamic_pointer_cast<Ast::Expression>(specialization->body)) {
-				auto result = context.analyze(std::dynamic_pointer_cast<Ast::Expression>(specialization->body));
-				if (result.is_ok()) {
-					specialization->valid = true;
-					specialization->return_type = std::dynamic_pointer_cast<Ast::Expression>(specialization->body)->type;
-					functions_with_same_arg_size[i]->specializations.push_back(specialization);
-				}
-			}
-			else if (std::dynamic_pointer_cast<Ast::Block>(specialization->body)) {
-				auto result = context.analyze(std::dynamic_pointer_cast<Ast::Block>(specialization->body));
-				if (result.is_ok()) {
-					specialization->valid = true;
-					specialization->return_type = std::dynamic_pointer_cast<Ast::Block>(specialization->body)->type;
-					if (specialization->return_type == Type("")) {
-						specialization->return_type = Type("void");	
-					}
-					functions_with_same_arg_size[i]->specializations.push_back(specialization);
-				}
-			}
-			else assert(false);
+			specialization = this->create_and_analyze_specialization(args, node, functions_with_same_arg_size[i]);
 		}
 
 		// If specialization valid
@@ -403,6 +367,48 @@ Result<Ok, Errors> Context::get_type_of_user_defined_function(std::shared_ptr<As
 	}
 
 	return Result<Ok, Errors>(Errors{error_message});
+}
+
+std::shared_ptr<Ast::FunctionSpecialization> Context::create_and_analyze_specialization(std::vector<Type> args, std::shared_ptr<Ast::Call> call, std::shared_ptr<Ast::Function> function) {
+	// Add new specialization
+	auto specialization = std::make_shared<Ast::FunctionSpecialization>();
+	specialization->args_types = args;
+	specialization->body = function->body->clone();
+
+	// Create new context
+	Context context;
+	context.file = this->file;
+	context.scopes = this->get_definitions();
+	context.add_scope();
+
+	// Add arguments to new scope
+	for (size_t i = 0; i != function->args.size(); i++) {
+		auto binding = Binding(function->args[i]->value, call->args[i]);
+		context.current_scope()[binding.identifier] = binding;
+	}
+
+	if (std::dynamic_pointer_cast<Ast::Expression>(specialization->body)) {
+		auto result = context.analyze(std::dynamic_pointer_cast<Ast::Expression>(specialization->body));
+		if (result.is_ok()) {
+			specialization->valid = true;
+			specialization->return_type = std::dynamic_pointer_cast<Ast::Expression>(specialization->body)->type;
+			function->specializations.push_back(specialization);
+		}
+	}
+	else if (std::dynamic_pointer_cast<Ast::Block>(specialization->body)) {
+		auto result = context.analyze(std::dynamic_pointer_cast<Ast::Block>(specialization->body));
+		if (result.is_ok()) {
+			specialization->valid = true;
+			specialization->return_type = std::dynamic_pointer_cast<Ast::Block>(specialization->body)->type;
+			if (specialization->return_type == Type("")) {
+				specialization->return_type = Type("void");	
+			}
+			function->specializations.push_back(specialization);
+		}
+	}
+	else assert(false);
+
+	return specialization;
 }
 
 std::vector<Type> Context::get_args_types(std::shared_ptr<Ast::Call> node) {
