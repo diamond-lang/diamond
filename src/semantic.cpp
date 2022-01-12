@@ -393,6 +393,10 @@ std::shared_ptr<Ast::FunctionSpecialization> Context::create_and_analyze_special
 			specialization->valid = true;
 			specialization->return_type = std::dynamic_pointer_cast<Ast::Expression>(specialization->body)->type;
 			function->specializations.push_back(specialization);
+			
+			if (specialization->return_type == Type("void")) {
+				specialization->body = std::make_shared<Ast::Block>(std::vector<std::shared_ptr<Ast::Node>>{specialization->body}, std::vector<std::shared_ptr<Ast::Function>>{}, specialization->body->line, specialization->body->col, specialization->body->file);
+			}
 		}
 	}
 	else if (std::dynamic_pointer_cast<Ast::Block>(specialization->body)) {
