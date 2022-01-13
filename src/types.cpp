@@ -150,9 +150,18 @@ void Ast::Function::print(size_t indent_level, std::vector<bool> last) {
 	std::cout << "function " << this->identifier->value << '(';
 	for (size_t i = 0; i < this->args.size(); i++) {
 		std::cout << this->args[i]->value;
+		
+		if (this->args[i]->type != Type("")) {
+			std::cout << ": " << this->args[i]->type.to_str();
+		}
+
 		if (i != this->args.size() - 1) std::cout << ", ";
 	}
-	std::cout << ")\n";
+	std::cout << ")";
+	if (this->return_type != Type("")) {
+		std::cout << ": " << this->return_type.to_str();
+	}
+	std::cout << "\n";
 	if (std::dynamic_pointer_cast<Ast::Expression>(body)) {
 		this->body->print(indent_level + 1, append(last, true));
 	}
@@ -242,7 +251,10 @@ std::shared_ptr<Ast::Node> Ast::IfElseExpr::clone() {
 
 // Call
 void Ast::Call::print(size_t indent_level, std::vector<bool> last) {
-	this->identifier->print(indent_level, last);
+	put_indent_level(indent_level, last);
+	std::cout << this->identifier->value;
+	if (this->type != Type("")) std::cout << ": " << this->type.to_str();
+	std::cout << "\n";
 	for (size_t i = 0; i < this->args.size(); i++) {
 		this->args[i]->print(indent_level + 1, append(last, i == this->args.size() - 1));
 	}
@@ -259,7 +271,9 @@ std::shared_ptr<Ast::Node> Ast::Call::clone() {
 // Number
 void Ast::Number::print(size_t indent_level, std::vector<bool> last) {
 	put_indent_level(indent_level, last);
-	std::cout << this->value << '\n';
+	std::cout << this->value;
+	if (this->type != Type("")) std::cout << ": " << this->type.to_str();
+	std::cout << "\n";
 }
 
 std::shared_ptr<Ast::Node> Ast::Number::clone() {
@@ -269,7 +283,9 @@ std::shared_ptr<Ast::Node> Ast::Number::clone() {
 // Integer
 void Ast::Integer::print(size_t indent_level, std::vector<bool> last) {
 	put_indent_level(indent_level, last);
-	std::cout << this->value << '\n';
+	std::cout << this->value;
+	if (this->type != Type("")) std::cout << ": " << this->type.to_str();
+	std::cout << "\n";
 }
 
 std::shared_ptr<Ast::Node> Ast::Integer::clone() {
@@ -279,7 +295,9 @@ std::shared_ptr<Ast::Node> Ast::Integer::clone() {
 // Identifier
 void Ast::Identifier::print(size_t indent_level, std::vector<bool> last) {
 	put_indent_level(indent_level, last);
-	std::cout << this->value << '\n';
+	std::cout << this->value;
+	if (this->type != Type("")) std::cout << ": " << this->type.to_str();
+	std::cout << "\n";
 }
 
 std::shared_ptr<Ast::Node> Ast::Identifier::clone() {
@@ -294,4 +312,21 @@ void Ast::Boolean::print(size_t indent_level, std::vector<bool> last) {
 
 std::shared_ptr<Ast::Node> Ast::Boolean::clone() {
 	return std::make_shared<Ast::Boolean>(this->value, this->line, this->col, this->file);
+}
+
+// Utilities
+std::vector<Type> get_args_types(std::vector<std::shared_ptr<Ast::Identifier>> args) {
+	std::vector<Type> types;
+	for (size_t i = 0; i < args.size(); i++) {
+		types.push_back(args[i]->type);
+	}
+	return types;
+}
+
+std::vector<Type> get_args_types(std::vector<std::shared_ptr<Ast::Expression>> args) {
+	std::vector<Type> types;
+	for (size_t i = 0; i < args.size(); i++) {
+		types.push_back(args[i]->type);
+	}
+	return types;
 }

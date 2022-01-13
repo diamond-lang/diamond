@@ -5,6 +5,7 @@
 #include "errors.hpp"
 #include "semantic.hpp"
 #include "intrinsics.hpp"
+#include "type_inference.hpp"
 
 enum BindingType {
 	AssignmentBinding,
@@ -58,13 +59,11 @@ struct Context {
 	Result<Ok, Errors> get_type_of_intrinsic(std::shared_ptr<Ast::Call> node);
 	Result<Ok, Errors> get_type_of_user_defined_function(std::shared_ptr<Ast::Call> node);
 	std::shared_ptr<Ast::FunctionSpecialization> create_and_analyze_specialization(std::vector<Type> args, std::shared_ptr<Ast::Call> call, std::shared_ptr<Ast::Function> function);
-	std::vector<Type> get_args_types(std::shared_ptr<Ast::Call> node);
 	std::vector<std::unordered_map<std::string, Binding>> get_definitions();
 };
 
-
-// Implementations
-// ---------------
+// Semantic Analysis
+// -----------------
 Result<Ok, Errors> semantic::analyze(std::shared_ptr<Ast::Program> program) {
 	Context context;
 	context.add_scope();
@@ -298,7 +297,7 @@ std::vector<std::unordered_map<std::string, Binding>> Context::get_definitions()
 
 Result<Ok, Errors> Context::get_type_of_intrinsic(std::shared_ptr<Ast::Call> node) {
 	if (intrinsics.find(node->identifier->value) != intrinsics.end()) {
-		auto args = this->get_args_types(node);
+		auto args = get_args_types(node->args);
 		auto prototypes = intrinsics[node->identifier->value];
 		for (size_t i = 0; i < prototypes.size(); i++) {
 			if (args == prototypes[i].first) {
@@ -345,10 +344,10 @@ Result<Ok, Errors> Context::get_type_of_user_defined_function(std::shared_ptr<As
 
 	// Check specializations
 	for (size_t i = 0; i < functions_with_same_arg_size.size(); i++) {
-		auto args = this->get_args_types(node);
+		auto args = get_args_types(node->args);
 		std::shared_ptr<Ast::FunctionSpecialization> specialization = nullptr;
 		for (auto it = functions_with_same_arg_size[i]->specializations.begin(); it != functions_with_same_arg_size[i]->specializations.end(); it++) {
-			if ((*it)->args_types == args) {
+			if (get_args_types((*it)->args) == args) {
 				specialization = *it;
 				break;
 			}
@@ -370,10 +369,18 @@ Result<Ok, Errors> Context::get_type_of_user_defined_function(std::shared_ptr<As
 }
 
 std::shared_ptr<Ast::FunctionSpecialization> Context::create_and_analyze_specialization(std::vector<Type> args, std::shared_ptr<Ast::Call> call, std::shared_ptr<Ast::Function> function) {
+	assert(function->generic);
+	if (function->return_type == Type("")) {;
+		type_inference::analyze(function);
+	}
+	
 	// Add new specialization
 	auto specialization = std::make_shared<Ast::FunctionSpecialization>();
-	specialization->args_types = args;
 	specialization->body = function->body->clone();
+	for (size_t i = 0; i < function->args.size(); i++) {
+		specialization->args.push_back(std::dynamic_pointer_cast<Ast::Identifier>(function->args[i]->clone()));
+		specialization->args[i]->type = args[i];
+	}
 
 	// Create new context
 	Context context;
@@ -387,6 +394,7 @@ std::shared_ptr<Ast::FunctionSpecialization> Context::create_and_analyze_special
 		context.current_scope()[binding.identifier] = binding;
 	}
 
+	// Analyze body as a expression
 	if (std::dynamic_pointer_cast<Ast::Expression>(specialization->body)) {
 		auto result = context.analyze(std::dynamic_pointer_cast<Ast::Expression>(specialization->body));
 		if (result.is_ok()) {
@@ -399,6 +407,8 @@ std::shared_ptr<Ast::FunctionSpecialization> Context::create_and_analyze_special
 			}
 		}
 	}
+
+	// Analyze body as a block
 	else if (std::dynamic_pointer_cast<Ast::Block>(specialization->body)) {
 		auto result = context.analyze(std::dynamic_pointer_cast<Ast::Block>(specialization->body));
 		if (result.is_ok()) {
@@ -413,12 +423,4 @@ std::shared_ptr<Ast::FunctionSpecialization> Context::create_and_analyze_special
 	else assert(false);
 
 	return specialization;
-}
-
-std::vector<Type> Context::get_args_types(std::shared_ptr<Ast::Call> node) {
-	std::vector<Type> types;
-	for (size_t i = 0; i < node->args.size(); i++) {
-		types.push_back(node->args[i]->type);
-	}
-	return types;
 }

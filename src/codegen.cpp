@@ -247,7 +247,7 @@ void Codegen::codegen(std::vector<std::shared_ptr<Ast::Function>> functions) {
 			assert(specialization->valid);
 
 			// Make function type
-			std::vector<llvm::Type*> args_types = this->as_llvm_types(specialization->args_types);
+			std::vector<llvm::Type*> args_types = this->as_llvm_types(get_args_types(specialization->args));
 			auto return_type = this->as_llvm_type(specialization->return_type);
 			llvm::FunctionType* function_type = llvm::FunctionType::get(return_type, args_types, false);
 
