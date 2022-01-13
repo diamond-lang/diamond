@@ -370,7 +370,7 @@ Result<Ok, Errors> Context::get_type_of_user_defined_function(std::shared_ptr<As
 
 std::shared_ptr<Ast::FunctionSpecialization> Context::create_and_analyze_specialization(std::vector<Type> args, std::shared_ptr<Ast::Call> call, std::shared_ptr<Ast::Function> function) {
 	assert(function->generic);
-	if (function->return_type == Type("")) {;
+	if (function->return_type == Type("")) {
 		type_inference::analyze(function);
 	}
 	

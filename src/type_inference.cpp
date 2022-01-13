@@ -31,6 +31,8 @@ struct type_inference::Context {
 	void unify(std::shared_ptr<Ast::Expression> node);
 	void unify(std::shared_ptr<Ast::IfElseExpr> node);
 	void unify(std::shared_ptr<Ast::Identifier> node);
+    void unify(std::shared_ptr<Ast::Integer> node);
+    void unify(std::shared_ptr<Ast::Number> node);
 	void unify(std::shared_ptr<Ast::Call> node);
 
 	Binding* get_binding(std::string identifier);
@@ -83,6 +85,13 @@ Type type_inference::Context::get_unified_type(std::string type_var) {
     return Type("");
 }
 
+bool is_number(std::string str) {
+    for (size_t i = 0; i < str.size(); i++) {
+        if (!isdigit((int)str[i])) return false;
+    }
+    return true;
+}
+
 // Type Inference
 // --------------
 void type_inference::analyze(std::shared_ptr<Ast::Function> function) {
@@ -117,7 +126,6 @@ void type_inference::Context::analyze(std::shared_ptr<Ast::Function> node) {
         this->analyze(expression);
 
         // Unify expression type with return type
-        std::set<std::string> return_set;
         this->sets.push_back(std::set<std::string>{node->return_type.to_str(), expression->type.to_str()});
 
         // Join sets that share elements
@@ -126,10 +134,23 @@ void type_inference::Context::analyze(std::shared_ptr<Ast::Function> node) {
         // Label sets
         std::string alphabet = "abcdefghijklmnopqrstuvwxyz";
         assert(this->sets.size() <= alphabet.size());
+        size_t j = 19;
         for (size_t i = 0; i < this->sets.size(); i++) {
-            this->labeled_sets[std::string("$") + alphabet[(i + 19) % alphabet.size()]] = this->sets[i];
-        }
+            bool representative_found = false;
+            for (auto it = this->sets[i].begin(); it != this->sets[i].end(); it++) {
+                if (!is_number(*it)) {
+                    assert(!representative_found);
+                    representative_found = true;
+                    this->labeled_sets[*it] = this->sets[i];
+                }
+            }
 
+            if (!representative_found) {
+                this->labeled_sets[std::string("$") + alphabet[j % alphabet.size()]] = this->sets[i];
+                j++;
+            }
+        }
+        
         this->unify(expression);
 
         // Unify args and return type
@@ -137,6 +158,8 @@ void type_inference::Context::analyze(std::shared_ptr<Ast::Function> node) {
             node->args[i]->type = this->get_unified_type(node->args[i]->type.to_str());
         }
         node->return_type = this->get_unified_type(node->return_type.to_str());
+
+        node->print();
 	}
 }
 
@@ -150,6 +173,11 @@ void type_inference::Context::analyze(std::shared_ptr<Ast::IfElseExpr> node) {
 	this->analyze(node->condition);
 	this->analyze(node->expression);
 	this->analyze(node->else_expression);
+
+    node->type = Type(std::to_string(this->current_type_variable_number));
+    this->current_type_variable_number++;
+
+    this->sets.push_back(std::set<std::string>{node->type.to_str(), node->expression->type.to_str(), node->else_expression->type.to_str()});
 }
 
 void type_inference::Context::analyze(std::shared_ptr<Ast::Identifier> node) {
@@ -189,8 +217,12 @@ void type_inference::Context::analyze(std::shared_ptr<Ast::Call> node) {
             if (sets.find(interface_prototype[i].to_str()) == sets.end()) {
                 sets[interface_prototype[i].to_str()] = std::set<std::string>{};
             }
-            
+
             sets[interface_prototype[i].to_str()].insert(prototype[i].to_str());
+         
+            if (interface_prototype[i].to_str()[0] != '$') {
+                sets[interface_prototype[i].to_str()].insert(interface_prototype[i].to_str());
+            }
         }
 
         // Save sets found
@@ -201,6 +233,8 @@ void type_inference::Context::analyze(std::shared_ptr<Ast::Call> node) {
 }
 
 void type_inference::Context::unify(std::shared_ptr<Ast::Expression> node) {
+    if (std::dynamic_pointer_cast<Ast::Integer>(node))    unify(std::dynamic_pointer_cast<Ast::Integer>(node));
+    if (std::dynamic_pointer_cast<Ast::Number>(node))     unify(std::dynamic_pointer_cast<Ast::Number>(node));
 	if (std::dynamic_pointer_cast<Ast::Identifier>(node)) unify(std::dynamic_pointer_cast<Ast::Identifier>(node));
 	if (std::dynamic_pointer_cast<Ast::IfElseExpr>(node)) unify(std::dynamic_pointer_cast<Ast::IfElseExpr>(node));
 	if (std::dynamic_pointer_cast<Ast::Call>(node))       unify(std::dynamic_pointer_cast<Ast::Call>(node));
@@ -210,9 +244,18 @@ void type_inference::Context::unify(std::shared_ptr<Ast::IfElseExpr> node) {
 	this->unify(node->condition);
 	this->unify(node->expression);
 	this->unify(node->else_expression);
+    node->type = this->get_unified_type(node->type.to_str());
 }
 
 void type_inference::Context::unify(std::shared_ptr<Ast::Identifier> node) {
+    node->type = this->get_unified_type(node->type.to_str());
+}
+
+void type_inference::Context::unify(std::shared_ptr<Ast::Integer> node) {
+    node->type = this->get_unified_type(node->type.to_str());
+}
+
+void type_inference::Context::unify(std::shared_ptr<Ast::Number> node) {
     node->type = this->get_unified_type(node->type.to_str());
 }
 

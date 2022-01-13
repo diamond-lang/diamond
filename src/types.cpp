@@ -85,6 +85,7 @@ std::vector<bool> append(std::vector<bool> vec, bool val) {
 
 // For printing
 void put_indent_level(size_t indent_level, std::vector<bool> last) {
+	if (indent_level == 0) return;
 	for (int i = 0; i < indent_level - 1; i++) {
 		if (last[i]) {
 			std::cout << "   ";
@@ -234,7 +235,9 @@ void Ast::IfElseExpr::print(size_t indent_level, std::vector<bool> last) {
 	last.pop_back();
 
 	put_indent_level(indent_level, append(last, false));
-	std::cout << "if" << '\n';
+	std::cout << "if";
+	if (this->type != Type("")) std::cout << ": " << this->type.to_str();
+	std::cout << "\n";
 	this->condition->print(indent_level + 1, append(append(last, false), false));
 	this->expression->print(indent_level + 1, append(append(last, false), false));
 
