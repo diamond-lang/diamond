@@ -158,8 +158,6 @@ void type_inference::Context::analyze(std::shared_ptr<Ast::Function> node) {
             node->args[i]->type = this->get_unified_type(node->args[i]->type.to_str());
         }
         node->return_type = this->get_unified_type(node->return_type.to_str());
-
-        node->print();
 	}
 }
 

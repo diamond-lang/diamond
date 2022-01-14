@@ -375,7 +375,8 @@ std::shared_ptr<Ast::FunctionSpecialization> Context::create_and_analyze_special
 	}
 	
 	// Add new specialization
-	auto specialization = std::make_shared<Ast::FunctionSpecialization>();
+	auto specialization = std::make_shared<Ast::FunctionSpecialization>(function->line, function->col, function->file);
+	specialization->identifier = function->identifier;
 	specialization->body = function->body->clone();
 	for (size_t i = 0; i < function->args.size(); i++) {
 		specialization->args.push_back(std::dynamic_pointer_cast<Ast::Identifier>(function->args[i]->clone()));

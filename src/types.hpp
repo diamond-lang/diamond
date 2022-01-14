@@ -158,11 +158,18 @@ namespace Ast {
 		virtual std::shared_ptr<Node> clone();
 	};
 
-	struct FunctionSpecialization {
-		bool valid = false;
+	struct FunctionSpecialization : Node {
+		std::shared_ptr<Ast::Identifier> identifier;
 		std::vector<std::shared_ptr<Ast::Identifier>> args;
-		Type return_type;
 		std::shared_ptr<Ast::Node> body;
+		
+		bool valid = false;
+		Type return_type = Type("");
+
+		FunctionSpecialization(size_t line, size_t col, std::string file) :  Node(line, col, file) {}
+		virtual ~FunctionSpecialization() {}
+		virtual void print(size_t indent_level = 0, std::vector<bool> last = {});
+		virtual std::shared_ptr<Node> clone();
 	};
 
 	struct Expression;
@@ -257,7 +264,7 @@ namespace Ast {
 	struct Boolean : Expression {
 		bool value;
 
-		Boolean(bool value, size_t line, size_t col, std::string file) : Expression(line, col, file), value(value) {}
+		Boolean(bool value, size_t line, size_t col, std::string file) : Expression(line, col, file), value(value) {this->type = Type("bool");}
 		virtual ~Boolean() {}
 		virtual void print(size_t indent_level = 0, std::vector<bool> last = {});
 		virtual std::shared_ptr<Node> clone();

@@ -176,7 +176,38 @@ std::shared_ptr<Ast::Node> Ast::Function::clone() {
 	for (size_t i = 0; i < this->args.size(); i++) {
 		args.push_back(std::dynamic_pointer_cast<Identifier>(this->args[i]->clone()));
 	}
-	return std::make_shared<Ast::Function>(std::dynamic_pointer_cast<Ast::Identifier>(this->identifier->clone()), args, this->body->clone(), this->line, this->col, this->file);
+	auto function = std::make_shared<Ast::Function>(std::dynamic_pointer_cast<Ast::Identifier>(this->identifier->clone()), args, this->body->clone(), this->line, this->col, this->file);
+	function->return_type = this->return_type;
+	return function;
+}
+
+void Ast::FunctionSpecialization::print(size_t indent_level, std::vector<bool> last) {
+	put_indent_level(indent_level, last);
+	std::cout << "function " << this->identifier->value << '(';
+	for (size_t i = 0; i < this->args.size(); i++) {
+		std::cout << this->args[i]->value;
+		
+		if (this->args[i]->type != Type("")) {
+			std::cout << ": " << this->args[i]->type.to_str();
+		}
+
+		if (i != this->args.size() - 1) std::cout << ", ";
+	}
+	std::cout << ")";
+	if (this->return_type != Type("")) {
+		std::cout << ": " << this->return_type.to_str();
+	}
+	std::cout << "\n";
+	if (std::dynamic_pointer_cast<Ast::Expression>(body)) {
+		this->body->print(indent_level + 1, append(last, true));
+	}
+	else {
+		this->body->print(indent_level, last);
+	}
+}
+
+std::shared_ptr<Ast::Node> Ast::FunctionSpecialization::clone() {
+	assert(false);
 }
 
 // Assignment
@@ -231,8 +262,11 @@ std::shared_ptr<Ast::Node> Ast::IfElseStmt::clone() {
 
 // IfElseExpr
 void Ast::IfElseExpr::print(size_t indent_level, std::vector<bool> last) {
-	bool is_last = last[last.size() - 1];
-	last.pop_back();
+	bool is_last = true;
+	if (last.size() > 0) {
+		is_last = last[last.size() - 1];
+		last.pop_back();
+	}
 
 	put_indent_level(indent_level, append(last, false));
 	std::cout << "if";
@@ -249,7 +283,9 @@ void Ast::IfElseExpr::print(size_t indent_level, std::vector<bool> last) {
 
 std::shared_ptr<Ast::Node> Ast::IfElseExpr::clone() {
 	assert(this->else_expression);
-	return std::make_shared<Ast::IfElseExpr>(std::dynamic_pointer_cast<Ast::Expression>(this->condition->clone()), std::dynamic_pointer_cast<Ast::Expression>(this->expression->clone()), std::dynamic_pointer_cast<Ast::Expression>(this->else_expression->clone()), this->line, this->col, this->file);
+	auto ifElse = std::make_shared<Ast::IfElseExpr>(std::dynamic_pointer_cast<Ast::Expression>(this->condition->clone()), std::dynamic_pointer_cast<Ast::Expression>(this->expression->clone()), std::dynamic_pointer_cast<Ast::Expression>(this->else_expression->clone()), this->line, this->col, this->file);
+	ifElse->type = this->type;
+	return ifElse;
 }
 
 // Call
@@ -268,7 +304,9 @@ std::shared_ptr<Ast::Node> Ast::Call::clone() {
 	for (size_t i = 0; i < this->args.size(); i++) {
 		args.push_back(std::dynamic_pointer_cast<Expression>(this->args[i]->clone()));
 	}
-	return std::make_shared<Ast::Call>(std::dynamic_pointer_cast<Ast::Identifier>(this->identifier->clone()), args, this->line, this->col, this->file);
+	auto call = std::make_shared<Ast::Call>(std::dynamic_pointer_cast<Ast::Identifier>(this->identifier->clone()), args, this->line, this->col, this->file);
+	call->type = this->type;
+	return call;
 }
 
 // Number
@@ -280,7 +318,9 @@ void Ast::Number::print(size_t indent_level, std::vector<bool> last) {
 }
 
 std::shared_ptr<Ast::Node> Ast::Number::clone() {
-	return std::make_shared<Ast::Number>(this->value, this->line, this->col, this->file);
+	auto number = std::make_shared<Ast::Number>(this->value, this->line, this->col, this->file);
+	number->type = this->type;
+	return number;
 }
 
 // Integer
@@ -292,7 +332,9 @@ void Ast::Integer::print(size_t indent_level, std::vector<bool> last) {
 }
 
 std::shared_ptr<Ast::Node> Ast::Integer::clone() {
-	return std::make_shared<Ast::Integer>(this->value, this->line, this->col, this->file);
+	auto integer = std::make_shared<Ast::Integer>(this->value, this->line, this->col, this->file);
+	integer->type = this->type;
+	return integer;
 }
 
 // Identifier
@@ -304,7 +346,9 @@ void Ast::Identifier::print(size_t indent_level, std::vector<bool> last) {
 }
 
 std::shared_ptr<Ast::Node> Ast::Identifier::clone() {
-	return std::make_shared<Ast::Identifier>(this->value, this->line, this->col, this->file);
+	auto identifier = std::make_shared<Ast::Identifier>(this->value, this->line, this->col, this->file);
+	identifier->type = this->type;
+	return identifier;
 }
 
 // Boolean
