@@ -37,9 +37,17 @@ struct Binding {
 	bool is_argument() {return this->binding_type == FunctionArgumentBinding;}
 };
 
+struct FunctionCall {
+	std::string identifier;
+	std::vector<Type> args;
+	Type return_type = Type("");
+};
+
 struct Context {
 	std::string file;
 	std::vector<std::unordered_map<std::string, Binding>> scopes;
+	std::unordered_map<std::string, Type> type_bindings;
+	std::vector<FunctionCall> call_stack;
 
 	Result<Ok, Errors> analyze(std::shared_ptr<Ast::Block> block);
 	Result<Ok, Errors> analyze(std::shared_ptr<Ast::Assignment> assignment);
@@ -53,14 +61,48 @@ struct Context {
 	Result<Ok, Errors> analyze(std::shared_ptr<Ast::Identifier> node);
 	Result<Ok, Errors> analyze(std::shared_ptr<Ast::Boolean> node);
 
-	void add_scope() {this->scopes.push_back(std::unordered_map<std::string, Binding>());}
-	std::unordered_map<std::string, Binding>& current_scope() {return this->scopes[this->scopes.size() - 1];}
-	Binding* get_binding(std::string identifier);
 	Result<Ok, Errors> get_type_of_intrinsic(std::shared_ptr<Ast::Call> node);
 	Result<Ok, Errors> get_type_of_user_defined_function(std::shared_ptr<Ast::Call> node);
 	std::shared_ptr<Ast::FunctionSpecialization> create_and_analyze_specialization(std::vector<Type> args, std::shared_ptr<Ast::Call> call, std::shared_ptr<Ast::Function> function);
+
+	void add_scope() {this->scopes.push_back(std::unordered_map<std::string, Binding>());}
+	std::unordered_map<std::string, Binding>& current_scope() {return this->scopes[this->scopes.size() - 1];}
+	Binding* get_binding(std::string identifier);
 	std::vector<std::unordered_map<std::string, Binding>> get_definitions();
+	int is_recursive_call(std::shared_ptr<Ast::Call> call);
 };
+
+Binding* Context::get_binding(std::string identifier) {
+	for (auto scope = this->scopes.rbegin(); scope != this->scopes.rend(); scope++) {
+		if (scope->find(identifier) != scope->end()) {
+			return &(*scope)[identifier];
+		}
+	}
+	return nullptr;
+}
+
+std::vector<std::unordered_map<std::string, Binding>> Context::get_definitions() {
+	std::vector<std::unordered_map<std::string, Binding>> scopes;
+	for (size_t i = 0; i < this->scopes.size(); i++) {
+		scopes.push_back(std::unordered_map<std::string, Binding>());
+		for (auto it = this->scopes[i].begin(); it != this->scopes[i].end(); it++) {
+			if (it->second.is_function()) {
+				scopes[i][it->first] = it->second;
+			}
+		}
+	}
+	return scopes;
+}
+
+int Context::is_recursive_call(std::shared_ptr<Ast::Call> call) {
+	for (int i = 0; i < this->call_stack.size(); i++) {
+		if (call->identifier->value == this->call_stack[i].identifier
+		&& get_args_types(call->args) == this->call_stack[i].args) {
+			return i;
+		}
+	}
+	return -1;
+}
 
 // Semantic Analysis
 // -----------------
@@ -214,6 +256,13 @@ Result<Ok, Errors> Context::analyze(std::shared_ptr<Ast::Call> node) {
 		if (result.is_error()) return result;
 	}
 
+	// Is a recursive call
+	int recursive = this->is_recursive_call(node);
+	if (recursive != -1) {
+		node->type = this->call_stack[recursive].return_type;
+		return Result<Ok, Errors>(Ok());
+	}
+
 	// If is intrinsic
 	auto result = this->get_type_of_intrinsic(node);
 	if (result.is_ok()) return Result<Ok, Errors>(Ok());
@@ -248,12 +297,22 @@ Result<Ok, Errors> Context::analyze(std::shared_ptr<Ast::IfElseExpr> node) {
 }
 
 Result<Ok, Errors> Context::analyze(std::shared_ptr<Ast::Number> node) {
-	node->type = Type("float64");
+	if (node->type.is_type_variable()) {
+		node->type = this->type_bindings[node->type.to_str()];
+	}
+	else {
+		node->type = Type("float64");
+	}
 	return Result<Ok, Errors>(Ok());
 }
 
 Result<Ok, Errors> Context::analyze(std::shared_ptr<Ast::Integer> node) {
-	node->type = Type("int64");
+	if (node->type.is_type_variable()) {
+		node->type = this->type_bindings[node->type.to_str()];
+	}
+	else {
+		node->type = Type("int64");
+	}
 	return Result<Ok, Errors>(Ok());
 }
 
@@ -271,28 +330,6 @@ Result<Ok, Errors> Context::analyze(std::shared_ptr<Ast::Identifier> node) {
 Result<Ok, Errors> Context::analyze(std::shared_ptr<Ast::Boolean> node) {
 	node->type = Type("bool");
 	return Result<Ok, Errors>(Ok());
-}
-
-Binding* Context::get_binding(std::string identifier) {
-	for (auto scope = this->scopes.rbegin(); scope != this->scopes.rend(); scope++) {
-		if (scope->find(identifier) != scope->end()) {
-			return &(*scope)[identifier];
-		}
-	}
-	return nullptr;
-}
-
-std::vector<std::unordered_map<std::string, Binding>> Context::get_definitions() {
-	std::vector<std::unordered_map<std::string, Binding>> scopes;
-	for (size_t i = 0; i < this->scopes.size(); i++) {
-		scopes.push_back(std::unordered_map<std::string, Binding>());
-		for (auto it = this->scopes[i].begin(); it != this->scopes[i].end(); it++) {
-			if (it->second.is_function()) {
-				scopes[i][it->first] = it->second;
-			}
-		}
-	}
-	return scopes;
 }
 
 Result<Ok, Errors> Context::get_type_of_intrinsic(std::shared_ptr<Ast::Call> node) {
@@ -373,21 +410,65 @@ std::shared_ptr<Ast::FunctionSpecialization> Context::create_and_analyze_special
 	if (function->return_type == Type("")) {
 		type_inference::analyze(function);
 	}
-	
+
 	// Add new specialization
 	auto specialization = std::make_shared<Ast::FunctionSpecialization>(function->line, function->col, function->file);
 	specialization->identifier = function->identifier;
 	specialization->body = function->body->clone();
 	for (size_t i = 0; i < function->args.size(); i++) {
 		specialization->args.push_back(std::dynamic_pointer_cast<Ast::Identifier>(function->args[i]->clone()));
-		specialization->args[i]->type = args[i];
 	}
+	specialization->return_type = function->return_type;
 
 	// Create new context
 	Context context;
 	context.file = this->file;
 	context.scopes = this->get_definitions();
 	context.add_scope();
+	context.call_stack = this->call_stack;
+
+	// Add type bindings
+	for (size_t i = 0; i < specialization->args.size(); i++) {
+		// If the arg type is a type variable
+		if (specialization->args[i]->type.is_type_variable()) {
+			std::string type_variable = specialization->args[i]->type.to_str();
+
+			// If is a new type variable
+			if (context.type_bindings.find(type_variable) == context.type_bindings.end()) {
+				context.type_bindings[type_variable] = call->args[i]->type;
+				specialization->args[i]->type = call->args[i]->type;
+			}
+
+			// Else compare wih previous type founded for her
+			else {
+				if (context.type_bindings[type_variable] != call->args[i]->type) {
+					specialization->args[i]->type == call->args[i]->type;
+					specialization->valid = false;
+					return specialization;
+				}
+				else {
+					specialization->args[i]->type = context.type_bindings[type_variable];
+				}
+			}
+		}
+	}
+
+	// To remove, this is just while I don't add type inference for blocks
+	for (size_t i = 0; i < specialization->args.size(); i++) {
+		if (specialization->args[i]->type == Type("")) {
+			specialization->args[i]->type = call->args[i]->type;
+		}
+	}
+
+	// If return type is a type variable
+	if (specialization->return_type.is_type_variable()) {
+		if (context.type_bindings.find(specialization->return_type.to_str()) != context.type_bindings.end()) {
+			specialization->return_type = context.type_bindings[specialization->return_type.to_str()];
+		}
+		else assert(false); // The concrete type couldn't be determined from the input types
+	}
+	
+	context.call_stack.push_back(FunctionCall{specialization->identifier->value, get_args_types(specialization->args), specialization->return_type});
 
 	// Add arguments to new scope
 	for (size_t i = 0; i != function->args.size(); i++) {

@@ -26,6 +26,9 @@ struct type_inference::Context {
 	void analyze(std::shared_ptr<Ast::Expression> node);
 	void analyze(std::shared_ptr<Ast::IfElseExpr> node);
 	void analyze(std::shared_ptr<Ast::Identifier> node);
+    void analyze(std::shared_ptr<Ast::Integer> node);
+    void analyze(std::shared_ptr<Ast::Number> node);
+    void analyze(std::shared_ptr<Ast::Boolean> node);
 	void analyze(std::shared_ptr<Ast::Call> node);
 
 	void unify(std::shared_ptr<Ast::Expression> node);
@@ -103,23 +106,22 @@ void type_inference::analyze(std::shared_ptr<Ast::Function> function) {
 }
 
 void type_inference::Context::analyze(std::shared_ptr<Ast::Function> node) {
-    this->add_scope();
+    if (std::dynamic_pointer_cast<Ast::Expression>(node->body)) {
+        this->add_scope();
 
-    // Assign a type variable to every argument and return type
-    for (size_t i = 0; i < node->args.size(); i++) {
-		node->args[i]->type = Type(std::to_string(this->current_type_variable_number));
-		this->current_type_variable_number++;
+        // Assign a type variable to every argument and return type
+        for (size_t i = 0; i < node->args.size(); i++) {
+            node->args[i]->type = Type(std::to_string(this->current_type_variable_number));
+            this->current_type_variable_number++;
 
-        type_inference::Binding binding;
-        binding.identifier = node->args[i]->value;
-        binding.type = node->args[i]->type;
-        this->current_scope()[binding.identifier] = binding;
-	}
-    node->return_type = Type(std::to_string(this->current_type_variable_number));
-    this->current_type_variable_number++;
+            type_inference::Binding binding;
+            binding.identifier = node->args[i]->value;
+            binding.type = node->args[i]->type;
+            this->current_scope()[binding.identifier] = binding;
+        }
+        node->return_type = Type(std::to_string(this->current_type_variable_number));
+        this->current_type_variable_number++;
 
-
-	if (std::dynamic_pointer_cast<Ast::Expression>(node->body)) {
 		auto expression = std::dynamic_pointer_cast<Ast::Expression>(node->body);
 
         // Analyze expression
@@ -163,6 +165,9 @@ void type_inference::Context::analyze(std::shared_ptr<Ast::Function> node) {
 
 void type_inference::Context::analyze(std::shared_ptr<Ast::Expression> node) {
 	if (std::dynamic_pointer_cast<Ast::Identifier>(node)) analyze(std::dynamic_pointer_cast<Ast::Identifier>(node));
+    if (std::dynamic_pointer_cast<Ast::Integer>(node))    analyze(std::dynamic_pointer_cast<Ast::Integer>(node));
+    if (std::dynamic_pointer_cast<Ast::Number>(node))     analyze(std::dynamic_pointer_cast<Ast::Number>(node));
+    if (std::dynamic_pointer_cast<Ast::Boolean>(node))    analyze(std::dynamic_pointer_cast<Ast::Boolean>(node));
 	if (std::dynamic_pointer_cast<Ast::IfElseExpr>(node)) analyze(std::dynamic_pointer_cast<Ast::IfElseExpr>(node));
 	if (std::dynamic_pointer_cast<Ast::Call>(node))       analyze(std::dynamic_pointer_cast<Ast::Call>(node));
 }
@@ -184,14 +189,24 @@ void type_inference::Context::analyze(std::shared_ptr<Ast::Identifier> node) {
 	}
 }
 
+void type_inference::Context::analyze(std::shared_ptr<Ast::Integer> node) {
+    node->type = Type(std::to_string(this->current_type_variable_number));
+    this->current_type_variable_number++;
+}
+
+void type_inference::Context::analyze(std::shared_ptr<Ast::Number> node) {
+	node->type = Type(std::to_string(this->current_type_variable_number));
+    this->current_type_variable_number++;
+}
+
+void type_inference::Context::analyze(std::shared_ptr<Ast::Boolean> node) {
+	node->type = Type("bool");
+}
+
 void type_inference::Context::analyze(std::shared_ptr<Ast::Call> node) {
 	// Assign a type variable to every argument and return type
 	for (size_t i = 0; i < node->args.size(); i++) {
         this->analyze(node->args[i]);
-        if (node->args[i]->type == Type("")) {
-            node->args[i]->type = Type(std::to_string(this->current_type_variable_number));
-            this->current_type_variable_number++;
-        }
 	}
 	node->type = Type(std::to_string(this->current_type_variable_number));
 	this->current_type_variable_number++;
@@ -218,7 +233,7 @@ void type_inference::Context::analyze(std::shared_ptr<Ast::Call> node) {
 
             sets[interface_prototype[i].to_str()].insert(prototype[i].to_str());
          
-            if (interface_prototype[i].to_str()[0] != '$') {
+            if (interface_prototype[i].is_type_variable()) {
                 sets[interface_prototype[i].to_str()].insert(interface_prototype[i].to_str());
             }
         }

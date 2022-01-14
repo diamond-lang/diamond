@@ -584,7 +584,8 @@ llvm::Value* Codegen::codegen(std::shared_ptr<Ast::Number> node) {
 }
 
 llvm::Value* Codegen::codegen(std::shared_ptr<Ast::Integer> node) {
-	return llvm::ConstantInt::get(*(this->context), llvm::APInt(64, node->value, true));
+	if (node->type == Type("float64")) return llvm::ConstantFP::get(*(this->context), llvm::APFloat((double)node->value));
+	else                               return llvm::ConstantInt::get(*(this->context), llvm::APInt(64, node->value, true));
 }
 
 llvm::Value* Codegen::codegen(std::shared_ptr<Ast::Identifier> node) {
@@ -600,7 +601,10 @@ llvm::Type* Codegen::as_llvm_type(Type type) {
 	else if (type == Type("int64"))   return llvm::Type::getInt64Ty(*(this->context));
 	else if (type == Type("bool"))    return llvm::Type::getInt1Ty(*(this->context));
 	else if (type == Type("void"))    return llvm::Type::getVoidTy(*(this->context));
-	else                              assert(false);
+	else                              {
+		std::cout <<"type: " << type.to_str() << "\n";
+		assert(false);
+	}
 }
 
 std::vector<llvm::Type*> Codegen::as_llvm_types(std::vector<Type> types) {

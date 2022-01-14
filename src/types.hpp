@@ -103,6 +103,7 @@ struct Type {
 	bool operator==(const Type &t) const;
 	bool operator!=(const Type &t) const;
 	std::string to_str(std::string output = "") const;
+	bool is_type_variable() const;
 };
 
 namespace Ast {

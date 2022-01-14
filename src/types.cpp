@@ -78,12 +78,18 @@ std::string Type::to_str(std::string output) const {
 	return output;
 }
 
+bool Type::is_type_variable() const {
+	std::string str = this->to_str();
+	if (str.size() > 0 && str[0] == '$') return true;
+	else                                 return false;
+}
+
+// For printing
 std::vector<bool> append(std::vector<bool> vec, bool val) {
 	vec.push_back(val);
 	return vec;
 }
 
-// For printing
 void put_indent_level(size_t indent_level, std::vector<bool> last) {
 	if (indent_level == 0) return;
 	for (int i = 0; i < indent_level - 1; i++) {
@@ -354,7 +360,9 @@ std::shared_ptr<Ast::Node> Ast::Identifier::clone() {
 // Boolean
 void Ast::Boolean::print(size_t indent_level, std::vector<bool> last) {
 	put_indent_level(indent_level, last);
-	std::cout << (this->value ? "true" : "false") << '\n';
+	std::cout << (this->value ? "true" : "false");
+	if (this->type != Type("")) std::cout << ": " << this->type.to_str();
+	std::cout << "\n";
 }
 
 std::shared_ptr<Ast::Node> Ast::Boolean::clone() {
