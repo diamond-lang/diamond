@@ -265,7 +265,7 @@ namespace Ast {
 	struct Boolean : Expression {
 		bool value;
 
-		Boolean(bool value, size_t line, size_t col, std::string file) : Expression(line, col, file), value(value) {this->type = Type("bool");}
+		Boolean(bool value, size_t line, size_t col, std::string file) : Expression(line, col, file), value(value) {}
 		virtual ~Boolean() {}
 		virtual void print(size_t indent_level = 0, std::vector<bool> last = {});
 		virtual std::shared_ptr<Node> clone();

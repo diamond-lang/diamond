@@ -248,11 +248,11 @@ void Ast::IfElseStmt::print(size_t indent_level, std::vector<bool> last) {
 	bool is_last = last[last.size() - 1];
 	last.pop_back();
 
-	bool has_else_block = this->else_block ? false : true;
-	put_indent_level(indent_level, append(last, has_else_block));
+	bool has_else_block = this->else_block ? true : false;
+	put_indent_level(indent_level, append(last, is_last && !has_else_block));
 	std::cout << "if" << '\n';
-	this->condition->print(indent_level + 1, append(append(last, has_else_block), false));
-	this->block->print(indent_level, append(last, has_else_block));
+	this->condition->print(indent_level + 1, append(append(last, is_last && !has_else_block), false));
+	this->block->print(indent_level, append(last, is_last && !has_else_block));
 
 	if (this->else_block) {
 		put_indent_level(indent_level, append(last, is_last));
@@ -279,7 +279,7 @@ void Ast::IfElseExpr::print(size_t indent_level, std::vector<bool> last) {
 	if (this->type != Type("")) std::cout << ": " << this->type.to_str();
 	std::cout << "\n";
 	this->condition->print(indent_level + 1, append(append(last, false), false));
-	this->expression->print(indent_level + 1, append(append(last, false), false));
+	this->expression->print(indent_level + 1, append(append(last, false), true));
 
 	assert(this->else_expression);
 	put_indent_level(indent_level, append(last, is_last));
@@ -366,7 +366,9 @@ void Ast::Boolean::print(size_t indent_level, std::vector<bool> last) {
 }
 
 std::shared_ptr<Ast::Node> Ast::Boolean::clone() {
-	return std::make_shared<Ast::Boolean>(this->value, this->line, this->col, this->file);
+	auto boolean = std::make_shared<Ast::Boolean>(this->value, this->line, this->col, this->file);
+	boolean->type = this->type;
+	return boolean;
 }
 
 // Utilities
