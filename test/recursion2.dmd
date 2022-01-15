@@ -1,0 +1,16 @@
+function fib2(n)
+    if n == 0
+        0 + 0
+    else
+        if n == 1
+            1
+        else
+            fib2(n - 2) + fib2(n - 1)
+
+print(fib2(10))
+print(fib2(10.0))
+
+--- Output
+55
+55
+---

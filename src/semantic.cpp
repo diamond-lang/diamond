@@ -104,6 +104,46 @@ int Context::is_recursive_call(std::shared_ptr<Ast::Call> call) {
 	return -1;
 }
 
+Type find_concrete_type_for_type_variable_on_expression(std::shared_ptr<Ast::Expression> expression, std::string type_variable) {
+	auto if_else = std::dynamic_pointer_cast<Ast::IfElseExpr>(expression);
+	auto call = std::dynamic_pointer_cast<Ast::Call>(expression);
+	auto integer = std::dynamic_pointer_cast<Ast::Integer>(expression);
+	auto number = std::dynamic_pointer_cast<Ast::Number>(expression);
+	if (if_else) {
+		Type expr_type = find_concrete_type_for_type_variable_on_expression(if_else->expression, type_variable);
+		if (expr_type != Type("")) return expr_type;
+
+		expr_type = find_concrete_type_for_type_variable_on_expression(if_else->else_expression, type_variable);
+		if (expr_type != Type("")) return expr_type;
+	}
+	if (call) {
+		if (call->type.to_str() == type_variable) {
+			for (size_t i = 0; i < call->args.size(); i++) {
+				if (call->args[i]->type.to_str() == type_variable) {
+					return find_concrete_type_for_type_variable_on_expression(call->args[i], type_variable);
+				}
+			}
+		}
+	}
+	else if (integer) {
+		if (integer->type.to_str() == type_variable) return Type("int64");
+	}
+	else if (number) {
+		if (number->type.to_str() == type_variable) return Type("float64");
+	}
+	return Type("");
+}
+
+Type find_concrete_type_for_type_variable(std::shared_ptr<Ast::FunctionSpecialization> specialization, std::string type_variable) {
+	if (std::dynamic_pointer_cast<Ast::Expression>(specialization->body)) {
+		return find_concrete_type_for_type_variable_on_expression(std::dynamic_pointer_cast<Ast::Expression>(specialization->body), type_variable);
+	}
+	else {
+		assert(false);
+	}
+	return Type("");
+}
+
 // Semantic Analysis
 // -----------------
 Result<Ok, Errors> semantic::analyze(std::shared_ptr<Ast::Program> program) {
@@ -465,7 +505,11 @@ std::shared_ptr<Ast::FunctionSpecialization> Context::create_and_analyze_special
 		if (context.type_bindings.find(specialization->return_type.to_str()) != context.type_bindings.end()) {
 			specialization->return_type = context.type_bindings[specialization->return_type.to_str()];
 		}
-		else assert(false); // The concrete type couldn't be determined from the input types
+		else {
+			Type concrete_type = find_concrete_type_for_type_variable(specialization, specialization->return_type.to_str());
+			context.type_bindings[specialization->return_type.to_str()] = concrete_type;
+			specialization->return_type = concrete_type;
+		}
 	}
 	
 	context.call_stack.push_back(FunctionCall{specialization->identifier->value, get_args_types(specialization->args), specialization->return_type});

@@ -70,6 +70,22 @@ void print_llvm_ir(std::shared_ptr<Ast::Program> program, std::string program_na
 	llvm_ir.module->print(llvm::errs(), nullptr);
 }
 
+std::string get_function_name(std::shared_ptr<Ast::FunctionSpecialization> function) {
+	std::string name = function->identifier->value;
+	for (size_t i = 0; i < function->args.size(); i++) {
+		name += "_" + function->args[i]->type.to_str();
+	}
+	return name;
+}
+
+std::string get_function_name(std::shared_ptr<Ast::Call> function) {
+	std::string name = function->identifier->value;
+	for (size_t i = 0; i < function->args.size(); i++) {
+		name += "_" + function->args[i]->type.to_str();
+	}
+	return name;
+}
+
 // Linking
 // -------
 static std::string get_object_file_name(std::string executable_name);
@@ -252,7 +268,7 @@ void Codegen::codegen(std::vector<std::shared_ptr<Ast::Function>> functions) {
 			llvm::FunctionType* function_type = llvm::FunctionType::get(return_type, args_types, false);
 
 			// Create function
-			std::string name = node->identifier->value + "_" + specialization->return_type.to_str();
+			std::string name = get_function_name(specialization);
 			llvm::Function* f = llvm::Function::Create(function_type, llvm::Function::ExternalLinkage, name, this->module);
 
 			// Set args for names
@@ -268,7 +284,7 @@ void Codegen::codegen(std::vector<std::shared_ptr<Ast::Function>> functions) {
 			auto& specialization = node->specializations[i];
 			assert(specialization->valid);
 
-			std::string name = node->identifier->value + "_" + specialization->return_type.to_str();
+			std::string name = get_function_name(specialization);
 			llvm::Function* f = this->module->getFunction(name);
 
 			// Create the body of the function
@@ -537,7 +553,7 @@ llvm::Value* Codegen::codegen(std::shared_ptr<Ast::Call> node) {
 	}
 
 	// Get function
-	std::string name = node->identifier->value + "_" + node->type.to_str();
+	std::string name = get_function_name(node);;
 	llvm::Function* function = this->module->getFunction(name);
 	assert(function);
 
@@ -589,6 +605,7 @@ llvm::Value* Codegen::codegen(std::shared_ptr<Ast::Integer> node) {
 }
 
 llvm::Value* Codegen::codegen(std::shared_ptr<Ast::Identifier> node) {
+	if (node->type == Type("float64") && this->current_scope()[node->value]->getType()->isIntegerTy(64)) std::cout << "Binding not the type it should be.\n";
 	return this->current_scope()[node->value];
 }
 
@@ -601,7 +618,7 @@ llvm::Type* Codegen::as_llvm_type(Type type) {
 	else if (type == Type("int64"))   return llvm::Type::getInt64Ty(*(this->context));
 	else if (type == Type("bool"))    return llvm::Type::getInt1Ty(*(this->context));
 	else if (type == Type("void"))    return llvm::Type::getVoidTy(*(this->context));
-	else                              {
+	else {
 		std::cout <<"type: " << type.to_str() << "\n";
 		assert(false);
 	}
