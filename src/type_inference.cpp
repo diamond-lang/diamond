@@ -233,7 +233,7 @@ void type_inference::Context::analyze(std::shared_ptr<Ast::Call> node) {
 
             sets[interface_prototype[i].to_str()].insert(prototype[i].to_str());
          
-            if (interface_prototype[i].is_type_variable()) {
+            if (!interface_prototype[i].is_type_variable()) {
                 sets[interface_prototype[i].to_str()].insert(interface_prototype[i].to_str());
             }
         }
