@@ -109,6 +109,7 @@ Type find_concrete_type_for_type_variable_on_expression(std::shared_ptr<Ast::Exp
 	auto call = std::dynamic_pointer_cast<Ast::Call>(expression);
 	auto integer = std::dynamic_pointer_cast<Ast::Integer>(expression);
 	auto number = std::dynamic_pointer_cast<Ast::Number>(expression);
+	
 	if (if_else) {
 		Type expr_type = find_concrete_type_for_type_variable_on_expression(if_else->expression, type_variable);
 		if (expr_type != Type("")) return expr_type;
@@ -131,12 +132,46 @@ Type find_concrete_type_for_type_variable_on_expression(std::shared_ptr<Ast::Exp
 	else if (number) {
 		if (number->type.to_str() == type_variable) return Type("float64");
 	}
+	else {
+		assert(false);
+	}
+	return Type("");
+}
+
+Type find_concrete_type_for_type_variable_on_block(std::shared_ptr<Ast::Block> block, std::string type_variable) {
+	for (size_t i = 0; i < block->statements.size(); i++) {
+        auto assignment = std::dynamic_pointer_cast<Ast::Assignment>(block->statements[i]);
+        auto return_stmt = std::dynamic_pointer_cast<Ast::Return>(block->statements[i]);
+        auto if_else_stmt = std::dynamic_pointer_cast<Ast::IfElseStmt>(block->statements[i]);
+		auto call = std::dynamic_pointer_cast<Ast::Call>(block->statements[i]);
+        
+        if (assignment) {
+			return find_concrete_type_for_type_variable_on_expression(assignment->expression, type_variable);
+		}
+        else if (return_stmt && return_stmt->expression) {
+			return find_concrete_type_for_type_variable_on_expression(return_stmt->expression, type_variable);
+		}
+        else if (if_else_stmt) {
+			Type block_type = find_concrete_type_for_type_variable_on_block(if_else_stmt->block, type_variable);
+			if (block_type != Type("")) return block_type;
+
+			block_type = find_concrete_type_for_type_variable_on_block(if_else_stmt->else_block, type_variable);
+			if (block_type != Type("")) return block_type;
+		}
+		else if (call) {}
+        else {
+			assert(false);
+		}
+    }
 	return Type("");
 }
 
 Type find_concrete_type_for_type_variable(std::shared_ptr<Ast::FunctionSpecialization> specialization, std::string type_variable) {
 	if (std::dynamic_pointer_cast<Ast::Expression>(specialization->body)) {
 		return find_concrete_type_for_type_variable_on_expression(std::dynamic_pointer_cast<Ast::Expression>(specialization->body), type_variable);
+	}
+	if (std::dynamic_pointer_cast<Ast::Block>(specialization->body)) {
+		return find_concrete_type_for_type_variable_on_block(std::dynamic_pointer_cast<Ast::Block>(specialization->body), type_variable);
 	}
 	else {
 		assert(false);

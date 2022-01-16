@@ -21,8 +21,13 @@ struct type_inference::Context {
 	size_t current_type_variable_number = 1;
     std::vector<std::set<std::string>> sets;
     std::unordered_map<std::string, std::set<std::string>> labeled_sets;
+    std::shared_ptr<Ast::Function> function;
 
-	void analyze(std::shared_ptr<Ast::Function> node);
+    void analyze(std::shared_ptr<Ast::Function> node);
+    void analyze(std::shared_ptr<Ast::Block> block);
+	void analyze(std::shared_ptr<Ast::Assignment> node);
+	void analyze(std::shared_ptr<Ast::Return> node);
+	void analyze(std::shared_ptr<Ast::IfElseStmt> node);
 	void analyze(std::shared_ptr<Ast::Expression> node);
 	void analyze(std::shared_ptr<Ast::IfElseExpr> node);
 	void analyze(std::shared_ptr<Ast::Identifier> node);
@@ -31,6 +36,10 @@ struct type_inference::Context {
     void analyze(std::shared_ptr<Ast::Boolean> node);
 	void analyze(std::shared_ptr<Ast::Call> node);
 
+    void unify(std::shared_ptr<Ast::Block> block);
+	void unify(std::shared_ptr<Ast::Assignment> node);
+	void unify(std::shared_ptr<Ast::Return> node);
+	void unify(std::shared_ptr<Ast::IfElseStmt> node);
 	void unify(std::shared_ptr<Ast::Expression> node);
 	void unify(std::shared_ptr<Ast::IfElseExpr> node);
 	void unify(std::shared_ptr<Ast::Identifier> node);
@@ -41,6 +50,7 @@ struct type_inference::Context {
 	Binding* get_binding(std::string identifier);
 	std::unordered_map<std::string, Binding>& current_scope() {return this->scopes[this->scopes.size() - 1];}
 	void add_scope() {this->scopes.push_back(std::unordered_map<std::string, Binding>());}
+    void remove_scope() {this->scopes.pop_back();}
     Type get_unified_type(std::string type_var);
 };
 
@@ -106,13 +116,18 @@ void type_inference::analyze(std::shared_ptr<Ast::Function> function) {
 }
 
 void type_inference::Context::analyze(std::shared_ptr<Ast::Function> node) {
-    if (std::dynamic_pointer_cast<Ast::Expression>(node->body)) {
-        this->add_scope();
+    this->function = node;
+    auto expression = std::dynamic_pointer_cast<Ast::Expression>(node->body);
+    auto block = std::dynamic_pointer_cast<Ast::Block>(node->body);
+
+    if (expression || block) {
+         this->add_scope();
 
         // Assign a type variable to every argument and return type
         for (size_t i = 0; i < node->args.size(); i++) {
             node->args[i]->type = Type(std::to_string(this->current_type_variable_number));
             this->current_type_variable_number++;
+            this->sets.push_back(std::set<std::string>{node->args[i]->type.to_str()});
 
             type_inference::Binding binding;
             binding.identifier = node->args[i]->value;
@@ -121,14 +136,19 @@ void type_inference::Context::analyze(std::shared_ptr<Ast::Function> node) {
         }
         node->return_type = Type(std::to_string(this->current_type_variable_number));
         this->current_type_variable_number++;
+        this->sets.push_back(std::set<std::string>{node->return_type.to_str()});
 
-		auto expression = std::dynamic_pointer_cast<Ast::Expression>(node->body);
+        if (expression) {
+            // Analyze expression
+            this->analyze(expression);
 
-        // Analyze expression
-        this->analyze(expression);
-
-        // Unify expression type with return type
-        this->sets.push_back(std::set<std::string>{node->return_type.to_str(), expression->type.to_str()});
+            // Unify expression type with return type
+            this->sets.push_back(std::set<std::string>{node->return_type.to_str(), expression->type.to_str()});
+        }
+        if (block) {
+            // Analyze block
+            this->analyze(block);
+        }
 
         // Join sets that share elements
         this->sets = merge_sets_with_shared_elements(this->sets);
@@ -153,14 +173,64 @@ void type_inference::Context::analyze(std::shared_ptr<Ast::Function> node) {
             }
         }
         
-        this->unify(expression);
+        if (expression) {
+            this->unify(expression);
+        }
+        if (block) {
+            this->unify(block);
+        }
 
         // Unify args and return type
         for (size_t i = 0; i < node->args.size(); i++) {
             node->args[i]->type = this->get_unified_type(node->args[i]->type.to_str());
         }
         node->return_type = this->get_unified_type(node->return_type.to_str());
-	}
+    } else {
+        assert(false);
+    }
+}
+
+void type_inference::Context::analyze(std::shared_ptr<Ast::Block> block) {
+    this->add_scope();
+
+    for (size_t i = 0; i < block->statements.size(); i++) {
+        auto assignment = std::dynamic_pointer_cast<Ast::Assignment>(block->statements[i]);
+        auto return_stmt = std::dynamic_pointer_cast<Ast::Return>(block->statements[i]);
+        auto if_else_stmt = std::dynamic_pointer_cast<Ast::IfElseStmt>(block->statements[i]);
+        auto call = std::dynamic_pointer_cast<Ast::Call>(block->statements[i]);
+        
+        if      (assignment)   this->analyze(assignment);
+        else if (return_stmt)  this->analyze(return_stmt);
+        else if (if_else_stmt) this->analyze(if_else_stmt);
+        else if (call)         this->analyze(call);
+        else                   assert(false);
+    }
+
+    this->remove_scope();
+}
+
+void type_inference::Context::analyze(std::shared_ptr<Ast::Assignment> node) {
+    this->analyze(node->expression);
+    type_inference::Binding binding;
+    binding.identifier = node->identifier->value;
+    binding.type = node->expression->type;
+    this->current_scope()[binding.identifier] = binding;
+}
+
+void type_inference::Context::analyze(std::shared_ptr<Ast::Return> node) {
+    if (node->expression) {
+        this->analyze(node->expression);
+        this->sets.push_back(std::set<std::string>{this->function->return_type.to_str(), node->expression->type.to_str()});
+    }
+    else {
+        this->sets.push_back(std::set<std::string>{this->function->return_type.to_str(), "void"});
+    }
+}
+
+void type_inference::Context::analyze(std::shared_ptr<Ast::IfElseStmt> node) {
+    this->analyze(node->condition);
+    this->analyze(node->block);
+    if (node->else_block) this->analyze(node->else_block);
 }
 
 void type_inference::Context::analyze(std::shared_ptr<Ast::Expression> node) {
@@ -243,6 +313,35 @@ void type_inference::Context::analyze(std::shared_ptr<Ast::Call> node) {
             this->sets.push_back(it->second);
         }
 	}
+}
+
+void type_inference::Context::unify(std::shared_ptr<Ast::Block> block) {
+    for (size_t i = 0; i < block->statements.size(); i++) {
+        auto assignment = std::dynamic_pointer_cast<Ast::Assignment>(block->statements[i]);
+        auto return_stmt = std::dynamic_pointer_cast<Ast::Return>(block->statements[i]);
+        auto if_else_stmt = std::dynamic_pointer_cast<Ast::IfElseStmt>(block->statements[i]);
+        auto call = std::dynamic_pointer_cast<Ast::Call>(block->statements[i]);
+        
+        if      (assignment)   this->unify(assignment);
+        else if (return_stmt)  this->unify(return_stmt);
+        else if (if_else_stmt) this->unify(if_else_stmt);
+        else if (call)         this->unify(call);
+        else                   assert(false);
+    }
+}
+
+void type_inference::Context::unify(std::shared_ptr<Ast::Assignment> node) {
+    this->unify(node->expression);
+}
+
+void type_inference::Context::unify(std::shared_ptr<Ast::Return> node) {
+    if (node->expression) this->unify(node->expression);
+}
+
+void type_inference::Context::unify(std::shared_ptr<Ast::IfElseStmt> node) {
+    this->unify(node->condition);
+    this->unify(node->block);
+    if (node->else_block) this->unify(node->else_block);
 }
 
 void type_inference::Context::unify(std::shared_ptr<Ast::Expression> node) {

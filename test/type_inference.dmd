@@ -1,0 +1,11 @@
+function yeah(a)
+    b be 35
+    print(a)
+    return b
+
+print(yeah(16.6))
+
+--- Output
+16.6
+35
+---
