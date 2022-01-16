@@ -153,6 +153,15 @@ void type_inference::Context::analyze(std::shared_ptr<Ast::Function> node) {
         // Join sets that share elements
         this->sets = merge_sets_with_shared_elements(this->sets);
 
+        // Check if return type is alone, if is alone it means the function is void
+        for (size_t i = 0; i < this->sets.size(); i++) {
+            if (this->sets[i].count(node->return_type.to_str())) {
+                if (this->sets[i].size() == 1) {
+                    this->sets[i].insert("void");
+                }
+            }
+        }
+
         // Label sets
         std::string alphabet = "abcdefghijklmnopqrstuvwxyz";
         assert(this->sets.size() <= alphabet.size());
@@ -163,7 +172,12 @@ void type_inference::Context::analyze(std::shared_ptr<Ast::Function> node) {
                 if (!is_number(*it)) {
                     assert(!representative_found);
                     representative_found = true;
-                    this->labeled_sets[*it] = this->sets[i];
+                    if (this->labeled_sets.find(*it) != this->labeled_sets.end()) {
+                         this->labeled_sets[*it].merge(this->sets[i]);
+                    }
+                    else {
+                        this->labeled_sets[*it] = this->sets[i];
+                    }
                 }
             }
 

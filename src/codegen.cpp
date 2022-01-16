@@ -62,6 +62,7 @@ struct Codegen {
 	void add_scope();
 	std::unordered_map<std::string, llvm::Value*>& current_scope();
 	void remove_scope();
+	llvm::Value* get_binding(std::string identifier);
 };
 
 void print_llvm_ir(std::shared_ptr<Ast::Program> program, std::string program_name) {
@@ -234,6 +235,8 @@ void Codegen::codegen(std::shared_ptr<Ast::Program> node) {
 }
 
 void Codegen::codegen(std::shared_ptr<Ast::Block> node) {
+	this->add_scope();
+
 	for (size_t i = 0; i < node->statements.size(); i++) {
 		if (std::dynamic_pointer_cast<Ast::Assignment>(node->statements[i])) {
 			this->codegen(std::dynamic_pointer_cast<Ast::Assignment>(node->statements[i]));
@@ -251,6 +254,8 @@ void Codegen::codegen(std::shared_ptr<Ast::Block> node) {
 			assert(false);
 		}
 	}
+
+	this->remove_scope();
 }
 
 void Codegen::codegen(std::vector<std::shared_ptr<Ast::Function>> functions) {
@@ -605,8 +610,7 @@ llvm::Value* Codegen::codegen(std::shared_ptr<Ast::Integer> node) {
 }
 
 llvm::Value* Codegen::codegen(std::shared_ptr<Ast::Identifier> node) {
-	if (node->type == Type("float64") && this->current_scope()[node->value]->getType()->isIntegerTy(64)) std::cout << "Binding not the type it should be.\n";
-	return this->current_scope()[node->value];
+	return this->get_binding(node->value);
 }
 
 llvm::Value* Codegen::codegen(std::shared_ptr<Ast::Boolean> node) {
@@ -642,4 +646,14 @@ std::unordered_map<std::string, llvm::Value*>& Codegen::current_scope() {
 
 void Codegen::remove_scope() {
 	this->scopes.pop_back();
+}
+
+llvm::Value* Codegen::get_binding(std::string identifier) {
+	for (auto scope = this->scopes.rbegin(); scope != this->scopes.rend(); scope++) {
+		if (scope->find(identifier) != scope->end()) {
+			return (*scope)[identifier];
+		}
+	}
+	assert(false);
+	return nullptr;
 }

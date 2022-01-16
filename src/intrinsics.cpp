@@ -30,6 +30,9 @@ std::unordered_map<std::string, std::pair<std::vector<Type>, Type>> interfaces =
     },
     {"!=",
         {{Type("$t"), Type("$t")}, Type("bool")}
+    },
+    {"print",
+        {{Type("$t")}, Type("void")}
     }
 };
 

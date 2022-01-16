@@ -66,6 +66,7 @@ struct Context {
 	std::shared_ptr<Ast::FunctionSpecialization> create_and_analyze_specialization(std::vector<Type> args, std::shared_ptr<Ast::Call> call, std::shared_ptr<Ast::Function> function);
 
 	void add_scope() {this->scopes.push_back(std::unordered_map<std::string, Binding>());}
+	void remove_scope() {this->scopes.pop_back();}
 	std::unordered_map<std::string, Binding>& current_scope() {return this->scopes[this->scopes.size() - 1];}
 	Binding* get_binding(std::string identifier);
 	std::vector<std::unordered_map<std::string, Binding>> get_definitions();
@@ -109,6 +110,7 @@ Type find_concrete_type_for_type_variable_on_expression(std::shared_ptr<Ast::Exp
 	auto call = std::dynamic_pointer_cast<Ast::Call>(expression);
 	auto integer = std::dynamic_pointer_cast<Ast::Integer>(expression);
 	auto number = std::dynamic_pointer_cast<Ast::Number>(expression);
+	auto identifier = std::dynamic_pointer_cast<Ast::Identifier>(expression);
 	
 	if (if_else) {
 		Type expr_type = find_concrete_type_for_type_variable_on_expression(if_else->expression, type_variable);
@@ -132,6 +134,7 @@ Type find_concrete_type_for_type_variable_on_expression(std::shared_ptr<Ast::Exp
 	else if (number) {
 		if (number->type.to_str() == type_variable) return Type("float64");
 	}
+	else if (identifier) {}
 	else {
 		assert(false);
 	}
@@ -189,6 +192,8 @@ Result<Ok, Errors> semantic::analyze(std::shared_ptr<Ast::Program> program) {
 }
 
 Result<Ok, Errors> Context::analyze(std::shared_ptr<Ast::Block> block) {
+	this->add_scope();
+
 	block->type = Type("");;
 	Errors errors;
 
@@ -266,6 +271,8 @@ Result<Ok, Errors> Context::analyze(std::shared_ptr<Ast::Block> block) {
 		}
 	}
 
+	this->remove_scope();
+
 	if (errors.size() != 0) return Result<Ok, std::vector<Error>>(errors);
 	else                    return Result<Ok, std::vector<Error>>(Ok());
 }
@@ -278,7 +285,7 @@ Result<Ok, Errors> Context::analyze(std::shared_ptr<Ast::Assignment> node) {
 	if (result.is_error()) return result;
 
 	// Save it context
-	if (this->get_binding(node->identifier->value)) {
+	if (this->current_scope().find(node->identifier->value) != this->current_scope().end()) {
 		return Result<Ok, Errors>(Errors{errors::reassigning_immutable_variable(node->identifier, this->get_binding(node->identifier->value)->assignment)}); // tested in test/errors/reassigning_immutable_variable.dm
 	}
 	else {
@@ -372,7 +379,7 @@ Result<Ok, Errors> Context::analyze(std::shared_ptr<Ast::IfElseExpr> node) {
 }
 
 Result<Ok, Errors> Context::analyze(std::shared_ptr<Ast::Number> node) {
-	if (node->type.is_type_variable()) {
+	if (node->type.is_type_variable() && this->type_bindings.find(node->type.to_str()) != this->type_bindings.end()) {
 		node->type = this->type_bindings[node->type.to_str()];
 	}
 	else {
@@ -382,7 +389,7 @@ Result<Ok, Errors> Context::analyze(std::shared_ptr<Ast::Number> node) {
 }
 
 Result<Ok, Errors> Context::analyze(std::shared_ptr<Ast::Integer> node) {
-	if (node->type.is_type_variable()) {
+	if (node->type.is_type_variable() && this->type_bindings.find(node->type.to_str()) != this->type_bindings.end()) {
 		node->type = this->type_bindings[node->type.to_str()];
 	}
 	else {
@@ -525,13 +532,6 @@ std::shared_ptr<Ast::FunctionSpecialization> Context::create_and_analyze_special
 					specialization->args[i]->type = context.type_bindings[type_variable];
 				}
 			}
-		}
-	}
-
-	// To remove, this is just while I don't add type inference for blocks
-	for (size_t i = 0; i < specialization->args.size(); i++) {
-		if (specialization->args[i]->type == Type("")) {
-			specialization->args[i]->type = call->args[i]->type;
 		}
 	}
 
