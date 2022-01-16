@@ -103,6 +103,7 @@ struct Type {
 	bool operator==(const Type &t) const;
 	bool operator!=(const Type &t) const;
 	std::string to_str(std::string output = "") const;
+	bool is_type_variable() const;
 };
 
 namespace Ast {
@@ -149,8 +150,7 @@ namespace Ast {
 		std::shared_ptr<Ast::Node> body;
 
 		bool generic = false;
-		std::vector<Type> args_types;
-		Type return_type;
+		Type return_type = Type("");
 		std::vector<std::shared_ptr<Ast::FunctionSpecialization>> specializations;
 
 		Function(std::shared_ptr<Ast::Identifier> identifier, std::vector<std::shared_ptr<Ast::Identifier>> args, std::shared_ptr<Ast::Node> body, size_t line, size_t col, std::string file) :  Node(line, col, file), identifier(identifier), args(args), body(body) {}
@@ -159,11 +159,18 @@ namespace Ast {
 		virtual std::shared_ptr<Node> clone();
 	};
 
-	struct FunctionSpecialization {
-		bool valid = false;
-		std::vector<Type> args_types;
-		Type return_type;
+	struct FunctionSpecialization : Node {
+		std::shared_ptr<Ast::Identifier> identifier;
+		std::vector<std::shared_ptr<Ast::Identifier>> args;
 		std::shared_ptr<Ast::Node> body;
+		
+		bool valid = false;
+		Type return_type = Type("");
+
+		FunctionSpecialization(size_t line, size_t col, std::string file) :  Node(line, col, file) {}
+		virtual ~FunctionSpecialization() {}
+		virtual void print(size_t indent_level = 0, std::vector<bool> last = {});
+		virtual std::shared_ptr<Node> clone();
 	};
 
 	struct Expression;
@@ -200,7 +207,7 @@ namespace Ast {
 	};
 
 	struct Expression : Node {
-		Type type;
+		Type type = Type();
 
 		Expression(size_t line, size_t col, std::string file) : Node(line, col, file) {}
 		virtual ~Expression() {}
@@ -264,5 +271,8 @@ namespace Ast {
 		virtual std::shared_ptr<Node> clone();
 	};
 }
+
+std::vector<Type> get_args_types(std::vector<std::shared_ptr<Ast::Identifier>> args);
+std::vector<Type> get_args_types(std::vector<std::shared_ptr<Ast::Expression>> args);
 
 #endif

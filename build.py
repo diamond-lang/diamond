@@ -16,7 +16,9 @@ source_files = [
 	'src/codegen.cpp',
 	'src/errors.cpp',
 	'src/utilities.cpp',
-	'src/types.cpp'
+	'src/types.cpp',
+	'src/intrinsics.cpp',
+	'src/type_inference.cpp'
 ]
 cpp_version = 'c++17'
 

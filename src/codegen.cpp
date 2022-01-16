@@ -62,12 +62,29 @@ struct Codegen {
 	void add_scope();
 	std::unordered_map<std::string, llvm::Value*>& current_scope();
 	void remove_scope();
+	llvm::Value* get_binding(std::string identifier);
 };
 
 void print_llvm_ir(std::shared_ptr<Ast::Program> program, std::string program_name) {
 	Codegen llvm_ir;
 	llvm_ir.codegen(program);
 	llvm_ir.module->print(llvm::errs(), nullptr);
+}
+
+std::string get_function_name(std::shared_ptr<Ast::FunctionSpecialization> function) {
+	std::string name = function->identifier->value;
+	for (size_t i = 0; i < function->args.size(); i++) {
+		name += "_" + function->args[i]->type.to_str();
+	}
+	return name;
+}
+
+std::string get_function_name(std::shared_ptr<Ast::Call> function) {
+	std::string name = function->identifier->value;
+	for (size_t i = 0; i < function->args.size(); i++) {
+		name += "_" + function->args[i]->type.to_str();
+	}
+	return name;
 }
 
 // Linking
@@ -218,6 +235,8 @@ void Codegen::codegen(std::shared_ptr<Ast::Program> node) {
 }
 
 void Codegen::codegen(std::shared_ptr<Ast::Block> node) {
+	this->add_scope();
+
 	for (size_t i = 0; i < node->statements.size(); i++) {
 		if (std::dynamic_pointer_cast<Ast::Assignment>(node->statements[i])) {
 			this->codegen(std::dynamic_pointer_cast<Ast::Assignment>(node->statements[i]));
@@ -235,6 +254,8 @@ void Codegen::codegen(std::shared_ptr<Ast::Block> node) {
 			assert(false);
 		}
 	}
+
+	this->remove_scope();
 }
 
 void Codegen::codegen(std::vector<std::shared_ptr<Ast::Function>> functions) {
@@ -247,12 +268,12 @@ void Codegen::codegen(std::vector<std::shared_ptr<Ast::Function>> functions) {
 			assert(specialization->valid);
 
 			// Make function type
-			std::vector<llvm::Type*> args_types = this->as_llvm_types(specialization->args_types);
+			std::vector<llvm::Type*> args_types = this->as_llvm_types(get_args_types(specialization->args));
 			auto return_type = this->as_llvm_type(specialization->return_type);
 			llvm::FunctionType* function_type = llvm::FunctionType::get(return_type, args_types, false);
 
 			// Create function
-			std::string name = node->identifier->value + "_" + specialization->return_type.to_str();
+			std::string name = get_function_name(specialization);
 			llvm::Function* f = llvm::Function::Create(function_type, llvm::Function::ExternalLinkage, name, this->module);
 
 			// Set args for names
@@ -268,7 +289,7 @@ void Codegen::codegen(std::vector<std::shared_ptr<Ast::Function>> functions) {
 			auto& specialization = node->specializations[i];
 			assert(specialization->valid);
 
-			std::string name = node->identifier->value + "_" + specialization->return_type.to_str();
+			std::string name = get_function_name(specialization);
 			llvm::Function* f = this->module->getFunction(name);
 
 			// Create the body of the function
@@ -537,7 +558,7 @@ llvm::Value* Codegen::codegen(std::shared_ptr<Ast::Call> node) {
 	}
 
 	// Get function
-	std::string name = node->identifier->value + "_" + node->type.to_str();
+	std::string name = get_function_name(node);;
 	llvm::Function* function = this->module->getFunction(name);
 	assert(function);
 
@@ -584,11 +605,12 @@ llvm::Value* Codegen::codegen(std::shared_ptr<Ast::Number> node) {
 }
 
 llvm::Value* Codegen::codegen(std::shared_ptr<Ast::Integer> node) {
-	return llvm::ConstantInt::get(*(this->context), llvm::APInt(64, node->value, true));
+	if (node->type == Type("float64")) return llvm::ConstantFP::get(*(this->context), llvm::APFloat((double)node->value));
+	else                               return llvm::ConstantInt::get(*(this->context), llvm::APInt(64, node->value, true));
 }
 
 llvm::Value* Codegen::codegen(std::shared_ptr<Ast::Identifier> node) {
-	return this->current_scope()[node->value];
+	return this->get_binding(node->value);
 }
 
 llvm::Value* Codegen::codegen(std::shared_ptr<Ast::Boolean> node) {
@@ -600,7 +622,10 @@ llvm::Type* Codegen::as_llvm_type(Type type) {
 	else if (type == Type("int64"))   return llvm::Type::getInt64Ty(*(this->context));
 	else if (type == Type("bool"))    return llvm::Type::getInt1Ty(*(this->context));
 	else if (type == Type("void"))    return llvm::Type::getVoidTy(*(this->context));
-	else                              assert(false);
+	else {
+		std::cout <<"type: " << type.to_str() << "\n";
+		assert(false);
+	}
 }
 
 std::vector<llvm::Type*> Codegen::as_llvm_types(std::vector<Type> types) {
@@ -621,4 +646,14 @@ std::unordered_map<std::string, llvm::Value*>& Codegen::current_scope() {
 
 void Codegen::remove_scope() {
 	this->scopes.pop_back();
+}
+
+llvm::Value* Codegen::get_binding(std::string identifier) {
+	for (auto scope = this->scopes.rbegin(); scope != this->scopes.rend(); scope++) {
+		if (scope->find(identifier) != scope->end()) {
+			return (*scope)[identifier];
+		}
+	}
+	assert(false);
+	return nullptr;
 }

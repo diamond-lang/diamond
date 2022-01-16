@@ -89,6 +89,11 @@ int main(int argc, char *argv[]) {
 		exit(EXIT_FAILURE);
 	}
 
+	if (command.type == EmitCommand && command.options[0] == std::string("--ast-with-types")) {
+		ast->print();
+		return 0;
+	}
+
 	if (command.type == EmitCommand && command.options[0] == std::string("--llvm-ir")) {
 		print_llvm_ir(ast, program_name);
 		return 0;
@@ -120,7 +125,7 @@ void check_usage(int argc, char *argv[]) {
 	if (argv[1] == std::string("run") && argc < 3) {
 		print_usage_and_exit();
 	}
-	if (argv[1] == std::string("emit") && (argc < 4 || !(argv[2] == std::string("--llvm-ir") || argv[2] == std::string("--ast")))) {
+	if (argv[1] == std::string("emit") && (argc < 4 || !(argv[2] == std::string("--llvm-ir") || argv[2] == std::string("--ast") || argv[2] == std::string("--ast-with-types")))) {
 		print_usage_and_exit();
 	}
 };
