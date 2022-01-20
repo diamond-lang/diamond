@@ -114,7 +114,7 @@ namespace Ast {
 
 		Node(size_t line, size_t col, std::string file): line(line), col(col), file(file) {}
 		virtual ~Node() {}
-		virtual void print(size_t indent_level = 0, std::vector<bool> last = {}) = 0;
+		virtual void print(size_t indent_level = 0, std::vector<bool> last = {}, bool concrete = false) = 0;
 		virtual std::shared_ptr<Node> clone() = 0;
 	};
 
@@ -127,8 +127,9 @@ namespace Ast {
 
 		Program(std::vector<std::shared_ptr<Ast::Node>> statements, std::vector<std::shared_ptr<Ast::Function>> functions, size_t line, size_t col, std::string file) : Node(line, col, file), statements(statements), functions(functions) {}
 		virtual ~Program() {}
-		virtual void print(size_t indent_level = 0, std::vector<bool> last = {});
+		virtual void print(size_t indent_level = 0, std::vector<bool> last = {}, bool concrete = false);
 		virtual std::shared_ptr<Node> clone();
+		void print_with_concrete_types();
 	};
 
 	struct Block : Node {
@@ -138,7 +139,7 @@ namespace Ast {
 
 		Block(std::vector<std::shared_ptr<Ast::Node>> statements, std::vector<std::shared_ptr<Ast::Function>> functions, size_t line, size_t col, std::string file) : Node(line, col, file), statements(statements), functions(functions) {}
 		virtual ~Block() {}
-		virtual void print(size_t indent_level = 0, std::vector<bool> last = {});
+		virtual void print(size_t indent_level = 0, std::vector<bool> last = {}, bool concrete = false);
 		virtual std::shared_ptr<Node> clone();
 	};
 
@@ -155,7 +156,7 @@ namespace Ast {
 
 		Function(std::shared_ptr<Ast::Identifier> identifier, std::vector<std::shared_ptr<Ast::Identifier>> args, std::shared_ptr<Ast::Node> body, size_t line, size_t col, std::string file) :  Node(line, col, file), identifier(identifier), args(args), body(body) {}
 		virtual ~Function() {}
-		virtual void print(size_t indent_level = 0, std::vector<bool> last = {});
+		virtual void print(size_t indent_level = 0, std::vector<bool> last = {}, bool concrete = false);
 		virtual std::shared_ptr<Node> clone();
 	};
 
@@ -169,7 +170,7 @@ namespace Ast {
 
 		FunctionSpecialization(size_t line, size_t col, std::string file) :  Node(line, col, file) {}
 		virtual ~FunctionSpecialization() {}
-		virtual void print(size_t indent_level = 0, std::vector<bool> last = {});
+		virtual void print(size_t indent_level = 0, std::vector<bool> last = {}, bool concrete = false);
 		virtual std::shared_ptr<Node> clone();
 	};
 
@@ -181,7 +182,7 @@ namespace Ast {
 
 		Assignment(std::shared_ptr<Ast::Identifier> identifier, std::shared_ptr<Ast::Expression> expression, size_t line, size_t col, std::string file) : Node(line, col, file), identifier(identifier), expression(expression) {}
 		virtual ~Assignment() {}
-		virtual void print(size_t indent_level = 0, std::vector<bool> last = {});
+		virtual void print(size_t indent_level = 0, std::vector<bool> last = {}, bool concrete = false);
 		virtual std::shared_ptr<Node> clone();
 	};
 
@@ -190,7 +191,7 @@ namespace Ast {
 
 		Return(std::shared_ptr<Ast::Expression> expression, size_t line, size_t col, std::string file) : Node(line, col, file), expression(expression) {}
 		virtual ~Return() {}
-		virtual void print(size_t indent_level = 0, std::vector<bool> last = {});
+		virtual void print(size_t indent_level = 0, std::vector<bool> last = {}, bool concrete = false);
 		virtual std::shared_ptr<Node> clone();
 	};
 
@@ -202,7 +203,7 @@ namespace Ast {
 		IfElseStmt(std::shared_ptr<Ast::Expression> condition, std::shared_ptr<Ast::Block> block, size_t line, size_t col, std::string file) : Node(line, col, file), condition(condition), block(block), else_block(nullptr) {}
 		IfElseStmt(std::shared_ptr<Ast::Expression> condition, std::shared_ptr<Ast::Block> block, std::shared_ptr<Ast::Block> else_block, size_t line, size_t col, std::string file) : Node(line, col, file), condition(condition), block(block), else_block(else_block) {}
 		virtual ~IfElseStmt() {}
-		virtual void print(size_t indent_level = 0, std::vector<bool> last = {});
+		virtual void print(size_t indent_level = 0, std::vector<bool> last = {}, bool concrete = false);
 		virtual std::shared_ptr<Node> clone();
 	};
 
@@ -221,7 +222,7 @@ namespace Ast {
 		
 		IfElseExpr(std::shared_ptr<Ast::Expression> condition, std::shared_ptr<Ast::Expression> expression, std::shared_ptr<Ast::Expression> else_expression, size_t line, size_t col, std::string file) : Expression(line, col, file), condition(condition), expression(expression), else_expression(else_expression) {}
 		virtual ~IfElseExpr() {}
-		virtual void print(size_t indent_level = 0, std::vector<bool> last = {});
+		virtual void print(size_t indent_level = 0, std::vector<bool> last = {}, bool concrete = false);
 		virtual std::shared_ptr<Node> clone();
 	};
 
@@ -231,7 +232,7 @@ namespace Ast {
 
 		Call(std::shared_ptr<Ast::Identifier> identifier, std::vector<std::shared_ptr<Ast::Expression>> args, size_t line, size_t col, std::string file) : Expression(line, col, file), identifier(identifier), args(args) {}
 		virtual ~Call() {}
-		virtual void print(size_t indent_level = 0, std::vector<bool> last = {});
+		virtual void print(size_t indent_level = 0, std::vector<bool> last = {}, bool concrete = false);
 		virtual std::shared_ptr<Node> clone();
 	};
 
@@ -240,7 +241,7 @@ namespace Ast {
 
 		Number(double value, size_t line, size_t col, std::string file) : Expression(line, col, file), value(value) {}
 		virtual ~Number() {}
-		virtual void print(size_t indent_level = 0, std::vector<bool> last = {});
+		virtual void print(size_t indent_level = 0, std::vector<bool> last = {}, bool concrete = false);
 		virtual std::shared_ptr<Node> clone();
 	};
 
@@ -249,7 +250,7 @@ namespace Ast {
 
 		Integer(int64_t value, size_t line, size_t col, std::string file) : Expression(line, col, file), value(value) {}
 		virtual ~Integer() {}
-		virtual void print(size_t indent_level = 0, std::vector<bool> last = {});
+		virtual void print(size_t indent_level = 0, std::vector<bool> last = {}, bool concrete = false);
 		virtual std::shared_ptr<Node> clone();
 	};
 
@@ -258,7 +259,7 @@ namespace Ast {
 
 		Identifier(std::string value, size_t line, size_t col, std::string file) : Expression(line, col, file), value(value) {}
 		virtual ~Identifier() {}
-		virtual void print(size_t indent_level = 0, std::vector<bool> last = {});
+		virtual void print(size_t indent_level = 0, std::vector<bool> last = {}, bool concrete = false);
 		virtual std::shared_ptr<Node> clone();
 	};
 
@@ -267,7 +268,7 @@ namespace Ast {
 
 		Boolean(bool value, size_t line, size_t col, std::string file) : Expression(line, col, file), value(value) {}
 		virtual ~Boolean() {}
-		virtual void print(size_t indent_level = 0, std::vector<bool> last = {});
+		virtual void print(size_t indent_level = 0, std::vector<bool> last = {}, bool concrete = false);
 		virtual std::shared_ptr<Node> clone();
 	};
 }

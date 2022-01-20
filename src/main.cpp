@@ -94,6 +94,11 @@ int main(int argc, char *argv[]) {
 		return 0;
 	}
 
+	if (command.type == EmitCommand && command.options[0] == std::string("--ast-with-concrete-types")) {
+		ast->print_with_concrete_types();
+		return 0;
+	}
+
 	if (command.type == EmitCommand && command.options[0] == std::string("--llvm-ir")) {
 		print_llvm_ir(ast, program_name);
 		return 0;
@@ -119,23 +124,26 @@ void print_usage_and_exit() {
 }
 
 void check_usage(int argc, char *argv[]) {
-	if (argc < 2) {
+	if (argc < 3) {
 		print_usage_and_exit();
 	}
 	if (argv[1] == std::string("run") && argc < 3) {
 		print_usage_and_exit();
 	}
-	if (argv[1] == std::string("emit") && (argc < 4 || !(argv[2] == std::string("--llvm-ir") || argv[2] == std::string("--ast") || argv[2] == std::string("--ast-with-types")))) {
+	if (argv[1] == std::string("emit") && (argc < 4 || !(argv[2] == std::string("--llvm-ir") || argv[2] == std::string("--ast") || argv[2] == std::string("--ast-with-types") || argv[2] == std::string("--ast-with-concrete-types")))) {
 		print_usage_and_exit();
 	}
 };
 
 Command get_command(int argc, char *argv[]) {
+	if (argv[1] == std::string("build")) {
+		return Command(std::string(argv[2]), BuildCommand);
+	}
 	if (argv[1] == std::string("run")) {
 		return Command(std::string(argv[2]), RunCommand);
 	}
 	if (argv[1] == std::string("emit")) {
 		return Command(std::string(argv[3]), EmitCommand, std::vector<std::string>{argv[2]});
 	}
-	return Command(std::string(argv[1]), BuildCommand);
+	assert(false);
 }

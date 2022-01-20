@@ -25,12 +25,17 @@ std::string underline_identifier(std::shared_ptr<Ast::Identifier> identifier);
 // Implementantions
 // ----------------
 std::string errors::usage() {
-	return make_header("diamond [program file]\n") +
-	                 "    Compiles a program.\n\n" +
-	       make_header("diamond run [program file]\n") +
-	                 "    Runs a program.\n\n" +
-		   make_header("diamond emit (--ast or --llvm-ir) [program file]\n") +
-		             "    Emits intermediary representations of the program. Serves for debugging the compiler\n\n";
+	return make_header("diamond build [program file]\n\n") +
+	                 "    Creates a native executable from the program.\n\n" +
+	       make_header("diamond run [program file]\n\n") +
+	                 "    Runs the program.\n\n" +
+		   make_header("diamond emit [options] [program file]\n\n") +
+		               "    This command emits intermediary representations of\n"
+					   "    the program. Serves for debugging the compiler.\n\n"
+					   "    The options are:\n"
+					   "        --ast\n"
+					   "        --ast-with-type\n"
+					   "        --ast-with-concrete-types\n\n";
 }
 
 std::string errors::unexpected_character(Source source) {
