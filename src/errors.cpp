@@ -25,11 +25,11 @@ std::string underline_identifier(std::shared_ptr<Ast::Identifier> identifier);
 // Implementantions
 // ----------------
 std::string errors::usage() {
-	return make_header("diamond build [program file]\n\n") +
+	return make_header("diamond build [program file]\n") +
 	                 "    Creates a native executable from the program.\n\n" +
-	       make_header("diamond run [program file]\n\n") +
+	       make_header("diamond run [program file]\n") +
 	                 "    Runs the program.\n\n" +
-		   make_header("diamond emit [options] [program file]\n\n") +
+		   make_header("diamond emit [options] [program file]\n") +
 		               "    This command emits intermediary representations of\n"
 					   "    the program. Serves for debugging the compiler.\n\n"
 					   "    The options are:\n"

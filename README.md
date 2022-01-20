@@ -4,8 +4,20 @@ A programming language that aims to make programming easier.
 
 ## Usage
 ```
-diamond [program file]      # Compiles a program
-diamond run [program file]  # Runs a program
+diamond build [program file]
+    Creates a native executable from the program.
+
+diamond run [program file]
+    Runs the program.
+
+diamond emit [options] [program file]
+    This command emits intermediary representations of
+    the program. Serves for debugging the compiler.
+
+    The options are:
+        --ast
+        --ast-with-type
+        --ast-with-concrete-types
 ```
 
 ## Dependencies
