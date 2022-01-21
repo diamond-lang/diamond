@@ -34,7 +34,8 @@ struct Codegen {
 	llvm::LLVMContext* context;
 	llvm::Module* module;
 	llvm::IRBuilder<>* builder;
-	std::vector<std::unordered_map<std::string, llvm::Value*>> scopes;
+	std::vector<std::unordered_map<std::string, llvm::AllocaInst*>> scopes;
+	llvm::BasicBlock* current_entry_block = nullptr; // Needed for doing stack allocations
 
 	Codegen() {
 		this->context = new llvm::LLVMContext();
@@ -58,9 +59,10 @@ struct Codegen {
 
 	llvm::Type* as_llvm_type(Type type);
 	std::vector<llvm::Type*> as_llvm_types(std::vector<Type> types);
+	llvm::AllocaInst* create_allocation(std::string name, llvm::Type* type);
 
 	void add_scope();
-	std::unordered_map<std::string, llvm::Value*>& current_scope();
+	std::unordered_map<std::string, llvm::AllocaInst*>& current_scope();
 	void remove_scope();
 	llvm::Value* get_binding(std::string identifier);
 };
@@ -85,6 +87,12 @@ std::string get_function_name(std::shared_ptr<Ast::Call> function) {
 		name += "_" + function->args[i]->type.to_str();
 	}
 	return name;
+}
+
+llvm::AllocaInst* Codegen::create_allocation(std::string name, llvm::Type* type) {
+	assert(this->current_entry_block);
+	llvm::IRBuilder<> block(this->current_entry_block, this->current_entry_block->begin());
+	return block.CreateAlloca(type, 0, name.c_str());
 }
 
 // Linking
@@ -224,6 +232,9 @@ void Codegen::codegen(std::shared_ptr<Ast::Program> node) {
 	llvm::BasicBlock* entry = llvm::BasicBlock::Create(*(this->context), "entry", main);
 	this->builder->SetInsertPoint(entry);
 
+	// Set current entry block
+	this->current_entry_block = &main->getEntryBlock();
+
 	// Add new scope
 	this->add_scope();
 
@@ -259,8 +270,8 @@ void Codegen::codegen(std::shared_ptr<Ast::Block> node) {
 }
 
 void Codegen::codegen(std::vector<std::shared_ptr<Ast::Function>> functions) {
-	for (size_t i = 0; i < functions.size(); i++) {
-		auto& node = functions[i];
+	for (auto it = functions.begin(); it != functions.end(); it++) {
+		auto& node = *it;
 
 		// Generate prototypes
 		for (size_t i = 0; i < node->specializations.size(); i++) {
@@ -296,11 +307,21 @@ void Codegen::codegen(std::vector<std::shared_ptr<Ast::Function>> functions) {
 			llvm::BasicBlock *body = llvm::BasicBlock::Create(*(this->context), "entry", f);
 			this->builder->SetInsertPoint(body);
 
+			// Set current entry block
+			this->current_entry_block = &f->getEntryBlock();
+
 			// Add arguments to scope
 			this->add_scope();
 			size_t j = 0;
 			for (auto &arg : f->args()) {
-				this->current_scope()[node->args[j]->value] = &arg;
+				// Create allocation for argument
+				auto allocation = this->create_allocation(node->args[j]->value, arg.getType());
+
+				// Store initial value
+				this->builder->CreateStore(&arg, allocation);
+
+				// Add arguments to scope
+				this->current_scope()[node->args[j]->value] = allocation;
 				j++;
 			}
 
@@ -330,8 +351,14 @@ void Codegen::codegen(std::shared_ptr<Ast::Assignment> node) {
 	// Generate value of expression
 	llvm::Value* expr = this->codegen(node->expression);
 
+	// Create allocation
+	auto allocation = this->create_allocation(node->identifier->value, expr->getType());
+
+	// Store value
+	this->builder->CreateStore(expr, allocation);
+
 	// Add it to the scope
-	this->current_scope()[node->identifier->value] = expr;
+	this->current_scope()[node->identifier->value] = allocation;
 }
 
 void Codegen::codegen(std::shared_ptr<Ast::Return> node) {
@@ -610,7 +637,7 @@ llvm::Value* Codegen::codegen(std::shared_ptr<Ast::Integer> node) {
 }
 
 llvm::Value* Codegen::codegen(std::shared_ptr<Ast::Identifier> node) {
-	return this->get_binding(node->value);
+	return this->builder->CreateLoad(this->get_binding(node->value), node->value.c_str());
 }
 
 llvm::Value* Codegen::codegen(std::shared_ptr<Ast::Boolean> node) {
@@ -637,10 +664,10 @@ std::vector<llvm::Type*> Codegen::as_llvm_types(std::vector<Type> types) {
 }
 
 void Codegen::add_scope() {
-	this->scopes.push_back(std::unordered_map<std::string, llvm::Value*>());
+	this->scopes.push_back(std::unordered_map<std::string, llvm::AllocaInst*>());
 }
 
-std::unordered_map<std::string, llvm::Value*>& Codegen::current_scope() {
+std::unordered_map<std::string, llvm::AllocaInst*>& Codegen::current_scope() {
 	return this->scopes[this->scopes.size() - 1];
 }
 
