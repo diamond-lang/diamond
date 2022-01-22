@@ -48,10 +48,10 @@ struct Codegen {
 		this->module = new llvm::Module("My cool jit", *(this->context));
 		this->builder = new llvm::IRBuilder(*(this->context));
 
-		// Add optimizations
+		// Add function pass optimizations
 		this->function_pass_manager = new llvm::legacy::FunctionPassManager(this->module);
-		this->function_pass_manager->add(llvm::createPromoteMemoryToRegisterPass()); // Add mem2reg, important when representing valus as allocations
-		//this->function_pass_manager->add(llvm::createInstructionCombiningPass());
+		this->function_pass_manager->add(llvm::createPromoteMemoryToRegisterPass());
+		this->function_pass_manager->add(llvm::createInstructionCombiningPass());
 		this->function_pass_manager->add(llvm::createReassociatePass());
 		this->function_pass_manager->add(llvm::createGVNPass());
 		this->function_pass_manager->add(llvm::createCFGSimplificationPass());
@@ -410,7 +410,7 @@ void Codegen::codegen(std::shared_ptr<Ast::IfElseStmt> node) {
 		this->builder->SetInsertPoint(block);
 		this->codegen(node->block);
 		
-		// Jump to merge block if if does not return (Type("") means the if does not return)
+		// Jump to merge block if does not return (Type("") means the if does not return)
 		if (node->block->type == Type("")) {
 			this->builder->CreateBr(merge_block);
 		}
@@ -444,8 +444,10 @@ void Codegen::codegen(std::shared_ptr<Ast::IfElseStmt> node) {
 		}
 
 		// Create merge block
-		current_function->getBasicBlockList().push_back(merge_block);
-		this->builder->SetInsertPoint(merge_block);
+		if (node->block->type == Type("") || node->else_block->type == Type("")) {
+			current_function->getBasicBlockList().push_back(merge_block);
+			this->builder->SetInsertPoint(merge_block);
+		}
 	}
 }
 
