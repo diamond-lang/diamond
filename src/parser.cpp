@@ -140,6 +140,7 @@ static bool is_assignment(Source source) {
 	auto result = parse::identifier(source);
 	if      (result.is_ok() && parse::token(result.get_source(), "be").is_ok()) return true;
 	else if (result.is_ok() && parse::token(result.get_source(), "=").is_ok())  return true;
+	else if (parse::token(source, "nonlocal").is_ok())                          return true;
 	else                                                                        return false;
 }
 
@@ -211,6 +212,11 @@ ParserResult<std::shared_ptr<Ast::Node>> parse::function(Source source) {
 }
 
 ParserResult<std::shared_ptr<Ast::Node>> parse::assignment(Source source) {
+	auto nonlocal = parse::token(source, "nonlocal");
+	if (nonlocal.is_ok()) {
+		source = nonlocal.get_source();
+	}
+
 	auto identifier = parse::identifier(source);
 	if (identifier.is_error()) return ParserResult<std::shared_ptr<Ast::Node>>(identifier.get_errors());
 	source = identifier.get_source();
@@ -225,7 +231,7 @@ ParserResult<std::shared_ptr<Ast::Node>> parse::assignment(Source source) {
 	if (expression.is_error()) return ParserResult<std::shared_ptr<Ast::Node>>(expression.get_errors());
 	source = expression.get_source();
 
-	auto node = std::make_shared<Ast::Assignment>(std::dynamic_pointer_cast<Ast::Identifier>(identifier.get_value()), expression.get_value(), equal.is_ok(), source.line, source.col, source.file);
+	auto node = std::make_shared<Ast::Assignment>(std::dynamic_pointer_cast<Ast::Identifier>(identifier.get_value()), expression.get_value(), equal.is_ok(), nonlocal.is_ok(), source.line, source.col, source.file);
 	return ParserResult<std::shared_ptr<Ast::Node>>(node, source);
 }
 

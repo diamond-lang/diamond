@@ -237,6 +237,10 @@ std::shared_ptr<Ast::Node> Ast::FunctionSpecialization::clone() {
 // Assignment
 void Ast::Assignment::print(size_t indent_level, std::vector<bool> last, bool concrete)  {
 	this->identifier->print(indent_level, last);
+	if (this->nonlocal) {
+		put_indent_level(indent_level + 1, append(last, false));
+		std::cout << "nonlocal\n";
+	}
 	put_indent_level(indent_level + 1, append(last, false));
 	std::cout << (is_mutable ? "=" : "be") << '\n';
 	
@@ -244,7 +248,7 @@ void Ast::Assignment::print(size_t indent_level, std::vector<bool> last, bool co
 }
 
 std::shared_ptr<Ast::Node> Ast::Assignment::clone() {
-	return std::make_shared<Ast::Assignment>(std::dynamic_pointer_cast<Ast::Identifier>(this->identifier->clone()), std::dynamic_pointer_cast<Expression>(this->expression->clone()), this->is_mutable, this->line, this->col, this->file);
+	return std::make_shared<Ast::Assignment>(std::dynamic_pointer_cast<Ast::Identifier>(this->identifier->clone()), std::dynamic_pointer_cast<Expression>(this->expression->clone()), this->is_mutable, this->nonlocal, this->line, this->col, this->file);
 }
 
 // Return

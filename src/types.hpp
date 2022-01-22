@@ -180,8 +180,9 @@ namespace Ast {
 		std::shared_ptr<Ast::Identifier> identifier;
 		std::shared_ptr<Ast::Expression> expression;
 		bool is_mutable = false;
+		bool nonlocal = false;
 
-		Assignment(std::shared_ptr<Ast::Identifier> identifier, std::shared_ptr<Ast::Expression> expression, bool is_mutable, size_t line, size_t col, std::string file) : Node(line, col, file), identifier(identifier), expression(expression), is_mutable(is_mutable) {}
+		Assignment(std::shared_ptr<Ast::Identifier> identifier, std::shared_ptr<Ast::Expression> expression, bool is_mutable, bool nonlocal, size_t line, size_t col, std::string file) : Node(line, col, file), identifier(identifier), expression(expression), is_mutable(is_mutable), nonlocal(nonlocal) {}
 		virtual ~Assignment() {}
 		virtual void print(size_t indent_level = 0, std::vector<bool> last = {}, bool concrete = false);
 		virtual std::shared_ptr<Node> clone();
