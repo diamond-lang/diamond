@@ -238,13 +238,13 @@ std::shared_ptr<Ast::Node> Ast::FunctionSpecialization::clone() {
 void Ast::Assignment::print(size_t indent_level, std::vector<bool> last, bool concrete)  {
 	this->identifier->print(indent_level, last);
 	put_indent_level(indent_level + 1, append(last, false));
-	std::cout << "be" << '\n';
+	std::cout << (is_mutable ? "=" : "be") << '\n';
 	
 	this->expression->print(indent_level + 1, append(last, true), concrete);
 }
 
 std::shared_ptr<Ast::Node> Ast::Assignment::clone() {
-	return std::make_shared<Ast::Assignment>(std::dynamic_pointer_cast<Ast::Identifier>(this->identifier->clone()), std::dynamic_pointer_cast<Expression>(this->expression->clone()), this->line, this->col, this->file);
+	return std::make_shared<Ast::Assignment>(std::dynamic_pointer_cast<Ast::Identifier>(this->identifier->clone()), std::dynamic_pointer_cast<Expression>(this->expression->clone()), this->is_mutable, this->line, this->col, this->file);
 }
 
 // Return
