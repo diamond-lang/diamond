@@ -138,8 +138,9 @@ ParserResult<std::shared_ptr<Ast::Expression>> parse::expression_block(Source so
 
 static bool is_assignment(Source source) {
 	auto result = parse::identifier(source);
-	if (result.is_ok() && parse::token(result.get_source(), "be").is_ok()) return true;
-	else                                                                   return false;
+	if      (result.is_ok() && parse::token(result.get_source(), "be").is_ok()) return true;
+	else if (result.is_ok() && parse::token(result.get_source(), "=").is_ok())  return true;
+	else                                                                        return false;
 }
 
 ParserResult<std::shared_ptr<Ast::Node>> parse::statement(Source source) {
@@ -214,15 +215,17 @@ ParserResult<std::shared_ptr<Ast::Node>> parse::assignment(Source source) {
 	if (identifier.is_error()) return ParserResult<std::shared_ptr<Ast::Node>>(identifier.get_errors());
 	source = identifier.get_source();
 
+	auto equal = parse::token(source, "=");
 	auto be = parse::token(source, "be");
-	if (be.is_error()) return ParserResult<std::shared_ptr<Ast::Node>>(be.get_errors());
-	source = be.get_source();
+	if (equal.is_error() && be.is_error()) return ParserResult<std::shared_ptr<Ast::Node>>(Errors{std::string("Errors: Expecting '=' or 'be'.")});
+	if (equal.is_ok()) source = equal.get_source();
+	if (be.is_ok()) source = be.get_source();
 
 	auto expression = parse::expression(source);
 	if (expression.is_error()) return ParserResult<std::shared_ptr<Ast::Node>>(expression.get_errors());
 	source = expression.get_source();
 
-	auto node = std::make_shared<Ast::Assignment>(std::dynamic_pointer_cast<Ast::Identifier>(identifier.get_value()), expression.get_value(), source.line, source.col, source.file);
+	auto node = std::make_shared<Ast::Assignment>(std::dynamic_pointer_cast<Ast::Identifier>(identifier.get_value()), expression.get_value(), equal.is_ok(), source.line, source.col, source.file);
 	return ParserResult<std::shared_ptr<Ast::Node>>(node, source);
 }
 
