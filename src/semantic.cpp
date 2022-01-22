@@ -286,12 +286,13 @@ Result<Ok, Errors> Context::analyze(std::shared_ptr<Ast::Assignment> node) {
 
 	// Save it context
 	if (this->current_scope().find(node->identifier->value) != this->current_scope().end()) {
-		return Result<Ok, Errors>(Errors{errors::reassigning_immutable_variable(node->identifier, this->get_binding(node->identifier->value)->assignment)}); // tested in test/errors/reassigning_immutable_variable.dm
+		auto assignment = this->current_scope()[node->identifier->value].assignment;
+		if ((assignment && !assignment->is_mutable) || !assignment) {
+			return Result<Ok, Errors>(Errors{errors::reassigning_immutable_variable(node->identifier, this->get_binding(node->identifier->value)->assignment)}); // tested in test/errors/reassigning_immutable_variable.dm
+		}
 	}
-	else {
-		this->current_scope()[node->identifier->value] = binding;
-		return Result<Ok, Errors>(Ok());
-	}
+	this->current_scope()[node->identifier->value] = binding;
+	return Result<Ok, Errors>(Ok());
 }
 
 Result<Ok, Errors> Context::analyze(std::shared_ptr<Ast::Return> node) {
