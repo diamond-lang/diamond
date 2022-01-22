@@ -1,0 +1,16 @@
+a = 20
+
+if true
+    a = -20
+
+print(a)
+
+if true
+    nonlocal a = 6
+
+print(a)
+
+--- Output
+20
+6
+---

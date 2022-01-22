@@ -82,6 +82,47 @@ struct Codegen {
 	llvm::Value* get_binding(std::string identifier);
 };
 
+llvm::Type* Codegen::as_llvm_type(Type type) {
+	if      (type == Type("float64")) return llvm::Type::getDoubleTy(*(this->context));
+	else if (type == Type("int64"))   return llvm::Type::getInt64Ty(*(this->context));
+	else if (type == Type("bool"))    return llvm::Type::getInt1Ty(*(this->context));
+	else if (type == Type("void"))    return llvm::Type::getVoidTy(*(this->context));
+	else {
+		std::cout <<"type: " << type.to_str() << "\n";
+		assert(false);
+	}
+}
+
+std::vector<llvm::Type*> Codegen::as_llvm_types(std::vector<Type> types) {
+	std::vector<llvm::Type*> llvm_types;
+	for (size_t i = 0; i < types.size(); i++) {
+		llvm_types.push_back(this->as_llvm_type(types[i]));
+	}
+	return llvm_types;
+}
+
+void Codegen::add_scope() {
+	this->scopes.push_back(std::unordered_map<std::string, llvm::AllocaInst*>());
+}
+
+std::unordered_map<std::string, llvm::AllocaInst*>& Codegen::current_scope() {
+	return this->scopes[this->scopes.size() - 1];
+}
+
+void Codegen::remove_scope() {
+	this->scopes.pop_back();
+}
+
+llvm::Value* Codegen::get_binding(std::string identifier) {
+	for (auto scope = this->scopes.rbegin(); scope != this->scopes.rend(); scope++) {
+		if (scope->find(identifier) != scope->end()) {
+			return (*scope)[identifier];
+		}
+	}
+	assert(false);
+	return nullptr;
+}
+
 void print_llvm_ir(std::shared_ptr<Ast::Program> program, std::string program_name) {
 	Codegen llvm_ir;
 	llvm_ir.codegen(program);
@@ -372,14 +413,20 @@ void Codegen::codegen(std::shared_ptr<Ast::Assignment> node) {
 	// Generate value of expression
 	llvm::Value* expr = this->codegen(node->expression);
 
-	// Create allocation if doesn't exists or if already exists, but it has a different type
-	if (this->current_scope().find(node->identifier->value) == this->current_scope().end()
-	||  this->current_scope()[node->identifier->value]->getType() != expr->getType()) { 
-		this->current_scope()[node->identifier->value] = this->create_allocation(node->identifier->value, expr->getType());
-	}
+	if (node->nonlocal) {
+		// Store value
+		this->builder->CreateStore(expr, this->get_binding(node->identifier->value));
+	} 
+	else {
+		// Create allocation if doesn't exists or if already exists, but it has a different type
+		if (this->current_scope().find(node->identifier->value) == this->current_scope().end()
+		||  this->current_scope()[node->identifier->value]->getType() != expr->getType()) { 
+			this->current_scope()[node->identifier->value] = this->create_allocation(node->identifier->value, expr->getType());
+		}
 
-	// Store value
-	this->builder->CreateStore(expr, this->current_scope()[node->identifier->value]);
+		// Store value
+		this->builder->CreateStore(expr, this->current_scope()[node->identifier->value]);
+	}
 }
 
 void Codegen::codegen(std::shared_ptr<Ast::Return> node) {
@@ -665,45 +712,4 @@ llvm::Value* Codegen::codegen(std::shared_ptr<Ast::Identifier> node) {
 
 llvm::Value* Codegen::codegen(std::shared_ptr<Ast::Boolean> node) {
 	return llvm::ConstantInt::getBool(*(this->context), node->value);
-}
-
-llvm::Type* Codegen::as_llvm_type(Type type) {
-	if      (type == Type("float64")) return llvm::Type::getDoubleTy(*(this->context));
-	else if (type == Type("int64"))   return llvm::Type::getInt64Ty(*(this->context));
-	else if (type == Type("bool"))    return llvm::Type::getInt1Ty(*(this->context));
-	else if (type == Type("void"))    return llvm::Type::getVoidTy(*(this->context));
-	else {
-		std::cout <<"type: " << type.to_str() << "\n";
-		assert(false);
-	}
-}
-
-std::vector<llvm::Type*> Codegen::as_llvm_types(std::vector<Type> types) {
-	std::vector<llvm::Type*> llvm_types;
-	for (size_t i = 0; i < types.size(); i++) {
-		llvm_types.push_back(this->as_llvm_type(types[i]));
-	}
-	return llvm_types;
-}
-
-void Codegen::add_scope() {
-	this->scopes.push_back(std::unordered_map<std::string, llvm::AllocaInst*>());
-}
-
-std::unordered_map<std::string, llvm::AllocaInst*>& Codegen::current_scope() {
-	return this->scopes[this->scopes.size() - 1];
-}
-
-void Codegen::remove_scope() {
-	this->scopes.pop_back();
-}
-
-llvm::Value* Codegen::get_binding(std::string identifier) {
-	for (auto scope = this->scopes.rbegin(); scope != this->scopes.rend(); scope++) {
-		if (scope->find(identifier) != scope->end()) {
-			return (*scope)[identifier];
-		}
-	}
-	assert(false);
-	return nullptr;
 }

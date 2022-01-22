@@ -284,14 +284,29 @@ Result<Ok, Errors> Context::analyze(std::shared_ptr<Ast::Assignment> node) {
 	auto result = this->analyze(node->expression);
 	if (result.is_error()) return result;
 
-	// Save it context
-	if (this->current_scope().find(node->identifier->value) != this->current_scope().end()) {
-		auto assignment = this->current_scope()[node->identifier->value].assignment;
-		if ((assignment && !assignment->is_mutable) || !assignment) {
-			return Result<Ok, Errors>(Errors{errors::reassigning_immutable_variable(node->identifier, this->get_binding(node->identifier->value)->assignment)}); // tested in test/errors/reassigning_immutable_variable.dm
+	// If nonlocal
+	if (node->nonlocal) {
+		Binding* aux = this->get_binding(node->identifier->value);
+		if (!aux) {
+			return Result<Ok, Errors>(Errors{errors::undefined_variable(node->identifier)});
 		}
+		if (aux->assignment && aux->assignment->expression->type != node->expression->type) {
+			return Result<Ok, Errors>(Errors{std::string{"Error: Incompatible type for variable"}});
+		} 
+		*aux = binding;
 	}
-	this->current_scope()[node->identifier->value] = binding;
+
+	// Normal assignment
+	else {
+		if (this->current_scope().find(node->identifier->value) != this->current_scope().end()) {
+			auto assignment = this->current_scope()[node->identifier->value].assignment;
+			if (assignment && !(assignment->is_mutable)) {
+				return Result<Ok, Errors>(Errors{errors::reassigning_immutable_variable(node->identifier, this->get_binding(node->identifier->value)->assignment)}); // tested in test/errors/reassigning_immutable_variable.dm
+			}
+		}
+		this->current_scope()[node->identifier->value] = binding;
+	}
+	
 	return Result<Ok, Errors>(Ok());
 }
 
