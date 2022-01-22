@@ -31,11 +31,13 @@ std::string errors::usage() {
 	                 "    Runs the program.\n\n" +
 		   make_header("diamond emit [options] [program file]\n") +
 		               "    This command emits intermediary representations of\n"
-					   "    the program. Serves for debugging the compiler.\n\n"
+					   "    the program. Is useful for debugging the compiler.\n\n"
 					   "    The options are:\n"
 					   "        --ast\n"
-					   "        --ast-with-type\n"
-					   "        --ast-with-concrete-types\n\n";
+					   "        --ast-with-types\n"
+					   "        --ast-with-concrete-types\n"
+					   "        --llvm-ir\n";
+					  // "                 \n";
 }
 
 std::string errors::unexpected_character(Source source) {

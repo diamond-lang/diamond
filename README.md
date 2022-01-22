@@ -12,12 +12,13 @@ diamond run [program file]
 
 diamond emit [options] [program file]
     This command emits intermediary representations of
-    the program. Serves for debugging the compiler.
+    the program. Is useful for debugging the compiler.
 
     The options are:
         --ast
-        --ast-with-type
+        --ast-with-types
         --ast-with-concrete-types
+        --llvm-ir
 ```
 
 ## Dependencies
