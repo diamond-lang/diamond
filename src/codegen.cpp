@@ -24,6 +24,10 @@
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Target/TargetOptions.h"
+#include "llvm/Transforms/InstCombine/InstCombine.h"
+#include "llvm/Transforms/Scalar.h"
+#include "llvm/Transforms/Scalar/GVN.h"
+#include "llvm/Transforms/Utils.h"
 
 #include "lld/Common/Driver.h"
 
@@ -34,13 +38,24 @@ struct Codegen {
 	llvm::LLVMContext* context;
 	llvm::Module* module;
 	llvm::IRBuilder<>* builder;
-	std::vector<std::unordered_map<std::string, llvm::AllocaInst*>> scopes;
+	llvm::legacy::FunctionPassManager* function_pass_manager;
 	llvm::BasicBlock* current_entry_block = nullptr; // Needed for doing stack allocations
+
+	std::vector<std::unordered_map<std::string, llvm::AllocaInst*>> scopes;
 
 	Codegen() {
 		this->context = new llvm::LLVMContext();
 		this->module = new llvm::Module("My cool jit", *(this->context));
 		this->builder = new llvm::IRBuilder(*(this->context));
+
+		// Add optimizations
+		this->function_pass_manager = new llvm::legacy::FunctionPassManager(this->module);
+		this->function_pass_manager->add(llvm::createPromoteMemoryToRegisterPass()); // Add mem2reg, important when representing valus as allocations
+		//this->function_pass_manager->add(llvm::createInstructionCombiningPass());
+		this->function_pass_manager->add(llvm::createReassociatePass());
+		this->function_pass_manager->add(llvm::createGVNPass());
+		this->function_pass_manager->add(llvm::createCFGSimplificationPass());
+		this->function_pass_manager->doInitialization();
 	}
 
 	void codegen(std::shared_ptr<Ast::Program> node);
@@ -341,7 +356,13 @@ void Codegen::codegen(std::vector<std::shared_ptr<Ast::Function>> functions) {
 			}
 			else assert(false);
 
+			// Verify function 
 			llvm::verifyFunction(*f);
+
+			// Run optimizations
+			this->function_pass_manager->run(*f);
+
+			// Remove scope
 			this->remove_scope();
 		}
 	}
