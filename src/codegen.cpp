@@ -372,14 +372,14 @@ void Codegen::codegen(std::shared_ptr<Ast::Assignment> node) {
 	// Generate value of expression
 	llvm::Value* expr = this->codegen(node->expression);
 
-	// Create allocation
-	auto allocation = this->create_allocation(node->identifier->value, expr->getType());
+	// Create allocation if doesn't exists or if already exists, but it has a different type
+	if (this->current_scope().find(node->identifier->value) == this->current_scope().end()
+	||  this->current_scope()[node->identifier->value]->getType() != expr->getType()) { 
+		this->current_scope()[node->identifier->value] = this->create_allocation(node->identifier->value, expr->getType());
+	}
 
 	// Store value
-	this->builder->CreateStore(expr, allocation);
-
-	// Add it to the scope
-	this->current_scope()[node->identifier->value] = allocation;
+	this->builder->CreateStore(expr, this->current_scope()[node->identifier->value]);
 }
 
 void Codegen::codegen(std::shared_ptr<Ast::Return> node) {

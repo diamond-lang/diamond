@@ -1,0 +1,9 @@
+a = 1.0 < 4.0
+print(a)
+a = 2.0
+print(a)
+
+--- Output
+true
+2
+---
