@@ -53,6 +53,7 @@ struct Context {
 	Result<Ok, Errors> analyze(std::shared_ptr<Ast::Assignment> assignment);
 	Result<Ok, Errors> analyze(std::shared_ptr<Ast::Return> node);
 	Result<Ok, Errors> analyze(std::shared_ptr<Ast::IfElseStmt> node);
+	Result<Ok, Errors> analyze(std::shared_ptr<Ast::WhileStmt> node);
 	Result<Ok, Errors> analyze(std::shared_ptr<Ast::Expression> node);
 	Result<Ok, Errors> analyze(std::shared_ptr<Ast::Call> node);
 	Result<Ok, Errors> analyze(std::shared_ptr<Ast::IfElseExpr> node);
@@ -146,6 +147,7 @@ Type find_concrete_type_for_type_variable_on_block(std::shared_ptr<Ast::Block> b
         auto assignment = std::dynamic_pointer_cast<Ast::Assignment>(block->statements[i]);
         auto return_stmt = std::dynamic_pointer_cast<Ast::Return>(block->statements[i]);
         auto if_else_stmt = std::dynamic_pointer_cast<Ast::IfElseStmt>(block->statements[i]);
+		auto while_stmt = std::dynamic_pointer_cast<Ast::WhileStmt>(block->statements[i]);
 		auto call = std::dynamic_pointer_cast<Ast::Call>(block->statements[i]);
         
         if (assignment) {
@@ -159,6 +161,10 @@ Type find_concrete_type_for_type_variable_on_block(std::shared_ptr<Ast::Block> b
 			if (block_type != Type("")) return block_type;
 
 			block_type = find_concrete_type_for_type_variable_on_block(if_else_stmt->else_block, type_variable);
+			if (block_type != Type("")) return block_type;
+		}
+		else if (while_stmt) {
+			Type block_type = find_concrete_type_for_type_variable_on_block(if_else_stmt->block, type_variable);
 			if (block_type != Type("")) return block_type;
 		}
 		else if (call) {}
@@ -261,6 +267,10 @@ Result<Ok, Errors> Context::analyze(std::shared_ptr<Ast::Block> block) {
 				}
 			}
 		}
+		else if (std::dynamic_pointer_cast<Ast::WhileStmt>(stmt)) {
+			auto node = std::dynamic_pointer_cast<Ast::WhileStmt>(stmt);
+			result = this->analyze(node);
+		}
 		else  {
 			assert(false);
 		}
@@ -323,7 +333,7 @@ Result<Ok, Errors> Context::analyze(std::shared_ptr<Ast::Return> node) {
 Result<Ok, Errors> Context::analyze(std::shared_ptr<Ast::IfElseStmt> node) {
 	auto codition = this->analyze(node->condition);
 	if (codition.is_error()) return codition;
-	if (node->condition->type != Type("bool")) return Result<Ok, Errors>(Errors{std::string("The condition in a if must be boolean")});
+	if (node->condition->type != Type("bool")) return Result<Ok, Errors>(Errors{std::string("Error: The condition in a if must be boolean")});
 
 	auto block = this->analyze(node->block);
 	if (block.is_error()) return block;
@@ -332,6 +342,17 @@ Result<Ok, Errors> Context::analyze(std::shared_ptr<Ast::IfElseStmt> node) {
 		auto else_block = this->analyze(node->else_block);
 		if (else_block.is_error()) return else_block;
 	}
+
+	return Result<Ok, Errors>(Ok());
+}
+
+Result<Ok, Errors> Context::analyze(std::shared_ptr<Ast::WhileStmt> node) {
+	auto codition = this->analyze(node->condition);
+	if (codition.is_error()) return codition;
+	if (node->condition->type != Type("bool")) return Result<Ok, Errors>(Errors{std::string("Error: The condition in a if must be boolean")});
+
+	auto block = this->analyze(node->block);
+	if (block.is_error()) return block;
 
 	return Result<Ok, Errors>(Ok());
 }

@@ -28,6 +28,7 @@ struct type_inference::Context {
 	void analyze(std::shared_ptr<Ast::Assignment> node);
 	void analyze(std::shared_ptr<Ast::Return> node);
 	void analyze(std::shared_ptr<Ast::IfElseStmt> node);
+    void analyze(std::shared_ptr<Ast::WhileStmt> node);
 	void analyze(std::shared_ptr<Ast::Expression> node);
 	void analyze(std::shared_ptr<Ast::IfElseExpr> node);
 	void analyze(std::shared_ptr<Ast::Identifier> node);
@@ -40,6 +41,7 @@ struct type_inference::Context {
 	void unify(std::shared_ptr<Ast::Assignment> node);
 	void unify(std::shared_ptr<Ast::Return> node);
 	void unify(std::shared_ptr<Ast::IfElseStmt> node);
+    void unify(std::shared_ptr<Ast::WhileStmt> node);
 	void unify(std::shared_ptr<Ast::Expression> node);
 	void unify(std::shared_ptr<Ast::IfElseExpr> node);
 	void unify(std::shared_ptr<Ast::Identifier> node);
@@ -211,11 +213,13 @@ void type_inference::Context::analyze(std::shared_ptr<Ast::Block> block) {
         auto assignment = std::dynamic_pointer_cast<Ast::Assignment>(block->statements[i]);
         auto return_stmt = std::dynamic_pointer_cast<Ast::Return>(block->statements[i]);
         auto if_else_stmt = std::dynamic_pointer_cast<Ast::IfElseStmt>(block->statements[i]);
+        auto while_stmt = std::dynamic_pointer_cast<Ast::WhileStmt>(block->statements[i]);
         auto call = std::dynamic_pointer_cast<Ast::Call>(block->statements[i]);
         
         if      (assignment)   this->analyze(assignment);
         else if (return_stmt)  this->analyze(return_stmt);
         else if (if_else_stmt) this->analyze(if_else_stmt);
+        else if (while_stmt)   this->analyze(while_stmt);
         else if (call)         this->analyze(call);
         else                   assert(false);
     }
@@ -245,6 +249,11 @@ void type_inference::Context::analyze(std::shared_ptr<Ast::IfElseStmt> node) {
     this->analyze(node->condition);
     this->analyze(node->block);
     if (node->else_block) this->analyze(node->else_block);
+}
+
+void type_inference::Context::analyze(std::shared_ptr<Ast::WhileStmt> node) {
+    this->analyze(node->condition);
+    this->analyze(node->block);
 }
 
 void type_inference::Context::analyze(std::shared_ptr<Ast::Expression> node) {
@@ -334,11 +343,13 @@ void type_inference::Context::unify(std::shared_ptr<Ast::Block> block) {
         auto assignment = std::dynamic_pointer_cast<Ast::Assignment>(block->statements[i]);
         auto return_stmt = std::dynamic_pointer_cast<Ast::Return>(block->statements[i]);
         auto if_else_stmt = std::dynamic_pointer_cast<Ast::IfElseStmt>(block->statements[i]);
+        auto while_stmt = std::dynamic_pointer_cast<Ast::WhileStmt>(block->statements[i]);
         auto call = std::dynamic_pointer_cast<Ast::Call>(block->statements[i]);
         
         if      (assignment)   this->unify(assignment);
         else if (return_stmt)  this->unify(return_stmt);
         else if (if_else_stmt) this->unify(if_else_stmt);
+        else if (while_stmt)   this->unify(while_stmt);
         else if (call)         this->unify(call);
         else                   assert(false);
     }
@@ -357,6 +368,12 @@ void type_inference::Context::unify(std::shared_ptr<Ast::IfElseStmt> node) {
     this->unify(node->block);
     if (node->else_block) this->unify(node->else_block);
 }
+
+void type_inference::Context::unify(std::shared_ptr<Ast::WhileStmt> node) {
+    this->unify(node->condition);
+    this->unify(node->block);
+}
+
 
 void type_inference::Context::unify(std::shared_ptr<Ast::Expression> node) {
     if (std::dynamic_pointer_cast<Ast::Integer>(node))    unify(std::dynamic_pointer_cast<Ast::Integer>(node));
