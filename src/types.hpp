@@ -209,6 +209,16 @@ namespace Ast {
 		virtual std::shared_ptr<Node> clone();
 	};
 
+	struct WhileStmt : Node {
+		std::shared_ptr<Ast::Expression> condition;
+		std::shared_ptr<Ast::Block> block;
+
+		WhileStmt(std::shared_ptr<Ast::Expression> condition, std::shared_ptr<Ast::Block> block, size_t line, size_t col, std::string file) : Node(line, col, file), condition(condition), block(block) {}
+		virtual ~WhileStmt() {}
+		virtual void print(size_t indent_level = 0, std::vector<bool> last = {}, bool concrete = false);
+		virtual std::shared_ptr<Node> clone();
+	};
+
 	struct Expression : Node {
 		Type type = Type();
 

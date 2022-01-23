@@ -288,6 +288,19 @@ std::shared_ptr<Ast::Node> Ast::IfElseStmt::clone() {
 	else                  return std::make_shared<Ast::IfElseStmt>(std::dynamic_pointer_cast<Ast::Expression>(this->condition->clone()), std::dynamic_pointer_cast<Ast::Block>(this->block->clone()), this->line, this->col, this->file);
 }
 
+// WhileStmt
+void Ast::WhileStmt::print(size_t indent_level, std::vector<bool> last, bool concrete)  {
+	put_indent_level(indent_level, last);
+	std::cout << "while" << '\n';
+	this->condition->print(indent_level + 1, append(last, false), concrete);
+	this->block->print(indent_level, last, concrete);
+}
+
+std::shared_ptr<Ast::Node> Ast::WhileStmt::clone() {
+	return std::make_shared<Ast::WhileStmt>(std::dynamic_pointer_cast<Ast::Expression>(this->condition->clone()), std::dynamic_pointer_cast<Ast::Block>(this->block->clone()), this->line, this->col, this->file);
+}
+
+
 // IfElseExpr
 void Ast::IfElseExpr::print(size_t indent_level, std::vector<bool> last, bool concrete)  {
 	bool is_last = true;

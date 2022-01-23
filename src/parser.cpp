@@ -148,6 +148,7 @@ ParserResult<std::shared_ptr<Ast::Node>> parse::statement(Source source) {
 	if (parse::identifier(source, "function").is_ok()) return parse::function(source);
 	if (parse::identifier(source, "return").is_ok())   return parse::return_stmt(source);
 	if (parse::identifier(source, "if").is_ok())       return parse::if_else_stmt(source);
+	if (parse::identifier(source, "while").is_ok())    return parse::while_stmt(source);
 	if (is_assignment(source)) return parse::assignment(source);
 	if (parse::call(source).is_ok()) {
 		auto result = parse::call(source);
@@ -289,6 +290,24 @@ ParserResult<std::shared_ptr<Ast::Node>> parse::if_else_stmt(Source source) {
 
 	// Return
 	auto node = std::make_shared<Ast::IfElseStmt>(condition.get_value(), block.get_value(), source.line, source.col, source.file);
+	return ParserResult<std::shared_ptr<Ast::Node>>(node, source);
+}
+
+ParserResult<std::shared_ptr<Ast::Node>> parse::while_stmt(Source source) {
+	auto keyword = parse::identifier(source, "while");
+	if (keyword.is_error()) return ParserResult<std::shared_ptr<Ast::Node>>(keyword.get_errors());
+	source = keyword.get_source();
+
+	auto condition = parse::expression(source);
+	if (condition.is_error()) return condition.get_errors();
+	source = condition.get_source();
+
+	auto block = parse::block(source);
+	if (block.is_error()) return block.get_errors();
+	source = block.get_source();
+
+	// Return
+	auto node = std::make_shared<Ast::WhileStmt>(condition.get_value(), block.get_value(), source.line, source.col, source.file);
 	return ParserResult<std::shared_ptr<Ast::Node>>(node, source);
 }
 
