@@ -64,6 +64,7 @@ struct Codegen {
 	void codegen(std::shared_ptr<Ast::Assignment> node);
 	void codegen(std::shared_ptr<Ast::Return> node);
 	void codegen(std::shared_ptr<Ast::IfElseStmt> node);
+	void codegen(std::shared_ptr<Ast::WhileStmt> node);
 	llvm::Value* codegen(std::shared_ptr<Ast::Expression> node);
 	llvm::Value* codegen(std::shared_ptr<Ast::Call> node);
 	llvm::Value* codegen(std::shared_ptr<Ast::IfElseExpr> node);
@@ -317,6 +318,9 @@ void Codegen::codegen(std::shared_ptr<Ast::Block> node) {
 		else if (std::dynamic_pointer_cast<Ast::IfElseStmt>(node->statements[i])) {
 			this->codegen(std::dynamic_pointer_cast<Ast::IfElseStmt>(node->statements[i]));
 		}
+		else if (std::dynamic_pointer_cast<Ast::WhileStmt>(node->statements[i])) {
+			this->codegen(std::dynamic_pointer_cast<Ast::WhileStmt>(node->statements[i]));
+		}
 		else {
 			assert(false);
 		}
@@ -496,6 +500,26 @@ void Codegen::codegen(std::shared_ptr<Ast::IfElseStmt> node) {
 			this->builder->SetInsertPoint(merge_block);
 		}
 	}
+}
+
+void Codegen::codegen(std::shared_ptr<Ast::WhileStmt> node) {
+	llvm::Function *current_function = this->builder->GetInsertBlock()->getParent();
+	llvm::BasicBlock *loop_block = llvm::BasicBlock::Create(*(this->context), "loop", current_function);
+	llvm::BasicBlock *then_block = llvm::BasicBlock::Create(*(this->context), "then");
+
+	// Jump to loop block if condition is true
+	this->builder->CreateCondBr(this->codegen(node->condition), loop_block, then_block);
+
+	// Codegen loop block
+	this->builder->SetInsertPoint(loop_block);
+	this->codegen(node->block);
+
+	// Jump to loop block again if condition is true
+	this->builder->CreateCondBr(this->codegen(node->condition), loop_block, then_block);
+
+	// Insert then block
+	current_function->getBasicBlockList().push_back(then_block);
+	this->builder->SetInsertPoint(then_block);
 }
 
 llvm::Value* Codegen::codegen(std::shared_ptr<Ast::Expression> node) {
