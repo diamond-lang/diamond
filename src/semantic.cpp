@@ -283,6 +283,12 @@ Result<Ok, Errors> Context::analyze(std::shared_ptr<Ast::Block> block) {
 			}
 			else {
 				result = Result<Ok, Errors>(Ok{});
+				if (block->type == Type("")) {
+					block->type = Type("void");
+				}
+				else if (block->type != Type("void")) {
+					result = Result<Ok, Errors>(Errors{std::string("Error: Incompatible return types")});
+				}
 			}
 		}
 		else  {

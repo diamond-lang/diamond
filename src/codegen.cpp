@@ -40,6 +40,8 @@ struct Codegen {
 	llvm::IRBuilder<>* builder;
 	llvm::legacy::FunctionPassManager* function_pass_manager;
 	llvm::BasicBlock* current_entry_block = nullptr; // Needed for doing stack allocations
+	llvm::BasicBlock* last_after_while_block = nullptr; // Needed for break
+	llvm::BasicBlock* last_while_block = nullptr; // Needed for continue
 
 	std::vector<std::unordered_map<std::string, llvm::AllocaInst*>> scopes;
 
@@ -63,6 +65,8 @@ struct Codegen {
 	void codegen(std::vector<std::shared_ptr<Ast::Function>> functions);
 	void codegen(std::shared_ptr<Ast::Assignment> node);
 	void codegen(std::shared_ptr<Ast::Return> node);
+	void codegen(std::shared_ptr<Ast::Break> node);
+	void codegen(std::shared_ptr<Ast::Continue> node);
 	void codegen(std::shared_ptr<Ast::IfElseStmt> node);
 	void codegen(std::shared_ptr<Ast::WhileStmt> node);
 	llvm::Value* codegen(std::shared_ptr<Ast::Expression> node);
@@ -321,6 +325,12 @@ void Codegen::codegen(std::shared_ptr<Ast::Block> node) {
 		else if (std::dynamic_pointer_cast<Ast::WhileStmt>(node->statements[i])) {
 			this->codegen(std::dynamic_pointer_cast<Ast::WhileStmt>(node->statements[i]));
 		}
+		else if (std::dynamic_pointer_cast<Ast::Break>(node->statements[i])) {
+			this->codegen(std::dynamic_pointer_cast<Ast::Break>(node->statements[i]));
+		}
+		else if (std::dynamic_pointer_cast<Ast::Continue>(node->statements[i])) {
+			this->codegen(std::dynamic_pointer_cast<Ast::Continue>(node->statements[i]));
+		}
 		else {
 			assert(false);
 		}
@@ -446,6 +456,16 @@ void Codegen::codegen(std::shared_ptr<Ast::Return> node) {
 	}
 }
 
+void Codegen::codegen(std::shared_ptr<Ast::Break> node) {
+	assert(this->last_after_while_block);
+	this->builder->CreateBr(this->last_after_while_block);
+}
+
+void Codegen::codegen(std::shared_ptr<Ast::Continue> node) {
+	assert(this->last_while_block);
+	this->builder->CreateBr(this->last_while_block);
+}
+
 void Codegen::codegen(std::shared_ptr<Ast::IfElseStmt> node) {
 	llvm::Function *current_function = this->builder->GetInsertBlock()->getParent();
 	llvm::BasicBlock *block = llvm::BasicBlock::Create(*(this->context), "then", current_function);
@@ -506,6 +526,8 @@ void Codegen::codegen(std::shared_ptr<Ast::WhileStmt> node) {
 	llvm::Function *current_function = this->builder->GetInsertBlock()->getParent();
 	llvm::BasicBlock *loop_block = llvm::BasicBlock::Create(*(this->context), "loop", current_function);
 	llvm::BasicBlock *then_block = llvm::BasicBlock::Create(*(this->context), "then");
+	this->last_after_while_block = then_block;
+	this->last_while_block = loop_block;
 
 	// Jump to loop block if condition is true
 	this->builder->CreateCondBr(this->codegen(node->condition), loop_block, then_block);
