@@ -11,6 +11,8 @@ namespace parse {
 	ParserResult<std::shared_ptr<Ast::Node>> statement(Source source);
 	ParserResult<std::shared_ptr<Ast::Node>> assignment(Source source);
 	ParserResult<std::shared_ptr<Ast::Node>> return_stmt(Source source);
+	ParserResult<std::shared_ptr<Ast::Node>> break_stmt(Source source);
+	ParserResult<std::shared_ptr<Ast::Node>> continue_stmt(Source source);
 	ParserResult<std::shared_ptr<Ast::Node>> if_else_stmt(Source source);
 	ParserResult<std::shared_ptr<Ast::Node>> while_stmt(Source source);
 	ParserResult<std::shared_ptr<Ast::Expression>> call(Source source);

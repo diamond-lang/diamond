@@ -149,6 +149,8 @@ ParserResult<std::shared_ptr<Ast::Node>> parse::statement(Source source) {
 	if (parse::identifier(source, "return").is_ok())   return parse::return_stmt(source);
 	if (parse::identifier(source, "if").is_ok())       return parse::if_else_stmt(source);
 	if (parse::identifier(source, "while").is_ok())    return parse::while_stmt(source);
+	if (parse::identifier(source, "break").is_ok())    return parse::break_stmt(source);
+	if (parse::identifier(source, "continue").is_ok()) return parse::continue_stmt(source);
 	if (is_assignment(source)) return parse::assignment(source);
 	if (parse::call(source).is_ok()) {
 		auto result = parse::call(source);
@@ -249,6 +251,24 @@ ParserResult<std::shared_ptr<Ast::Node>> parse::return_stmt(Source source) {
 	}
 
 	auto node = std::make_shared<Ast::Return>(nullptr, source.line, source.col, source.file);
+	return ParserResult<std::shared_ptr<Ast::Node>>(node, source);
+}
+
+ParserResult<std::shared_ptr<Ast::Node>> parse::break_stmt(Source source) {
+	auto keyword = parse::identifier(source, "break");
+	if (keyword.is_error()) return ParserResult<std::shared_ptr<Ast::Node>>(keyword.get_errors());
+	source = keyword.get_source();
+
+	auto node = std::make_shared<Ast::Break>(source.line, source.col, source.file);
+	return ParserResult<std::shared_ptr<Ast::Node>>(node, source);
+}
+
+ParserResult<std::shared_ptr<Ast::Node>> parse::continue_stmt(Source source) {
+	auto keyword = parse::identifier(source, "continue");
+	if (keyword.is_error()) return ParserResult<std::shared_ptr<Ast::Node>>(keyword.get_errors());
+	source = keyword.get_source();
+
+	auto node = std::make_shared<Ast::Continue>(source.line, source.col, source.file);
 	return ParserResult<std::shared_ptr<Ast::Node>>(node, source);
 }
 

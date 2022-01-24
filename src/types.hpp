@@ -197,6 +197,20 @@ namespace Ast {
 		virtual std::shared_ptr<Node> clone();
 	};
 
+	struct Break : Node {
+		Break(size_t line, size_t col, std::string file) : Node(line, col, file) {}
+		virtual ~Break() {}
+		virtual void print(size_t indent_level = 0, std::vector<bool> last = {}, bool concrete = false);
+		virtual std::shared_ptr<Node> clone();
+	};
+
+	struct Continue : Node {
+		Continue(size_t line, size_t col, std::string file) : Node(line, col, file) {}
+		virtual ~Continue() {}
+		virtual void print(size_t indent_level = 0, std::vector<bool> last = {}, bool concrete = false);
+		virtual std::shared_ptr<Node> clone();
+	};
+
 	struct IfElseStmt : Node {
 		std::shared_ptr<Ast::Expression> condition;
 		std::shared_ptr<Ast::Block> block;

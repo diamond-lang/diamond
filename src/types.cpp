@@ -265,6 +265,26 @@ std::shared_ptr<Ast::Node> Ast::Return::clone() {
 	else                  return std::make_shared<Ast::Return>(nullptr, this->line, this->col, this->file);
 }
 
+// Break
+void Ast::Break::print(size_t indent_level, std::vector<bool> last, bool concrete)  {
+	put_indent_level(indent_level, last);
+	std::cout << "break" << '\n';
+}
+
+std::shared_ptr<Ast::Node> Ast::Break::clone() {
+	return std::make_shared<Ast::Break>(this->line, this->col, this->file);
+}
+
+// Break
+void Ast::Continue::print(size_t indent_level, std::vector<bool> last, bool concrete)  {
+	put_indent_level(indent_level, last);
+	std::cout << "continue" << '\n';
+}
+
+std::shared_ptr<Ast::Node> Ast::Continue::clone() {
+	return std::make_shared<Ast::Continue>(this->line, this->col, this->file);
+}
+
 // IfElseStmt
 void Ast::IfElseStmt::print(size_t indent_level, std::vector<bool> last, bool concrete)  {
 	bool is_last = last[last.size() - 1];
