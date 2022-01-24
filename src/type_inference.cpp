@@ -215,12 +215,16 @@ void type_inference::Context::analyze(std::shared_ptr<Ast::Block> block) {
         auto if_else_stmt = std::dynamic_pointer_cast<Ast::IfElseStmt>(block->statements[i]);
         auto while_stmt = std::dynamic_pointer_cast<Ast::WhileStmt>(block->statements[i]);
         auto call = std::dynamic_pointer_cast<Ast::Call>(block->statements[i]);
+        auto break_stmt = std::dynamic_pointer_cast<Ast::Break>(block->statements[i]);
+        auto continue_stmt = std::dynamic_pointer_cast<Ast::Continue>(block->statements[i]);
         
         if      (assignment)   this->analyze(assignment);
         else if (return_stmt)  this->analyze(return_stmt);
         else if (if_else_stmt) this->analyze(if_else_stmt);
         else if (while_stmt)   this->analyze(while_stmt);
         else if (call)         this->analyze(call);
+        else if (break_stmt) {}
+		else if (continue_stmt) {}
         else                   assert(false);
     }
 
@@ -345,12 +349,16 @@ void type_inference::Context::unify(std::shared_ptr<Ast::Block> block) {
         auto if_else_stmt = std::dynamic_pointer_cast<Ast::IfElseStmt>(block->statements[i]);
         auto while_stmt = std::dynamic_pointer_cast<Ast::WhileStmt>(block->statements[i]);
         auto call = std::dynamic_pointer_cast<Ast::Call>(block->statements[i]);
+        auto break_stmt = std::dynamic_pointer_cast<Ast::Break>(block->statements[i]);
+        auto continue_stmt = std::dynamic_pointer_cast<Ast::Continue>(block->statements[i]);
         
         if      (assignment)   this->unify(assignment);
         else if (return_stmt)  this->unify(return_stmt);
         else if (if_else_stmt) this->unify(if_else_stmt);
         else if (while_stmt)   this->unify(while_stmt);
         else if (call)         this->unify(call);
+        else if (break_stmt) {}
+		else if (continue_stmt) {}
         else                   assert(false);
     }
 }

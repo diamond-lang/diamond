@@ -48,6 +48,7 @@ struct Context {
 	std::vector<std::unordered_map<std::string, Binding>> scopes;
 	std::unordered_map<std::string, Type> type_bindings;
 	std::vector<FunctionCall> call_stack;
+	bool inside_while = false;
 
 	Result<Ok, Errors> analyze(std::shared_ptr<Ast::Block> block);
 	Result<Ok, Errors> analyze(std::shared_ptr<Ast::Assignment> assignment);
@@ -149,6 +150,8 @@ Type find_concrete_type_for_type_variable_on_block(std::shared_ptr<Ast::Block> b
         auto if_else_stmt = std::dynamic_pointer_cast<Ast::IfElseStmt>(block->statements[i]);
 		auto while_stmt = std::dynamic_pointer_cast<Ast::WhileStmt>(block->statements[i]);
 		auto call = std::dynamic_pointer_cast<Ast::Call>(block->statements[i]);
+		auto break_stmt = std::dynamic_pointer_cast<Ast::Break>(block->statements[i]);
+        auto continue_stmt = std::dynamic_pointer_cast<Ast::Continue>(block->statements[i]);
         
         if (assignment) {
 			return find_concrete_type_for_type_variable_on_expression(assignment->expression, type_variable);
@@ -168,6 +171,8 @@ Type find_concrete_type_for_type_variable_on_block(std::shared_ptr<Ast::Block> b
 			if (block_type != Type("")) return block_type;
 		}
 		else if (call) {}
+		else if (break_stmt) {}
+		else if (continue_stmt) {}
         else {
 			assert(false);
 		}
@@ -271,6 +276,15 @@ Result<Ok, Errors> Context::analyze(std::shared_ptr<Ast::Block> block) {
 			auto node = std::dynamic_pointer_cast<Ast::WhileStmt>(stmt);
 			result = this->analyze(node);
 		}
+		else if (std::dynamic_pointer_cast<Ast::Break>(stmt)
+		     ||  std::dynamic_pointer_cast<Ast::Continue>(stmt)) {
+			if (!this->inside_while) {
+				result = Result<Ok, Errors>(Errors{std::string("Error: break or continue must be used inside a loop")});
+			}
+			else {
+				result = Result<Ok, Errors>(Ok{});
+			}
+		}
 		else  {
 			assert(false);
 		}
@@ -351,6 +365,7 @@ Result<Ok, Errors> Context::analyze(std::shared_ptr<Ast::WhileStmt> node) {
 	if (codition.is_error()) return codition;
 	if (node->condition->type != Type("bool")) return Result<Ok, Errors>(Errors{std::string("Error: The condition in a if must be boolean")});
 
+	this->inside_while = true;
 	auto block = this->analyze(node->block);
 	if (block.is_error()) return block;
 
