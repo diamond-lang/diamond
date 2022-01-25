@@ -340,10 +340,10 @@ void Codegen::codegen(std::shared_ptr<Ast::Block> node) {
 }
 
 void Codegen::codegen(std::vector<std::shared_ptr<Ast::Function>> functions) {
+	// Generate function prototypes
 	for (auto it = functions.begin(); it != functions.end(); it++) {
 		auto& node = *it;
 
-		// Generate prototypes
 		for (size_t i = 0; i < node->specializations.size(); i++) {
 			auto& specialization = node->specializations[i];
 			assert(specialization->valid);
@@ -364,8 +364,12 @@ void Codegen::codegen(std::vector<std::shared_ptr<Ast::Function>> functions) {
 				j++;
 			}
 		}
+	}
 
-		// Generate functions
+	// Generate function implementations
+	for (auto it = functions.begin(); it != functions.end(); it++) {
+		auto& node = *it;
+
 		for (size_t i = 0; i < node->specializations.size(); i++) {
 			auto& specialization = node->specializations[i];
 			assert(specialization->valid);
@@ -701,7 +705,7 @@ llvm::Value* Codegen::codegen(std::shared_ptr<Ast::Call> node) {
 	}
 
 	// Get function
-	std::string name = get_function_name(node);;
+	std::string name = get_function_name(node);
 	llvm::Function* function = this->module->getFunction(name);
 	assert(function);
 
