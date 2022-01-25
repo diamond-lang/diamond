@@ -109,6 +109,9 @@ void put_indent_level(size_t indent_level, std::vector<bool> last) {
 // Program
 void Ast::Program::print(size_t indent_level, std::vector<bool> last, bool concrete)  {
 	std::cout << "program" << '\n';
+	for (size_t i = 0; i < this->use_statements.size(); i++) {
+		this->use_statements[i]->print(indent_level + 1, append(last, (this->statements.size() == 0 && this->functions.size() == 0 && i == this->use_statements.size() - 1)), concrete);
+	}
 	for (size_t i = 0; i < this->statements.size(); i++) {
 		this->statements[i]->print(indent_level + 1, append(last, (this->functions.size() == 0 && i == this->statements.size() - 1)), concrete);
 	}
@@ -129,6 +132,10 @@ void Ast::Program::print_with_concrete_types() {
 }
 
 std::shared_ptr<Ast::Node> Ast::Program::clone() {
+	std::vector<std::shared_ptr<Ast::Use>> use_statements;
+	for (size_t i = 0; i < this->use_statements.size(); i++) {
+		use_statements.push_back(std::dynamic_pointer_cast<Ast::Use>(this->use_statements[i]->clone()));
+	}
 	std::vector<std::shared_ptr<Ast::Node>> statements;
 	for (size_t i = 0; i < this->statements.size(); i++) {
 		statements.push_back(this->statements[i]->clone());
@@ -137,11 +144,14 @@ std::shared_ptr<Ast::Node> Ast::Program::clone() {
 	for (size_t i = 0; i < this->functions.size(); i++) {
 		functions.push_back(std::dynamic_pointer_cast<Ast::Function>(this->functions[i]->clone()));
 	}
-	return std::make_shared<Ast::Program>(statements, functions, this->line, this->col, this->file);
+	return std::make_shared<Ast::Program>(statements, functions, use_statements, this->line, this->col, this->file);
 }
 
 // Block
 void Ast::Block::print(size_t indent_level, std::vector<bool> last, bool concrete)  {
+	for (size_t i = 0; i < this->use_statements.size(); i++) {
+		this->use_statements[i]->print(indent_level + 1, append(last, (this->statements.size() == 0 && this->functions.size() == 0 && i == this->use_statements.size() - 1)), concrete);
+	}
 	for (size_t i = 0; i < this->statements.size(); i++) {
 		this->statements[i]->print(indent_level + 1, append(last, (this->functions.size() == 0 && i == this->statements.size() - 1)), concrete);
 	}
@@ -158,6 +168,10 @@ void Ast::Block::print(size_t indent_level, std::vector<bool> last, bool concret
 }
 
 std::shared_ptr<Ast::Node> Ast::Block::clone() {
+	std::vector<std::shared_ptr<Ast::Use>> use_statements;
+	for (size_t i = 0; i < this->use_statements.size(); i++) {
+		use_statements.push_back(std::dynamic_pointer_cast<Ast::Use>(this->use_statements[i]->clone()));
+	}
 	std::vector<std::shared_ptr<Ast::Node>> statements;
 	for (size_t i = 0; i < this->statements.size(); i++) {
 		statements.push_back(this->statements[i]->clone());
@@ -166,7 +180,7 @@ std::shared_ptr<Ast::Node> Ast::Block::clone() {
 	for (size_t i = 0; i < this->functions.size(); i++) {
 		functions.push_back(std::dynamic_pointer_cast<Ast::Function>(this->functions[i]->clone()));
 	}
-	return std::make_shared<Ast::Block>(statements, functions, this->line, this->col, this->file);
+	return std::make_shared<Ast::Block>(statements, functions, use_statements, this->line, this->col, this->file);
 }
 
 // Function
@@ -321,6 +335,15 @@ std::shared_ptr<Ast::Node> Ast::WhileStmt::clone() {
 	return std::make_shared<Ast::WhileStmt>(std::dynamic_pointer_cast<Ast::Expression>(this->condition->clone()), std::dynamic_pointer_cast<Ast::Block>(this->block->clone()), this->line, this->col, this->file);
 }
 
+// UseStmt
+void Ast::Use::print(size_t indent_level, std::vector<bool> last, bool concrete)  {
+	put_indent_level(indent_level, last);
+	std::cout << "use \"" << this->path->value << "\"\n";
+}
+
+std::shared_ptr<Ast::Node> Ast::Use::clone() {
+	return std::make_shared<Ast::Use>(std::dynamic_pointer_cast<Ast::String>(this->path->clone()), this->line, this->col, this->file);
+}
 
 // IfElseExpr
 void Ast::IfElseExpr::print(size_t indent_level, std::vector<bool> last, bool concrete)  {
@@ -425,6 +448,20 @@ std::shared_ptr<Ast::Node> Ast::Boolean::clone() {
 	auto boolean = std::make_shared<Ast::Boolean>(this->value, this->line, this->col, this->file);
 	boolean->type = this->type;
 	return boolean;
+}
+
+// String
+void Ast::String::print(size_t indent_level, std::vector<bool> last, bool concrete)  {
+	put_indent_level(indent_level, last);
+	std::cout << "\"" << this->value << "\"";
+	if (this->type != Type("")) std::cout << ": " << this->type.to_str();
+	std::cout << "\n";
+}
+
+std::shared_ptr<Ast::Node> Ast::String::clone() {
+	auto str = std::make_shared<Ast::String>(this->value, this->line, this->col, this->file);
+	str->type = this->type;
+	return str;
 }
 
 // Utilities
