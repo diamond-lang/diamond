@@ -1,5 +1,5 @@
 #ifndef INTRINSICS_HPP
-#define INTRINSICS_CPP
+#define INTRINSICS_HPP
 
 #include "types.hpp"
 #include <unordered_map>

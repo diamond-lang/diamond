@@ -1,6 +1,7 @@
 #include<set>
 #include <unordered_map>
-#include <bits/stdc++.h>
+#include <algorithm>
+#include <iterator>
 
 #include "type_inference.hpp"
 #include "intrinsics.hpp"
@@ -72,7 +73,7 @@ std::vector<std::set<std::string>> merge_sets_with_shared_elements(std::vector<s
         
         for (size_t j = i + 1; j < sets.size(); j++) {
             std::set<std::string> intersect;
-            set_intersection(sets[i].begin(), sets[i].end(), sets[j].begin(), sets[j].end(), std::inserter(intersect, intersect.begin()));
+            std::set_intersection(sets[i].begin(), sets[i].end(), sets[j].begin(), sets[j].end(), std::inserter(intersect, intersect.begin()));
             
             if (intersect.size() != 0) {
                 // Merge sets

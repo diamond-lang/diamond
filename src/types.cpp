@@ -232,6 +232,7 @@ void Ast::FunctionSpecialization::print(size_t indent_level, std::vector<bool> l
 
 std::shared_ptr<Ast::Node> Ast::FunctionSpecialization::clone() {
 	assert(false);
+	return nullptr;
 }
 
 // Assignment

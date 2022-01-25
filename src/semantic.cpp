@@ -582,7 +582,7 @@ std::shared_ptr<Ast::FunctionSpecialization> Context::create_and_analyze_special
 			// Else compare wih previous type founded for her
 			else {
 				if (context.type_bindings[type_variable] != call->args[i]->type) {
-					specialization->args[i]->type == call->args[i]->type;
+					specialization->args[i]->type = call->args[i]->type;
 					specialization->valid = false;
 					return specialization;
 				}
