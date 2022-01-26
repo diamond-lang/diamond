@@ -198,7 +198,7 @@ Type find_concrete_type_for_type_variable(std::shared_ptr<Ast::FunctionSpecializ
 Result<Ok, Errors> semantic::analyze(std::shared_ptr<Ast::Program> program) {
 	Context context;
 	context.add_scope();
-	auto block = std::make_shared<Ast::Block>(program->statements, program->functions, program->line, program->col, program->file);
+	auto block = std::make_shared<Ast::Block>(program->statements, program->functions, program->use_statements, program->line, program->col, program->file);
 	return context.analyze(block);
 }
 
@@ -622,7 +622,7 @@ std::shared_ptr<Ast::FunctionSpecialization> Context::create_and_analyze_special
 			function->specializations.push_back(specialization);
 			
 			if (specialization->return_type == Type("void")) {
-				specialization->body = std::make_shared<Ast::Block>(std::vector<std::shared_ptr<Ast::Node>>{specialization->body}, std::vector<std::shared_ptr<Ast::Function>>{}, specialization->body->line, specialization->body->col, specialization->body->file);
+				specialization->body = std::make_shared<Ast::Block>(std::vector<std::shared_ptr<Ast::Node>>{specialization->body}, std::vector<std::shared_ptr<Ast::Function>>{}, std::vector<std::shared_ptr<Ast::Use>>{}, specialization->body->line, specialization->body->col, specialization->body->file);
 			}
 		}
 	}

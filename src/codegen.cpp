@@ -300,7 +300,7 @@ void Codegen::codegen(std::shared_ptr<Ast::Program> node) {
 	this->add_scope();
 
 	// Codegen statements
-	this->codegen(std::make_shared<Ast::Block>(node->statements, node->functions, node->line, node->col, node->file));
+	this->codegen(std::make_shared<Ast::Block>(node->statements, node->functions, node->use_statements, node->line, node->col, node->file));
 
 	// Create return statement
 	this->builder->CreateRet(llvm::ConstantInt::get(*(this->context), llvm::APInt(32, 0)));
