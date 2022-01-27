@@ -1,11 +1,15 @@
 #include <iostream>
 #include <unordered_map>
 #include <assert.h>
+#include <filesystem>
+#include <set>
 
 #include "errors.hpp"
 #include "semantic.hpp"
 #include "intrinsics.hpp"
 #include "type_inference.hpp"
+#include "utilities.hpp"
+#include "parser.hpp"
 
 enum BindingType {
 	AssignmentBinding,
@@ -49,6 +53,7 @@ struct Context {
 	std::unordered_map<std::string, Type> type_bindings;
 	std::vector<FunctionCall> call_stack;
 	bool inside_while = false;
+	std::unordered_map<std::string, std::shared_ptr<Ast::Program>> modules;
 
 	Result<Ok, Errors> analyze(std::shared_ptr<Ast::Block> block);
 	Result<Ok, Errors> analyze(std::shared_ptr<Ast::Assignment> assignment);
@@ -73,6 +78,7 @@ struct Context {
 	Binding* get_binding(std::string identifier);
 	std::vector<std::unordered_map<std::string, Binding>> get_definitions();
 	int is_recursive_call(std::shared_ptr<Ast::Call> call);
+	void add_functions_to_current_scope(std::shared_ptr<Ast::Block> block);
 };
 
 Binding* Context::get_binding(std::string identifier) {
@@ -193,22 +199,8 @@ Type find_concrete_type_for_type_variable(std::shared_ptr<Ast::FunctionSpecializ
 	return Type("");
 }
 
-// Semantic Analysis
-// -----------------
-Result<Ok, Errors> semantic::analyze(std::shared_ptr<Ast::Program> program) {
-	Context context;
-	context.add_scope();
-	auto block = std::make_shared<Ast::Block>(program->statements, program->functions, program->use_statements, program->line, program->col, program->file);
-	return context.analyze(block);
-}
-
-Result<Ok, Errors> Context::analyze(std::shared_ptr<Ast::Block> block) {
-	this->add_scope();
-
-	block->type = Type("");;
-	Errors errors;
-
-	// Add functions to the current scope
+void Context::add_functions_to_current_scope(std::shared_ptr<Ast::Block> block) {
+	// Add functions from current block to current context
 	for (size_t i = 0; i < block->functions.size(); i++) {
 		auto function = block->functions[i];
 
@@ -222,6 +214,77 @@ Result<Ok, Errors> Context::analyze(std::shared_ptr<Ast::Block> block) {
 		}
 	}
 
+	auto current_directory = std::filesystem::canonical(std::filesystem::current_path() / block->file).parent_path();
+
+	// Parse used modules yet not parsed
+	for (size_t i = 0; i < block->use_statements.size(); i++) {
+	 	auto module_path = current_directory / (block->use_statements[i]->path->value + ".dmd");
+		assert(std::filesystem::exists(module_path));
+		module_path = std::filesystem::canonical(module_path);
+
+		if (this->modules.find(module_path) == this->modules.end()) {
+			// Read file
+			Result<std::string, Error> result = utilities::read_file(module_path);
+			if (result.is_error()) {
+				std::cout << result.get_error().message;
+				exit(EXIT_FAILURE);
+			}
+			std::string file = result.get_value();
+
+			// Parse
+			auto parsing_result = parse::program(Source(module_path, file.begin(), file.end()));
+			if (parsing_result.is_error()) {
+				std::vector<Error> errors = parsing_result.get_errors();
+				for (size_t i = 0; i < errors.size(); i++) {
+					std::cout << errors[i].message << '\n';
+				}
+				exit(EXIT_FAILURE);
+			}
+			this->modules[module_path] = parsing_result.get_value();
+		}
+	}
+
+	// Add modules bindings to current context
+	for (auto it = this->modules.begin(); it != this->modules.end(); it++) {
+		for (size_t i = 0; i < it->second->functions.size(); i++) {
+			auto function = it->second->functions[i];
+
+			auto& scope = this->current_scope();
+			if (scope.find(function->identifier->value) == scope.end()) {
+				auto binding = Binding(function->identifier->value, {function});
+				scope[function->identifier->value] = binding;
+			}
+			else {
+				scope[function->identifier->value].methods.push_back(function);
+			}
+		}
+	}
+}
+
+// Semantic Analysis
+// -----------------
+Result<Ok, Errors> semantic::analyze(std::shared_ptr<Ast::Program> program) {
+	Context context;
+	context.add_scope();
+	context.modules[std::filesystem::canonical(std::filesystem::current_path() / program->file).parent_path()] = program;
+
+	auto block = std::make_shared<Ast::Block>(program->statements, program->functions, program->use_statements, program->line, program->col, program->file);
+	auto result = context.analyze(block);
+
+	program->modules = context.modules;
+	return context.analyze(block);
+}
+
+Result<Ok, Errors> Context::analyze(std::shared_ptr<Ast::Block> block) {
+	this->add_scope();
+
+	block->type = Type("");;
+	Errors errors;
+
+	// Add functions to the current scope
+	add_functions_to_current_scope(block);
+
+	// Analyze statements
 	for (size_t i = 0; i  < block->statements.size(); i++) {
 		std::shared_ptr<Ast::Node> stmt = block->statements[i];
 		Result<Ok, Errors> result;
@@ -562,10 +625,19 @@ std::shared_ptr<Ast::FunctionSpecialization> Context::create_and_analyze_special
 
 	// Create new context
 	Context context;
-	context.file = this->file;
-	context.scopes = this->get_definitions();
 	context.add_scope();
 	context.call_stack = this->call_stack;
+
+	if (this->file == function->file) {
+		context.file = this->file;
+		context.scopes = this->get_definitions();
+	}
+	else {
+		context.file = function->file;
+		auto program = this->modules[function->file];
+		auto block = std::make_shared<Ast::Block>(program->statements, program->functions, program->use_statements, program->line, program->col, program->file);
+		context.add_functions_to_current_scope(block);
+	}
 
 	// Add type bindings
 	for (size_t i = 0; i < specialization->args.size(); i++) {

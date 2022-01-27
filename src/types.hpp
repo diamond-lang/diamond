@@ -7,6 +7,7 @@
 #include <variant>
 #include <cassert>
 #include <cstdint>
+#include <unordered_map>
 
 // Source file
 struct Source {
@@ -121,11 +122,13 @@ namespace Ast {
 	struct Identifier;
 	struct Function;
 	struct Use;
+	struct Program;
 
 	struct Program : Node {
 		std::vector<std::shared_ptr<Ast::Node>> statements;
 		std::vector<std::shared_ptr<Ast::Function>> functions;
 		std::vector<std::shared_ptr<Ast::Use>> use_statements;
+		std::unordered_map<std::string, std::shared_ptr<Ast::Program>> modules;
 
 		Program(std::vector<std::shared_ptr<Ast::Node>> statements, std::vector<std::shared_ptr<Ast::Function>> functions, std::vector<std::shared_ptr<Ast::Use>> use_statements, size_t line, size_t col, std::string file) : Node(line, col, file), statements(statements), functions(functions), use_statements(use_statements) {}
 		virtual ~Program() {}
