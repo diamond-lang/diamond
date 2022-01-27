@@ -62,7 +62,8 @@ struct Codegen {
 
 	void codegen(std::shared_ptr<Ast::Program> node);
 	void codegen(std::shared_ptr<Ast::Block> node);
-	void codegen(std::vector<std::shared_ptr<Ast::Function>> functions);
+	void codegen_function_prototypes(std::vector<std::shared_ptr<Ast::Function>> functions);
+	void codegen_function_bodies(std::vector<std::shared_ptr<Ast::Function>> functions);
 	void codegen(std::shared_ptr<Ast::Assignment> node);
 	void codegen(std::shared_ptr<Ast::Return> node);
 	void codegen(std::shared_ptr<Ast::Break> node);
@@ -285,8 +286,13 @@ void Codegen::codegen(std::shared_ptr<Ast::Program> node) {
 	llvm::Function::Create(printfType, llvm::Function::ExternalLinkage, "printf", this->module);
 
 	// Codegen functions
-	this->codegen(node->functions);
-
+	for (auto it = node->modules.begin(); it != node->modules.end(); it++) {
+		this->codegen_function_prototypes(it->second->functions);
+	}
+	for (auto it = node->modules.begin(); it != node->modules.end(); it++) {
+		this->codegen_function_bodies(it->second->functions);
+	}
+ 
 	// Crate main function
 	llvm::FunctionType* mainType = llvm::FunctionType::get(this->builder->getInt32Ty(), false);
 	llvm::Function* main = llvm::Function::Create(mainType, llvm::Function::ExternalLinkage, "main", this->module);
@@ -339,8 +345,7 @@ void Codegen::codegen(std::shared_ptr<Ast::Block> node) {
 	this->remove_scope();
 }
 
-void Codegen::codegen(std::vector<std::shared_ptr<Ast::Function>> functions) {
-	// Generate function prototypes
+void Codegen::codegen_function_prototypes(std::vector<std::shared_ptr<Ast::Function>> functions) {
 	for (auto it = functions.begin(); it != functions.end(); it++) {
 		auto& node = *it;
 
@@ -365,8 +370,9 @@ void Codegen::codegen(std::vector<std::shared_ptr<Ast::Function>> functions) {
 			}
 		}
 	}
+}
 
-	// Generate function implementations
+void Codegen::codegen_function_bodies(std::vector<std::shared_ptr<Ast::Function>> functions) {
 	for (auto it = functions.begin(); it != functions.end(); it++) {
 		auto& node = *it;
 

@@ -1,0 +1,5 @@
+use "is_even"
+
+function is_odd(n)
+    if n == 0 return false
+    else      return is_even(n - 1)

@@ -265,6 +265,7 @@ void Context::add_functions_to_current_scope(std::shared_ptr<Ast::Block> block) 
 // -----------------
 Result<Ok, Errors> semantic::analyze(std::shared_ptr<Ast::Program> program) {
 	Context context;
+	context.file = program->file;
 	context.add_scope();
 	context.modules[std::filesystem::canonical(std::filesystem::current_path() / program->file).parent_path()] = program;
 
