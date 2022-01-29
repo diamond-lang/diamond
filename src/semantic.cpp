@@ -243,12 +243,10 @@ void Context::add_functions_to_current_scope(std::shared_ptr<Ast::Block> block) 
 			}
 			this->modules[module_path] = parsing_result.get_value();
 		}
-	}
 
-	// Add modules bindings to current context
-	for (auto it = this->modules.begin(); it != this->modules.end(); it++) {
-		for (size_t i = 0; i < it->second->functions.size(); i++) {
-			auto function = it->second->functions[i];
+		// Add modules bindings to current context
+		for (size_t i = 0; i < this->modules[module_path]->functions.size(); i++) {
+			auto function = this->modules[module_path]->functions[i];
 
 			auto& scope = this->current_scope();
 			if (scope.find(function->identifier->value) == scope.end()) {
