@@ -156,6 +156,7 @@ ParserResult<std::shared_ptr<Ast::Node>> parse::statement(Source source) {
 	if (parse::identifier(source, "break").is_ok())    return parse::break_stmt(source);
 	if (parse::identifier(source, "continue").is_ok()) return parse::continue_stmt(source);
 	if (parse::identifier(source, "use").is_ok())      return parse::use_stmt(source);
+	if (parse::identifier(source, "include").is_ok())  return parse::include_stmt(source);
 	if (is_assignment(source)) return parse::assignment(source);
 	if (parse::call(source).is_ok()) {
 		auto result = parse::call(source);
@@ -347,6 +348,21 @@ ParserResult<std::shared_ptr<Ast::Node>> parse::use_stmt(Source source) {
 
 	// Return
 	auto node = std::make_shared<Ast::Use>(std::dynamic_pointer_cast<Ast::String>(path.get_value()), source.line, source.col, source.file);
+	return ParserResult<std::shared_ptr<Ast::Node>>(node, source);
+}
+
+ParserResult<std::shared_ptr<Ast::Node>> parse::include_stmt(Source source) {
+	auto keyword = parse::identifier(source, "include");
+	if (keyword.is_error()) return ParserResult<std::shared_ptr<Ast::Node>>(keyword.get_errors());
+	source = keyword.get_source();
+
+	auto path = parse::string(source);
+	if (path.is_error()) return path.get_errors();
+	source = path.get_source();
+
+	// Return
+	auto node = std::make_shared<Ast::Use>(std::dynamic_pointer_cast<Ast::String>(path.get_value()), source.line, source.col, source.file);
+	node->include = true;
 	return ParserResult<std::shared_ptr<Ast::Node>>(node, source);
 }
 

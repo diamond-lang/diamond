@@ -338,7 +338,12 @@ std::shared_ptr<Ast::Node> Ast::WhileStmt::clone() {
 // UseStmt
 void Ast::Use::print(size_t indent_level, std::vector<bool> last, bool concrete)  {
 	put_indent_level(indent_level, last);
-	std::cout << "use \"" << this->path->value << "\"\n";
+	if (this->include) {
+		std::cout << "include \"" << this->path->value << "\"\n";
+	}
+	else {
+		std::cout << "use \"" << this->path->value << "\"\n";
+	}
 }
 
 std::shared_ptr<Ast::Node> Ast::Use::clone() {

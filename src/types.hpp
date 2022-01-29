@@ -243,6 +243,7 @@ namespace Ast {
 
 	struct Use : Node {
 		std::shared_ptr<Ast::String> path;
+		bool include = false;
 
 		Use(std::shared_ptr<Ast::String> path, size_t line, size_t col, std::string file) : Node(line, col, file), path(path) {}
 		virtual ~Use() {}
