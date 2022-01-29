@@ -135,20 +135,20 @@ void print_llvm_ir(std::shared_ptr<Ast::Program> program, std::string program_na
 	llvm_ir.module->print(llvm::errs(), nullptr);
 }
 
-std::string get_function_name(std::shared_ptr<Ast::FunctionSpecialization> function) {
-	std::string name = function->identifier->value;
-	for (size_t i = 0; i < function->args.size(); i++) {
-		name += "_" + function->args[i]->type.to_str();
+std::string get_function_name(std::string identifier, std::vector<Type> args) {
+	std::string name = identifier;
+	for (size_t i = 0; i < args.size(); i++) {
+		name += "_" + args[i].to_str();
 	}
 	return name;
 }
 
+std::string get_function_name(std::shared_ptr<Ast::FunctionSpecialization> function) {
+	return get_function_name(function->identifier->value, get_args_types(function->args));
+}
+
 std::string get_function_name(std::shared_ptr<Ast::Call> function) {
-	std::string name = function->identifier->value;
-	for (size_t i = 0; i < function->args.size(); i++) {
-		name += "_" + function->args[i]->type.to_str();
-	}
-	return name;
+	return get_function_name(function->identifier->value, get_args_types(function->args));
 }
 
 llvm::AllocaInst* Codegen::create_allocation(std::string name, llvm::Type* type) {
