@@ -272,6 +272,7 @@ namespace Ast {
 	struct Call : Expression {
 		std::shared_ptr<Ast::Identifier> identifier;
 		std::vector<std::shared_ptr<Ast::Expression>> args;
+		std::shared_ptr<Ast::Node> function = nullptr;  
 
 		Call(std::shared_ptr<Ast::Identifier> identifier, std::vector<std::shared_ptr<Ast::Expression>> args, size_t line, size_t col, std::string file) : Expression(line, col, file), identifier(identifier), args(args) {}
 		virtual ~Call() {}

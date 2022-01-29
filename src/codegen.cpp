@@ -135,20 +135,16 @@ void print_llvm_ir(std::shared_ptr<Ast::Program> program, std::string program_na
 	llvm_ir.module->print(llvm::errs(), nullptr);
 }
 
-std::string get_function_name(std::string identifier, std::vector<Type> args) {
-	std::string name = identifier;
+std::string get_function_name(std::string file, std::string identifier, std::vector<Type> args, Type return_type) {
+	std::string name = file + "::" + identifier;
 	for (size_t i = 0; i < args.size(); i++) {
 		name += "_" + args[i].to_str();
 	}
-	return name;
+	return name + "_" + return_type.to_str();
 }
 
 std::string get_function_name(std::shared_ptr<Ast::FunctionSpecialization> function) {
-	return get_function_name(function->identifier->value, get_args_types(function->args));
-}
-
-std::string get_function_name(std::shared_ptr<Ast::Call> function) {
-	return get_function_name(function->identifier->value, get_args_types(function->args));
+	return get_function_name(function->file, function->identifier->value, get_args_types(function->args), function->return_type);
 }
 
 llvm::AllocaInst* Codegen::create_allocation(std::string name, llvm::Type* type) {
@@ -711,7 +707,9 @@ llvm::Value* Codegen::codegen(std::shared_ptr<Ast::Call> node) {
 	}
 
 	// Get function
-	std::string name = get_function_name(node);
+	auto specialization = std::dynamic_pointer_cast<Ast::FunctionSpecialization>(node->function);
+	assert(specialization);
+	std::string name = get_function_name(specialization);
 	llvm::Function* function = this->module->getFunction(name);
 	assert(function);
 

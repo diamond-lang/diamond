@@ -45,6 +45,7 @@ struct FunctionCall {
 	std::string identifier;
 	std::vector<Type> args;
 	Type return_type = Type("");
+	std::shared_ptr<Ast::Node> function;
 };
 
 struct Context {
@@ -464,6 +465,7 @@ Result<Ok, Errors> Context::analyze(std::shared_ptr<Ast::Call> node) {
 	int recursive = this->is_recursive_call(node);
 	if (recursive != -1) {
 		node->type = this->call_stack[recursive].return_type;
+		node->function = this->call_stack[recursive].function;
 		return Result<Ok, Errors>(Ok());
 	}
 
@@ -602,6 +604,7 @@ Result<Ok, Errors> Context::get_type_of_user_defined_function(std::shared_ptr<As
 		// If specialization valid
 		if (specialization->valid) {
 			node->type = specialization->return_type;
+			node->function = specialization;
 			return Result<Ok, Errors>(Ok());
 		}
 	}
@@ -678,7 +681,7 @@ std::shared_ptr<Ast::FunctionSpecialization> Context::create_and_analyze_special
 		}
 	}
 	
-	context.call_stack.push_back(FunctionCall{specialization->identifier->value, get_args_types(specialization->args), specialization->return_type});
+	context.call_stack.push_back(FunctionCall{specialization->identifier->value, get_args_types(specialization->args), specialization->return_type, specialization});
 
 	// Add arguments to new scope
 	for (size_t i = 0; i != function->args.size(); i++) {
