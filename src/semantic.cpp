@@ -80,6 +80,7 @@ struct Context {
 	std::vector<std::unordered_map<std::string, Binding>> get_definitions();
 	int is_recursive_call(std::shared_ptr<Ast::Call> call);
 	void add_functions_to_current_scope(std::shared_ptr<Ast::Block> block);
+	void add_module_functions(std::filesystem::path module_path, std::set<std::filesystem::path> already_included_modules = {});
 };
 
 Binding* Context::get_binding(std::string identifier) {
@@ -222,28 +223,33 @@ void Context::add_functions_to_current_scope(std::shared_ptr<Ast::Block> block) 
 	 	auto module_path = current_directory / (block->use_statements[i]->path->value + ".dmd");
 		assert(std::filesystem::exists(module_path));
 		module_path = std::filesystem::canonical(module_path);
+		this->add_module_functions(module_path);
+	}
+}
 
-		if (this->modules.find(module_path) == this->modules.end()) {
-			// Read file
-			Result<std::string, Error> result = utilities::read_file(module_path);
-			if (result.is_error()) {
-				std::cout << result.get_error().message;
-				exit(EXIT_FAILURE);
-			}
-			std::string file = result.get_value();
-
-			// Parse
-			auto parsing_result = parse::program(Source(module_path, file.begin(), file.end()));
-			if (parsing_result.is_error()) {
-				std::vector<Error> errors = parsing_result.get_errors();
-				for (size_t i = 0; i < errors.size(); i++) {
-					std::cout << errors[i].message << '\n';
-				}
-				exit(EXIT_FAILURE);
-			}
-			this->modules[module_path] = parsing_result.get_value();
+void Context::add_module_functions(std::filesystem::path module_path, std::set<std::filesystem::path> already_included_modules) {
+	if (this->modules.find(module_path) == this->modules.end()) {
+		// Read file
+		Result<std::string, Error> result = utilities::read_file(module_path);
+		if (result.is_error()) {
+			std::cout << result.get_error().message;
+			exit(EXIT_FAILURE);
 		}
+		std::string file = result.get_value();
 
+		// Parse
+		auto parsing_result = parse::program(Source(module_path, file.begin(), file.end()));
+		if (parsing_result.is_error()) {
+			std::vector<Error> errors = parsing_result.get_errors();
+			for (size_t i = 0; i < errors.size(); i++) {
+				std::cout << errors[i].message << '\n';
+			}
+			exit(EXIT_FAILURE);
+		}
+		this->modules[module_path] = parsing_result.get_value();
+	}
+
+	if (already_included_modules.find(module_path) == already_included_modules.end()) {
 		// Add modules bindings to current context
 		for (size_t i = 0; i < this->modules[module_path]->functions.size(); i++) {
 			auto function = this->modules[module_path]->functions[i];
@@ -255,6 +261,16 @@ void Context::add_functions_to_current_scope(std::shared_ptr<Ast::Block> block) 
 			}
 			else {
 				scope[function->identifier->value].methods.push_back(function);
+			}
+		}
+
+		already_included_modules.insert(module_path);
+
+		// Add includes
+		for (size_t i = 0; i < this->modules[module_path]->use_statements.size(); i++) {
+			auto use_stmt = this->modules[module_path]->use_statements[i];
+			if (use_stmt->include) {
+				this->add_module_functions(module_path.parent_path() / (this->modules[module_path]->use_statements[i]->path->value + ".dmd"), already_included_modules);
 			}
 		}
 	}
@@ -636,9 +652,11 @@ std::shared_ptr<Ast::FunctionSpecialization> Context::create_and_analyze_special
 	}
 	else {
 		context.file = function->file;
+		context.modules = this->modules;
 		auto program = this->modules[function->file];
 		auto block = std::make_shared<Ast::Block>(program->statements, program->functions, program->use_statements, program->line, program->col, program->file);
 		context.add_functions_to_current_scope(block);
+		this->modules = context.modules;
 	}
 
 	// Add type bindings
