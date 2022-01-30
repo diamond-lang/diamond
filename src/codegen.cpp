@@ -62,7 +62,8 @@ struct Codegen {
 
 	void codegen(std::shared_ptr<Ast::Program> node);
 	void codegen(std::shared_ptr<Ast::Block> node);
-	void codegen(std::vector<std::shared_ptr<Ast::Function>> functions);
+	void codegen_function_prototypes(std::vector<std::shared_ptr<Ast::Function>> functions);
+	void codegen_function_bodies(std::vector<std::shared_ptr<Ast::Function>> functions);
 	void codegen(std::shared_ptr<Ast::Assignment> node);
 	void codegen(std::shared_ptr<Ast::Return> node);
 	void codegen(std::shared_ptr<Ast::Break> node);
@@ -134,20 +135,16 @@ void print_llvm_ir(std::shared_ptr<Ast::Program> program, std::string program_na
 	llvm_ir.module->print(llvm::errs(), nullptr);
 }
 
-std::string get_function_name(std::shared_ptr<Ast::FunctionSpecialization> function) {
-	std::string name = function->identifier->value;
-	for (size_t i = 0; i < function->args.size(); i++) {
-		name += "_" + function->args[i]->type.to_str();
+std::string get_function_name(std::string file, std::string identifier, std::vector<Type> args, Type return_type) {
+	std::string name = file + "::" + identifier;
+	for (size_t i = 0; i < args.size(); i++) {
+		name += "_" + args[i].to_str();
 	}
-	return name;
+	return name + "_" + return_type.to_str();
 }
 
-std::string get_function_name(std::shared_ptr<Ast::Call> function) {
-	std::string name = function->identifier->value;
-	for (size_t i = 0; i < function->args.size(); i++) {
-		name += "_" + function->args[i]->type.to_str();
-	}
-	return name;
+std::string get_function_name(std::shared_ptr<Ast::FunctionSpecialization> function) {
+	return get_function_name(function->file, function->identifier->value, get_args_types(function->args), function->return_type);
 }
 
 llvm::AllocaInst* Codegen::create_allocation(std::string name, llvm::Type* type) {
@@ -285,8 +282,13 @@ void Codegen::codegen(std::shared_ptr<Ast::Program> node) {
 	llvm::Function::Create(printfType, llvm::Function::ExternalLinkage, "printf", this->module);
 
 	// Codegen functions
-	this->codegen(node->functions);
-
+	for (auto it = node->modules.begin(); it != node->modules.end(); it++) {
+		this->codegen_function_prototypes(it->second->functions);
+	}
+	for (auto it = node->modules.begin(); it != node->modules.end(); it++) {
+		this->codegen_function_bodies(it->second->functions);
+	}
+ 
 	// Crate main function
 	llvm::FunctionType* mainType = llvm::FunctionType::get(this->builder->getInt32Ty(), false);
 	llvm::Function* main = llvm::Function::Create(mainType, llvm::Function::ExternalLinkage, "main", this->module);
@@ -300,7 +302,7 @@ void Codegen::codegen(std::shared_ptr<Ast::Program> node) {
 	this->add_scope();
 
 	// Codegen statements
-	this->codegen(std::make_shared<Ast::Block>(node->statements, node->functions, node->line, node->col, node->file));
+	this->codegen(std::make_shared<Ast::Block>(node->statements, node->functions, node->use_statements, node->line, node->col, node->file));
 
 	// Create return statement
 	this->builder->CreateRet(llvm::ConstantInt::get(*(this->context), llvm::APInt(32, 0)));
@@ -339,8 +341,7 @@ void Codegen::codegen(std::shared_ptr<Ast::Block> node) {
 	this->remove_scope();
 }
 
-void Codegen::codegen(std::vector<std::shared_ptr<Ast::Function>> functions) {
-	// Generate function prototypes
+void Codegen::codegen_function_prototypes(std::vector<std::shared_ptr<Ast::Function>> functions) {
 	for (auto it = functions.begin(); it != functions.end(); it++) {
 		auto& node = *it;
 
@@ -365,8 +366,9 @@ void Codegen::codegen(std::vector<std::shared_ptr<Ast::Function>> functions) {
 			}
 		}
 	}
+}
 
-	// Generate function implementations
+void Codegen::codegen_function_bodies(std::vector<std::shared_ptr<Ast::Function>> functions) {
 	for (auto it = functions.begin(); it != functions.end(); it++) {
 		auto& node = *it;
 
@@ -705,7 +707,9 @@ llvm::Value* Codegen::codegen(std::shared_ptr<Ast::Call> node) {
 	}
 
 	// Get function
-	std::string name = get_function_name(node);
+	auto specialization = std::dynamic_pointer_cast<Ast::FunctionSpecialization>(node->function);
+	assert(specialization);
+	std::string name = get_function_name(specialization);
 	llvm::Function* function = this->module->getFunction(name);
 	assert(function);
 

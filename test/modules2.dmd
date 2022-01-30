@@ -1,0 +1,12 @@
+use "modules/subtract"
+
+function add(a, b)
+    a + b
+
+print(add(5, 5))
+print(subtract(10, 5))
+
+--- Output
+10
+5
+---

@@ -7,6 +7,7 @@
 #include <variant>
 #include <cassert>
 #include <cstdint>
+#include <unordered_map>
 
 // Source file
 struct Source {
@@ -120,12 +121,16 @@ namespace Ast {
 
 	struct Identifier;
 	struct Function;
+	struct Use;
+	struct Program;
 
 	struct Program : Node {
 		std::vector<std::shared_ptr<Ast::Node>> statements;
 		std::vector<std::shared_ptr<Ast::Function>> functions;
+		std::vector<std::shared_ptr<Ast::Use>> use_statements;
+		std::unordered_map<std::string, std::shared_ptr<Ast::Program>> modules;
 
-		Program(std::vector<std::shared_ptr<Ast::Node>> statements, std::vector<std::shared_ptr<Ast::Function>> functions, size_t line, size_t col, std::string file) : Node(line, col, file), statements(statements), functions(functions) {}
+		Program(std::vector<std::shared_ptr<Ast::Node>> statements, std::vector<std::shared_ptr<Ast::Function>> functions, std::vector<std::shared_ptr<Ast::Use>> use_statements, size_t line, size_t col, std::string file) : Node(line, col, file), statements(statements), functions(functions), use_statements(use_statements) {}
 		virtual ~Program() {}
 		virtual void print(size_t indent_level = 0, std::vector<bool> last = {}, bool concrete = false);
 		virtual std::shared_ptr<Node> clone();
@@ -135,9 +140,10 @@ namespace Ast {
 	struct Block : Node {
 		std::vector<std::shared_ptr<Ast::Node>> statements;
 		std::vector<std::shared_ptr<Ast::Function>> functions;
+		std::vector<std::shared_ptr<Ast::Use>> use_statements;
 		Type type = Type("");
 
-		Block(std::vector<std::shared_ptr<Ast::Node>> statements, std::vector<std::shared_ptr<Ast::Function>> functions, size_t line, size_t col, std::string file) : Node(line, col, file), statements(statements), functions(functions) {}
+		Block(std::vector<std::shared_ptr<Ast::Node>> statements, std::vector<std::shared_ptr<Ast::Function>> functions, std::vector<std::shared_ptr<Ast::Use>> use_statements, size_t line, size_t col, std::string file) : Node(line, col, file), statements(statements), functions(functions), use_statements(use_statements) {}
 		virtual ~Block() {}
 		virtual void print(size_t indent_level = 0, std::vector<bool> last = {}, bool concrete = false);
 		virtual std::shared_ptr<Node> clone();
@@ -233,6 +239,18 @@ namespace Ast {
 		virtual std::shared_ptr<Node> clone();
 	};
 
+	struct String;
+
+	struct Use : Node {
+		std::shared_ptr<Ast::String> path;
+		bool include = false;
+
+		Use(std::shared_ptr<Ast::String> path, size_t line, size_t col, std::string file) : Node(line, col, file), path(path) {}
+		virtual ~Use() {}
+		virtual void print(size_t indent_level = 0, std::vector<bool> last = {}, bool concrete = false);
+		virtual std::shared_ptr<Node> clone();
+	};
+
 	struct Expression : Node {
 		Type type = Type();
 
@@ -255,6 +273,7 @@ namespace Ast {
 	struct Call : Expression {
 		std::shared_ptr<Ast::Identifier> identifier;
 		std::vector<std::shared_ptr<Ast::Expression>> args;
+		std::shared_ptr<Ast::Node> function = nullptr;  
 
 		Call(std::shared_ptr<Ast::Identifier> identifier, std::vector<std::shared_ptr<Ast::Expression>> args, size_t line, size_t col, std::string file) : Expression(line, col, file), identifier(identifier), args(args) {}
 		virtual ~Call() {}
@@ -294,6 +313,15 @@ namespace Ast {
 
 		Boolean(bool value, size_t line, size_t col, std::string file) : Expression(line, col, file), value(value) {}
 		virtual ~Boolean() {}
+		virtual void print(size_t indent_level = 0, std::vector<bool> last = {}, bool concrete = false);
+		virtual std::shared_ptr<Node> clone();
+	};
+
+	struct String : Expression {
+		std::string value;
+
+		String(std::string value, size_t line, size_t col, std::string file) : Expression(line, col, file), value(value) {}
+		virtual ~String() {}
 		virtual void print(size_t indent_level = 0, std::vector<bool> last = {}, bool concrete = false);
 		virtual std::shared_ptr<Node> clone();
 	};

@@ -44,8 +44,11 @@ def get_all_files(folder):
 def main():
 	for file in get_all_files('test'):
 		content = open(file).read()
-		expected = re.search("(?<=--- Output\n)(.|\n)*(?=---)", content).group(0)
-		test(file, expected)
+		try:
+			expected = re.search("(?<=--- Output\n)(.|\n)*(?=---)", content).group(0)
+			test(file, expected)
+		except:
+			pass
 
 if __name__ == "__main__":
 	main()
