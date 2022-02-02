@@ -228,9 +228,9 @@ void Context::add_functions_to_current_scope(std::shared_ptr<Ast::Block> block) 
 }
 
 void Context::add_module_functions(std::filesystem::path module_path, std::set<std::filesystem::path> already_included_modules) {
-	if (this->modules.find(module_path) == this->modules.end()) {
+	if (this->modules.find(module_path.string()) == this->modules.end()) {
 		// Read file
-		Result<std::string, Error> result = utilities::read_file(module_path);
+		Result<std::string, Error> result = utilities::read_file(module_path.string());
 		if (result.is_error()) {
 			std::cout << result.get_error().message;
 			exit(EXIT_FAILURE);
@@ -238,7 +238,7 @@ void Context::add_module_functions(std::filesystem::path module_path, std::set<s
 		std::string file = result.get_value();
 
 		// Parse
-		auto parsing_result = parse::program(Source(module_path, file.begin(), file.end()));
+		auto parsing_result = parse::program(Source(module_path.string(), file.begin(), file.end()));
 		if (parsing_result.is_error()) {
 			std::vector<Error> errors = parsing_result.get_errors();
 			for (size_t i = 0; i < errors.size(); i++) {
@@ -246,13 +246,13 @@ void Context::add_module_functions(std::filesystem::path module_path, std::set<s
 			}
 			exit(EXIT_FAILURE);
 		}
-		this->modules[module_path] = parsing_result.get_value();
+		this->modules[module_path.string()] = parsing_result.get_value();
 	}
 
 	if (already_included_modules.find(module_path) == already_included_modules.end()) {
 		// Add modules bindings to current context
-		for (size_t i = 0; i < this->modules[module_path]->functions.size(); i++) {
-			auto function = this->modules[module_path]->functions[i];
+		for (size_t i = 0; i < this->modules[module_path.string()]->functions.size(); i++) {
+			auto function = this->modules[module_path.string()]->functions[i];
 
 			auto& scope = this->current_scope();
 			if (scope.find(function->identifier->value) == scope.end()) {
@@ -267,10 +267,10 @@ void Context::add_module_functions(std::filesystem::path module_path, std::set<s
 		already_included_modules.insert(module_path);
 
 		// Add includes
-		for (size_t i = 0; i < this->modules[module_path]->use_statements.size(); i++) {
-			auto use_stmt = this->modules[module_path]->use_statements[i];
+		for (size_t i = 0; i < this->modules[module_path.string()]->use_statements.size(); i++) {
+			auto use_stmt = this->modules[module_path.string()]->use_statements[i];
 			if (use_stmt->include) {
-				this->add_module_functions(module_path.parent_path() / (this->modules[module_path]->use_statements[i]->path->value + ".dmd"), already_included_modules);
+				this->add_module_functions(module_path.parent_path() / (this->modules[module_path.string()]->use_statements[i]->path->value + ".dmd"), already_included_modules);
 			}
 		}
 	}
@@ -282,7 +282,7 @@ Result<Ok, Errors> semantic::analyze(std::shared_ptr<Ast::Program> program) {
 	Context context;
 	context.file = program->file;
 	context.add_scope();
-	context.modules[std::filesystem::canonical(std::filesystem::current_path() / program->file).parent_path()] = program;
+	context.modules[std::filesystem::canonical(std::filesystem::current_path() / program->file).parent_path().string()] = program;
 
 	auto block = std::make_shared<Ast::Block>(program->statements, program->functions, program->use_statements, program->line, program->col, program->file);
 	auto result = context.analyze(block);
