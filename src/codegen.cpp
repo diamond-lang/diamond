@@ -645,6 +645,12 @@ llvm::Value* Codegen::codegen(std::shared_ptr<Ast::Call> node) {
 				return this->builder->CreateICmpEQ(args[0], args[1], "addtmp");
 			}
 		}
+		if (node->identifier->value == "and") {
+			return this->builder->CreateAnd(args[0], args[1], "andtmp");
+		}
+		if (node->identifier->value == "or") {
+			return this->builder->CreateOr(args[0], args[1], "ortmp");
+		}
 	}
 	if (node->args.size() == 1) {
 		if (node->identifier->value == "-") {

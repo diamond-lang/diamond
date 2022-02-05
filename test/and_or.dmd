@@ -1,0 +1,11 @@
+print(true and true)
+print(false and true)
+print(true or false)
+print(false or false)
+
+--- Output
+true
+false
+true
+false
+---
