@@ -448,8 +448,8 @@ ParserResult<std::shared_ptr<Ast::Expression>> parse::if_else_expr(Source source
 }
 
 ParserResult<std::shared_ptr<Ast::Expression>> parse::not_expr(Source source) {
-	auto op = parse::identifier(source);
-	if (op.is_ok() && std::dynamic_pointer_cast<Ast::Identifier>(op.get_value())->value == "not") {
+	auto op = parse::identifier(source, "not");
+	if (op.is_ok()) {
 		source = op.get_source();
 
 		auto expression = parse::binary(source);
@@ -467,15 +467,17 @@ ParserResult<std::shared_ptr<Ast::Expression>> parse::not_expr(Source source) {
 
 ParserResult<std::shared_ptr<Ast::Expression>> parse::binary(Source source, int precedence) {
 	static std::map<std::string, int> bin_op_precedence;
-	bin_op_precedence["=="] = 1;
-	bin_op_precedence["<"] = 2;
-	bin_op_precedence["<="] = 2;
-	bin_op_precedence[">"] = 2;
-	bin_op_precedence[">="] = 2;
-	bin_op_precedence["+"] = 3;
-	bin_op_precedence["-"] = 3;
-	bin_op_precedence["*"] = 4;
-	bin_op_precedence["/"] = 4;
+	bin_op_precedence["or"] = 1;
+	bin_op_precedence["and"] = 2;
+	bin_op_precedence["=="] = 3;
+	bin_op_precedence["<"] = 4;
+	bin_op_precedence["<="] = 4;
+	bin_op_precedence[">"] = 4;
+	bin_op_precedence[">="] = 4;
+	bin_op_precedence["+"] = 5;
+	bin_op_precedence["-"] = 5;
+	bin_op_precedence["*"] = 6;
+	bin_op_precedence["/"] = 6;
 
 	if (precedence > std::max_element(bin_op_precedence.begin(), bin_op_precedence.end(), [] (auto a, auto b) { return a.second < b.second;})->second) {
 		return parse::unary(source);
@@ -612,7 +614,7 @@ ParserResult<std::shared_ptr<Ast::Expression>> parse::string(Source source) {
 }
 
 ParserResult<std::shared_ptr<Ast::Node>> parse::op(Source source) {
-	auto result = parse::token(source, "(\\+|-|\\*|\\/|<=|<|>=|>|==)");
+	auto result = parse::token(source, "(\\+|-|\\*|\\/|<=|<|>=|>|==|and|or)");
 	if (result.is_error()) return ParserResult<std::shared_ptr<Ast::Node>>(result.get_errors());
 	source = parse::token(source, "(?=.)").get_source();
 	auto node = std::make_shared<Ast::Identifier>(result.get_value(), source.line, source.col, source.file);
