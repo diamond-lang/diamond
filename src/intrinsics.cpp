@@ -94,6 +94,12 @@ std::unordered_map<std::string, std::vector<std::pair<std::vector<Type>, Type>>>
     {"not", {
         {{Type("bool")}, Type("bool")}
     }},
+    {"and", {
+        {{Type("bool"), Type("bool")}, Type("bool")}
+    }},
+    {"or", {
+        {{Type("bool"), Type("bool")}, Type("bool")}
+    }},
     {"print", {
         {{Type("float64")}, Type("void")},
         {{Type("int64")}, Type("void")},
