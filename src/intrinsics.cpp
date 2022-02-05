@@ -52,6 +52,9 @@ std::unordered_map<std::string, std::vector<std::pair<std::vector<Type>, Type>>>
         {{Type("float64"), Type("float64")}, Type("float64")},
         {{Type("int64"), Type("int64")}, Type("int64")}
     }},
+    {"%", {
+        {{Type("int64"), Type("int64")}, Type("int64")}
+    }},
     {"-", {
         {{Type("$t"), Type("$t")}, Type("$t")},
         {{Type("float64")}, Type("float64")},
