@@ -478,6 +478,7 @@ ParserResult<std::shared_ptr<Ast::Expression>> parse::binary(Source source, int 
 	bin_op_precedence["-"] = 5;
 	bin_op_precedence["*"] = 6;
 	bin_op_precedence["/"] = 6;
+	bin_op_precedence["%"] = 6;
 
 	if (precedence > std::max_element(bin_op_precedence.begin(), bin_op_precedence.end(), [] (auto a, auto b) { return a.second < b.second;})->second) {
 		return parse::unary(source);
@@ -614,7 +615,7 @@ ParserResult<std::shared_ptr<Ast::Expression>> parse::string(Source source) {
 }
 
 ParserResult<std::shared_ptr<Ast::Node>> parse::op(Source source) {
-	auto result = parse::token(source, "(\\+|-|\\*|\\/|<=|<|>=|>|==|and|or)");
+	auto result = parse::token(source, "(\\+|-|\\*|\\/|<=|<|>=|>|==|and|or|%)");
 	if (result.is_error()) return ParserResult<std::shared_ptr<Ast::Node>>(result.get_errors());
 	source = parse::token(source, "(?=.)").get_source();
 	auto node = std::make_shared<Ast::Identifier>(result.get_value(), source.line, source.col, source.file);
