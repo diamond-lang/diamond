@@ -38,17 +38,14 @@ std::unordered_map<std::string, std::pair<std::vector<Type>, Type>> interfaces =
 
 std::unordered_map<std::string, std::vector<std::pair<std::vector<Type>, Type>>> intrinsics = {
     {"+", {
-        {{Type("$t"), Type("$t")}, Type("$t")},
         {{Type("float64"), Type("float64")}, Type("float64")},
         {{Type("int64"), Type("int64")}, Type("int64")}
     }},
     {"*", {
-        {{Type("$t"), Type("$t")}, Type("$t")},
         {{Type("float64"), Type("float64")}, Type("float64")},
         {{Type("int64"), Type("int64")}, Type("int64")}
     }},
     {"/", {
-        {{Type("$t"), Type("$t")}, Type("$t")},
         {{Type("float64"), Type("float64")}, Type("float64")},
         {{Type("int64"), Type("int64")}, Type("int64")}
     }},
@@ -56,40 +53,33 @@ std::unordered_map<std::string, std::vector<std::pair<std::vector<Type>, Type>>>
         {{Type("int64"), Type("int64")}, Type("int64")}
     }},
     {"-", {
-        {{Type("$t"), Type("$t")}, Type("$t")},
         {{Type("float64")}, Type("float64")},
         {{Type("int64")}, Type("int64")},
         {{Type("float64"), Type("float64")}, Type("float64")},
         {{Type("int64"), Type("int64")}, Type("int64")},
     }},
     {"<", {
-        {{Type("$t"), Type("$t")}, Type("bool")},
         {{Type("float64"), Type("float64")}, Type("bool")},
         {{Type("int64"), Type("int64")}, Type("bool")}
     }},
     {"<=", {
-        {{Type("$t"), Type("$t")}, Type("bool")},
         {{Type("float64"), Type("float64")}, Type("bool")},
         {{Type("int64"), Type("int64")}, Type("bool")}
     }},
     {">", {
-        {{Type("$t"), Type("$t")}, Type("bool")},
         {{Type("float64"), Type("float64")}, Type("bool")},
         {{Type("int64"), Type("int64")}, Type("bool")}
     }},
     {">=", {
-        {{Type("$t"), Type("$t")}, Type("bool")},
         {{Type("float64"), Type("float64")}, Type("bool")},
         {{Type("int64"), Type("int64")}, Type("bool")}
     }},
     {"==", {
-        {{Type("$t"), Type("$t")}, Type("bool")},
         {{Type("bool"), Type("bool")}, Type("bool")},
         {{Type("float64"), Type("float64")}, Type("bool")},
         {{Type("int64"), Type("int64")}, Type("bool")}
     }},
     {"!=", {
-        {{Type("$t"), Type("$t")}, Type("bool")},
         {{Type("bool"), Type("bool")}, Type("bool")},
         {{Type("float64"), Type("float64")}, Type("bool")},
         {{Type("int64"), Type("int64")}, Type("bool")}
