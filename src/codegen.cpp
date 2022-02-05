@@ -599,8 +599,11 @@ llvm::Value* Codegen::codegen(std::shared_ptr<Ast::Call> node) {
 				return this->builder->CreateFDiv(args[0], args[1], "divtmp");
 			}
 			if (args[0]->getType()->isIntegerTy(64) && args[1]->getType()->isIntegerTy(64)) {
-				return this->builder->CreateSDiv(args[0], args[1], "addtmp");
+				return this->builder->CreateSDiv(args[0], args[1], "divtmp");
 			}
+		}
+		if (node->identifier->value == "%") {
+			return this->builder->CreateSRem(args[0], args[1], "remtmp");
 		}
 		if (node->identifier->value == "<") {
 			if (args[0]->getType()->isDoubleTy() && args[1]->getType()->isDoubleTy()) {
