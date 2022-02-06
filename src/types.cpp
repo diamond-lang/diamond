@@ -5,23 +5,25 @@
 
 // Source
 char current(Source source) {
-	return *(source.it);
+	char c = fgetc(source.file_pointer);
+	fseek(source.file_pointer, -1, SEEK_CUR);
+	return c;
 }
 
 bool at_end(Source source) {
-	if (source.it >= source.end) return true;
-	else                         return false;
+	return current(source) == EOF;
 }
 
 bool match(Source source, std::string to_match) {
 	for (size_t i = 0; i < to_match.size(); i++) {
 		if (current(source) != to_match[i]) return false;
-		source = source + 1;
+		advance(source);
 	}
+	fseek(source.file_pointer, -to_match.size(), SEEK_CUR);
 	return true;
 }
 
-Source addOne(Source source) {
+void advance(Source& source) {
 	if (current(source) == '\n') {
 		source.line += 1;
 		source.col = 1;
@@ -29,13 +31,8 @@ Source addOne(Source source) {
 	else {
 		source.col++;
 	}
-	source.it++;
-	return source;
-}
-
-Source operator+(Source source, size_t offset) {
-	if (offset == 0) return source;
-	else             return addOne(source) + (offset - 1);
+	source.index++;
+	fgetc(source.file_pointer);
 }
 
 // Ast

@@ -11,14 +11,15 @@ from functools import partial
 name = 'diamond'
 source_files = [
 	'src/main.cpp',
-	'src/parser.cpp',
-	'src/semantic.cpp',
-	'src/codegen.cpp',
+	'src/lexer.cpp',
+	# 'src/parser.cpp',
+	# 'src/semantic.cpp',
+	# 'src/codegen.cpp',
 	'src/errors.cpp',
 	'src/utilities.cpp',
 	'src/types.cpp',
-	'src/intrinsics.cpp',
-	'src/type_inference.cpp'
+	# 'src/intrinsics.cpp',
+	# 'src/type_inference.cpp'
 ]
 cpp_version = 'c++17'
 

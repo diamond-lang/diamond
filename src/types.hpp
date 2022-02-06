@@ -8,23 +8,62 @@
 #include <cassert>
 #include <cstdint>
 #include <unordered_map>
+#include <filesystem>
+#include <cstdio>
 
 // Source file
 struct Source {
 	size_t line;
 	size_t col;
-	size_t indentation_level = -1;
-	std::string file;
-	std::string::iterator it;
-	std::string::iterator end;
-
+	size_t index;
+	std::filesystem::path path;
+	FILE* file_pointer;
+	
 	Source() {}
-	Source(std::string file, std::string::iterator it, std::string::iterator end) : line(1), col(1), file(file), it(it), end(end) {}
+	Source(std::filesystem::path path, FILE* file_pointer) : line(1), col(1), index(0), path(path), file_pointer(file_pointer) {} 
 };
+void advance(Source& source);
 char current(Source source);
 bool at_end(Source source);
 bool match(Source source, std::string to_match);
-Source operator+(Source source, size_t offset);
+
+// Tokens
+namespace token {
+	enum TokenVariant {
+		LeftParen, 
+		RightParen, 
+		Comma, 
+		Plus, 
+		Slash, 
+		Star,
+		Minus, 
+		VerticalBar,
+		Colon,
+		Not,
+		NotEqual,
+		Greater,
+		GreaterEqual,
+		Less,
+		LessEqual,
+		Equal,
+		EqualEqual,
+		Be,
+		Identifier,
+		String,
+		Or,
+		And,
+		Newline,
+		Indent
+	};
+
+	struct Token {
+		token::TokenVariant variant;
+		std::string literal;
+
+		Token(token::TokenVariant variant, std::string literal) : variant(variant), literal(literal) {} 
+	};
+};
+
 
 struct Ok {
 	Ok() {}

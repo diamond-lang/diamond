@@ -4,6 +4,7 @@
 
 #include "errors.hpp"
 #include "utilities.hpp"
+#include "lexer.hpp"
 #include "parser.hpp"
 #include "semantic.hpp"
 #include "codegen.hpp"
@@ -46,74 +47,76 @@ int main(int argc, char *argv[]) {
 		enable_colored_text_and_unicode();
 	#endif
 
-	// Check usage
-	check_usage(argc, argv);
+	auto tokens = lexer::lex(std::filesystem::path(argv[2]));
 
-	// Get command line arguments
-	Command command = get_command(argc, argv);
+	// // Check usage
+	// check_usage(argc, argv);
 
-	std::string program_name = utilities::get_program_name(command.file);
-	bool executable_already_existed = utilities::file_exists(utilities::get_executable_name(program_name));
+	// // Get command line arguments
+	// Command command = get_command(argc, argv);
 
-	// Read file
-	Result<std::string, Error> result = utilities::read_file(command.file);
-	if (result.is_error()) {
-		std::cout << result.get_error().message;
-		exit(EXIT_FAILURE);
-	}
-	std::string file = result.get_value();
+	// std::string program_name = utilities::get_program_name(command.file);
+	// bool executable_already_existed = utilities::file_exists(utilities::get_executable_name(program_name));
 
-	// Parse
-	auto parsing_result = parse::program(Source(command.file, file.begin(), file.end()));
-	if (parsing_result.is_error()) {
-		std::vector<Error> errors = parsing_result.get_errors();
-		for (size_t i = 0; i < errors.size(); i++) {
-			std::cout << errors[i].message << '\n';
-		}
-		exit(EXIT_FAILURE);
-	}
-	auto ast = parsing_result.get_value();
+	// // Read file
+	// Result<std::string, Error> result = utilities::read_file(command.file);
+	// if (result.is_error()) {
+	// 	std::cout << result.get_error().message;
+	// 	exit(EXIT_FAILURE);
+	// }
+	// std::string file = result.get_value();
 
-	if (command.type == EmitCommand && command.options[0] == std::string("--ast")) {
-		ast->print();
-		return 0;
-	}
+	// // Parse
+	// auto parsing_result = parse::program(Source(command.file, file.begin(), file.end()));
+	// if (parsing_result.is_error()) {
+	// 	std::vector<Error> errors = parsing_result.get_errors();
+	// 	for (size_t i = 0; i < errors.size(); i++) {
+	// 		std::cout << errors[i].message << '\n';
+	// 	}
+	// 	exit(EXIT_FAILURE);
+	// }
+	// auto ast = parsing_result.get_value();
 
-	// Analyze
-	auto analyze_result = semantic::analyze(ast);
-	if (analyze_result.is_error()) {
-		std::vector<Error> error = analyze_result.get_errors();
-		for (size_t i = 0; i < error.size(); i++) {
-			std::cout << error[i].message << '\n';
-		}
-		exit(EXIT_FAILURE);
-	}
+	// if (command.type == EmitCommand && command.options[0] == std::string("--ast")) {
+	// 	ast->print();
+	// 	return 0;
+	// }
 
-	if (command.type == EmitCommand && command.options[0] == std::string("--ast-with-types")) {
-		ast->print();
-		return 0;
-	}
+	// // Analyze
+	// auto analyze_result = semantic::analyze(ast);
+	// if (analyze_result.is_error()) {
+	// 	std::vector<Error> error = analyze_result.get_errors();
+	// 	for (size_t i = 0; i < error.size(); i++) {
+	// 		std::cout << error[i].message << '\n';
+	// 	}
+	// 	exit(EXIT_FAILURE);
+	// }
 
-	if (command.type == EmitCommand && command.options[0] == std::string("--ast-with-concrete-types")) {
-		ast->print_with_concrete_types();
-		return 0;
-	}
+	// if (command.type == EmitCommand && command.options[0] == std::string("--ast-with-types")) {
+	// 	ast->print();
+	// 	return 0;
+	// }
 
-	if (command.type == EmitCommand && command.options[0] == std::string("--llvm-ir")) {
-		print_llvm_ir(ast, program_name);
-		return 0;
-	}
+	// if (command.type == EmitCommand && command.options[0] == std::string("--ast-with-concrete-types")) {
+	// 	ast->print_with_concrete_types();
+	// 	return 0;
+	// }
 
-	// Generate executable
-	generate_executable(ast, program_name);
+	// if (command.type == EmitCommand && command.options[0] == std::string("--llvm-ir")) {
+	// 	print_llvm_ir(ast, program_name);
+	// 	return 0;
+	// }
 
-	if (command.type == RunCommand) {
-		system(utilities::get_run_command(program_name).c_str());
+	// // Generate executable
+	// generate_executable(ast, program_name);
 
-		if (!executable_already_existed) {
-			remove(utilities::get_executable_name(program_name).c_str());
-		}
-	}
+	// if (command.type == RunCommand) {
+	// 	system(utilities::get_run_command(program_name).c_str());
+
+	// 	if (!executable_already_existed) {
+	// 		remove(utilities::get_executable_name(program_name).c_str());
+	// 	}
+	// }
 
 	return 0;
 }
