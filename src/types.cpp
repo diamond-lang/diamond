@@ -6,7 +6,22 @@
 // Source
 char current(Source source) {
 	char c = fgetc(source.file_pointer);
-	fseek(source.file_pointer, -1, SEEK_CUR);
+	if (c == EOF) fseek(source.file_pointer, 0, SEEK_END);
+	else          fseek(source.file_pointer, -1, SEEK_CUR);
+	return c;
+}
+
+char peek(Source source, unsigned int offset) {
+	unsigned int aux = offset;
+	while (aux > 0) {
+		char c = fgetc(source.file_pointer);
+		if (c == EOF) {
+			fseek(source.file_pointer, -(int)(offset - aux), SEEK_CUR);
+		}
+		aux--;
+	}
+	char c = current(source);
+	fseek(source.file_pointer, -(int)offset, SEEK_CUR);
 	return c;
 }
 
@@ -15,12 +30,21 @@ bool at_end(Source source) {
 }
 
 bool match(Source source, std::string to_match) {
-	for (size_t i = 0; i < to_match.size(); i++) {
-		if (current(source) != to_match[i]) return false;
+	bool match = true;
+	int i = 0;
+	while (!at_end(source) && i < to_match.size()) {
+		if (current(source) != to_match[i]) {
+			match = false;
+			break;
+		}
 		advance(source);
+		i++;
 	}
-	fseek(source.file_pointer, -to_match.size(), SEEK_CUR);
-	return true;
+	if (at_end(source) && i != to_match.size()) {
+		match = false;
+	}
+	fseek(source.file_pointer, -i, SEEK_CUR);
+	return match;
 }
 
 void advance(Source& source) {
@@ -33,6 +57,13 @@ void advance(Source& source) {
 	}
 	source.index++;
 	fgetc(source.file_pointer);
+}
+
+void advance(Source& source, unsigned int offset) {
+	while (offset != 0) {
+		advance(source);
+		offset--;
+	}
 }
 
 // Ast

@@ -49,6 +49,17 @@ int main(int argc, char *argv[]) {
 
 	auto tokens = lexer::lex(std::filesystem::path(argv[2]));
 
+	if (tokens.is_error()) {
+		for (size_t i = 0; i < tokens.get_error().size(); i++) {
+			std::cout << tokens.get_error()[i].message << "\n";
+		}
+	}
+	else {
+		for (size_t i = 0; i < tokens.get_value().size(); i++) {
+			std::cout << tokens.get_value()[i].get_literal() << "\n";
+		}
+	}
+
 	// // Check usage
 	// check_usage(argc, argv);
 

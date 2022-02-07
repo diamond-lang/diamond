@@ -22,8 +22,10 @@ struct Source {
 	Source() {}
 	Source(std::filesystem::path path, FILE* file_pointer) : line(1), col(1), index(0), path(path), file_pointer(file_pointer) {} 
 };
-void advance(Source& source);
 char current(Source source);
+char peek(Source source, unsigned int offset = 1);
+void advance(Source& source);
+void advance(Source& source, unsigned int offset);
 bool at_end(Source source);
 bool match(Source source, std::string to_match);
 
@@ -32,13 +34,18 @@ namespace token {
 	enum TokenVariant {
 		LeftParen, 
 		RightParen, 
+		LeftBracket,
+		RightBracket,
+		LeftCurly,
+		RightCurly,
 		Comma, 
 		Plus, 
-		Slash, 
+		Slash,
+		Modulo, 
 		Star,
 		Minus, 
-		VerticalBar,
 		Colon,
+		Dot,
 		Not,
 		NotEqual,
 		Greater,
@@ -48,19 +55,34 @@ namespace token {
 		Equal,
 		EqualEqual,
 		Be,
+		Integer,
+		Float,
 		Identifier,
 		String,
+		If,
+		Else,
+		While,
+		Function,
 		Or,
 		And,
 		Newline,
-		Indent
+		Indent,
+		EndOfFile
 	};
 
 	struct Token {
 		token::TokenVariant variant;
-		std::string literal;
+		std::string str;
+		const char* static_str = nullptr;
 
-		Token(token::TokenVariant variant, std::string literal) : variant(variant), literal(literal) {} 
+		Token(token::TokenVariant variant) : variant(variant) {} 
+		Token(token::TokenVariant variant, std::string literal) : variant(variant), str(literal) {}
+		Token(token::TokenVariant variant, const char* literal) : variant(variant), static_str(literal) {} 
+
+		std::string get_literal() {
+			if (static_str) return std::string(this->static_str);
+			else            return this->str; 
+		}
 	};
 };
 
