@@ -1,73 +1,7 @@
+#include "ast.hpp"
+
+#include <cassert>
 #include <iostream>
-#include <assert.h>
-
-#include "types.hpp"
-
-// Source
-char current(Source source) {
-	char c = fgetc(source.file_pointer);
-	if (c == EOF) fseek(source.file_pointer, 0, SEEK_END);
-	else          fseek(source.file_pointer, -1, SEEK_CUR);
-	return c;
-}
-
-char peek(Source source, unsigned int offset) {
-	unsigned int aux = offset;
-	while (aux > 0) {
-		char c = fgetc(source.file_pointer);
-		if (c == EOF) {
-			fseek(source.file_pointer, -(int)(offset - aux), SEEK_CUR);
-		}
-		aux--;
-	}
-	char c = current(source);
-	fseek(source.file_pointer, -(int)offset, SEEK_CUR);
-	return c;
-}
-
-bool at_end(Source source) {
-	return current(source) == EOF;
-}
-
-bool match(Source source, std::string to_match) {
-	bool match = true;
-	int i = 0;
-	while (!at_end(source) && i < to_match.size()) {
-		if (current(source) != to_match[i]) {
-			match = false;
-			break;
-		}
-		advance(source);
-		i++;
-	}
-	if (at_end(source) && i != to_match.size()) {
-		match = false;
-	}
-	fseek(source.file_pointer, -i, SEEK_CUR);
-	return match;
-}
-
-void advance(Source& source) {
-	if (current(source) == '\n') {
-		source.line += 1;
-		source.col = 1;
-	}
-	else {
-		source.col++;
-	}
-	source.index++;
-	fgetc(source.file_pointer);
-}
-
-void advance(Source& source, unsigned int offset) {
-	while (offset != 0) {
-		advance(source);
-		offset--;
-	}
-}
-
-// Ast
-// ---
 
 // Type
 bool Type::operator==(const Type &t) const {

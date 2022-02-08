@@ -1,13 +1,8 @@
-#include <fstream>
-#include <sstream>
 #include <iostream>
+#include <cassert>
 
 #include "errors.hpp"
-#include "utilities.hpp"
 #include "lexer.hpp"
-#include "parser.hpp"
-#include "semantic.hpp"
-#include "codegen.hpp"
 
 #ifdef _WIN32
 #include <Windows.h>
@@ -51,7 +46,7 @@ int main(int argc, char *argv[]) {
 
 	if (tokens.is_error()) {
 		for (size_t i = 0; i < tokens.get_error().size(); i++) {
-			std::cout << tokens.get_error()[i].message << "\n";
+			std::cout << tokens.get_error()[i] << "\n";
 		}
 	}
 	else {
