@@ -8,87 +8,89 @@
 
 // Prototypes and definitions
 // --------------------------
-struct Source {
-	size_t line;
-	size_t col;
-	size_t index;
-	std::filesystem::path path;
-	FILE* file_pointer;
-	
-	Source() {}
-	Source(std::filesystem::path path, FILE* file_pointer) : line(1), col(1), index(0), path(path), file_pointer(file_pointer) {} 
-};
+namespace lexer {
+    struct Source {
+        size_t line;
+        size_t col;
+        size_t index;
+        std::filesystem::path path;
+        FILE* file_pointer;
+        
+        Source() {}
+        Source(std::filesystem::path path, FILE* file_pointer) : line(1), col(1), index(0), path(path), file_pointer(file_pointer) {} 
+    };
 
-char current(Source source) {
-	char c = fgetc(source.file_pointer);
-	if (c == EOF) fseek(source.file_pointer, 0, SEEK_END);
-	else          fseek(source.file_pointer, -1, SEEK_CUR);
-	return c;
+    char current(Source source) {
+        char c = fgetc(source.file_pointer);
+        if (c == EOF) fseek(source.file_pointer, 0, SEEK_END);
+        else          fseek(source.file_pointer, -1, SEEK_CUR);
+        return c;
+    }
+
+    void advance(Source& source) {
+        if (current(source) == '\n') {
+            source.line += 1;
+            source.col = 1;
+        }
+        else {
+            source.col++;
+        }
+        source.index++;
+        fgetc(source.file_pointer);
+    }
+
+    void advance(Source& source, unsigned int offset) {
+        while (offset != 0) {
+            advance(source);
+            offset--;
+        }
+    }
+
+    char peek(Source source, unsigned int offset = 1);
+    char peek(Source source, unsigned int offset) {
+        unsigned int aux = offset;
+        while (aux > 0) {
+            char c = fgetc(source.file_pointer);
+            if (c == EOF) {
+                fseek(source.file_pointer, -(int)(offset - aux), SEEK_CUR);
+            }
+            aux--;
+        }
+        char c = current(source);
+        fseek(source.file_pointer, -(int)offset, SEEK_CUR);
+        return c;
+    }
+
+    bool at_end(Source source) {
+        return current(source) == EOF;
+    }
+
+    bool match(Source source, std::string to_match) {
+        bool match = true;
+        int i = 0;
+        while (!at_end(source) && i < to_match.size()) {
+            if (current(source) != to_match[i]) {
+                match = false;
+                break;
+            }
+            advance(source);
+            i++;
+        }
+        if (at_end(source) && i != to_match.size()) {
+            match = false;
+        }
+        fseek(source.file_pointer, -i, SEEK_CUR);
+        return match;
+    }
+
+    Result<token::Token, Error> get_token(Source& source);
+    Result<token::Token, Error> advance(token::Token token, Source& source, unsigned int offset);
+    void advance_until_new_line(Source& source);
+    Result<token::Token, Error> get_string(Source& source);
+    Result<token::Token, Error> get_number(Source& source);
+    Result<token::Token, Error> get_identifier(Source& source);
+    std::string get_integer(Source& source);
 }
-
-void advance(Source& source) {
-	if (current(source) == '\n') {
-		source.line += 1;
-		source.col = 1;
-	}
-	else {
-		source.col++;
-	}
-	source.index++;
-	fgetc(source.file_pointer);
-}
-
-void advance(Source& source, unsigned int offset) {
-	while (offset != 0) {
-		advance(source);
-		offset--;
-	}
-}
-
-char peek(Source source, unsigned int offset = 1);
-char peek(Source source, unsigned int offset) {
-	unsigned int aux = offset;
-	while (aux > 0) {
-		char c = fgetc(source.file_pointer);
-		if (c == EOF) {
-			fseek(source.file_pointer, -(int)(offset - aux), SEEK_CUR);
-		}
-		aux--;
-	}
-	char c = current(source);
-	fseek(source.file_pointer, -(int)offset, SEEK_CUR);
-	return c;
-}
-
-bool at_end(Source source) {
-	return current(source) == EOF;
-}
-
-bool match(Source source, std::string to_match) {
-	bool match = true;
-	int i = 0;
-	while (!at_end(source) && i < to_match.size()) {
-		if (current(source) != to_match[i]) {
-			match = false;
-			break;
-		}
-		advance(source);
-		i++;
-	}
-	if (at_end(source) && i != to_match.size()) {
-		match = false;
-	}
-	fseek(source.file_pointer, -i, SEEK_CUR);
-	return match;
-}
-
-Result<token::Token, Error> get_token(Source& source);
-Result<token::Token, Error> advance(token::Token token, Source& source, unsigned int offset);
-void advance_until_new_line(Source& source);
-Result<token::Token, Error> get_string(Source& source);
-Result<token::Token, Error> get_number(Source& source);
-Result<token::Token, Error> get_identifier(Source& source);
-std::string get_integer(Source& source);
 
 // Lexing
 // ------
@@ -120,7 +122,7 @@ Result<std::vector<token::Token>, Errors> lexer::lex(std::filesystem::path path)
     else                    return Result<std::vector<token::Token>, Errors>(tokens);
 }
 
-Result<token::Token, Error> get_token(Source& source) {
+Result<token::Token, Error> lexer::get_token(Source& source) {
     if (at_end(source))      return advance(token::Token(token::EndOfFile), source, 1);
     if (match(source, "("))  return advance(token::Token(token::LeftParen, "("), source, 1);
     if (match(source, ")"))  return advance(token::Token(token::RightParen, ")"), source, 1);
@@ -183,19 +185,19 @@ Result<token::Token, Error> get_token(Source& source) {
     return Result<token::Token, Error>(std::string("Error: Unrecognized symbol\n"));
 }
 
-Result<token::Token, Error> advance(token::Token token, Source& source, unsigned int offset) {
+Result<token::Token, Error> lexer::advance(token::Token token, Source& source, unsigned int offset) {
     advance(source, offset);
     return Result<token::Token, Error>(token);
 }
 
-void advance_until_new_line(Source& source) {
+void lexer::advance_until_new_line(Source& source) {
     while (current(source) != '\n') {
         advance(source);
     }
     advance(source);
 }
 
-Result<token::Token, Error> get_string(Source& source) {
+Result<token::Token, Error> lexer::get_string(Source& source) {
     std::string literal = "\"";
     advance(source);
     while (!(at_end(source) || match(source, "\n") || match(source, "\""))) {
@@ -213,7 +215,7 @@ Result<token::Token, Error> get_string(Source& source) {
     }
 }
 
-Result<token::Token, Error> get_identifier(Source& source) {
+Result<token::Token, Error> lexer::get_identifier(Source& source) {
     std::string literal = "";
 
     while (!(at_end(source) || match(source, "\n"))) {
@@ -231,7 +233,7 @@ Result<token::Token, Error> get_identifier(Source& source) {
     return token::Token(token::Identifier, literal);
 }
 
-Result<token::Token, Error> get_number(Source& source) {
+Result<token::Token, Error> lexer::get_number(Source& source) {
     std::string literal = "";
     
     // eg: .8
@@ -255,7 +257,7 @@ Result<token::Token, Error> get_number(Source& source) {
     }
 }
 
-std::string get_integer(Source& source) {
+std::string lexer::get_integer(Source& source) {
     std::string integer = "";
     while (!(at_end(source) || match(source, "\n")) && isdigit(current(source))) {
         integer += current(source);
