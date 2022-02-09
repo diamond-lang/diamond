@@ -46,6 +46,14 @@ namespace lexer {
         }
     }
 
+    char prev(Source source) {
+        int result = fseek(source.file_pointer, -1, SEEK_CUR);
+        if (result < 0) return '\n';
+        char c = current(source);
+        advance(source);
+        return c;
+    }
+
     char peek(Source source, unsigned int offset = 1);
     char peek(Source source, unsigned int offset) {
         unsigned int aux = offset;
@@ -90,6 +98,7 @@ namespace lexer {
     Result<token::Token, Error> get_number(Source& source);
     Result<token::Token, Error> get_identifier(Source& source);
     std::string get_integer(Source& source);
+    Result<token::Token, Error> get_indent(Source& source);
 }
 
 // Lexing
@@ -123,7 +132,7 @@ Result<std::vector<token::Token>, Errors> lexer::lex(std::filesystem::path path)
 }
 
 Result<token::Token, Error> lexer::get_token(Source& source) {
-    if (at_end(source))      return advance(token::Token(token::EndOfFile), source, 1);
+    if (at_end(source))      return advance(token::Token(token::EndOfFile, "EndOfFile"), source, 1);
     if (match(source, "("))  return advance(token::Token(token::LeftParen, "("), source, 1);
     if (match(source, ")"))  return advance(token::Token(token::RightParen, ")"), source, 1);
     if (match(source, "["))  return advance(token::Token(token::LeftBracket, "["), source, 1);
@@ -169,8 +178,11 @@ Result<token::Token, Error> lexer::get_token(Source& source) {
         return advance(token::Token(token::Less), source, 1);
     }
     if (match(source, " "))  {
-        advance(source);
-        return get_token(source);
+        if (prev(source) == '\n') return get_indent(source);
+        else {
+            advance(source);
+            return get_token(source);
+        }
     }
     if (match(source, "\t")) {
         advance(source);
@@ -264,4 +276,29 @@ std::string lexer::get_integer(Source& source) {
         advance(source);
     }
     return integer;
+}
+
+Result<token::Token, Error> lexer::get_indent(Source& source) {
+    size_t length = 0;
+    while (!(at_end(source) || match(source, "\n")) && match(source, " ")) {
+        length++;
+        advance(source);
+    }
+    return Result<token::Token, Error>(token::Token(token::Indent, length));
+}
+
+void lexer::print(std::vector<token::Token> tokens) {
+    for (size_t i = 0; i < tokens.size(); i++) {
+        if (tokens[i] != token::Indent) {
+            std::cout << tokens[i].get_literal() << "\n";
+        }
+        else {
+            size_t j = 0;
+            while (j < tokens[i].length) {
+                std::cout << "🠺";
+                j++;
+            }
+            std::cout << "\n";
+        }
+    }
 }

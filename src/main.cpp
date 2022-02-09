@@ -50,9 +50,7 @@ int main(int argc, char *argv[]) {
 		}
 	}
 	else {
-		for (size_t i = 0; i < tokens.get_value().size(); i++) {
-			std::cout << tokens.get_value()[i].get_literal() << "\n";
-		}
+		lexer::print(tokens.get_value());
 	}
 
 	// // Check usage

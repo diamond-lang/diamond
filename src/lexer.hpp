@@ -6,5 +6,6 @@
 #include "tokens.hpp"
 
 namespace lexer {
-    Result<std::vector<token::Token>, Errors> lex(std::filesystem::path path); 
+    Result<std::vector<token::Token>, Errors> lex(std::filesystem::path path);
+    void print(std::vector<token::Token> tokens);
 };

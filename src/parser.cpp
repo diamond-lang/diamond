@@ -7,50 +7,112 @@
 #include "errors.hpp"
 #include "parser.hpp"
 
-Result<std::shared_ptr<Ast::Program>, std::vector<Error>> parse::program(Source source) {
-	auto result = parse::block(source);
-	if (result.is_error()) return Result<std::shared_ptr<Ast::Program>, Errors>(result.get_errors());
+// Prototypes and definitions
+// --------------------------
+namespace parse {
+	 struct Source {
+		std::vector<token::Token> tokens;
+		std::vector<token::Token>::iterator it;
+
+		Source() {}
+		Source(std::vector<token::Token> tokens) : tokens(tokens), it(tokens.begin())  {}
+    };
+
+	token::Token current(Source source) {
+		return *(source.it);
+	}
+
+	Source advance(Source source, unsigned int offset = 1);
+	Source advance(Source source, unsigned int offset) {
+		while (offset != 0) {
+			source.it++;
+		}
+		return source;
+	}
+
+	template <class T>
+	struct Result {
+		bool ok;
+		T value;
+		Source source;
+		Errors errors;
+
+		Result<T>(T value, Source source) : ok(true), value(value), source(source) {}
+		Result<T>(Errors errors) : ok(false), errors(errors) {}
+
+		bool is_ok()    {return this->ok;}
+		bool is_error() {return !this->is_ok();}
+		T get_value() {
+			assert(this->ok);
+			return this->value;
+		}
+		Source get_source() {
+			assert(this->ok);
+			return this->source;
+		}
+		Errors get_errors() {
+			assert(!(this->ok));
+			return this->errors;
+		}
+	};
+
+	Source advance_until_next_statement(Source source);
+
+	Result<std::shared_ptr<Ast::Block>> block(Source source);
+	Result<std::shared_ptr<Ast::Expression>> expression_block(Source source);
+	Result<std::shared_ptr<Ast::Node>> function(Source source);
+	Result<std::shared_ptr<Ast::Node>> statement(Source source);
+	Result<std::shared_ptr<Ast::Node>> assignment(Source source);
+	Result<std::shared_ptr<Ast::Node>> return_stmt(Source source);
+	Result<std::shared_ptr<Ast::Node>> break_stmt(Source source);
+	Result<std::shared_ptr<Ast::Node>> continue_stmt(Source source);
+	Result<std::shared_ptr<Ast::Node>> if_else_stmt(Source source);
+	Result<std::shared_ptr<Ast::Node>> while_stmt(Source source);
+	Result<std::shared_ptr<Ast::Node>> use_stmt(Source source);
+	Result<std::shared_ptr<Ast::Node>> include_stmt(Source source);
+	Result<std::shared_ptr<Ast::Expression>> call(Source source);
+	Result<std::shared_ptr<Ast::Expression>> expression(Source source);
+	Result<std::shared_ptr<Ast::Expression>> if_else_expr(Source source);
+	Result<std::shared_ptr<Ast::Expression>> not_expr(Source source);
+	Result<std::shared_ptr<Ast::Expression>> binary(Source source, int precedence = 1);
+	Result<std::shared_ptr<Ast::Expression>> unary(Source source);
+	Result<std::shared_ptr<Ast::Expression>> primary(Source source);
+	Result<std::shared_ptr<Ast::Expression>> grouping(Source source);
+	Result<std::shared_ptr<Ast::Expression>> number(Source source);
+	Result<std::shared_ptr<Ast::Expression>> integer(Source source);
+	Result<std::shared_ptr<Ast::Expression>> boolean(Source source);
+	Result<std::shared_ptr<Ast::Expression>> identifier(Source source);
+	Result<std::shared_ptr<Ast::Expression>> identifier(Source source, std::string identifier);
+	Result<std::shared_ptr<Ast::Expression>> string(Source source);
+	Result<std::shared_ptr<Ast::Node>> op(Source source);
+	Result<std::string> token(Source source, std::string regex);
+	Result<std::string> whitespace(Source source);
+	Result<std::string> comment(Source source);
+	Result<std::string> regex(Source source, std::string regex);
+}
+
+// Parsing
+// -------
+Result<std::shared_ptr<Ast::Program>, Errors> parse::program(std::vector<token::Token> tokens) {
+	auto result = parse::block(parse::Source(tokens));
+	if (result.is_error()) return ::Result<std::shared_ptr<Ast::Program>, Errors>(result.get_errors());
 	else {
 		auto block = result.get_value();
 		auto program = std::make_shared<Ast::Program>(block->statements, block->functions, block->use_statements, block->line, block->col, block->file);
-		return Result<std::shared_ptr<Ast::Program>, Errors>(program);
+		return ::Result<std::shared_ptr<Ast::Program>, Errors>(program);
 	}
 }
 
-Source eat_indentation(Source source) {
-	while(current(source) == ' ' || current(source) == '\t') {
-		source = source + 1;
-	}
-	return source;
-}
-
-size_t new_indentation_level(Source source) {
-	if (source.indentation_level == -1) {
-		source.indentation_level = 1;
-	}
-	else {
-		// Set indentation or error
-		Source indent = eat_indentation(source);
-		if (indent.col > source.indentation_level) {
-			source.indentation_level = indent.col;
-		}
-		else {
-			source.indentation_level = -1;
-		}
-	}
-	return source.indentation_level;
-}
-
-Source advance_until_next_statement(Source source) {
-	while (current(source) == '\n' || parse::comment(source).is_ok()) {
-		if (current(source) == '\n') source = source + 1;
-		else                         source = parse::comment(source).get_source();
+parse::Source parse::advance_until_next_statement(parse::Source source) {
+	while (current(source) == token::Newline || parse::comment(source).is_ok()) {
+		if (current(source) == token::Newline) source = advance(source);
+		else                                   source = parse::comment(source).get_source();
 	}
 
 	return source;
 }
 
-ParserResult<std::shared_ptr<Ast::Block>> parse::block(Source source) {
+parse::Result<std::shared_ptr<Ast::Block>> parse::block(Source source) {
 	// Advance until next statement
 	source = advance_until_next_statement(source);
 
