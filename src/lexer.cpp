@@ -207,7 +207,7 @@ void lexer::advance_until_new_line(Source& source) {
     while (!at_end(source) && current(source) != '\n') {
         advance(source);
     }
-    advance(source);
+    if (!at_end(source)) advance(source);
 }
 
 Result<token::Token, Error> lexer::get_string(Source& source) {
@@ -256,7 +256,7 @@ Result<token::Token, Error> lexer::get_identifier(Source& source) {
     if (literal == "include")  return token::Token(token::Include, "include", line, column);
     if (literal == "break")    return token::Token(token::Break, "break", line, column);
     if (literal == "continue") return token::Token(token::Continue, "continue", line, column);
-    if (literal == "include")  return token::Token(token::Return, "return", line, column);
+    if (literal == "return")  return token::Token(token::Return, "return", line, column);
 
     return token::Token(token::Identifier, literal, line, column);
 }

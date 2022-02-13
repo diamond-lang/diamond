@@ -20,17 +20,20 @@ namespace parse {
 		return source.tokens[source.position];
 	}
 
+	size_t current_indentation(parse::Source source) {
+		assert(source.indentation_level.size() > 0);
+		return source.indentation_level[source.indentation_level.size() - 1];
+	}
+
 	Source advance(parse::Source source) {
-		if (current(source) == token::NewLine) {
-			source.column = 1;
-			source.line++;
-		}
-		else {
-			source.column += current(source).length;
-		}
+		if (at_end(source)) return source;
 		source.position++;
+		if (at_end(source)) return source;
+		source.line = current(source).line;
+		source.column = current(source).column;
 		return source;
 	}
+
 	Source advance(parse::Source source, unsigned int offset) {
 		if (offset == 0) return source;
 		else             return advance(advance(source), offset - 1);
@@ -63,10 +66,9 @@ namespace parse {
 	};
 
 	Source advance_until_next_statement(parse::Source source);
-	::Result<size_t, Error> new_indentation_level(parse::Source source);
 	size_t get_indentation(parse::Source source);
 
-	Result<std::shared_ptr<Ast::Block>> block(parse::Source source, bool top_level = false);
+	Result<std::shared_ptr<Ast::Block>> block(parse::Source source);
 	Result<std::shared_ptr<Ast::Expression>> expression_block(parse::Source source);
 	Result<std::shared_ptr<Ast::Node>> function(parse::Source source);
 	Result<std::shared_ptr<Ast::Node>> statement(parse::Source source);
@@ -103,31 +105,14 @@ parse::Source parse::advance_until_next_statement(parse::Source source) {
 	return source;
 }
 
-::Result<size_t, Error> parse::new_indentation_level(parse::Source source) {
-	// Set indentation or error
-	if (current(source) == token::Indent) {
-		if (current(source).length > source.indentation_level) {
-			source.indentation_level = current(source).length;
-			return ::Result<size_t, Error>(source.indentation_level);
-		}
-	}
-	return ::Result<size_t, Error>(errors::expecting_new_indentation_level(source));
-}
-
 size_t parse::get_indentation(parse::Source source) {
-	auto indent = parse::token(source, token::Indent);
-	if (indent.is_ok()) {
-		return indent.get_value().length;
-	}
-	else {
-		return 1;
-	}
+	return source.column;
 }
 
 // Parsing
 // -------
 ::Result<std::shared_ptr<Ast::Program>, Errors> parse::program(std::vector<token::Token> tokens, std::filesystem::path file) {
-	auto result = parse::block(parse::Source(tokens, file), true);
+	auto result = parse::block(parse::Source(tokens, file));
 	if (result.is_error()) return ::Result<std::shared_ptr<Ast::Program>, std::vector<std::string>>(result.get_errors());
 	else {
 		auto block = result.get_value();
@@ -136,17 +121,20 @@ size_t parse::get_indentation(parse::Source source) {
 	}
 }
 
-parse::Result<std::shared_ptr<Ast::Block>> parse::block(parse::Source source, bool top_level) {
+parse::Result<std::shared_ptr<Ast::Block>> parse::block(parse::Source source) {
 	// Advance until next statement
 	source = advance_until_next_statement(source);
 
 	// Set new indentation level
-	size_t indentation_level = 1;
-	if (!top_level) {
-		auto result = new_indentation_level(source);
-		if (result.is_error()) return parse::Result<std::shared_ptr<Ast::Block>>(Errors{result.get_error()}); // tested in errors/expecting_new_indentation_level.dm
-		indentation_level = result.get_value();
-		source.indentation_level = result.get_value();
+	if (source.indentation_level.size() == 0) {
+		source.indentation_level.push_back(1);
+	}
+	else {
+		size_t previous = current_indentation(source);
+		source.indentation_level.push_back(advance_until_next_statement(source).column);
+		if (previous >= current_indentation(source)) {
+			return parse::Result<std::shared_ptr<Ast::Block>>(Errors{errors::expecting_new_indentation_level(source)}); // tested in errors/expecting_new_indentation_level.dm
+		}
 	}
  
 	// Create variables to store statements and functions
@@ -164,23 +152,20 @@ parse::Result<std::shared_ptr<Ast::Block>> parse::block(parse::Source source, bo
 		if (at_end(source)) break;
 
 		// Check indentation
-		size_t length = get_indentation(source);
-		if (length < indentation_level) {
+		if (current(source).column < current_indentation(source)) {
 			source = backup;
 			break;
 		}
-		if (length > indentation_level) {
+		if (current(source).column > current_indentation(source)) {
 			errors.push_back(errors::unexpected_indent(source)); // tested in test/errors/unexpected_indentation_1.dm and test/errors/unexpected_indentation_2.dm
 			while (!at_end(source) && current(source) != token::NewLine) source = advance(source); // advances until new line
 			continue;
 		}
-		if (parse::token(source, token::Indent).is_ok()) source = advance(source);
 
 		// Parse statement
 		auto result = parse::statement(source);
 		if (result.is_ok()) {
 			source = result.get_source();
-			source.indentation_level = indentation_level; // remember indentation level
 
 			if (std::dynamic_pointer_cast<Ast::Function>(result.get_value())) {
 				functions.push_back(std::dynamic_pointer_cast<Ast::Function>(result.get_value()));
@@ -205,6 +190,9 @@ parse::Result<std::shared_ptr<Ast::Block>> parse::block(parse::Source source, bo
 		while (!at_end(source) && current(source) != token::NewLine) source = advance(source);
 	}
 
+	// Pop indentation level
+	source.indentation_level.pop_back();
+
 	// Return
 	if (errors.size() == 0) return Result<std::shared_ptr<Ast::Block>>(std::make_shared<Ast::Block>(statements, functions, use_statements, 1, 1, source.file), source);
 	else                    return Result<std::shared_ptr<Ast::Block>>(errors);
@@ -215,19 +203,25 @@ parse::Result<std::shared_ptr<Ast::Expression>> parse::expression_block(parse::S
 	source = advance_until_next_statement(source);
 
 	// Set new indentation level
-	auto indentation_level = new_indentation_level(source);
-	if (indentation_level.is_error()) return parse::Result<std::shared_ptr<Ast::Expression>>(Errors{indentation_level.get_error()}); // tested in errors/expecting_new_indentation_level.dm
-	source.indentation_level = indentation_level.get_value();
-	source = advance(source);
+	size_t previous = current_indentation(source);
+	source.indentation_level.push_back(advance_until_next_statement(source).column);
+	if (previous >= current_indentation(source)) {
+		return parse::Result<std::shared_ptr<Ast::Expression>>(Errors{errors::expecting_new_indentation_level(source)}); // tested in errors/expecting_new_indentation_level.dm
+	}
 
 	// Parse expression
 	auto expression = parse::expression(source);
-	if (expression.is_error()) return expression;
+	if (expression.is_error()) {
+		return expression;
+	}
 	source = expression.get_source();
 
 	if (!at_end(source) && current(source) != token::NewLine) {
 		return parse::Result<std::shared_ptr<Ast::Expression>>(Errors{errors::unexpected_character(source)});
 	}
+
+	// Pop back indentation level
+	source.indentation_level.pop_back();
 
 	return parse::Result<std::shared_ptr<Ast::Expression>>(expression.get_value(), source);
 }
@@ -302,6 +296,7 @@ parse::Result<std::shared_ptr<Ast::Node>> parse::function(parse::Source source) 
 	}
 
 	auto expression_block = parse::expression_block(source);
+	
 	if (expression_block.is_ok()) {
 		source = expression_block.get_source();
 		auto node = std::make_shared<Ast::Function>(std::dynamic_pointer_cast<Ast::Identifier>(identifier.get_value()), args, expression_block.get_value(), source.line, source.column, source.file);
@@ -371,7 +366,7 @@ parse::Result<std::shared_ptr<Ast::Node>> parse::continue_stmt(parse::Source sou
 }
 
 parse::Result<std::shared_ptr<Ast::Node>> parse::if_else_stmt(parse::Source source) {
-	size_t indentation_level = source.indentation_level;
+	size_t indentation_level = source.column;
 
 	auto keyword = parse::token(source, token::If);
 	if (keyword.is_error()) return parse::Result<std::shared_ptr<Ast::Node>>(keyword.get_errors());
@@ -389,10 +384,7 @@ parse::Result<std::shared_ptr<Ast::Node>> parse::if_else_stmt(parse::Source sour
 	Source aux = advance_until_next_statement(source);
 
 	// Match indentation
-	size_t length = get_indentation(aux);
-	if (length == indentation_level) {
-		if (parse::token(aux, token::Indent).is_ok()) aux = advance(aux);
-		aux.indentation_level = length;
+	if (aux.column == indentation_level) {
 
 		// Match else
 		auto keyword_else = parse::token(aux, token::Else);
@@ -492,11 +484,11 @@ parse::Result<std::shared_ptr<Ast::Expression>> parse::expression(parse::Source 
 }
 
 parse::Result<std::shared_ptr<Ast::Expression>> parse::if_else_expr(parse::Source source) {
+	size_t indentation_level = source.column;
+
 	auto keyword = parse::token(source, token::If);
 	if (keyword.is_error()) return parse::Result<std::shared_ptr<Ast::Expression>>(keyword.get_errors());
 	source = keyword.get_source();
-
-	size_t indentation_level = source.column;
 
 	auto condition = parse::expression(source);
 	if (condition.is_error()) return condition.get_errors();
@@ -513,10 +505,7 @@ parse::Result<std::shared_ptr<Ast::Expression>> parse::if_else_expr(parse::Sourc
 	Source aux = advance_until_next_statement(source);
 
 	// Match indentation
-	if (current(source) == token::Indent && current(source).length == indentation_level) {
-		aux = advance(source);
-		aux.indentation_level = indentation_level;
-
+	if (aux.column == indentation_level) {
 		// Match else
 		auto keyword_else = parse::token(aux, token::Else);
 		if (keyword_else.is_ok()) {

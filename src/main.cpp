@@ -64,6 +64,7 @@ int main(int argc, char *argv[]) {
 
 	if (command.type == EmitCommand && command.options[0] == std::string("--tokens")) {
 		lexer::print(tokens.get_value());
+		return 0;
 	}
 
 
