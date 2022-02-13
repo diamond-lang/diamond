@@ -1,7 +1,14 @@
 #ifndef SHARED_HPP
 #define SHARED_HPP
 
+#include <vector>
+#include <cassert>
 #include <variant>
+
+using Error = std::string;
+using Errors = std::vector<Error>;
+
+struct Ok {};
 
 template <class T1, class T2>
 struct Result {

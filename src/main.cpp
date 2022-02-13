@@ -67,21 +67,21 @@ int main(int argc, char *argv[]) {
 	}
 
 
-	// // Parse
-	// auto parsing_result = parse::program(tokens.get_value(), command.file);
-	// if (parsing_result.is_error()) {
-	// 	std::vector<Error> errors = parsing_result.get_errors();
-	// 	for (size_t i = 0; i < errors.size(); i++) {
-	// 		std::cout << errors[i] << '\n';
-	// 	}
-	// 	exit(EXIT_FAILURE);
-	// }
-	// auto ast = parsing_result.get_value();
+	// Parse
+	auto parsing_result = parse::program(tokens.get_value(), command.file);
+	if (parsing_result.is_error()) {
+		std::vector<Error> errors = parsing_result.get_errors();
+		for (size_t i = 0; i < errors.size(); i++) {
+			std::cout << errors[i] << '\n';
+		}
+		exit(EXIT_FAILURE);
+	}
+	auto ast = parsing_result.get_value();
 
-	// if (command.type == EmitCommand && command.options[0] == std::string("--ast")) {
-	// 	ast->print();
-	// 	return 0;
-	// }
+	if (command.type == EmitCommand && command.options[0] == std::string("--ast")) {
+		ast->print();
+		return 0;
+	}
 
 	// // Analyze
 	// auto analyze_result = semantic::analyze(ast);

@@ -15,7 +15,7 @@ source_files = [
 	'src/lexer.cpp',
 	'src/ast.cpp',
 	'src/utilities.cpp',
-	# 'src/parser.cpp',
+	'src/parser.cpp',
 	# 'src/semantic.cpp',
 	# 'src/codegen.cpp',
 	# 'src/utilities.cpp',
