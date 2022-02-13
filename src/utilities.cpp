@@ -5,7 +5,7 @@
 #include "utilities.hpp"
 #include "errors.hpp"
 
-Result<std::string, Error> utilities::read_file(std::string path) {
+std::string utilities::read_file(std::filesystem::path path) {
 	std::string file = "";
 	std::ifstream f(path);
 	if (f.is_open()) {
@@ -14,10 +14,10 @@ Result<std::string, Error> utilities::read_file(std::string path) {
 			file += line + '\n';
 		}
 		f.close();
-		return Result<std::string, Error>(file);;
+		return file;
 	}
 	else {
-		return Result<std::string, Error>(Error(errors::file_couldnt_be_found(path)));
+		return "";
 	}
 }
 

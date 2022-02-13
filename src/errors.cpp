@@ -26,6 +26,7 @@ std::string errors::usage() {
 		               "    This command emits intermediary representations of\n"
 					   "    the program. Is useful for debugging the compiler.\n\n"
 					   "    The options are:\n"
+					   "        --tokens\n"
 					   "        --ast\n"
 					   "        --ast-with-types\n"
 					   "        --ast-with-concrete-types\n"

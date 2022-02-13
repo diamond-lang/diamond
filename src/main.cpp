@@ -3,6 +3,8 @@
 
 #include "errors.hpp"
 #include "lexer.hpp"
+#include "utilities.hpp"
+#include "parser.hpp"
 
 #ifdef _WIN32
 #include <Windows.h>
@@ -42,40 +44,35 @@ int main(int argc, char *argv[]) {
 		enable_colored_text_and_unicode();
 	#endif
 
-	auto tokens = lexer::lex(std::filesystem::path(argv[2]));
+	// Check usage
+	check_usage(argc, argv);
 
+	// Get command line arguments
+	Command command = get_command(argc, argv);
+
+	std::string program_name = utilities::get_program_name(command.file);
+	bool executable_already_existed = utilities::file_exists(utilities::get_executable_name(program_name));
+
+	// Lex
+	auto tokens = lexer::lex(std::filesystem::path(command.file));
 	if (tokens.is_error()) {
 		for (size_t i = 0; i < tokens.get_error().size(); i++) {
 			std::cout << tokens.get_error()[i] << "\n";
 		}
+		exit(EXIT_FAILURE);
 	}
-	else {
+
+	if (command.type == EmitCommand && command.options[0] == std::string("--tokens")) {
 		lexer::print(tokens.get_value());
 	}
 
-	// // Check usage
-	// check_usage(argc, argv);
-
-	// // Get command line arguments
-	// Command command = get_command(argc, argv);
-
-	// std::string program_name = utilities::get_program_name(command.file);
-	// bool executable_already_existed = utilities::file_exists(utilities::get_executable_name(program_name));
-
-	// // Read file
-	// Result<std::string, Error> result = utilities::read_file(command.file);
-	// if (result.is_error()) {
-	// 	std::cout << result.get_error().message;
-	// 	exit(EXIT_FAILURE);
-	// }
-	// std::string file = result.get_value();
 
 	// // Parse
-	// auto parsing_result = parse::program(Source(command.file, file.begin(), file.end()));
+	// auto parsing_result = parse::program(tokens.get_value(), command.file);
 	// if (parsing_result.is_error()) {
 	// 	std::vector<Error> errors = parsing_result.get_errors();
 	// 	for (size_t i = 0; i < errors.size(); i++) {
-	// 		std::cout << errors[i].message << '\n';
+	// 		std::cout << errors[i] << '\n';
 	// 	}
 	// 	exit(EXIT_FAILURE);
 	// }
@@ -137,7 +134,7 @@ void check_usage(int argc, char *argv[]) {
 	if (argv[1] == std::string("run") && argc < 3) {
 		print_usage_and_exit();
 	}
-	if (argv[1] == std::string("emit") && (argc < 4 || !(argv[2] == std::string("--llvm-ir") || argv[2] == std::string("--ast") || argv[2] == std::string("--ast-with-types") || argv[2] == std::string("--ast-with-concrete-types")))) {
+	if (argv[1] == std::string("emit") && (argc < 4 || !(argv[2] == std::string("--llvm-ir") || argv[2] == std::string("--ast") || argv[2] == std::string("--ast-with-types") || argv[2] == std::string("--ast-with-concrete-types") || argv[2] == std::string("--tokens")))) {
 		print_usage_and_exit();
 	}
 };

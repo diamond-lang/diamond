@@ -37,9 +37,17 @@ namespace token {
 		Else,
 		While,
 		Function,
+		NonLocal,
+		True,
+		False,
 		Or,
 		And,
-		Newline,
+		Use,
+		Break,
+		Continue,
+		Return,
+		Include,
+		NewLine,
 		Indent,
 		EndOfFile
 	};
@@ -50,10 +58,12 @@ namespace token {
 		const char* static_str = nullptr;
         size_t length;
 
+		Token() {}
 		Token(token::TokenVariant variant) : variant(variant) {} 
 		Token(token::TokenVariant variant, std::string literal) : variant(variant), str(literal), length(literal.size()) {}
 		Token(token::TokenVariant variant, const char* literal) : variant(variant), static_str(literal), length(strlen(literal)) {}
         Token(token::TokenVariant variant, size_t length) : variant(variant), length(length) {} 
+		~Token() {}
 
 		std::string get_literal() {
 			if (static_str) return std::string(this->static_str);

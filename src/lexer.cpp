@@ -120,8 +120,12 @@ Result<std::vector<token::Token>, Errors> lexer::lex(std::filesystem::path path)
     // Tokenize 
     while (!at_end(source)) {
         auto result = get_token(source);
-        if (result.is_ok()) tokens.push_back(result.get_value());
-        else                errors.push_back(result.get_error());
+        if (result.is_ok() && result.get_value() != token::EndOfFile) {
+            tokens.push_back(result.get_value());
+        }
+        else if (result.is_error()) {
+            errors.push_back(result.get_error());
+        }
     }
 
     // Close file
@@ -175,7 +179,7 @@ Result<token::Token, Error> lexer::get_token(Source& source) {
         return get_token(source);
     }
     if (match(source, "-")) {
-        return advance(token::Token(token::Less), source, 1);
+        return advance(token::Token(token::Less, "-"), source, 1);
     }
     if (match(source, " "))  {
         if (prev(source) == '\n') return get_indent(source);
@@ -188,7 +192,7 @@ Result<token::Token, Error> lexer::get_token(Source& source) {
         advance(source);
         return get_token(source);
     }
-    if (match(source, "\n"))      return advance(token::Token(token::Newline, "\\n"), source, 1);
+    if (match(source, "\n"))      return advance(token::Token(token::NewLine, "\\n"), source, 1);
     if (match(source, "\""))      return get_string(source);
     if (isdigit(current(source))) return get_number(source);
     if (isalpha(current(source))) return get_identifier(source);
@@ -203,7 +207,7 @@ Result<token::Token, Error> lexer::advance(token::Token token, Source& source, u
 }
 
 void lexer::advance_until_new_line(Source& source) {
-    while (current(source) != '\n') {
+    while (!at_end(source) && current(source) != '\n') {
         advance(source);
     }
     advance(source);
@@ -241,6 +245,16 @@ Result<token::Token, Error> lexer::get_identifier(Source& source) {
     if (literal == "while")    return token::Token(token::While, "while");
     if (literal == "function") return token::Token(token::Function, "function");
     if (literal == "be")       return token::Token(token::Be, "be");
+    if (literal == "nonlocal") return token::Token(token::NonLocal, "nonlocal");
+    if (literal == "true")     return token::Token(token::True, "true");
+    if (literal == "false")    return token::Token(token::False, "false");
+    if (literal == "and")      return token::Token(token::And, "and");
+    if (literal == "or")       return token::Token(token::Or, "or");
+    if (literal == "use")      return token::Token(token::Use, "use");
+    if (literal == "include")  return token::Token(token::Include, "include");
+    if (literal == "break")    return token::Token(token::Break, "break");
+    if (literal == "continue") return token::Token(token::Continue, "continue");
+    if (literal == "include")  return token::Token(token::Return, "return");
 
     return token::Token(token::Identifier, literal);
 }
