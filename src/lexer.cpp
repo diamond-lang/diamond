@@ -211,7 +211,7 @@ void lexer::advance_until_new_line(Source& source) {
 }
 
 Result<token::Token, Error> lexer::get_string(Source& source) {
-    std::string literal = "\"";
+    std::string literal = "";
     size_t line = source.line;
     size_t column = source.column;
 
@@ -226,7 +226,6 @@ Result<token::Token, Error> lexer::get_string(Source& source) {
     }
     else {
         advance(source);
-        literal += "\"";
         return Result<token::Token, Error>(token::Token(token::String, literal, line, column));
     }
 }
@@ -256,7 +255,8 @@ Result<token::Token, Error> lexer::get_identifier(Source& source) {
     if (literal == "include")  return token::Token(token::Include, "include", line, column);
     if (literal == "break")    return token::Token(token::Break, "break", line, column);
     if (literal == "continue") return token::Token(token::Continue, "continue", line, column);
-    if (literal == "return")  return token::Token(token::Return, "return", line, column);
+    if (literal == "return")   return token::Token(token::Return, "return", line, column);
+    if (literal == "not")      return token::Token(token::Not, "not", line, column);
 
     return token::Token(token::Identifier, literal, line, column);
 }
@@ -298,6 +298,11 @@ std::string lexer::get_integer(Source& source) {
 
 void lexer::print(std::vector<token::Token> tokens) {
     for (size_t i = 0; i < tokens.size(); i++) {
-        std::cout << tokens[i].get_literal() << "\n";
+        if (tokens[i] == token::String) {
+            std::cout << tokens[i].get_literal() << "\n";
+        }
+        else {
+            std::cout << "\"" << tokens[i].get_literal() << "\"\n";
+        }
     }
 }

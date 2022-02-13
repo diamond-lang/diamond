@@ -157,7 +157,9 @@ parse::Result<std::shared_ptr<Ast::Block>> parse::block(parse::Source source) {
 			break;
 		}
 		if (current(source).column > current_indentation(source)) {
-			errors.push_back(errors::unexpected_indent(source)); // tested in test/errors/unexpected_indentation_1.dm and test/errors/unexpected_indentation_2.dm
+			auto aux = source;
+			aux.column = 1;
+			errors.push_back(errors::unexpected_indent(aux)); // tested in test/errors/unexpected_indentation_1.dm and test/errors/unexpected_indentation_2.dm
 			while (!at_end(source) && current(source) != token::NewLine) source = advance(source); // advances until new line
 			continue;
 		}
