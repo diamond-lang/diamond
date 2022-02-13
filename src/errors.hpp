@@ -4,7 +4,6 @@
 #include <string>
 #include <filesystem>
 
-#include "shared.hpp"
 #include "parser.hpp"
 #include "ast.hpp"
 

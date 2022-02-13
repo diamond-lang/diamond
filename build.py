@@ -16,11 +16,11 @@ source_files = [
 	'src/ast.cpp',
 	'src/utilities.cpp',
 	'src/parser.cpp',
-	# 'src/semantic.cpp',
-	# 'src/codegen.cpp',
-	# 'src/utilities.cpp',
-	# 'src/intrinsics.cpp',
-	# 'src/type_inference.cpp'
+	'src/semantic.cpp',
+	'src/codegen.cpp',
+	'src/utilities.cpp',
+	'src/intrinsics.cpp',
+	'src/type_inference.cpp'
 ]
 cpp_version = 'c++17'
 

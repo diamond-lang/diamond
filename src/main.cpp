@@ -5,6 +5,8 @@
 #include "lexer.hpp"
 #include "utilities.hpp"
 #include "parser.hpp"
+#include "semantic.hpp"
+#include "codegen.hpp"
 
 #ifdef _WIN32
 #include <Windows.h>
@@ -57,7 +59,7 @@ int main(int argc, char *argv[]) {
 	auto tokens = lexer::lex(std::filesystem::path(command.file));
 	if (tokens.is_error()) {
 		for (size_t i = 0; i < tokens.get_error().size(); i++) {
-			std::cout << tokens.get_error()[i] << "\n";
+			std::cout << tokens.get_error()[i].value << "\n";
 		}
 		exit(EXIT_FAILURE);
 	}
@@ -73,7 +75,7 @@ int main(int argc, char *argv[]) {
 	if (parsing_result.is_error()) {
 		std::vector<Error> errors = parsing_result.get_errors();
 		for (size_t i = 0; i < errors.size(); i++) {
-			std::cout << errors[i] << '\n';
+			std::cout << errors[i].value << '\n';
 		}
 		exit(EXIT_FAILURE);
 	}
@@ -85,40 +87,40 @@ int main(int argc, char *argv[]) {
 	}
 
 	// // Analyze
-	// auto analyze_result = semantic::analyze(ast);
-	// if (analyze_result.is_error()) {
-	// 	std::vector<Error> error = analyze_result.get_errors();
-	// 	for (size_t i = 0; i < error.size(); i++) {
-	// 		std::cout << error[i].message << '\n';
-	// 	}
-	// 	exit(EXIT_FAILURE);
-	// }
+	auto analyze_result = semantic::analyze(ast);
+	if (analyze_result.is_error()) {
+		std::vector<Error> error = analyze_result.get_errors();
+		for (size_t i = 0; i < error.size(); i++) {
+			std::cout << error[i].value << '\n';
+		}
+		exit(EXIT_FAILURE);
+	}
 
-	// if (command.type == EmitCommand && command.options[0] == std::string("--ast-with-types")) {
-	// 	ast->print();
-	// 	return 0;
-	// }
+	if (command.type == EmitCommand && command.options[0] == std::string("--ast-with-types")) {
+		ast->print();
+		return 0;
+	}
 
-	// if (command.type == EmitCommand && command.options[0] == std::string("--ast-with-concrete-types")) {
-	// 	ast->print_with_concrete_types();
-	// 	return 0;
-	// }
+	if (command.type == EmitCommand && command.options[0] == std::string("--ast-with-concrete-types")) {
+		ast->print_with_concrete_types();
+		return 0;
+	}
 
-	// if (command.type == EmitCommand && command.options[0] == std::string("--llvm-ir")) {
-	// 	print_llvm_ir(ast, program_name);
-	// 	return 0;
-	// }
+	if (command.type == EmitCommand && command.options[0] == std::string("--llvm-ir")) {
+		print_llvm_ir(ast, program_name);
+		return 0;
+	}
 
-	// // Generate executable
-	// generate_executable(ast, program_name);
+	// Generate executable
+	generate_executable(ast, program_name);
 
-	// if (command.type == RunCommand) {
-	// 	system(utilities::get_run_command(program_name).c_str());
+	if (command.type == RunCommand) {
+		system(utilities::get_run_command(program_name).c_str());
 
-	// 	if (!executable_already_existed) {
-	// 		remove(utilities::get_executable_name(program_name).c_str());
-	// 	}
-	// }
+		if (!executable_already_existed) {
+			remove(utilities::get_executable_name(program_name).c_str());
+		}
+	}
 
 	return 0;
 }

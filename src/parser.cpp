@@ -113,11 +113,11 @@ size_t parse::get_indentation(parse::Source source) {
 // -------
 ::Result<std::shared_ptr<Ast::Program>, Errors> parse::program(std::vector<token::Token> tokens, std::filesystem::path file) {
 	auto result = parse::block(parse::Source(tokens, file));
-	if (result.is_error()) return ::Result<std::shared_ptr<Ast::Program>, std::vector<std::string>>(result.get_errors());
+	if (result.is_error()) return ::Result<std::shared_ptr<Ast::Program>, Errors>(result.get_errors());
 	else {
 		auto block = result.get_value();
 		auto program = std::make_shared<Ast::Program>(block->statements, block->functions, block->use_statements, block->line, block->col, block->file);
-		return ::Result<std::shared_ptr<Ast::Program>, std::vector<std::string>>(program);
+		return ::Result<std::shared_ptr<Ast::Program>, Errors>(program);
 	}
 }
 

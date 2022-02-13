@@ -5,7 +5,14 @@
 #include <cassert>
 #include <variant>
 
-using Error = std::string;
+struct Error {
+	std::string value;
+
+	Error() : value("") {}
+	Error(std::string value) : value(value) {}
+	~Error() {}
+};
+
 using Errors = std::vector<Error>;
 
 struct Ok {};
