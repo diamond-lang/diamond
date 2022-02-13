@@ -11,13 +11,13 @@
 namespace lexer {
     struct Source {
         size_t line;
-        size_t col;
+        size_t column;
         size_t index;
         std::filesystem::path path;
         FILE* file_pointer;
         
         Source() {}
-        Source(std::filesystem::path path, FILE* file_pointer) : line(1), col(1), index(0), path(path), file_pointer(file_pointer) {} 
+        Source(std::filesystem::path path, FILE* file_pointer) : line(1), column(1), index(0), path(path), file_pointer(file_pointer) {} 
     };
 
     char current(Source source) {
@@ -30,10 +30,10 @@ namespace lexer {
     void advance(Source& source) {
         if (current(source) == '\n') {
             source.line += 1;
-            source.col = 1;
+            source.column = 1;
         }
         else {
-            source.col++;
+            source.column++;
         }
         source.index++;
         fgetc(source.file_pointer);
@@ -136,31 +136,31 @@ Result<std::vector<token::Token>, Errors> lexer::lex(std::filesystem::path path)
 }
 
 Result<token::Token, Error> lexer::get_token(Source& source) {
-    if (at_end(source))      return advance(token::Token(token::EndOfFile, "EndOfFile"), source, 1);
-    if (match(source, "("))  return advance(token::Token(token::LeftParen, "("), source, 1);
-    if (match(source, ")"))  return advance(token::Token(token::RightParen, ")"), source, 1);
-    if (match(source, "["))  return advance(token::Token(token::LeftBracket, "["), source, 1);
-    if (match(source, "]"))  return advance(token::Token(token::RightBracket, "]"), source, 1);
-    if (match(source, "{"))  return advance(token::Token(token::LeftCurly, "{"), source, 1);
-    if (match(source, "}"))  return advance(token::Token(token::RightCurly, "}"), source, 1);
-    if (match(source, "+"))  return advance(token::Token(token::Plus, "+"), source, 1);
-    if (match(source, "*"))  return advance(token::Token(token::Star, "*"), source, 1);
-    if (match(source, "/"))  return advance(token::Token(token::Slash, "/"), source, 1);
-    if (match(source, "%"))  return advance(token::Token(token::Modulo, "%"), source, 1);
-    if (match(source, ":"))  return advance(token::Token(token::Colon, ":"), source, 1);
-    if (match(source, ","))  return advance(token::Token(token::Comma, ","), source, 1);
-    if (match(source, "!=")) return advance(token::Token(token::NotEqual, "!="), source, 2);
-    if (match(source, "==")) return advance(token::Token(token::EqualEqual, "=="), source, 2);
-    if (match(source, "="))  return advance(token::Token(token::Equal, "="), source, 1);
-    if (match(source, ">=")) return advance(token::Token(token::GreaterEqual, ">="), source, 2);
-    if (match(source, ">"))  return advance(token::Token(token::Greater, ">"), source, 1);
-    if (match(source, "<=")) return advance(token::Token(token::LessEqual, "<="), source, 2);
-    if (match(source, "<"))  return advance(token::Token(token::Less, "<"), source, 1);
+    if (at_end(source))      return advance(token::Token(token::EndOfFile, "EndOfFile", source.line, source.column), source, 1);
+    if (match(source, "("))  return advance(token::Token(token::LeftParen, "(", source.line, source.column), source, 1);
+    if (match(source, ")"))  return advance(token::Token(token::RightParen, ")", source.line, source.column), source, 1);
+    if (match(source, "["))  return advance(token::Token(token::LeftBracket, "[", source.line, source.column), source, 1);
+    if (match(source, "]"))  return advance(token::Token(token::RightBracket, "]", source.line, source.column), source, 1);
+    if (match(source, "{"))  return advance(token::Token(token::LeftCurly, "{", source.line, source.column), source, 1);
+    if (match(source, "}"))  return advance(token::Token(token::RightCurly, "}", source.line, source.column), source, 1);
+    if (match(source, "+"))  return advance(token::Token(token::Plus, "+", source.line, source.column), source, 1);
+    if (match(source, "*"))  return advance(token::Token(token::Star, "*", source.line, source.column), source, 1);
+    if (match(source, "/"))  return advance(token::Token(token::Slash, "/", source.line, source.column), source, 1);
+    if (match(source, "%"))  return advance(token::Token(token::Modulo, "%", source.line, source.column), source, 1);
+    if (match(source, ":"))  return advance(token::Token(token::Colon, ":", source.line, source.column), source, 1);
+    if (match(source, ","))  return advance(token::Token(token::Comma, ",", source.line, source.column), source, 1);
+    if (match(source, "!=")) return advance(token::Token(token::NotEqual, "!=", source.line, source.column), source, 2);
+    if (match(source, "==")) return advance(token::Token(token::EqualEqual, "==", source.line, source.column), source, 2);
+    if (match(source, "="))  return advance(token::Token(token::Equal, "=", source.line, source.column), source, 1);
+    if (match(source, ">=")) return advance(token::Token(token::GreaterEqual, ">=", source.line, source.column), source, 2);
+    if (match(source, ">"))  return advance(token::Token(token::Greater, ">", source.line, source.column), source, 1);
+    if (match(source, "<=")) return advance(token::Token(token::LessEqual, "<=", source.line, source.column), source, 2);
+    if (match(source, "<"))  return advance(token::Token(token::Less, "<", source.line, source.column), source, 1);
     if (match(source, ".") && isdigit(peek(source))) {
         return get_number(source);
     }
     if (match(source, ".")) {
-        return advance(token::Token(token::Dot, "."), source, 1);
+        return advance(token::Token(token::Dot, ".", source.line, source.column), source, 1);
     }
     if (match(source, "---")) {
         advance(source, 3);
@@ -179,20 +179,17 @@ Result<token::Token, Error> lexer::get_token(Source& source) {
         return get_token(source);
     }
     if (match(source, "-")) {
-        return advance(token::Token(token::Less, "-"), source, 1);
+        return advance(token::Token(token::Less, "-", source.line, source.column), source, 1);
     }
     if (match(source, " "))  {
-        if (prev(source) == '\n') return get_indent(source);
-        else {
-            advance(source);
-            return get_token(source);
-        }
+        advance(source);
+        return get_token(source);
     }
     if (match(source, "\t")) {
         advance(source);
         return get_token(source);
     }
-    if (match(source, "\n"))      return advance(token::Token(token::NewLine, "\\n"), source, 1);
+    if (match(source, "\n"))      return advance(token::Token(token::NewLine, "\\n", source.line, source.column), source, 1);
     if (match(source, "\""))      return get_string(source);
     if (isdigit(current(source))) return get_number(source);
     if (isalpha(current(source))) return get_identifier(source);
@@ -215,6 +212,9 @@ void lexer::advance_until_new_line(Source& source) {
 
 Result<token::Token, Error> lexer::get_string(Source& source) {
     std::string literal = "\"";
+    size_t line = source.line;
+    size_t column = source.column;
+
     advance(source);
     while (!(at_end(source) || match(source, "\n") || match(source, "\""))) {
         literal += current(source);
@@ -227,12 +227,14 @@ Result<token::Token, Error> lexer::get_string(Source& source) {
     else {
         advance(source);
         literal += "\"";
-        return Result<token::Token, Error>(token::Token(token::String, literal));
+        return Result<token::Token, Error>(token::Token(token::String, literal, line, column));
     }
 }
 
 Result<token::Token, Error> lexer::get_identifier(Source& source) {
     std::string literal = "";
+    size_t line = source.line;
+    size_t column = source.column;
 
     while (!(at_end(source) || match(source, "\n"))) {
         if (!(isalnum(current(source)) || current(source) == '_')) break;
@@ -240,33 +242,35 @@ Result<token::Token, Error> lexer::get_identifier(Source& source) {
         advance(source);
     }
 
-    if (literal == "if")       return token::Token(token::If, "if");
-    if (literal == "else")     return token::Token(token::Else, "else");
-    if (literal == "while")    return token::Token(token::While, "while");
-    if (literal == "function") return token::Token(token::Function, "function");
-    if (literal == "be")       return token::Token(token::Be, "be");
-    if (literal == "nonlocal") return token::Token(token::NonLocal, "nonlocal");
-    if (literal == "true")     return token::Token(token::True, "true");
-    if (literal == "false")    return token::Token(token::False, "false");
-    if (literal == "and")      return token::Token(token::And, "and");
-    if (literal == "or")       return token::Token(token::Or, "or");
-    if (literal == "use")      return token::Token(token::Use, "use");
-    if (literal == "include")  return token::Token(token::Include, "include");
-    if (literal == "break")    return token::Token(token::Break, "break");
-    if (literal == "continue") return token::Token(token::Continue, "continue");
-    if (literal == "include")  return token::Token(token::Return, "return");
+    if (literal == "if")       return token::Token(token::If, "if", line, column);
+    if (literal == "else")     return token::Token(token::Else, "else", line, column);
+    if (literal == "while")    return token::Token(token::While, "while", line, column);
+    if (literal == "function") return token::Token(token::Function, "function", line, column);
+    if (literal == "be")       return token::Token(token::Be, "be", line, column);
+    if (literal == "nonlocal") return token::Token(token::NonLocal, "nonlocal", line, column);
+    if (literal == "true")     return token::Token(token::True, "true", line, column);
+    if (literal == "false")    return token::Token(token::False, "false", line, column);
+    if (literal == "and")      return token::Token(token::And, "and", line, column);
+    if (literal == "or")       return token::Token(token::Or, "or", line, column);
+    if (literal == "use")      return token::Token(token::Use, "use", line, column);
+    if (literal == "include")  return token::Token(token::Include, "include", line, column);
+    if (literal == "break")    return token::Token(token::Break, "break", line, column);
+    if (literal == "continue") return token::Token(token::Continue, "continue", line, column);
+    if (literal == "include")  return token::Token(token::Return, "return", line, column);
 
-    return token::Token(token::Identifier, literal);
+    return token::Token(token::Identifier, literal, line, column);
 }
 
 Result<token::Token, Error> lexer::get_number(Source& source) {
     std::string literal = "";
+    size_t line = source.line;
+    size_t column = source.column;
     
     // eg: .8
     if (match(source, ".")) {
         advance(source);
         literal += "." + get_integer(source);
-        return token::Token(token::Float, literal);
+        return token::Token(token::Float, literal, line, column);
     }
 
     literal += get_integer(source);
@@ -275,11 +279,11 @@ Result<token::Token, Error> lexer::get_number(Source& source) {
     if (match(source, ".")) {
         advance(source);
         literal += "." + get_integer(source);
-        return token::Token(token::Float, literal);
+        return token::Token(token::Float, literal, line, column);
     
     // eg: 16
     } else {
-        return token::Token(token::Integer, literal);
+        return token::Token(token::Integer, literal, line, column);
     }
 }
 
@@ -292,27 +296,8 @@ std::string lexer::get_integer(Source& source) {
     return integer;
 }
 
-Result<token::Token, Error> lexer::get_indent(Source& source) {
-    size_t length = 0;
-    while (!(at_end(source) || match(source, "\n")) && match(source, " ")) {
-        length++;
-        advance(source);
-    }
-    return Result<token::Token, Error>(token::Token(token::Indent, length));
-}
-
 void lexer::print(std::vector<token::Token> tokens) {
     for (size_t i = 0; i < tokens.size(); i++) {
-        if (tokens[i] != token::Indent) {
-            std::cout << tokens[i].get_literal() << "\n";
-        }
-        else {
-            size_t j = 0;
-            while (j < tokens[i].length) {
-                std::cout << "🠺";
-                j++;
-            }
-            std::cout << "\n";
-        }
+        std::cout << tokens[i].get_literal() << "\n";
     }
 }

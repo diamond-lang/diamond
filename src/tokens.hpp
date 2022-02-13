@@ -48,7 +48,6 @@ namespace token {
 		Return,
 		Include,
 		NewLine,
-		Indent,
 		EndOfFile
 	};
 
@@ -56,13 +55,13 @@ namespace token {
 		token::TokenVariant variant;
 		std::string str;
 		const char* static_str = nullptr;
-        size_t length;
+		size_t line;
+		size_t column;
 
 		Token() {}
-		Token(token::TokenVariant variant) : variant(variant) {} 
-		Token(token::TokenVariant variant, std::string literal) : variant(variant), str(literal), length(literal.size()) {}
-		Token(token::TokenVariant variant, const char* literal) : variant(variant), static_str(literal), length(strlen(literal)) {}
-        Token(token::TokenVariant variant, size_t length) : variant(variant), length(length) {} 
+		Token(token::TokenVariant variant, size_t line, size_t column) : variant(variant), line(line), column(column) {} 
+		Token(token::TokenVariant variant, std::string literal, size_t line, size_t column) : variant(variant), str(literal), line(line), column(column) {}
+		Token(token::TokenVariant variant, const char* literal, size_t line, size_t column) : variant(variant), static_str(literal), line(line), column(column) {}
 		~Token() {}
 
 		std::string get_literal() {
