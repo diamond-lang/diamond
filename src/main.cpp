@@ -8,6 +8,8 @@
 #include "semantic.hpp"
 #include "codegen.hpp"
 
+// Definitions and prototypes
+// --------------------------
 #ifdef _WIN32
 #include <Windows.h>
 
@@ -37,94 +39,6 @@ struct Command {
 	~Command() {}
 };
 
-void print_usage_and_exit();
-void check_usage(int argc, char *argv[]);
-Command get_command(int argc, char *argv[]);
-
-int main(int argc, char *argv[]) {
-	#ifdef _WIN32
-		enable_colored_text_and_unicode();
-	#endif
-
-	// Check usage
-	check_usage(argc, argv);
-
-	// Get command line arguments
-	Command command = get_command(argc, argv);
-
-	std::string program_name = utilities::get_program_name(command.file);
-	bool executable_already_existed = utilities::file_exists(utilities::get_executable_name(program_name));
-
-	// Lex
-	auto tokens = lexer::lex(std::filesystem::path(command.file));
-	if (tokens.is_error()) {
-		for (size_t i = 0; i < tokens.get_error().size(); i++) {
-			std::cout << tokens.get_error()[i].value << "\n";
-		}
-		exit(EXIT_FAILURE);
-	}
-
-	if (command.type == EmitCommand && command.options[0] == std::string("--tokens")) {
-		lexer::print(tokens.get_value());
-		return 0;
-	}
-
-
-	// Parse
-	auto parsing_result = parse::program(tokens.get_value(), command.file);
-	if (parsing_result.is_error()) {
-		std::vector<Error> errors = parsing_result.get_errors();
-		for (size_t i = 0; i < errors.size(); i++) {
-			std::cout << errors[i].value << '\n';
-		}
-		exit(EXIT_FAILURE);
-	}
-	auto ast = parsing_result.get_value();
-
-	if (command.type == EmitCommand && command.options[0] == std::string("--ast")) {
-		ast->print();
-		return 0;
-	}
-
-	// // Analyze
-	auto analyze_result = semantic::analyze(ast);
-	if (analyze_result.is_error()) {
-		std::vector<Error> error = analyze_result.get_errors();
-		for (size_t i = 0; i < error.size(); i++) {
-			std::cout << error[i].value << '\n';
-		}
-		exit(EXIT_FAILURE);
-	}
-
-	if (command.type == EmitCommand && command.options[0] == std::string("--ast-with-types")) {
-		ast->print();
-		return 0;
-	}
-
-	if (command.type == EmitCommand && command.options[0] == std::string("--ast-with-concrete-types")) {
-		ast->print_with_concrete_types();
-		return 0;
-	}
-
-	if (command.type == EmitCommand && command.options[0] == std::string("--llvm-ir")) {
-		print_llvm_ir(ast, program_name);
-		return 0;
-	}
-
-	// Generate executable
-	generate_executable(ast, program_name);
-
-	if (command.type == RunCommand) {
-		system(utilities::get_run_command(program_name).c_str());
-
-		if (!executable_already_existed) {
-			remove(utilities::get_executable_name(program_name).c_str());
-		}
-	}
-
-	return 0;
-}
-
 void print_usage_and_exit() {
 	std::cout << errors::usage();
 	exit(EXIT_FAILURE);
@@ -153,4 +67,138 @@ Command get_command(int argc, char *argv[]) {
 		return Command(std::string(argv[3]), EmitCommand, std::vector<std::string>{argv[2]});
 	}
 	assert(false);
+}
+
+void print_errors_and_exit(std::vector<Error> errors) {
+	for (size_t i = 0; i < errors.size(); i++) {
+		std::cout << errors[i].value << "\n";
+	}
+	exit(EXIT_FAILURE);
+}
+
+void build(Command command) {
+	// Get program name
+	std::string program_name = utilities::get_program_name(command.file);
+
+	// Lex
+	auto tokens = lexer::lex(std::filesystem::path(command.file));
+	if (tokens.is_error()) print_errors_and_exit(tokens.get_error());
+
+	// Parse
+	auto parsing_result = parse::program(tokens.get_value(), command.file);
+	if (parsing_result.is_error()) print_errors_and_exit(parsing_result.get_error());
+	auto ast = parsing_result.get_value();
+
+	// Analyze
+	auto analyze_result = semantic::analyze(ast);
+	if (analyze_result.is_error()) print_errors_and_exit(analyze_result.get_error());
+
+	// Generate executable
+	generate_executable(ast, program_name);
+}
+
+void run(Command command) {
+	// Get program name
+	std::string program_name = utilities::get_program_name(command.file);
+
+	// Check if executable already existed
+	bool already_existed = utilities::file_exists(utilities::get_executable_name(program_name));
+
+	// Lex
+	auto tokens = lexer::lex(std::filesystem::path(command.file));
+	if (tokens.is_error()) print_errors_and_exit(tokens.get_error());
+
+	// Parse
+	auto parsing_result = parse::program(tokens.get_value(), command.file);
+	if (parsing_result.is_error()) print_errors_and_exit(parsing_result.get_error());
+	auto ast = parsing_result.get_value();
+
+	// Analyze
+	auto analyze_result = semantic::analyze(ast);
+	if (analyze_result.is_error()) print_errors_and_exit(analyze_result.get_error());
+
+	// Generate executable
+	generate_executable(ast, program_name);
+
+	// Run executable
+	system(utilities::get_run_command(program_name).c_str());
+
+	if (!already_existed) {
+		remove(utilities::get_executable_name(program_name).c_str());
+	}
+}
+
+void emit(Command command) {
+	// Get program name
+	std::string program_name = utilities::get_program_name(command.file);
+
+	// Lex
+	auto tokens = lexer::lex(std::filesystem::path(command.file));
+	if (tokens.is_error()) print_errors_and_exit(tokens.get_error());
+
+	// Emit tokens
+	if (command.options[0] == std::string("--tokens")) {
+		lexer::print(tokens.get_value());
+		return;
+	}
+
+	// Parse
+	auto parsing_result = parse::program(tokens.get_value(), command.file);
+	if (parsing_result.is_error()) print_errors_and_exit(parsing_result.get_error());
+	auto ast = parsing_result.get_value();
+
+	// Emit AST
+	if (command.options[0] == std::string("--ast")) {
+		ast->print();
+		return;
+	}
+
+	// Analyze
+	auto analyze_result = semantic::analyze(ast);
+	if (analyze_result.is_error()) print_errors_and_exit(analyze_result.get_error());
+
+	// Emit AST with types
+	if (command.options[0] == std::string("--ast-with-types")) {
+		ast->print();
+		return;
+	}
+
+	// Emit AST with concrete types
+	if (command.options[0] == std::string("--ast-with-concrete-types")) {
+		ast->print_with_concrete_types();
+		return;
+	}
+
+	// Emit LLVM-IR
+	if (command.options[0] == std::string("--llvm-ir")) {
+		print_llvm_ir(ast, program_name);
+		return;
+	}
+}
+
+// Main
+// ----
+int main(int argc, char *argv[]) {
+	#ifdef _WIN32
+		enable_colored_text_and_unicode();
+	#endif
+
+	// Check usage
+	check_usage(argc, argv);
+
+	// Get command line arguments
+	Command command = get_command(argc, argv);
+
+	// Execute command
+	if (command.type == BuildCommand) {
+		build(command);
+	}
+	if (command.type == RunCommand) {
+		run(command);
+	}
+	if (command.type == EmitCommand) {
+		emit(command);
+	}
+
+	return 0;
 }

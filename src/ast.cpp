@@ -83,7 +83,8 @@ void Ast::Program::print(size_t indent_level, std::vector<bool> last, bool concr
 		}
 		else {
 			for (size_t j = 0; j < this->functions[i]->specializations.size(); j++) {
-				this->functions[i]->specializations[j]->print(indent_level + 1, append(last, j == this->functions[i]->specializations.size() - 1), concrete);
+				bool is_last = i == this->functions.size() - 1 && j == this->functions[i]->specializations.size() - 1;
+				this->functions[i]->specializations[j]->print(indent_level + 1, append(last, is_last), concrete);
 			}
 		}
 	}

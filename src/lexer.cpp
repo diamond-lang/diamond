@@ -299,10 +299,10 @@ std::string lexer::get_integer(Source& source) {
 void lexer::print(std::vector<token::Token> tokens) {
     for (size_t i = 0; i < tokens.size(); i++) {
         if (tokens[i] == token::String) {
-            std::cout << tokens[i].get_literal() << "\n";
+            std::cout << "\"" << tokens[i].get_literal() << "\"\n";
         }
         else {
-            std::cout << "\"" << tokens[i].get_literal() << "\"\n";
+            std::cout << tokens[i].get_literal() << "\n";
         }
     }
 }

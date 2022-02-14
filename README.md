@@ -15,6 +15,7 @@ diamond emit [options] [program file]
     the program. Is useful for debugging the compiler.
 
     The options are:
+        --tokens
         --ast
         --ast-with-types
         --ast-with-concrete-types
