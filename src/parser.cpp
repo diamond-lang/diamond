@@ -12,12 +12,12 @@
 // --------------------------
 namespace parse {
 	bool at_end(parse::Source source) {
-		return source.position >= source.tokens.size();
+		return source.position >= (*source.tokens).size();
 	}
 	
 	token::Token current(parse::Source source) {
 		assert(!at_end(source));
-		return source.tokens[source.position];
+		return (*source.tokens)[source.position];
 	}
 
 	size_t current_indentation(parse::Source source) {
@@ -112,7 +112,7 @@ size_t parse::get_indentation(parse::Source source) {
 // Parsing
 // -------
 ::Result<std::shared_ptr<Ast::Program>, Errors> parse::program(std::vector<token::Token> tokens, std::filesystem::path file) {
-	auto result = parse::block(parse::Source(tokens, file));
+	auto result = parse::block(parse::Source(&tokens, file));
 	if (result.is_error()) return ::Result<std::shared_ptr<Ast::Program>, Errors>(result.get_errors());
 	else {
 		auto block = result.get_value();

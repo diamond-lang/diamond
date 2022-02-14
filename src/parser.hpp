@@ -8,7 +8,7 @@
 
 namespace parse {
 	struct Source {
-		std::vector<token::Token> tokens;
+		std::vector<token::Token>* tokens;
 		size_t position = 0;
 		size_t line;
 		size_t column;
@@ -16,10 +16,10 @@ namespace parse {
 		std::filesystem::path file;
 
 		Source() {}
-		Source(std::vector<token::Token> tokens, std::filesystem::path file) : tokens(tokens), file(file)  {
-			if (tokens.size() > 0) {
-				this->line = tokens[0].line;
-				this->column = tokens[0].column;
+		Source(std::vector<token::Token>* tokens, std::filesystem::path file) : tokens(tokens), file(file)  {
+			if ((*tokens).size() > 0) {
+				this->line = (*tokens)[0].line;
+				this->column = (*tokens)[0].column;
 			}
 		}
     };
