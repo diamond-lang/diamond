@@ -9,6 +9,7 @@
 #include "intrinsics.hpp"
 #include "type_inference.hpp"
 #include "utilities.hpp"
+#include "lexer.hpp"
 #include "parser.hpp"
 
 enum BindingType {
@@ -232,21 +233,31 @@ void Context::add_module_functions(std::filesystem::path module_path, std::set<s
 		// Read file
 		Result<std::string, Error> result = utilities::read_file(module_path.string());
 		if (result.is_error()) {
-			std::cout << result.get_error().message;
+			std::cout << result.get_error().value;
 			exit(EXIT_FAILURE);
 		}
 		std::string file = result.get_value();
 
+		// Lex
+		auto tokens = lexer::lex(module_path);
+		if (tokens.is_error()) {
+			for (size_t i = 0; i < tokens.get_error().size(); i++) {
+				std::cout << tokens.get_error()[i].value << "\n";
+			}
+			exit(EXIT_FAILURE);
+		}
+
 		// Parse
-		auto parsing_result = parse::program(Source(module_path.string(), file.begin(), file.end()));
+		auto parsing_result = parse::program(tokens.get_value(), module_path);
 		if (parsing_result.is_error()) {
 			std::vector<Error> errors = parsing_result.get_errors();
 			for (size_t i = 0; i < errors.size(); i++) {
-				std::cout << errors[i].message << '\n';
+				std::cout << errors[i].value << '\n';
 			}
 			exit(EXIT_FAILURE);
 		}
 		this->modules[module_path.string()] = parsing_result.get_value();
+
 	}
 
 	if (already_included_modules.find(module_path) == already_included_modules.end()) {

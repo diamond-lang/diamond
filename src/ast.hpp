@@ -1,99 +1,12 @@
-#ifndef TYPES_HPP
-#define TYPES_HPP
+#ifndef AST_HPP
+#define AST_HPP
 
 #include <string>
 #include <vector>
-#include <memory>
 #include <variant>
-#include <cassert>
-#include <cstdint>
 #include <unordered_map>
+#include <filesystem>
 
-// Source file
-struct Source {
-	size_t line;
-	size_t col;
-	size_t indentation_level = -1;
-	std::string file;
-	std::string::iterator it;
-	std::string::iterator end;
-
-	Source() {}
-	Source(std::string file, std::string::iterator it, std::string::iterator end) : line(1), col(1), file(file), it(it), end(end) {}
-};
-char current(Source source);
-bool at_end(Source source);
-bool match(Source source, std::string to_match);
-Source operator+(Source source, size_t offset);
-
-struct Ok {
-	Ok() {}
-	~Ok() {}
-};
-
-struct Error {
-	std::string message;
-
-	Error() {}
-	Error(std::string message) : message(message) {}
-	~Error() {}
-};
-
-using Errors = std::vector<Error>;
-
-// Parser result
-template <class T>
-struct ParserResult {
-	bool ok;
-	T value;
-	Source source;
-	Errors errors;
-
-	ParserResult<T>(T value, Source source) : ok(true), value(value), source(source) {}
-	ParserResult<T>(Errors errors) : ok(false), errors(errors) {}
-
-	bool is_ok() {return this->ok;}
-	bool is_error()     {return !this->is_ok();}
-	T get_value()       {
-		assert(this->ok);
-		return this->value;
-	}
-	Source get_source() {
-		assert(this->ok);
-		return this->source;
-	}
-	Errors get_errors() {
-		assert(!(this->ok));
-		return this->errors;
-	}
-};
-
-template <class T1, class T2>
-struct Result {
-	std::variant<T1, T2> value;
-
-	Result() {}
-	Result(T1 value) : value(value) {}
-	Result(T2 error) : value(error) {}
-	~Result() {}
-
-	bool is_ok()    {return std::holds_alternative<T1>(this->value);}
-	bool is_error() {return !std::holds_alternative<T1>(this->value);}
-	T1 get_value()  {
-		assert(this->is_ok() == true);
-		return std::get<T1>(this->value);
-	}
-	T2 get_error() {
-		assert(this->is_error() == true);
-		return std::get<T2>(this->value);
-	}
-	T2 get_errors()  {
-		assert(this->is_error() == true);
-		return std::get<T2>(this->value);
-	}
-};
-
-// Ast
 struct Type {
 	std::string name;
 	std::vector<Type> parameters;

@@ -15,11 +15,11 @@ std::string make_bright_cyan(std::string str);
 std::string make_red(std::string str);
 std::string make_magenta(std::string str);
 std::string make_bright_magenta(std::string str);
-std::string current_line(Source source);
+std::string current_line(parse::Source source);
 std::string current_line(std::shared_ptr<Ast::Node> node);
 std::string current_line(size_t line, std::string file_path);
-std::string underline_current_char(Source source);
-std::string underline_current_line(Source source);
+std::string underline_current_char(parse::Source source);
+std::string underline_current_line(parse::Source source);
 std::string underline_identifier(std::shared_ptr<Ast::Identifier> identifier);
 
 // Implementantions
@@ -33,6 +33,7 @@ std::string errors::usage() {
 		               "    This command emits intermediary representations of\n"
 					   "    the program. Is useful for debugging the compiler.\n\n"
 					   "    The options are:\n"
+					   "        --tokens\n"
 					   "        --ast\n"
 					   "        --ast-with-types\n"
 					   "        --ast-with-concrete-types\n"
@@ -40,25 +41,25 @@ std::string errors::usage() {
 					  // "                 \n";
 }
 
-std::string errors::unexpected_character(Source source) {
+std::string errors::unexpected_character(parse::Source source) {
 	return make_header("Unexpected character\n\n") +
 	       std::to_string(source.line) + "| " + current_line(source) + "\n" +
 	       underline_current_char(source);
 }
 
-std::string errors::unexpected_indent(Source source) {
+std::string errors::unexpected_indent(parse::Source source) {
 	return make_header("Unexpected indent\n\n") +
 	       std::to_string(source.line) + "| " + current_line(source) + "\n" +
 	       underline_current_char(source);
 }
 
-std::string errors::expecting_statement(Source source) {
+std::string errors::expecting_statement(parse::Source source) {
 	return make_header("Expecting a statement\n\n") +
 	       std::to_string(source.line) + "| " + current_line(source) + "\n" +
 	       underline_current_line(source);
 }
 
-std::string errors::expecting_new_indentation_level(Source source) {
+std::string errors::expecting_new_indentation_level(parse::Source source) {
 	return make_header("Expecting new indentation level\n\n") +
 		   std::to_string(source.line - 1) + "| " + current_line(source.line - 1, source.file) + "\n" +
 	       std::to_string(source.line) + "| " + current_line(source) + "\n" +
@@ -107,13 +108,13 @@ std::string errors::file_couldnt_be_found(std::string path) {
 }
 
 std::string current(size_t line, std::string file_path) {return current_line(line, file_path);} 
-std::string current_line(Source source) {return current_line(source.line, source.file);}
+std::string current_line(parse::Source source) {return current_line(source.line, source.file);}
 std::string current_line(std::shared_ptr<Ast::Node> node) {return current_line(node->line, node->file);}
 std::string current_line(size_t line, std::string file_path) {
 	if (file_path == "") return "";
 
 	// Read file
-	std::string file = utilities::read_file(file_path).get_value();
+	std::string file = utilities::read_file(file_path);
 
 	// Get line
 	std::string result = "";
@@ -130,7 +131,7 @@ std::string current_line(size_t line, std::string file_path) {
 	return result;
 }
 
-std::string underline_current_char(Source source) {
+std::string underline_current_char(parse::Source source) {
 	std::string result = "";
 	for (size_t i = 0; i < std::to_string(source.line).size(); i++) {
 		result += ' '; // Add space for line number
@@ -138,18 +139,18 @@ std::string underline_current_char(Source source) {
 	result += "  "; // Add space for | character after number
 
 	std::string line = current_line(source);
-	size_t col = source.col - 1;
+	size_t column = source.column - 1;
 	for (auto it = line.begin(); it != line.end(); it++) {
-		if (col <= 0)    break;
+		if (column <= 0)    break;
 		if (*it == '\t') result += *it;
 		else             result += ' ';
-		col -= 1;
+		column -= 1;
 	}
 	result += make_red("^");
 	return result;
 }
 
-std::string underline_current_line(Source source) {
+std::string underline_current_line(parse::Source source) {
 	std::string result = "";
 	for (size_t i = 0; i < std::to_string(source.line).size(); i++) {
 		result += ' '; // Add space for line number
