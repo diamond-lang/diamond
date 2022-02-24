@@ -42,4 +42,12 @@ struct Result {
 	}
 };
 
+struct Location {
+	size_t line;
+	size_t column;
+	std::filesystem::path file;
+
+	Location(size_t line, size_t column, std::filesystem::path file) : line(line), column(column), file(file) {}
+};
+
 #endif

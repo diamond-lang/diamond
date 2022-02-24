@@ -6,16 +6,6 @@
 #include "tokens.hpp"
 #include "ast.hpp"
 
-namespace parse {
-	struct Source {
-		size_t line;
-		size_t column;
-		std::filesystem::path file;
-
-		Source(size_t line, size_t column, std::filesystem::path file) : line(line), column(column), file(file) {}
-    };
-};
-
 struct Parser {
 	std::vector<token::Token>& tokens;
 	size_t position = 0;
@@ -60,7 +50,7 @@ struct Parser {
 	void advance_until_next_statement();
 	bool at_end();
 	bool match(std::vector<token::TokenVariant> tokens);
-	parse::Source source();
+	Location location();
 };
 
 #endif

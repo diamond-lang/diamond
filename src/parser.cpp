@@ -43,8 +43,8 @@ bool Parser::match(std::vector<token::TokenVariant> tokens) {
 	return true;
 }
 
-parse::Source Parser::source() {
-	return parse::Source(this->current().line, this->current().column, this->file);
+Location Parser::location() {
+	return Location(this->current().line, this->current().column, this->file);
 }
 
 // Parsing
@@ -74,7 +74,7 @@ Result<size_t, Error> Parser::parse_block() {
 		size_t previous = this->current_indentation();
 		this->indentation_level.push_back(this->current().column);
 		if (previous >= this->current_indentation()) {
-			this->errors.push_back(errors::expecting_new_indentation_level(this->source())); // tested in errors/expecting_new_indentation_level.dm
+			this->errors.push_back(errors::expecting_new_indentation_level(this->location())); // tested in errors/expecting_new_indentation_level.dm
 			return Error {};
 		}
 	}
@@ -92,7 +92,7 @@ Result<size_t, Error> Parser::parse_block() {
 			break;
 		}
 		else if (this->current().column > this->current_indentation()) {
-			this->errors.push_back(errors::unexpected_indent(this->source())); // tested in test/errors/unexpected_indentation_1.dm and test/errors/unexpected_indentation_2.dm
+			this->errors.push_back(errors::unexpected_indent(this->location())); // tested in test/errors/unexpected_indentation_1.dm and test/errors/unexpected_indentation_2.dm
 			there_was_errors = true;
 			while (!this->at_end() && this->current() != token::NewLine) this->advance(); // advances until new line
 			continue;
@@ -116,7 +116,7 @@ Result<size_t, Error> Parser::parse_block() {
 			}
 
 			if (!this->at_end() && this->current() != token::NewLine) {
-				this->errors.push_back(errors::unexpected_character(this->source())); // tested in test/errors/expecting_line_ending.dm
+				this->errors.push_back(errors::unexpected_character(this->location())); // tested in test/errors/expecting_line_ending.dm
 				there_was_errors = true;
 			}
 		}
@@ -157,7 +157,7 @@ Result<size_t, Error> Parser::parse_statement() {
 		default:
 			break;
 	}
-	this->errors.push_back(errors::expecting_statement(this->source())); // tested in test/errors/expecting_statement.dm
+	this->errors.push_back(errors::expecting_statement(this->location())); // tested in test/errors/expecting_statement.dm
 	return Error {};
 }
 
@@ -550,7 +550,7 @@ Result<size_t, Error> Parser::parse_primary() {
 		}
 		default: break;
 	}
-	this->errors.push_back(errors::unexpected_character(this->source())); // tested in test/errors/expecting_primary.dm
+	this->errors.push_back(errors::unexpected_character(this->location())); // tested in test/errors/expecting_primary.dm
 	return Error {};
 }
 
@@ -643,7 +643,7 @@ Result<size_t, Error> Parser::parse_string() {
 
 Result<token::Token, Error> Parser::parse_token(token::TokenVariant token) {
 	if (this->current() != token) {
-		this->errors.push_back(errors::unexpected_character(this->source()));
+		this->errors.push_back(errors::unexpected_character(this->location()));
 		return Error {};
 	}
 	auto curr = this->current();

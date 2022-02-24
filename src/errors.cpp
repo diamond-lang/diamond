@@ -15,11 +15,11 @@ std::string make_bright_cyan(std::string str);
 std::string make_red(std::string str);
 std::string make_magenta(std::string str);
 std::string make_bright_magenta(std::string str);
-std::string current_line(parse::Source source);
+std::string current_line(Location location);
 std::string current_line(std::shared_ptr<Ast::Node> node);
 std::string current_line(size_t line, std::string file_path);
-std::string underline_current_char(parse::Source source);
-std::string underline_current_line(parse::Source source);
+std::string underline_current_char(Location location);
+std::string underline_current_line(Location location);
 //std::string underline_identifier(std::shared_ptr<Ast::Identifier> identifier);
 
 // Implementantions
@@ -41,29 +41,29 @@ std::string errors::usage() {
 					  // "                 \n";
 }
 
-std::string errors::unexpected_character(parse::Source source) {
+std::string errors::unexpected_character(Location location) {
 	return make_header("Unexpected character\n\n") +
-	       std::to_string(source.line) + "| " + current_line(source) + "\n" +
-	       underline_current_char(source);
+	       std::to_string(location.line) + "| " + current_line(location) + "\n" +
+	       underline_current_char(location);
 }
 
-std::string errors::unexpected_indent(parse::Source source) {
+std::string errors::unexpected_indent(Location location) {
 	return make_header("Unexpected indent\n\n") +
-	       std::to_string(source.line) + "| " + current_line(source) + "\n" +
-	       underline_current_char(source);
+	       std::to_string(location.line) + "| " + current_line(location) + "\n" +
+	       underline_current_char(location);
 }
 
-std::string errors::expecting_statement(parse::Source source) {
+std::string errors::expecting_statement(Location location) {
 	return make_header("Expecting a statement\n\n") +
-	       std::to_string(source.line) + "| " + current_line(source) + "\n" +
-	       underline_current_line(source);
+	       std::to_string(location.line) + "| " + current_line(location) + "\n" +
+	       underline_current_line(location);
 }
 
-std::string errors::expecting_new_indentation_level(parse::Source source) {
+std::string errors::expecting_new_indentation_level(Location location) {
 	return make_header("Expecting new indentation level\n\n") +
-		   std::to_string(source.line - 1) + "| " + current_line(source.line - 1, source.file) + "\n" +
-	       std::to_string(source.line) + "| " + current_line(source) + "\n" +
-	       underline_current_char(source);
+		   std::to_string(location.line - 1) + "| " + current_line(location.line - 1, location.file) + "\n" +
+	       std::to_string(location.line) + "| " + current_line(location) + "\n" +
+	       underline_current_char(location);
 }
 
 // std::string errors::undefined_variable(std::shared_ptr<Ast::Identifier> identifier) {
@@ -108,7 +108,7 @@ std::string errors::file_couldnt_be_found(std::string path) {
 }
 
 std::string current(size_t line, std::string file_path) {return current_line(line, file_path);} 
-std::string current_line(parse::Source source) {return current_line(source.line, source.file);}
+std::string current_line(Location location) {return current_line(location.line, location.file);}
 //std::string current_line(std::shared_ptr<Ast::Node> node) {return current_line(node->line, node->file);}
 std::string current_line(size_t line, std::string file_path) {
 	if (file_path == "") return "";
@@ -131,15 +131,15 @@ std::string current_line(size_t line, std::string file_path) {
 	return result;
 }
 
-std::string underline_current_char(parse::Source source) {
+std::string underline_current_char(Location location) {
 	std::string result = "";
-	for (size_t i = 0; i < std::to_string(source.line).size(); i++) {
+	for (size_t i = 0; i < std::to_string(location.line).size(); i++) {
 		result += ' '; // Add space for line number
 	}
 	result += "  "; // Add space for | character after number
 
-	std::string line = current_line(source);
-	size_t column = source.column - 1;
+	std::string line = current_line(location);
+	size_t column = location.column - 1;
 	for (auto it = line.begin(); it != line.end(); it++) {
 		if (column <= 0)    break;
 		if (*it == '\t') result += *it;
@@ -150,14 +150,14 @@ std::string underline_current_char(parse::Source source) {
 	return result;
 }
 
-std::string underline_current_line(parse::Source source) {
+std::string underline_current_line(Location location) {
 	std::string result = "";
-	for (size_t i = 0; i < std::to_string(source.line).size(); i++) {
+	for (size_t i = 0; i < std::to_string(location.line).size(); i++) {
 		result += ' '; // Add space for line number
 	}
 	result += "  "; // Add space for | and space after
 
-	std::string line = current_line(source);
+	std::string line = current_line(location);
 	for (auto it = line.begin(); it != line.end(); it++) {
 		result += make_red("^");	
 	}
