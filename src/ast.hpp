@@ -6,6 +6,7 @@
 #include <variant>
 #include <unordered_map>
 #include <filesystem>
+#include <optional>
 
 struct Type {
 	std::string name;
@@ -21,226 +22,200 @@ struct Type {
 };
 
 namespace Ast {
-	struct Node {
+	struct BlockNode {
 		size_t line;
-		size_t col;
-		std::string file;
-
-		Node(size_t line, size_t col, std::string file): line(line), col(col), file(file) {}
-		virtual ~Node() {}
-		virtual void print(size_t indent_level = 0, std::vector<bool> last = {}, bool concrete = false) = 0;
-		virtual std::shared_ptr<Node> clone() = 0;
-	};
-
-	struct Identifier;
-	struct Function;
-	struct Use;
-	struct Program;
-
-	struct Program : Node {
-		std::vector<std::shared_ptr<Ast::Node>> statements;
-		std::vector<std::shared_ptr<Ast::Function>> functions;
-		std::vector<std::shared_ptr<Ast::Use>> use_statements;
-		std::unordered_map<std::string, std::shared_ptr<Ast::Program>> modules;
-
-		Program(std::vector<std::shared_ptr<Ast::Node>> statements, std::vector<std::shared_ptr<Ast::Function>> functions, std::vector<std::shared_ptr<Ast::Use>> use_statements, size_t line, size_t col, std::string file) : Node(line, col, file), statements(statements), functions(functions), use_statements(use_statements) {}
-		virtual ~Program() {}
-		virtual void print(size_t indent_level = 0, std::vector<bool> last = {}, bool concrete = false);
-		virtual std::shared_ptr<Node> clone();
-		void print_with_concrete_types();
-	};
-
-	struct Block : Node {
-		std::vector<std::shared_ptr<Ast::Node>> statements;
-		std::vector<std::shared_ptr<Ast::Function>> functions;
-		std::vector<std::shared_ptr<Ast::Use>> use_statements;
+		size_t column;
 		Type type = Type("");
 
-		Block(std::vector<std::shared_ptr<Ast::Node>> statements, std::vector<std::shared_ptr<Ast::Function>> functions, std::vector<std::shared_ptr<Ast::Use>> use_statements, size_t line, size_t col, std::string file) : Node(line, col, file), statements(statements), functions(functions), use_statements(use_statements) {}
-		virtual ~Block() {}
-		virtual void print(size_t indent_level = 0, std::vector<bool> last = {}, bool concrete = false);
-		virtual std::shared_ptr<Node> clone();
+		std::vector<size_t> statements;
+		std::vector<size_t> functions;
+		std::vector<size_t> use_include_statements;
 	};
 
-	struct FunctionSpecialization;
+	struct FunctionNode {
+		size_t line;
+		size_t column;
 
-	struct Function : Node {
-		std::shared_ptr<Ast::Identifier> identifier;
-		std::vector<std::shared_ptr<Ast::Identifier>> args;
-		std::shared_ptr<Ast::Node> body;
+		size_t identifier;
+		std::vector<size_t> args;
+		size_t body;
 
 		bool generic = false;
 		Type return_type = Type("");
-		std::vector<std::shared_ptr<Ast::FunctionSpecialization>> specializations;
-
-		Function(std::shared_ptr<Ast::Identifier> identifier, std::vector<std::shared_ptr<Ast::Identifier>> args, std::shared_ptr<Ast::Node> body, size_t line, size_t col, std::string file) :  Node(line, col, file), identifier(identifier), args(args), body(body) {}
-		virtual ~Function() {}
-		virtual void print(size_t indent_level = 0, std::vector<bool> last = {}, bool concrete = false);
-		virtual std::shared_ptr<Node> clone();
+		std::vector<size_t> specializations;
 	};
 
-	struct FunctionSpecialization : Node {
-		std::shared_ptr<Ast::Identifier> identifier;
-		std::vector<std::shared_ptr<Ast::Identifier>> args;
-		std::shared_ptr<Ast::Node> body;
+	struct FunctionSpecializationNode {
+		size_t line;
+		size_t column;
+
+		size_t identifier;
+		std::vector<size_t> args;
+		size_t body;
 		
 		bool valid = false;
 		Type return_type = Type("");
-
-		FunctionSpecialization(size_t line, size_t col, std::string file) :  Node(line, col, file) {}
-		virtual ~FunctionSpecialization() {}
-		virtual void print(size_t indent_level = 0, std::vector<bool> last = {}, bool concrete = false);
-		virtual std::shared_ptr<Node> clone();
 	};
 
-	struct Expression;
+	struct AssignmentNode {
+		size_t line;
+		size_t column;
 
-	struct Assignment : Node {
-		std::shared_ptr<Ast::Identifier> identifier;
-		std::shared_ptr<Ast::Expression> expression;
+		size_t identifier;
+		size_t expression;
 		bool is_mutable = false;
 		bool nonlocal = false;
-
-		Assignment(std::shared_ptr<Ast::Identifier> identifier, std::shared_ptr<Ast::Expression> expression, bool is_mutable, bool nonlocal, size_t line, size_t col, std::string file) : Node(line, col, file), identifier(identifier), expression(expression), is_mutable(is_mutable), nonlocal(nonlocal) {}
-		virtual ~Assignment() {}
-		virtual void print(size_t indent_level = 0, std::vector<bool> last = {}, bool concrete = false);
-		virtual std::shared_ptr<Node> clone();
 	};
 
-	struct Return : Node {
-		std::shared_ptr<Ast::Expression> expression;
+	struct ReturnNode {
+		size_t line;
+		size_t column;
 
-		Return(std::shared_ptr<Ast::Expression> expression, size_t line, size_t col, std::string file) : Node(line, col, file), expression(expression) {}
-		virtual ~Return() {}
-		virtual void print(size_t indent_level = 0, std::vector<bool> last = {}, bool concrete = false);
-		virtual std::shared_ptr<Node> clone();
+		std::optional<size_t> expression;
 	};
 
-	struct Break : Node {
-		Break(size_t line, size_t col, std::string file) : Node(line, col, file) {}
-		virtual ~Break() {}
-		virtual void print(size_t indent_level = 0, std::vector<bool> last = {}, bool concrete = false);
-		virtual std::shared_ptr<Node> clone();
+	struct BreakNode {
+		size_t line;
+		size_t column;
 	};
 
-	struct Continue : Node {
-		Continue(size_t line, size_t col, std::string file) : Node(line, col, file) {}
-		virtual ~Continue() {}
-		virtual void print(size_t indent_level = 0, std::vector<bool> last = {}, bool concrete = false);
-		virtual std::shared_ptr<Node> clone();
+	struct ContinueNode {
+		size_t line;
+		size_t column;
 	};
 
-	struct IfElseStmt : Node {
-		std::shared_ptr<Ast::Expression> condition;
-		std::shared_ptr<Ast::Block> block;
-		std::shared_ptr<Ast::Block> else_block;
+	struct IfElseNode {
+		size_t line;
+		size_t column;
+		Type type = Type("");
 
-		IfElseStmt(std::shared_ptr<Ast::Expression> condition, std::shared_ptr<Ast::Block> block, size_t line, size_t col, std::string file) : Node(line, col, file), condition(condition), block(block), else_block(nullptr) {}
-		IfElseStmt(std::shared_ptr<Ast::Expression> condition, std::shared_ptr<Ast::Block> block, std::shared_ptr<Ast::Block> else_block, size_t line, size_t col, std::string file) : Node(line, col, file), condition(condition), block(block), else_block(else_block) {}
-		virtual ~IfElseStmt() {}
-		virtual void print(size_t indent_level = 0, std::vector<bool> last = {}, bool concrete = false);
-		virtual std::shared_ptr<Node> clone();
+		size_t condition;
+		size_t if_branch;
+		std::optional<size_t> else_branch;
 	};
 
-	struct WhileStmt : Node {
-		std::shared_ptr<Ast::Expression> condition;
-		std::shared_ptr<Ast::Block> block;
+	struct WhileNode {
+		size_t line;
+		size_t column;
 
-		WhileStmt(std::shared_ptr<Ast::Expression> condition, std::shared_ptr<Ast::Block> block, size_t line, size_t col, std::string file) : Node(line, col, file), condition(condition), block(block) {}
-		virtual ~WhileStmt() {}
-		virtual void print(size_t indent_level = 0, std::vector<bool> last = {}, bool concrete = false);
-		virtual std::shared_ptr<Node> clone();
+		size_t condition;
+		size_t block;
 	};
 
-	struct String;
+	struct UseNode {
+		size_t line;
+		size_t column;
 
-	struct Use : Node {
-		std::shared_ptr<Ast::String> path;
-		bool include = false;
-
-		Use(std::shared_ptr<Ast::String> path, size_t line, size_t col, std::string file) : Node(line, col, file), path(path) {}
-		virtual ~Use() {}
-		virtual void print(size_t indent_level = 0, std::vector<bool> last = {}, bool concrete = false);
-		virtual std::shared_ptr<Node> clone();
+		size_t path;
 	};
 
-	struct Expression : Node {
-		Type type = Type();
+	struct IncludeNode {
+		size_t line;
+		size_t column;
 
-		Expression(size_t line, size_t col, std::string file) : Node(line, col, file) {}
-		virtual ~Expression() {}
-		virtual std::shared_ptr<Node> clone() = 0;
+		size_t path;
 	};
 
-	struct IfElseExpr : Expression {
-		std::shared_ptr<Ast::Expression> condition;
-		std::shared_ptr<Ast::Expression> expression;
-		std::shared_ptr<Ast::Expression> else_expression;
-		
-		IfElseExpr(std::shared_ptr<Ast::Expression> condition, std::shared_ptr<Ast::Expression> expression, std::shared_ptr<Ast::Expression> else_expression, size_t line, size_t col, std::string file) : Expression(line, col, file), condition(condition), expression(expression), else_expression(else_expression) {}
-		virtual ~IfElseExpr() {}
-		virtual void print(size_t indent_level = 0, std::vector<bool> last = {}, bool concrete = false);
-		virtual std::shared_ptr<Node> clone();
+	struct CallNode {
+		size_t line;
+		size_t column;
+		Type type = Type("");
+
+		size_t identifier;
+		std::vector<size_t> args;
+		size_t function; 
 	};
 
-	struct Call : Expression {
-		std::shared_ptr<Ast::Identifier> identifier;
-		std::vector<std::shared_ptr<Ast::Expression>> args;
-		std::shared_ptr<Ast::Node> function = nullptr;  
+	struct FloatNode {
+		size_t line;
+		size_t column;
+		Type type = Type("");
 
-		Call(std::shared_ptr<Ast::Identifier> identifier, std::vector<std::shared_ptr<Ast::Expression>> args, size_t line, size_t col, std::string file) : Expression(line, col, file), identifier(identifier), args(args) {}
-		virtual ~Call() {}
-		virtual void print(size_t indent_level = 0, std::vector<bool> last = {}, bool concrete = false);
-		virtual std::shared_ptr<Node> clone();
-	};
-
-	struct Number : Expression {
 		double value;
-
-		Number(double value, size_t line, size_t col, std::string file) : Expression(line, col, file), value(value) {}
-		virtual ~Number() {}
-		virtual void print(size_t indent_level = 0, std::vector<bool> last = {}, bool concrete = false);
-		virtual std::shared_ptr<Node> clone();
 	};
 
-	struct Integer : Expression {
+	struct IntegerNode {
+		size_t line;
+		size_t column;
+		Type type = Type("");
+
 		int64_t value;
-
-		Integer(int64_t value, size_t line, size_t col, std::string file) : Expression(line, col, file), value(value) {}
-		virtual ~Integer() {}
-		virtual void print(size_t indent_level = 0, std::vector<bool> last = {}, bool concrete = false);
-		virtual std::shared_ptr<Node> clone();
 	};
 
-	struct Identifier : Expression {
+	struct IdentifierNode {
+		size_t line;
+		size_t column;
+		Type type = Type("");
+
 		std::string value;
-
-		Identifier(std::string value, size_t line, size_t col, std::string file) : Expression(line, col, file), value(value) {}
-		virtual ~Identifier() {}
-		virtual void print(size_t indent_level = 0, std::vector<bool> last = {}, bool concrete = false);
-		virtual std::shared_ptr<Node> clone();
 	};
 
-	struct Boolean : Expression {
+	struct BooleanNode {
+		size_t line;
+		size_t column;
+		Type type = Type("");
+
 		bool value;
-
-		Boolean(bool value, size_t line, size_t col, std::string file) : Expression(line, col, file), value(value) {}
-		virtual ~Boolean() {}
-		virtual void print(size_t indent_level = 0, std::vector<bool> last = {}, bool concrete = false);
-		virtual std::shared_ptr<Node> clone();
 	};
 
-	struct String : Expression {
+	struct StringNode {
+		size_t line;
+		size_t column;
+		Type type = Type("");
+
 		std::string value;
-
-		String(std::string value, size_t line, size_t col, std::string file) : Expression(line, col, file), value(value) {}
-		virtual ~String() {}
-		virtual void print(size_t indent_level = 0, std::vector<bool> last = {}, bool concrete = false);
-		virtual std::shared_ptr<Node> clone();
 	};
-}
 
-std::vector<Type> get_args_types(std::vector<std::shared_ptr<Ast::Identifier>> args);
-std::vector<Type> get_args_types(std::vector<std::shared_ptr<Ast::Expression>> args);
+	enum NodeVariant {
+        Block,
+        Function,
+        FunctionSpecialization,
+        Assignment,
+        Return,
+        Break,
+        Continue,
+        IfElse,
+        While,
+        Use,
+		Include,
+        Call,
+        Float,
+        Integer,
+        Identifier,
+        Boolean,
+        String
+    };
+
+	using Node = std::variant<
+		BlockNode,
+		FunctionNode,
+		FunctionSpecializationNode,
+		AssignmentNode,
+		ReturnNode,
+		BreakNode,
+		ContinueNode,
+		IfElseNode,
+		WhileNode,
+		UseNode,
+		IncludeNode,
+		CallNode,
+		FloatNode,
+		IntegerNode,
+		IdentifierNode,
+		BooleanNode,
+		StringNode
+	>;
+
+    struct Ast {
+        std::vector<Node> nodes;
+        size_t program;
+    };
+
+	void print(Ast ast, size_t indent_level = 0, std::vector<bool> last = {}, bool concrete = false);
+	void print(Ast ast, size_t node, size_t indent_level = 0, std::vector<bool> last = {}, bool concrete = false);
+	void print_with_concrete_types(Ast ast, size_t node, size_t indent_level = 0, std::vector<bool> last = {});
+};
+
+std::vector<Type> get_args_types(std::vector<Ast::Node*> args);
 
 #endif

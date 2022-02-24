@@ -127,6 +127,7 @@ Result<std::vector<token::Token>, Errors> lexer::lex(std::filesystem::path path)
             errors.push_back(result.get_error());
         }
     }
+    tokens.push_back(token::Token(token::EndOfFile, source.line, source.column));
 
     // Close file
     fclose(file_pointer);
@@ -179,7 +180,7 @@ Result<token::Token, Error> lexer::get_token(Source& source) {
         return get_token(source);
     }
     if (match(source, "-")) {
-        return advance(token::Token(token::Less, "-", source.line, source.column), source, 1);
+        return advance(token::Token(token::Minus, "-", source.line, source.column), source, 1);
     }
     if (match(source, " "))  {
         advance(source);

@@ -5,8 +5,6 @@
 #include "lexer.hpp"
 #include "utilities.hpp"
 #include "parser.hpp"
-#include "semantic.hpp"
-#include "codegen.hpp"
 
 // Definitions and prototypes
 // --------------------------
@@ -30,7 +28,7 @@ enum CommandType {
 };
 
 struct Command {
-	std::string file;
+	std::filesystem::path file;
 	CommandType type;
 	std::vector<std::string> options;
 
@@ -81,20 +79,22 @@ void build(Command command) {
 	std::string program_name = utilities::get_program_name(command.file);
 
 	// Lex
-	auto tokens = lexer::lex(std::filesystem::path(command.file));
-	if (tokens.is_error()) print_errors_and_exit(tokens.get_error());
+	auto lexing_result = lexer::lex(std::filesystem::path(command.file));
+	if (lexing_result.is_error()) print_errors_and_exit(lexing_result.get_error());
+	auto tokens = lexing_result.get_value();
 
 	// Parse
-	auto parsing_result = parse::program(tokens.get_value(), command.file);
-	if (parsing_result.is_error()) print_errors_and_exit(parsing_result.get_error());
-	auto ast = parsing_result.get_value();
+	Parser parser(tokens, command.file);
+	auto parsing_result = parser.parse_program();
+	if (parsing_result.is_error()) print_errors_and_exit(parser.errors);
+	auto& ast = parser.ast;
 
-	// Analyze
-	auto analyze_result = semantic::analyze(ast);
-	if (analyze_result.is_error()) print_errors_and_exit(analyze_result.get_error());
+	// // Analyze
+	// auto analyze_result = semantic::analyze(ast);
+	// if (analyze_result.is_error()) print_errors_and_exit(analyze_result.get_error());
 
-	// Generate executable
-	generate_executable(ast, program_name);
+	// // Generate executable
+	// generate_executable(ast, program_name);
 }
 
 void run(Command command) {
@@ -105,27 +105,29 @@ void run(Command command) {
 	bool already_existed = utilities::file_exists(utilities::get_executable_name(program_name));
 
 	// Lex
-	auto tokens = lexer::lex(std::filesystem::path(command.file));
-	if (tokens.is_error()) print_errors_and_exit(tokens.get_error());
+	auto lexing_result = lexer::lex(std::filesystem::path(command.file));
+	if (lexing_result.is_error()) print_errors_and_exit(lexing_result.get_error());
+	auto tokens = lexing_result.get_value();
 
 	// Parse
-	auto parsing_result = parse::program(tokens.get_value(), command.file);
-	if (parsing_result.is_error()) print_errors_and_exit(parsing_result.get_error());
-	auto ast = parsing_result.get_value();
+	Parser parser(tokens, command.file);
+	auto parsing_result = parser.parse_program();
+	if (parsing_result.is_error()) print_errors_and_exit(parser.errors);
+	auto& ast = parser.ast;
 
-	// Analyze
-	auto analyze_result = semantic::analyze(ast);
-	if (analyze_result.is_error()) print_errors_and_exit(analyze_result.get_error());
+	// // Analyze
+	// auto analyze_result = semantic::analyze(ast);
+	// if (analyze_result.is_error()) print_errors_and_exit(analyze_result.get_error());
 
-	// Generate executable
-	generate_executable(ast, program_name);
+	// // Generate executable
+	// generate_executable(ast, program_name);
 
-	// Run executable
-	system(utilities::get_run_command(program_name).c_str());
+	// // Run executable
+	// system(utilities::get_run_command(program_name).c_str());
 
-	if (!already_existed) {
-		remove(utilities::get_executable_name(program_name).c_str());
-	}
+	// if (!already_existed) {
+	// 	remove(utilities::get_executable_name(program_name).c_str());
+	// }
 }
 
 void emit(Command command) {
@@ -133,47 +135,49 @@ void emit(Command command) {
 	std::string program_name = utilities::get_program_name(command.file);
 
 	// Lex
-	auto tokens = lexer::lex(std::filesystem::path(command.file));
-	if (tokens.is_error()) print_errors_and_exit(tokens.get_error());
+	auto lexing_result = lexer::lex(std::filesystem::path(command.file));
+	if (lexing_result.is_error()) print_errors_and_exit(lexing_result.get_error());
+	auto tokens = lexing_result.get_value();
 
 	// Emit tokens
 	if (command.options[0] == std::string("--tokens")) {
-		lexer::print(tokens.get_value());
+		lexer::print(tokens);
 		return;
 	}
 
 	// Parse
-	auto parsing_result = parse::program(tokens.get_value(), command.file);
-	if (parsing_result.is_error()) print_errors_and_exit(parsing_result.get_error());
-	auto ast = parsing_result.get_value();
+	Parser parser(tokens, command.file);
+	auto parsing_result = parser.parse_program();
+	if (parsing_result.is_error()) print_errors_and_exit(parser.errors);
+	auto& ast = parser.ast;
 
 	// Emit AST
 	if (command.options[0] == std::string("--ast")) {
-		ast->print();
+		print(ast);
 		return;
 	}
 
-	// Analyze
-	auto analyze_result = semantic::analyze(ast);
-	if (analyze_result.is_error()) print_errors_and_exit(analyze_result.get_error());
+	// // Analyze
+	// auto analyze_result = semantic::analyze(ast);
+	// if (analyze_result.is_error()) print_errors_and_exit(analyze_result.get_error());
 
-	// Emit AST with types
-	if (command.options[0] == std::string("--ast-with-types")) {
-		ast->print();
-		return;
-	}
+	// // Emit AST with types
+	// if (command.options[0] == std::string("--ast-with-types")) {
+	// 	ast->print();
+	// 	return;
+	// }
 
-	// Emit AST with concrete types
-	if (command.options[0] == std::string("--ast-with-concrete-types")) {
-		ast->print_with_concrete_types();
-		return;
-	}
+	// // Emit AST with concrete types
+	// if (command.options[0] == std::string("--ast-with-concrete-types")) {
+	// 	ast->print_with_concrete_types();
+	// 	return;
+	// }
 
-	// Emit LLVM-IR
-	if (command.options[0] == std::string("--llvm-ir")) {
-		print_llvm_ir(ast, program_name);
-		return;
-	}
+	// // Emit LLVM-IR
+	// if (command.options[0] == std::string("--llvm-ir")) {
+	// 	print_llvm_ir(ast, program_name);
+	// 	return;
+	// }
 }
 
 // Main
