@@ -71,16 +71,16 @@ void put_indent_level(size_t indent_level, std::vector<bool> last) {
 }
 
 
-void Ast::print(Ast ast, size_t indent_level, std::vector<bool> last, bool concrete) {
+void Ast::print(const Ast& ast, size_t indent_level, std::vector<bool> last, bool concrete) {
 	std::cout << "program\n";
 	print(ast, ast.program, indent_level, last, concrete);
 }
 
-void Ast::print_with_concrete_types(Ast ast, size_t node, size_t indent_level, std::vector<bool> last) {
+void Ast::print_with_concrete_types(const Ast& ast, size_t node, size_t indent_level, std::vector<bool> last) {
 	print(ast, node, indent_level, last, true);
 }
 
-void Ast::print(Ast ast, size_t node, size_t indent_level, std::vector<bool> last, bool concrete) {
+void Ast::print(const Ast& ast, size_t node, size_t indent_level, std::vector<bool> last, bool concrete) {
 	switch (ast.nodes[node].index()) {
 		case Block: {
 			auto& statements = std::get<BlockNode>(ast.nodes[node]).statements;

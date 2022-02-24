@@ -211,11 +211,9 @@ namespace Ast {
         size_t program;
     };
 
-	void print(Ast ast, size_t indent_level = 0, std::vector<bool> last = {}, bool concrete = false);
-	void print(Ast ast, size_t node, size_t indent_level = 0, std::vector<bool> last = {}, bool concrete = false);
-	void print_with_concrete_types(Ast ast, size_t node, size_t indent_level = 0, std::vector<bool> last = {});
+	void print(const Ast& ast, size_t indent_level = 0, std::vector<bool> last = {}, bool concrete = false);
+	void print(const Ast& ast, size_t node, size_t indent_level = 0, std::vector<bool> last = {}, bool concrete = false);
+	void print_with_concrete_types(const Ast& ast, size_t node, size_t indent_level = 0, std::vector<bool> last = {});
 };
-
-std::vector<Type> get_args_types(std::vector<Ast::Node*> args);
 
 #endif
