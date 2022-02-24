@@ -7,7 +7,7 @@
 #include "ast.hpp"
 
 namespace parse {
-	Result<Ast::Ast, Errors> program(std::vector<token::Token>& tokens, std::filesystem::path& file);
+	Result<Ast::Ast, Errors> program(const std::vector<token::Token>& tokens, const std::filesystem::path& file);
 };
 
 #endif

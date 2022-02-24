@@ -9,14 +9,14 @@
 // Prototypes and definitions
 // --------------------------
 struct Parser {
-	std::vector<token::Token>& tokens;
+	const std::vector<token::Token>& tokens;
 	size_t position = 0;
-	std::filesystem::path& file;
+	const std::filesystem::path& file;
 	Ast::Ast ast;
 	std::vector<size_t> indentation_level;
 	Errors errors;
 
-	Parser(std::vector<token::Token>& tokens, std::filesystem::path& file) : tokens(tokens), file(file) {}
+	Parser(const std::vector<token::Token>& tokens, const std::filesystem::path& file) : tokens(tokens), file(file) {}
 
 	Result<Ok, Error> parse_program();
 	Result<size_t, Error> parse_block();
@@ -96,7 +96,7 @@ Location Parser::location() {
 
 // Parsing
 // -------
-Result<Ast::Ast, Errors> parse::program(std::vector<token::Token>& tokens, std::filesystem::path& file) {
+Result<Ast::Ast, Errors> parse::program(const std::vector<token::Token>& tokens, const std::filesystem::path& file) {
 	Parser parser(tokens, file);
 	auto parsing_result = parser.parse_program();
 	if (parsing_result.is_error()) return parser.errors;
