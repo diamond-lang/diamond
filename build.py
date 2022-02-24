@@ -12,6 +12,7 @@ name = 'diamond'
 source_files = [
 	'src/main.cpp',
 	'src/errors.cpp',
+	'src/tokens.cpp',
 	'src/lexer.cpp',
 	'src/ast.cpp',
 	'src/utilities.cpp',
@@ -32,7 +33,7 @@ def get_source_files():
 	else: assert False
 
 def get_compiler():
-	if   platform.system() == 'Linux': return 'clang++'
+	if   platform.system() == 'Linux': return 'c++'
 	elif platform.system() == 'Windows': return 'cl'
 	else: assert False
 
@@ -73,7 +74,7 @@ def build_object_file(source_file, llvm_config):
 	llvm_include_path = get_llvm_include_path(llvm_include_path)
 
 	if not os.path.exists(source_file_o) or os.path.getmtime(source_file) > os.path.getmtime(source_file_o):
-		command = f'{get_compiler()} -g {get_cpp_version()} {source_file} {get_flags_to_make_object_file()}{source_file_o} {llvm_include_path}'
+		command = f'{get_compiler()} {get_cpp_version()} {source_file} {get_flags_to_make_object_file()}{source_file_o} {llvm_include_path}'
 		print(command)
 		output = os.popen(command).read()
 

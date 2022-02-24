@@ -9,10 +9,10 @@
 
 namespace errors {
 	std::string usage();
-	std::string unexpected_character(parse::Source source);
-	std::string unexpected_indent(parse::Source source);
-	std::string expecting_statement(parse::Source source);
-	std::string expecting_new_indentation_level(parse::Source source);
+	std::string unexpected_character(Location location);
+	std::string unexpected_indent(Location location);
+	std::string expecting_statement(Location location);
+	std::string expecting_new_indentation_level(Location location);
 	// std::string undefined_variable(std::shared_ptr<Ast::Identifier> identifier);
 	// std::string reassigning_immutable_variable(std::shared_ptr<Ast::Identifier> identifier, std::shared_ptr<Ast::Assignment> assignment);
 	// std::string undefined_function(std::shared_ptr<Ast::Call> call);

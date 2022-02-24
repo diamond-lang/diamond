@@ -3,6 +3,7 @@
 
 #include <string>
 #include <cstring>
+#include <vector>
 
 namespace token {
 	enum TokenVariant {
@@ -76,6 +77,8 @@ namespace token {
             return !(*this == variant);
         }
 	};
+
+	void print(std::vector<Token> tokens);
 };
 
 #endif

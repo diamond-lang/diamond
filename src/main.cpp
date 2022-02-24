@@ -84,10 +84,9 @@ void build(Command command) {
 	auto tokens = lexing_result.get_value();
 
 	// Parse
-	Parser parser(tokens, command.file);
-	auto parsing_result = parser.parse_program();
-	if (parsing_result.is_error()) print_errors_and_exit(parser.errors);
-	auto& ast = parser.ast;
+	auto parsing_result = parse::program(tokens, command.file);
+	if (parsing_result.is_error()) print_errors_and_exit(parsing_result.get_errors());
+	auto ast = parsing_result.get_value();
 
 	// // Analyze
 	// auto analyze_result = semantic::analyze(ast);
@@ -110,10 +109,9 @@ void run(Command command) {
 	auto tokens = lexing_result.get_value();
 
 	// Parse
-	Parser parser(tokens, command.file);
-	auto parsing_result = parser.parse_program();
-	if (parsing_result.is_error()) print_errors_and_exit(parser.errors);
-	auto& ast = parser.ast;
+	auto parsing_result = parse::program(tokens, command.file);
+	if (parsing_result.is_error()) print_errors_and_exit(parsing_result.get_errors());
+	auto ast = parsing_result.get_value();
 
 	// // Analyze
 	// auto analyze_result = semantic::analyze(ast);
@@ -141,15 +139,14 @@ void emit(Command command) {
 
 	// Emit tokens
 	if (command.options[0] == std::string("--tokens")) {
-		lexer::print(tokens);
+		token::print(tokens);
 		return;
 	}
 
 	// Parse
-	Parser parser(tokens, command.file);
-	auto parsing_result = parser.parse_program();
-	if (parsing_result.is_error()) print_errors_and_exit(parser.errors);
-	auto& ast = parser.ast;
+	auto parsing_result = parse::program(tokens, command.file);
+	if (parsing_result.is_error()) print_errors_and_exit(parsing_result.get_errors());
+	auto ast = parsing_result.get_value();
 
 	// Emit AST
 	if (command.options[0] == std::string("--ast")) {
