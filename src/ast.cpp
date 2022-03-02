@@ -5,7 +5,7 @@
 
 // Type
 // ----
-bool Type::operator==(const Type &t) const {
+bool Ast::Type::operator==(const Type &t) const {
 	if (this->name == t.name && this->parameters.size() == t.parameters.size()) {
 		for (size_t i = 0; i < this->parameters.size(); i++) {
 			if (this->parameters[i] != t.parameters[i]) {
@@ -19,11 +19,11 @@ bool Type::operator==(const Type &t) const {
 	}
 }
 
-bool Type::operator!=(const Type &t) const {
+bool Ast::Type::operator!=(const Type &t) const {
 	return !(t == *this);
 }
 
-std::string Type::to_str(std::string output) const {
+std::string Ast::Type::to_str(std::string output) const {
 	if (this->parameters.size() == 0) {
 		output += this->name;
 	}
@@ -41,7 +41,7 @@ std::string Type::to_str(std::string output) const {
 	return output;
 }
 
-bool Type::is_type_variable() const {
+bool Ast::Type::is_type_variable() const {
 	std::string str = this->to_str();
 	if (str.size() > 0 && str[0] == '$') return true;
 	else                                 return false;

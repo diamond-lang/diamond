@@ -8,20 +8,20 @@
 #include <filesystem>
 #include <optional>
 
-struct Type {
-	std::string name;
-	std::vector<Type> parameters;
-
-	Type() : name("") {}
-	Type(std::string name) : name(name) {}
-	Type(std::string name, std::vector<Type> parameters) : name(name), parameters(parameters) {}
-	bool operator==(const Type &t) const;
-	bool operator!=(const Type &t) const;
-	std::string to_str(std::string output = "") const;
-	bool is_type_variable() const;
-};
-
 namespace Ast {
+	struct Type {
+		std::string name;
+		std::vector<Type> parameters;
+
+		Type() : name("") {}
+		Type(std::string name) : name(name) {}
+		Type(std::string name, std::vector<Type> parameters) : name(name), parameters(parameters) {}
+		bool operator==(const Type &t) const;
+		bool operator!=(const Type &t) const;
+		std::string to_str(std::string output = "") const;
+		bool is_type_variable() const;
+	};
+
 	struct BlockNode {
 		size_t line;
 		size_t column;
