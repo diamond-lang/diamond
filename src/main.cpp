@@ -94,6 +94,9 @@ void build(Command command) {
 
 	// // Generate executable
 	// generate_executable(ast, program_name);
+
+	// Cleanup
+	ast.free();
 }
 
 void run(Command command) {
@@ -126,6 +129,9 @@ void run(Command command) {
 	// if (!already_existed) {
 	// 	remove(utilities::get_executable_name(program_name).c_str());
 	// }
+
+	// Cleanup
+	ast.free();
 }
 
 void emit(Command command) {
@@ -151,6 +157,7 @@ void emit(Command command) {
 	// Emit AST
 	if (command.options[0] == std::string("--ast")) {
 		print(ast);
+		ast.free();
 		return;
 	}
 
@@ -161,19 +168,22 @@ void emit(Command command) {
 	// // Emit AST with types
 	// if (command.options[0] == std::string("--ast-with-types")) {
 	// 	ast->print();
-	// 	return;
+	// 	ast.free();
+	//	return;
 	// }
 
 	// // Emit AST with concrete types
 	// if (command.options[0] == std::string("--ast-with-concrete-types")) {
 	// 	ast->print_with_concrete_types();
-	// 	return;
+	// ast.free();
+	// return;
 	// }
 
 	// // Emit LLVM-IR
 	// if (command.options[0] == std::string("--llvm-ir")) {
 	// 	print_llvm_ir(ast, program_name);
-	// 	return;
+	//	ast.free();
+	//	return;
 	// }
 }
 

@@ -7,6 +7,7 @@
 #include <unordered_map>
 #include <filesystem>
 #include <optional>
+#include <cmath>
 
 namespace Ast {
 	struct Type {
@@ -22,36 +23,94 @@ namespace Ast {
 		bool is_type_variable() const;
 	};
 
+	struct BlockNode;
+	struct FunctionNode;
+	struct FunctionSpecializationNode;
+	struct AssignmentNode;
+	struct ReturnNode;
+	struct BreakNode;
+	struct ContinueNode;
+	struct IfElseNode;
+	struct WhileNode;
+	struct UseNode;
+	struct IncludeNode;
+	struct CallNode;
+	struct FloatNode;
+	struct IntegerNode;
+	struct IdentifierNode;
+	struct BooleanNode;
+	struct StringNode;
+
+	enum NodeVariant {
+        Block,
+        Function,
+        FunctionSpecialization,
+        Assignment,
+        Return,
+        Break,
+        Continue,
+        IfElse,
+        While,
+        Use,
+		Include,
+        Call,
+        Float,
+        Integer,
+        Identifier,
+        Boolean,
+        String
+    };
+
+	using Node = std::variant<
+		BlockNode,
+		FunctionNode,
+		FunctionSpecializationNode,
+		AssignmentNode,
+		ReturnNode,
+		BreakNode,
+		ContinueNode,
+		IfElseNode,
+		WhileNode,
+		UseNode,
+		IncludeNode,
+		CallNode,
+		FloatNode,
+		IntegerNode,
+		IdentifierNode,
+		BooleanNode,
+		StringNode
+	>;
+
 	struct BlockNode {
 		size_t line;
 		size_t column;
 		Type type = Type("");
 
-		std::vector<size_t> statements;
-		std::vector<size_t> functions;
-		std::vector<size_t> use_include_statements;
+		std::vector<Node*> statements;
+		std::vector<Node*> functions;
+		std::vector<Node*> use_include_statements;
 	};
 
 	struct FunctionNode {
 		size_t line;
 		size_t column;
 
-		size_t identifier;
-		std::vector<size_t> args;
-		size_t body;
+		Node* identifier;
+		std::vector<Node*> args;
+		Node* body;
 
 		bool generic = false;
 		Type return_type = Type("");
-		std::vector<size_t> specializations;
+		std::vector<Node*> specializations;
 	};
 
 	struct FunctionSpecializationNode {
 		size_t line;
 		size_t column;
 
-		size_t identifier;
-		std::vector<size_t> args;
-		size_t body;
+		Node* identifier;
+		std::vector<Node*> args;
+		Node* body;
 		
 		bool valid = false;
 		Type return_type = Type("");
@@ -60,18 +119,18 @@ namespace Ast {
 	struct AssignmentNode {
 		size_t line;
 		size_t column;
-
-		size_t identifier;
-		size_t expression;
 		bool is_mutable = false;
 		bool nonlocal = false;
+
+		Node* identifier;
+		Node* expression;
 	};
 
 	struct ReturnNode {
 		size_t line;
 		size_t column;
 
-		std::optional<size_t> expression;
+		std::optional<Node*> expression;
 	};
 
 	struct BreakNode {
@@ -89,31 +148,31 @@ namespace Ast {
 		size_t column;
 		Type type = Type("");
 
-		size_t condition;
-		size_t if_branch;
-		std::optional<size_t> else_branch;
+		Node* condition;
+		Node* if_branch;
+		std::optional<Node*> else_branch;
 	};
 
 	struct WhileNode {
 		size_t line;
 		size_t column;
 
-		size_t condition;
-		size_t block;
+		Node* condition;
+		Node* block;
 	};
 
 	struct UseNode {
 		size_t line;
 		size_t column;
 
-		size_t path;
+		Node* path;
 	};
 
 	struct IncludeNode {
 		size_t line;
 		size_t column;
 
-		size_t path;
+		Node* path;
 	};
 
 	struct CallNode {
@@ -121,9 +180,9 @@ namespace Ast {
 		size_t column;
 		Type type = Type("");
 
-		size_t identifier;
-		std::vector<size_t> args;
-		size_t function; 
+		Node* identifier;
+		std::vector<Node*> args;
+		Node* function; 
 	};
 
 	struct FloatNode {
@@ -166,54 +225,24 @@ namespace Ast {
 		std::string value;
 	};
 
-	enum NodeVariant {
-        Block,
-        Function,
-        FunctionSpecialization,
-        Assignment,
-        Return,
-        Break,
-        Continue,
-        IfElse,
-        While,
-        Use,
-		Include,
-        Call,
-        Float,
-        Integer,
-        Identifier,
-        Boolean,
-        String
-    };
-
-	using Node = std::variant<
-		BlockNode,
-		FunctionNode,
-		FunctionSpecializationNode,
-		AssignmentNode,
-		ReturnNode,
-		BreakNode,
-		ContinueNode,
-		IfElseNode,
-		WhileNode,
-		UseNode,
-		IncludeNode,
-		CallNode,
-		FloatNode,
-		IntegerNode,
-		IdentifierNode,
-		BooleanNode,
-		StringNode
-	>;
-
     struct Ast {
-        std::vector<Node> nodes;
-        size_t program;
+		Node* program;
+        std::vector<Node*> nodes;
+		unsigned int growth_factor = 2;
+		unsigned int initial_size = 20;
+		size_t size = 0;
+
+		size_t capacity();
+		void push_back(Node node);
+		size_t size_of_arrays_filled();
+		Node* last_element();
+
+		void free();
     };
 
 	void print(const Ast& ast, size_t indent_level = 0, std::vector<bool> last = {}, bool concrete = false);
-	void print(const Ast& ast, size_t node, size_t indent_level = 0, std::vector<bool> last = {}, bool concrete = false);
-	void print_with_concrete_types(const Ast& ast, size_t node, size_t indent_level = 0, std::vector<bool> last = {});
+	void print(const Ast& ast, Node* node, size_t indent_level = 0, std::vector<bool> last = {}, bool concrete = false);
+	void print_with_concrete_types(const Ast& ast, Node* node, size_t indent_level = 0, std::vector<bool> last = {});
 };
 
 #endif

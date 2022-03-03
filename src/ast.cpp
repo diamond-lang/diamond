@@ -47,6 +47,48 @@ bool Ast::Type::is_type_variable() const {
 	else                                 return false;
 }
 
+// Ast
+// ---
+size_t Ast::Ast::capacity() {
+	size_t result = 0;
+	for (size_t i = 0; i < this->nodes.size(); i++) {
+		result += this->initial_size * pow(this->growth_factor, i);
+	}
+	return result;
+}
+
+void Ast::Ast::push_back(Node node) {
+	if (this->size + 1 > this->capacity()) {
+		Node* array = new Node[this->initial_size * static_cast<unsigned int>(pow(this->growth_factor, this->nodes.size()))];
+		this->nodes.push_back(array);
+	}
+
+	this->size++;
+	this->nodes[this->nodes.size() - 1][this->size - 1 - this->size_of_arrays_filled()] = node;
+}
+
+size_t Ast::Ast::size_of_arrays_filled() {
+	if (this->nodes.size() == 0) return 0;
+	else {
+		size_t size_of_arrays_filled = 0;
+		for (size_t i = 0; i < this->nodes.size() - 1; i++) {
+			size_of_arrays_filled += this->initial_size * static_cast<unsigned int>(pow(this->growth_factor, i));
+		}
+		return size_of_arrays_filled;
+	}
+}
+
+Ast::Node* Ast::Ast::last_element() {
+	if (this->size == 0) return nullptr;
+	else                 return &this->nodes[this->nodes.size() - 1][this->size - 1 - this->size_of_arrays_filled()];
+}
+
+void Ast::Ast::free() {
+	for (size_t i = 0; i < this->nodes.size(); i++) {
+		delete[] this->nodes[i];
+	}
+}
+
 // Print
 // -----
 std::vector<bool> append(std::vector<bool> vec, bool val) {
@@ -76,31 +118,29 @@ void Ast::print(const Ast& ast, size_t indent_level, std::vector<bool> last, boo
 	print(ast, ast.program, indent_level, last, concrete);
 }
 
-void Ast::print_with_concrete_types(const Ast& ast, size_t node, size_t indent_level, std::vector<bool> last) {
+void Ast::print_with_concrete_types(const Ast& ast, Node* node, size_t indent_level, std::vector<bool> last) {
 	print(ast, node, indent_level, last, true);
 }
 
-void Ast::print(const Ast& ast, size_t node, size_t indent_level, std::vector<bool> last, bool concrete) {
-	switch (ast.nodes[node].index()) {
+void Ast::print(const Ast& ast, Node* node, size_t indent_level, std::vector<bool> last, bool concrete) {
+	switch (node->index()) {
 		case Block: {
-			auto& statements = std::get<BlockNode>(ast.nodes[node]).statements;
-			auto& functions = std::get<BlockNode>(ast.nodes[node]).functions;
-			auto& use_include_statements = std::get<BlockNode>(ast.nodes[node]).use_include_statements;
+			auto& block = std::get<BlockNode>(*node);
 
-			for (size_t i = 0; i < use_include_statements.size(); i++) {
-				print(ast, use_include_statements[i], indent_level + 1,  append(last, (statements.size() == 0 && functions.size() == 0 && i == use_include_statements.size() - 1)), concrete);
+			for (size_t i = 0; i < block.use_include_statements.size(); i++) {
+				print(ast, block.use_include_statements[i], indent_level + 1,  append(last, (block.statements.size() == 0 && block.functions.size() == 0 && i == block.use_include_statements.size() - 1)), concrete);
 			}
-			for (size_t i = 0; i < statements.size(); i++) {
-				print(ast, statements[i], indent_level + 1, append(last, functions.size() == 0 && i == statements.size() - 1), concrete);
+			for (size_t i = 0; i < block.statements.size(); i++) {
+				print(ast, block.statements[i], indent_level + 1, append(last, block.functions.size() == 0 && i == block.statements.size() - 1), concrete);
 			}
-			for (size_t i = 0; i < functions.size(); i++) {
+			for (size_t i = 0; i < block.functions.size(); i++) {
 				if (!concrete) {
-					print(ast, functions[i], indent_level + 1, append(last, i == functions.size() - 1), concrete);
+					print(ast, block.functions[i], indent_level + 1, append(last, i == block.functions.size() - 1), concrete);
 				}
 				else {
-					auto& specializations = std::get<FunctionNode>(ast.nodes[functions[i]]).specializations;
+					auto& specializations = std::get<FunctionNode>(*block.functions[i]).specializations;
 					for (size_t j = 0; j < specializations.size(); j++) {
-						bool is_last = i == functions.size() - 1 && j == specializations.size() - 1;
+						bool is_last = i == block.functions.size() - 1 && j == specializations.size() - 1;
 						print(ast, specializations[j], indent_level + 1, append(last, is_last), concrete);
 					}
 				}
@@ -109,87 +149,79 @@ void Ast::print(const Ast& ast, size_t node, size_t indent_level, std::vector<bo
 		}
 			
 		case Function: {
-			auto& identifier = std::get<FunctionNode>(ast.nodes[node]).identifier;
-			auto& args = std::get<FunctionNode>(ast.nodes[node]).args;
-			auto& return_type = std::get<FunctionNode>(ast.nodes[node]).return_type;
-			auto body = std::get<FunctionNode>(ast.nodes[node]).body;
+			auto& function = std::get<FunctionNode>(*node);
 
 			put_indent_level(indent_level, last);
-			std::cout << "function " << std::get<IdentifierNode>(ast.nodes[identifier]).value << '(';
-			for (size_t i = 0; i < args.size(); i++) {
-				auto& arg_name = std::get<IdentifierNode>(ast.nodes[args[i]]).value;
+			std::cout << "function " << std::get<IdentifierNode>(*function.identifier).value << '(';
+			for (size_t i = 0; i < function.args.size(); i++) {
+				auto& arg_name = std::get<IdentifierNode>(*function.args[i]).value;
 				std::cout << arg_name;
 
-				auto& arg_type = std::get<IdentifierNode>(ast.nodes[args[i]]).type;
+				auto& arg_type = std::get<IdentifierNode>(*function.args[i]).type;
 				
 				if (arg_type != Type("")) {
 					std::cout << ": " << arg_type.to_str();
 				}
 
-				if (i != args.size() - 1) std::cout << ", ";
+				if (i != function.args.size() - 1) std::cout << ", ";
 			}
 			std::cout << ")";
-			if (return_type != Type("")) {
-				std::cout << ": " << return_type.to_str();
+			if (function.return_type != Type("")) {
+				std::cout << ": " << function.return_type.to_str();
 			}
 			std::cout << "\n";
-			print(ast, body, indent_level, last, concrete);
+			print(ast, function.body, indent_level, last, concrete);
 			break;
 		}
 		
 		case FunctionSpecialization: {
-			auto& identifier = std::get<FunctionSpecializationNode>(ast.nodes[node]).identifier;
-			auto& args = std::get<FunctionSpecializationNode>(ast.nodes[node]).args;
-			auto& return_type = std::get<FunctionSpecializationNode>(ast.nodes[node]).return_type;
-			auto body = std::get<FunctionSpecializationNode>(ast.nodes[node]).body;
+			auto& function = std::get<FunctionSpecialization>(*node);
 
 			put_indent_level(indent_level, last);
-			std::cout << "function " << identifier << '(';
-			for (size_t i = 0; i < args.size(); i++) {
-				auto& arg_name = std::get<IdentifierNode>(ast.nodes[args[i]]).value;
+			std::cout << "function " << std::get<IdentifierNode>(*function.identifier).value << '(';
+			for (size_t i = 0; i < function.args.size(); i++) {
+				auto& arg_name = std::get<IdentifierNode>(*function.args[i]).value;
 				std::cout << arg_name;
 
-				auto& arg_type = std::get<IdentifierNode>(ast.nodes[args[i]]).type;
+				auto& arg_type = std::get<IdentifierNode>(*function.args[i]).type;
 				
 				if (arg_type != Type("")) {
 					std::cout << ": " << arg_type.to_str();
 				}
 
-				if (i != args.size() - 1) std::cout << ", ";
+				if (i != function.args.size() - 1) std::cout << ", ";
 			}
 			std::cout << ")";
-			if (return_type != Type("")) {
-				std::cout << ": " << return_type.to_str();
+			if (function.return_type != Type("")) {
+				std::cout << ": " << function.return_type.to_str();
 			}
 			std::cout << "\n";
-			print(ast, body, indent_level, last, concrete);
+			print(ast, function.body, indent_level, last, concrete);
 			break;
 		}
 
 		case Assignment: {
-			auto& identifier = std::get<AssignmentNode>(ast.nodes[node]).identifier;
-			auto expression = std::get<AssignmentNode>(ast.nodes[node]).expression;
-			auto nonlocal = std::get<AssignmentNode>(ast.nodes[node]).nonlocal;
-			auto is_mutable = std::get<AssignmentNode>(ast.nodes[node]).is_mutable;
+			auto& assignment = std::get<AssignmentNode>(*node);
 
-			print(ast, identifier, indent_level, last);
-			if (nonlocal) {
+			print(ast, assignment.identifier, indent_level, last);
+			if (assignment.nonlocal) {
 				put_indent_level(indent_level + 1, append(last, false));
 				std::cout << "nonlocal\n";
 			}
 			put_indent_level(indent_level + 1, append(last, false));
-			std::cout << (is_mutable ? "=" : "be") << '\n';
+			std::cout << (assignment.is_mutable ? "=" : "be") << '\n';
 			
-			print(ast, expression, indent_level + 1, append(last, true), concrete);
+			print(ast, assignment.expression, indent_level + 1, append(last, true), concrete);
 			break;
 		}
 
 		case Return: {
-			auto expression = std::get<ReturnNode>(ast.nodes[node]).expression;
+			auto& return_node = std::get<ReturnNode>(*node);
+
 			put_indent_level(indent_level, last);
 			std::cout << "return" << '\n';
-			if (expression.has_value()) {
-				print(ast, expression.value(), indent_level + 1, append(last, true), concrete);
+			if (return_node.expression.has_value()) {
+				print(ast, return_node.expression.value(), indent_level + 1, append(last, true), concrete);
 			}
 			break;
 		}
@@ -207,117 +239,106 @@ void Ast::print(const Ast& ast, size_t node, size_t indent_level, std::vector<bo
 		}
 		
 		case IfElse: {
-			auto condition = std::get<IfElseNode>(ast.nodes[node]).condition;
-			auto if_branch = std::get<IfElseNode>(ast.nodes[node]).if_branch;
-			auto else_branch = std::get<IfElseNode>(ast.nodes[node]).else_branch;
+			auto& if_else = std::get<IfElseNode>(*node);
 
 			bool is_last = last[last.size() - 1];
 			last.pop_back();
 
-			bool has_else_block = else_branch ? true : false;
+			bool has_else_block = if_else.else_branch ? true : false;
 			put_indent_level(indent_level, append(last, is_last && !has_else_block));
 			std::cout << "if" << '\n';
-			print(ast, condition, indent_level + 1, append(append(last, is_last && !has_else_block), false), concrete);
-			print(ast, if_branch, indent_level, append(last, is_last && !has_else_block), concrete);
+			print(ast, if_else.condition, indent_level + 1, append(append(last, is_last && !has_else_block), false), concrete);
+			print(ast, if_else.if_branch, indent_level, append(last, is_last && !has_else_block), concrete);
 		
-			if (else_branch.has_value()) {
+			if (if_else.else_branch.has_value()) {
 				put_indent_level(indent_level, append(last, is_last));
 				std::cout << "else" << "\n";
-				print(ast, else_branch.value(), indent_level, append(last, is_last));
+				print(ast, if_else.else_branch.value(), indent_level, append(last, is_last));
 			}
 			break;
 		}
 
 		case While: {
-			auto condition = std::get<WhileNode>(ast.nodes[node]).condition;
-			auto block = std::get<WhileNode>(ast.nodes[node]).block;
+			auto& while_node = std::get<WhileNode>(*node);
 
 			put_indent_level(indent_level, last);
 			std::cout << "while" << '\n';
-			print(ast, condition, indent_level + 1, append(last, false), concrete);
-			print(ast, block, indent_level, last, concrete);
+			print(ast, while_node.condition, indent_level + 1, append(last, false), concrete);
+			print(ast, while_node.block, indent_level, last, concrete);
 			break;
 		}
 
 		case Use: {
-			auto path = std::get<StringNode>(ast.nodes[std::get<UseNode>(ast.nodes[node]).path]);
+			auto path = std::get<StringNode>(*std::get<UseNode>(*node).path);
 			std::cout << "use \"" << path.value << "\"\n";
 			break;
 		}
 
 		case Include: {
-			auto path = std::get<StringNode>(ast.nodes[std::get<IncludeNode>(ast.nodes[node]).path]);
+			auto path = std::get<StringNode>(*std::get<IncludeNode>(*node).path);
 			std::cout << "include \"" << path.value << "\"\n";
 			break;
 		}
 
 		case Call: {
-			auto& call = std::get<CallNode>(ast.nodes[node]);
-			auto& identifier = std::get<IdentifierNode>(ast.nodes[call.identifier]);
-			auto& args = call.args;
-			auto& type = call.type;
+			auto& call = std::get<CallNode>(*node);
 
 			put_indent_level(indent_level, last);
-			std::cout << identifier.value;
-			if (type != Type("")) std::cout << ": " << type.to_str();
+			std::cout << std::get<IdentifierNode>(*call.identifier).value;
+			if (call.type != Type("")) std::cout << ": " << call.type.to_str();
 			std::cout << "\n";
-			for (size_t i = 0; i < args.size(); i++) {
-				print(ast, args[i], indent_level + 1, append(last, i == args.size() - 1), concrete);
+			for (size_t i = 0; i < call.args.size(); i++) {
+				print(ast, call.args[i], indent_level + 1, append(last, i == call.args.size() - 1), concrete);
 			}
 			break;
 		}
 
 		case Float: {
-			auto value = std::get<FloatNode>(ast.nodes[node]).value;
-			auto& type = std::get<FloatNode>(ast.nodes[node]).type;
+			auto& float_node = std::get<FloatNode>(*node);
 
 			put_indent_level(indent_level, last);
-			std::cout << value;
-			if (type != Type("")) std::cout << ": " << type.to_str();
+			std::cout << float_node.value;
+			if (float_node.type != Type("")) std::cout << ": " << float_node.type.to_str();
 			std::cout << "\n";
 			break;
 		}
 
 		case Integer: {
-			auto value = std::get<IntegerNode>(ast.nodes[node]).value;
-			auto& type = std::get<IntegerNode>(ast.nodes[node]).type;
+			auto& integer = std::get<IntegerNode>(*node);
 
 			put_indent_level(indent_level, last);
-			std::cout << value;
-			if (type != Type("")) std::cout << ": " << type.to_str();
+			std::cout << integer.value;
+			if (integer.type != Type("")) std::cout << ": " << integer.type.to_str();
 			std::cout << "\n";
 			break;
 		}
 
 		case Identifier: {
-			auto value = std::get<IdentifierNode>(ast.nodes[node]).value;
-			auto& type = std::get<IdentifierNode>(ast.nodes[node]).type;
+			auto& identifier = std::get<IdentifierNode>(*node);
 
 			put_indent_level(indent_level, last);
-			std::cout << value;
-			if (type != Type("")) std::cout << ": " << type.to_str();
+			std::cout << identifier.value;
+			if (identifier.type != Type("")) std::cout << ": " << identifier.type.to_str();
 			std::cout << "\n";
 			break;
 		}
 
 		case Boolean: {
-			auto value = std::get<BooleanNode>(ast.nodes[node]).value;
-			auto& type = std::get<BooleanNode>(ast.nodes[node]).type;
+			auto& boolean = std::get<BooleanNode>(*node);
 
 			put_indent_level(indent_level, last);
-			std::cout << (value ? "true" : "false");
-			if (type != Type("")) std::cout << ": " << type.to_str();
+			std::cout << (boolean.value ? "true" : "false");
+			if (boolean.type != Type("")) std::cout << ": " << boolean.type.to_str();
 			std::cout << "\n";
 			break;
 		}
 
 		case String: {
-			auto value = std::get<StringNode>(ast.nodes[node]).value;
-			auto& type = std::get<StringNode>(ast.nodes[node]).type;
+			auto& string = std::get<StringNode>(*node);
 
 			put_indent_level(indent_level, last);
-			std::cout << "\"" << value << "\"";
-			if (type != Type("")) std::cout << ": " << type.to_str();
+			std::cout << "\"" << string.value << "\"";
+			if (string.type != Type("")) std::cout << ": " << string.type.to_str();
 			std::cout << "\n";
 			break;
 		}
