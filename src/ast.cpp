@@ -47,6 +47,12 @@ bool Ast::Type::is_type_variable() const {
 	else                                 return false;
 }
 
+// Node
+// ----
+Ast::Type Ast::get_type(Node* node) {
+	return std::visit([](const auto& field) {return field.type;}, *node);	
+}
+
 // Ast
 // ---
 size_t Ast::Ast::capacity() {

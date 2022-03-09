@@ -81,6 +81,8 @@ namespace Ast {
 		StringNode
 	>;
 
+	Type get_type(Node* node);
+
 	struct BlockNode {
 		size_t line;
 		size_t column;
@@ -94,6 +96,7 @@ namespace Ast {
 	struct FunctionNode {
 		size_t line;
 		size_t column;
+		Type type = Type("");
 
 		Node* identifier;
 		std::vector<Node*> args;
@@ -107,6 +110,7 @@ namespace Ast {
 	struct FunctionSpecializationNode {
 		size_t line;
 		size_t column;
+		Type type = Type("");
 
 		Node* identifier;
 		std::vector<Node*> args;
@@ -119,6 +123,8 @@ namespace Ast {
 	struct AssignmentNode {
 		size_t line;
 		size_t column;
+		Type type = Type("");
+
 		bool is_mutable = false;
 		bool nonlocal = false;
 
@@ -129,6 +135,7 @@ namespace Ast {
 	struct ReturnNode {
 		size_t line;
 		size_t column;
+		Type type = Type("");
 
 		std::optional<Node*> expression;
 	};
@@ -136,11 +143,13 @@ namespace Ast {
 	struct BreakNode {
 		size_t line;
 		size_t column;
+		Type type = Type("");
 	};
 
 	struct ContinueNode {
 		size_t line;
 		size_t column;
+		Type type = Type("");
 	};
 
 	struct IfElseNode {
@@ -156,6 +165,7 @@ namespace Ast {
 	struct WhileNode {
 		size_t line;
 		size_t column;
+		Type type = Type("");
 
 		Node* condition;
 		Node* block;
@@ -164,6 +174,7 @@ namespace Ast {
 	struct UseNode {
 		size_t line;
 		size_t column;
+		Type type = Type("");
 
 		Node* path;
 	};
@@ -171,6 +182,7 @@ namespace Ast {
 	struct IncludeNode {
 		size_t line;
 		size_t column;
+		Type type = Type("");
 
 		Node* path;
 	};
