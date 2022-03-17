@@ -15,8 +15,9 @@ struct Parser {
 	Ast::Ast ast;
 	std::vector<size_t> indentation_level;
 	Errors errors;
-
+	
 	Parser(const std::vector<token::Token>& tokens, const std::filesystem::path& file) : tokens(tokens), file(file) {}
+	Parser(Ast::Ast& ast, const std::vector<token::Token>& tokens, const std::filesystem::path& file) : ast(ast), tokens(tokens), file(file) {}
 
 	Result<Ok, Error> parse_program();
 	Result<Ast::Node*, Error> parse_block();
@@ -100,7 +101,16 @@ Result<Ast::Ast, Errors> parse::program(const std::vector<token::Token>& tokens,
 	Parser parser(tokens, file);
 	auto parsing_result = parser.parse_program();
 	if (parsing_result.is_error()) return parser.errors;
+	parser.ast.file = file;
 	return parser.ast;
+}
+
+Result<Ok, Errors> parse::module(Ast::Ast& ast, const std::vector<token::Token>& tokens, const std::filesystem::path& file) {
+	Parser parser(ast, tokens, file);
+	auto result = parser.parse_block();
+	if (result.is_error()) return parser.errors;
+	parser.ast.modules[file] = result.get_value();
+	return Ok {};
 }
 
 Result<Ok, Error> Parser::parse_program() {

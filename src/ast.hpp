@@ -25,7 +25,6 @@ namespace Ast {
 
 	struct BlockNode;
 	struct FunctionNode;
-	struct FunctionSpecializationNode;
 	struct AssignmentNode;
 	struct ReturnNode;
 	struct BreakNode;
@@ -44,7 +43,6 @@ namespace Ast {
 	enum NodeVariant {
         Block,
         Function,
-        FunctionSpecialization,
         Assignment,
         Return,
         Break,
@@ -64,7 +62,6 @@ namespace Ast {
 	using Node = std::variant<
 		BlockNode,
 		FunctionNode,
-		FunctionSpecializationNode,
 		AssignmentNode,
 		ReturnNode,
 		BreakNode,
@@ -82,6 +79,7 @@ namespace Ast {
 	>;
 
 	Type get_type(Node* node);
+	std::vector<Type> get_types(std::vector<Node*> nodes);
 
 	struct BlockNode {
 		size_t line;
@@ -91,6 +89,11 @@ namespace Ast {
 		std::vector<Node*> statements;
 		std::vector<Node*> functions;
 		std::vector<Node*> use_include_statements;
+	};
+
+	struct FunctionPrototype {
+		std::vector<Type> args;
+		Type return_type;
 	};
 
 	struct FunctionNode {
@@ -104,20 +107,7 @@ namespace Ast {
 
 		bool generic = false;
 		Type return_type = Type("");
-		std::vector<Node*> specializations;
-	};
-
-	struct FunctionSpecializationNode {
-		size_t line;
-		size_t column;
-		Type type = Type("");
-
-		Node* identifier;
-		std::vector<Node*> args;
-		Node* body;
-		
-		bool valid = false;
-		Type return_type = Type("");
+		std::vector<FunctionPrototype> specializations;
 	};
 
 	struct AssignmentNode {
@@ -238,17 +228,22 @@ namespace Ast {
 	};
 
     struct Ast {
+		// High level
 		Node* program;
-        std::vector<Node*> nodes;
+		std::filesystem::path file;
+		std::unordered_map<std::string, Node*> modules; 
+        
+		// Storage
+		std::vector<Node*> nodes;
 		unsigned int growth_factor = 2;
 		unsigned int initial_size = 20;
 		size_t size = 0;
 
+		// Methods
 		size_t capacity();
 		void push_back(Node node);
 		size_t size_of_arrays_filled();
 		Node* last_element();
-
 		void free();
     };
 

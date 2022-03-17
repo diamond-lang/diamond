@@ -5,7 +5,7 @@
 #include "shared.hpp"
 
 namespace semantic {
-	Result<Ok, Errors> analyze(std::shared_ptr<Ast::Program> program);
+	Result<Ok, Errors> analyze(Ast::Ast& ast);
 }
 
 #endif

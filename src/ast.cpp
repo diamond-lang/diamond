@@ -50,7 +50,15 @@ bool Ast::Type::is_type_variable() const {
 // Node
 // ----
 Ast::Type Ast::get_type(Node* node) {
-	return std::visit([](const auto& field) {return field.type;}, *node);	
+	return std::visit([](const auto& variant) {return variant.type;}, *node);	
+}
+
+std::vector<Ast::Type> Ast::get_types(std::vector<Node*> nodes) {
+	std::vector<Type> types;
+	for (size_t i = 0; i < nodes.size(); i++) {
+		types.push_back(get_type(nodes[i]));
+	}
+	return types;
 }
 
 // Ast
@@ -144,11 +152,7 @@ void Ast::print(const Ast& ast, Node* node, size_t indent_level, std::vector<boo
 					print(ast, block.functions[i], indent_level + 1, append(last, i == block.functions.size() - 1), concrete);
 				}
 				else {
-					auto& specializations = std::get<FunctionNode>(*block.functions[i]).specializations;
-					for (size_t j = 0; j < specializations.size(); j++) {
-						bool is_last = i == block.functions.size() - 1 && j == specializations.size() - 1;
-						print(ast, specializations[j], indent_level + 1, append(last, is_last), concrete);
-					}
+					std::cout << "To do\n";
 				}
 			}
 			break;
@@ -180,32 +184,6 @@ void Ast::print(const Ast& ast, Node* node, size_t indent_level, std::vector<boo
 			break;
 		}
 		
-		case FunctionSpecialization: {
-			auto& function = std::get<FunctionSpecialization>(*node);
-
-			put_indent_level(indent_level, last);
-			std::cout << "function " << std::get<IdentifierNode>(*function.identifier).value << '(';
-			for (size_t i = 0; i < function.args.size(); i++) {
-				auto& arg_name = std::get<IdentifierNode>(*function.args[i]).value;
-				std::cout << arg_name;
-
-				auto& arg_type = std::get<IdentifierNode>(*function.args[i]).type;
-				
-				if (arg_type != Type("")) {
-					std::cout << ": " << arg_type.to_str();
-				}
-
-				if (i != function.args.size() - 1) std::cout << ", ";
-			}
-			std::cout << ")";
-			if (function.return_type != Type("")) {
-				std::cout << ": " << function.return_type.to_str();
-			}
-			std::cout << "\n";
-			print(ast, function.body, indent_level, last, concrete);
-			break;
-		}
-
 		case Assignment: {
 			auto& assignment = std::get<AssignmentNode>(*node);
 

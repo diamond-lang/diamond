@@ -13,10 +13,10 @@ namespace errors {
 	std::string unexpected_indent(Location location);
 	std::string expecting_statement(Location location);
 	std::string expecting_new_indentation_level(Location location);
-	// std::string undefined_variable(std::shared_ptr<Ast::Identifier> identifier);
-	// std::string reassigning_immutable_variable(std::shared_ptr<Ast::Identifier> identifier, std::shared_ptr<Ast::Assignment> assignment);
-	// std::string undefined_function(std::shared_ptr<Ast::Call> call);
-	// std::string unhandled_return_value(std::shared_ptr<Ast::Call> call);
+	std::string undefined_variable(Ast::IdentifierNode& identifier, std::filesystem::path file);
+	std::string reassigning_immutable_variable(Ast::IdentifierNode& identifier, Ast::AssignmentNode& assignment, std::filesystem::path file);
+	std::string undefined_function(Ast::CallNode& call, std::filesystem::path file);
+	std::string unhandled_return_value(Ast::CallNode& call, std::filesystem::path file);
 	std::string file_couldnt_be_found(std::string path);
 }
 
