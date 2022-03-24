@@ -79,6 +79,7 @@ namespace Ast {
 	>;
 
 	Type get_type(Node* node);
+	void set_type(Node* node, Type type);
 	std::vector<Type> get_types(std::vector<Node*> nodes);
 
 	struct BlockNode {
@@ -104,9 +105,9 @@ namespace Ast {
 		Node* identifier;
 		std::vector<Node*> args;
 		Node* body;
-
-		bool generic = false;
+		
 		Type return_type = Type("");
+		std::vector<FunctionPrototype> constraints;
 		std::vector<FunctionPrototype> specializations;
 	};
 
@@ -184,7 +185,7 @@ namespace Ast {
 
 		Node* identifier;
 		std::vector<Node*> args;
-		Node* function; 
+		FunctionNode* function; 
 	};
 
 	struct FloatNode {
@@ -248,8 +249,8 @@ namespace Ast {
     };
 
 	void print(const Ast& ast, size_t indent_level = 0, std::vector<bool> last = {}, bool concrete = false);
-	void print(const Ast& ast, Node* node, size_t indent_level = 0, std::vector<bool> last = {}, bool concrete = false);
-	void print_with_concrete_types(const Ast& ast, Node* node, size_t indent_level = 0, std::vector<bool> last = {});
+	void print(Node* node, size_t indent_level = 0, std::vector<bool> last = {}, bool concrete = false);
+	void print_with_concrete_types(Node* node, size_t indent_level = 0, std::vector<bool> last = {});
 };
 
 #endif

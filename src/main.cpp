@@ -5,6 +5,7 @@
 #include "lexer.hpp"
 #include "utilities.hpp"
 #include "parser.hpp"
+#include "semantic.hpp"
 
 // Definitions and prototypes
 // --------------------------
@@ -85,12 +86,12 @@ void build(Command command) {
 
 	// Parse
 	auto parsing_result = parse::program(tokens, command.file);
-	if (parsing_result.is_error()) print_errors_and_exit(parsing_result.get_errors());
+	if (parsing_result.is_error()) print_errors_and_exit(parsing_result.get_error());
 	auto ast = parsing_result.get_value();
 
 	// // Analyze
-	// auto analyze_result = semantic::analyze(ast);
-	// if (analyze_result.is_error()) print_errors_and_exit(analyze_result.get_error());
+	auto analyze_result = semantic::analyze(ast);
+	if (analyze_result.is_error()) print_errors_and_exit(analyze_result.get_error());
 
 	// // Generate executable
 	// generate_executable(ast, program_name);
@@ -113,12 +114,12 @@ void run(Command command) {
 
 	// Parse
 	auto parsing_result = parse::program(tokens, command.file);
-	if (parsing_result.is_error()) print_errors_and_exit(parsing_result.get_errors());
+	if (parsing_result.is_error()) print_errors_and_exit(parsing_result.get_error());
 	auto ast = parsing_result.get_value();
 
 	// // Analyze
-	// auto analyze_result = semantic::analyze(ast);
-	// if (analyze_result.is_error()) print_errors_and_exit(analyze_result.get_error());
+	auto analyze_result = semantic::analyze(ast);
+	if (analyze_result.is_error()) print_errors_and_exit(analyze_result.get_error());
 
 	// // Generate executable
 	// generate_executable(ast, program_name);
@@ -151,26 +152,26 @@ void emit(Command command) {
 
 	// Parse
 	auto parsing_result = parse::program(tokens, command.file);
-	if (parsing_result.is_error()) print_errors_and_exit(parsing_result.get_errors());
+	if (parsing_result.is_error()) print_errors_and_exit(parsing_result.get_error());
 	auto ast = parsing_result.get_value();
 
 	// Emit AST
 	if (command.options[0] == std::string("--ast")) {
-		print(ast);
+		Ast::print(ast);
 		ast.free();
 		return;
 	}
 
-	// // Analyze
-	// auto analyze_result = semantic::analyze(ast);
-	// if (analyze_result.is_error()) print_errors_and_exit(analyze_result.get_error());
+	// Analyze
+	auto analyze_result = semantic::analyze(ast);
+	if (analyze_result.is_error()) print_errors_and_exit(analyze_result.get_error());
 
-	// // Emit AST with types
-	// if (command.options[0] == std::string("--ast-with-types")) {
-	// 	ast->print();
-	// 	ast.free();
-	//	return;
-	// }
+	// Emit AST with types
+	if (command.options[0] == std::string("--ast-with-types")) {
+		Ast::print(ast);
+		ast.free();
+		return;
+	}
 
 	// // Emit AST with concrete types
 	// if (command.options[0] == std::string("--ast-with-concrete-types")) {

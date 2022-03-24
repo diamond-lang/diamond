@@ -53,6 +53,10 @@ Ast::Type Ast::get_type(Node* node) {
 	return std::visit([](const auto& variant) {return variant.type;}, *node);	
 }
 
+void Ast::set_type(Node* node, Type type) {
+	std::visit([type](auto& variant) {variant.type = type;}, *node);
+}
+
 std::vector<Ast::Type> Ast::get_types(std::vector<Node*> nodes) {
 	std::vector<Type> types;
 	for (size_t i = 0; i < nodes.size(); i++) {
@@ -129,27 +133,27 @@ void put_indent_level(size_t indent_level, std::vector<bool> last) {
 
 void Ast::print(const Ast& ast, size_t indent_level, std::vector<bool> last, bool concrete) {
 	std::cout << "program\n";
-	print(ast, ast.program, indent_level, last, concrete);
+	print(ast.program, indent_level, last, concrete);
 }
 
-void Ast::print_with_concrete_types(const Ast& ast, Node* node, size_t indent_level, std::vector<bool> last) {
-	print(ast, node, indent_level, last, true);
+void Ast::print_with_concrete_types(Node* node, size_t indent_level, std::vector<bool> last) {
+	print(node, indent_level, last, true);
 }
 
-void Ast::print(const Ast& ast, Node* node, size_t indent_level, std::vector<bool> last, bool concrete) {
+void Ast::print(Node* node, size_t indent_level, std::vector<bool> last, bool concrete) {
 	switch (node->index()) {
 		case Block: {
 			auto& block = std::get<BlockNode>(*node);
 
 			for (size_t i = 0; i < block.use_include_statements.size(); i++) {
-				print(ast, block.use_include_statements[i], indent_level + 1,  append(last, (block.statements.size() == 0 && block.functions.size() == 0 && i == block.use_include_statements.size() - 1)), concrete);
+				print(block.use_include_statements[i], indent_level + 1,  append(last, (block.statements.size() == 0 && block.functions.size() == 0 && i == block.use_include_statements.size() - 1)), concrete);
 			}
 			for (size_t i = 0; i < block.statements.size(); i++) {
-				print(ast, block.statements[i], indent_level + 1, append(last, block.functions.size() == 0 && i == block.statements.size() - 1), concrete);
+				print(block.statements[i], indent_level + 1, append(last, block.functions.size() == 0 && i == block.statements.size() - 1), concrete);
 			}
 			for (size_t i = 0; i < block.functions.size(); i++) {
 				if (!concrete) {
-					print(ast, block.functions[i], indent_level + 1, append(last, i == block.functions.size() - 1), concrete);
+					print(block.functions[i], indent_level + 1, append(last, i == block.functions.size() - 1), concrete);
 				}
 				else {
 					std::cout << "To do\n";
@@ -180,14 +184,14 @@ void Ast::print(const Ast& ast, Node* node, size_t indent_level, std::vector<boo
 				std::cout << ": " << function.return_type.to_str();
 			}
 			std::cout << "\n";
-			print(ast, function.body, indent_level, last, concrete);
+			print(function.body, indent_level, last, concrete);
 			break;
 		}
 		
 		case Assignment: {
 			auto& assignment = std::get<AssignmentNode>(*node);
 
-			print(ast, assignment.identifier, indent_level, last);
+			print(assignment.identifier, indent_level, last);
 			if (assignment.nonlocal) {
 				put_indent_level(indent_level + 1, append(last, false));
 				std::cout << "nonlocal\n";
@@ -195,7 +199,7 @@ void Ast::print(const Ast& ast, Node* node, size_t indent_level, std::vector<boo
 			put_indent_level(indent_level + 1, append(last, false));
 			std::cout << (assignment.is_mutable ? "=" : "be") << '\n';
 			
-			print(ast, assignment.expression, indent_level + 1, append(last, true), concrete);
+			print(assignment.expression, indent_level + 1, append(last, true), concrete);
 			break;
 		}
 
@@ -205,7 +209,7 @@ void Ast::print(const Ast& ast, Node* node, size_t indent_level, std::vector<boo
 			put_indent_level(indent_level, last);
 			std::cout << "return" << '\n';
 			if (return_node.expression.has_value()) {
-				print(ast, return_node.expression.value(), indent_level + 1, append(last, true), concrete);
+				print(return_node.expression.value(), indent_level + 1, append(last, true), concrete);
 			}
 			break;
 		}
@@ -231,13 +235,13 @@ void Ast::print(const Ast& ast, Node* node, size_t indent_level, std::vector<boo
 			bool has_else_block = if_else.else_branch ? true : false;
 			put_indent_level(indent_level, append(last, is_last && !has_else_block));
 			std::cout << "if" << '\n';
-			print(ast, if_else.condition, indent_level + 1, append(append(last, is_last && !has_else_block), false), concrete);
-			print(ast, if_else.if_branch, indent_level, append(last, is_last && !has_else_block), concrete);
+			print(if_else.condition, indent_level + 1, append(append(last, is_last && !has_else_block), false), concrete);
+			print(if_else.if_branch, indent_level, append(last, is_last && !has_else_block), concrete);
 		
 			if (if_else.else_branch.has_value()) {
 				put_indent_level(indent_level, append(last, is_last));
 				std::cout << "else" << "\n";
-				print(ast, if_else.else_branch.value(), indent_level, append(last, is_last));
+				print(if_else.else_branch.value(), indent_level, append(last, is_last));
 			}
 			break;
 		}
@@ -247,8 +251,8 @@ void Ast::print(const Ast& ast, Node* node, size_t indent_level, std::vector<boo
 
 			put_indent_level(indent_level, last);
 			std::cout << "while" << '\n';
-			print(ast, while_node.condition, indent_level + 1, append(last, false), concrete);
-			print(ast, while_node.block, indent_level, last, concrete);
+			print(while_node.condition, indent_level + 1, append(last, false), concrete);
+			print(while_node.block, indent_level, last, concrete);
 			break;
 		}
 
@@ -272,7 +276,7 @@ void Ast::print(const Ast& ast, Node* node, size_t indent_level, std::vector<boo
 			if (call.type != Type("")) std::cout << ": " << call.type.to_str();
 			std::cout << "\n";
 			for (size_t i = 0; i < call.args.size(); i++) {
-				print(ast, call.args[i], indent_level + 1, append(last, i == call.args.size() - 1), concrete);
+				print(call.args[i], indent_level + 1, append(last, i == call.args.size() - 1), concrete);
 			}
 			break;
 		}

@@ -34,39 +34,33 @@ namespace semantic {
 		else return false;
 	}
 
-	struct FunctionCall {
-		std::string identifier;
-		std::vector<Ast::Type> args;
-		Ast::Type return_type = Ast::Type("");
-		Ast::FunctionNode* function = nullptr; 
-	};
-
 	struct Context {
 		std::filesystem::path current_module;
 		std::vector<std::unordered_map<std::string, Binding>> scopes;
-		std::unordered_map<std::string, Ast::Type> type_bindings;
-		std::vector<FunctionCall> call_stack;
+		std::vector<Ast::FunctionNode*> call_stack;
 		bool inside_loop = false;
 		Errors errors;
 		Ast::Ast& ast;
 
+		Context(Ast::Ast& ast) : ast(ast) {}
+
 		Result<Ok, Error> analyze(Ast::Node* node);
 		Result<Ok, Error> analyze(Ast::BlockNode& node);
-		Result<Ok, Error> analyze(Ast::FunctionNode& node) {}
+		Result<Ok, Error> analyze(Ast::FunctionNode& node);
 		Result<Ok, Error> analyze(Ast::AssignmentNode& node);
 		Result<Ok, Error> analyze(Ast::ReturnNode& node);
-		Result<Ok, Error> analyze(Ast::BreakNode& node) {}
-		Result<Ok, Error> analyze(Ast::ContinueNode& node) {}
+		Result<Ok, Error> analyze(Ast::BreakNode& node) {return Ok {};}
+		Result<Ok, Error> analyze(Ast::ContinueNode& node) {return Ok {};}
 		Result<Ok, Error> analyze(Ast::IfElseNode& node);
 		Result<Ok, Error> analyze(Ast::WhileNode& node);
-		Result<Ok, Error> analyze(Ast::UseNode& node) {}
-		Result<Ok, Error> analyze(Ast::IncludeNode& node) {}
+		Result<Ok, Error> analyze(Ast::UseNode& node) {return Ok {};}
+		Result<Ok, Error> analyze(Ast::IncludeNode& node) {return Ok {};}
 		Result<Ok, Error> analyze(Ast::CallNode& node);
 		Result<Ok, Error> analyze(Ast::FloatNode& node);
 		Result<Ok, Error> analyze(Ast::IntegerNode& node);
 		Result<Ok, Error> analyze(Ast::IdentifierNode& node);
 		Result<Ok, Error> analyze(Ast::BooleanNode& node);
-		Result<Ok, Error> analyze(Ast::StringNode& node) {}
+		Result<Ok, Error> analyze(Ast::StringNode& node) {return Ok {};}
 
 		void add_scope() {
 			this->scopes.push_back(std::unordered_map<std::string, Binding>());
@@ -158,8 +152,8 @@ namespace semantic {
 		int is_recursive_call(Ast::CallNode& call) {
 			auto& identifier = std::get<Ast::IdentifierNode>(*call.identifier).value;
 			for (int i = 0; i < this->call_stack.size(); i++) {
-				if (identifier == this->call_stack[i].identifier
-				&& Ast::get_types(call.args) == this->call_stack[i].args) {
+				if (identifier == std::get<Ast::IdentifierNode>(*this->call_stack[i]->identifier).value
+				&& Ast::get_types(call.args) == Ast::get_types(this->call_stack[i]->args)) {
 					return i;
 				}
 			}
@@ -205,16 +199,14 @@ namespace semantic {
 			// Iterate over functions with same name
 			auto& functions = std::get<std::vector<Ast::FunctionNode*>>(*binding);
 			for (size_t i = 0; i < functions.size(); i++) {
-				assert(functions[i]->generic);
-
-				// Check function same number of arguments as the call
+			
+				// Continue if number of arguments of the function isn't the same as the call
 				if (functions[i]->args.size() != call.args.size()) continue;
 
-				// Type infer function
-				if (functions[i]->return_type == Ast::Type("")) {
-					asdasd
-				}
+				
 			}
+
+			return Ok {};
 		}
 	};
 };
@@ -222,7 +214,12 @@ namespace semantic {
 // Semantic analysis
 // -----------------
 Result<Ok, Errors> semantic::analyze(Ast::Ast& ast) {
+	semantic::Context context(ast);
+	context.current_module = ast.file;
+	context.analyze(ast.program);
 
+	if (context.errors.size() > 0) return context.errors;
+	else                           return Ok {};
 }
 
 Result<Ok, Error> semantic::Context::analyze(Ast::Node* node) {
@@ -238,6 +235,11 @@ Result<Ok, Error> semantic::Context::analyze(Ast::BlockNode& node) {
 
 	// Add functions to the current scope
 	this->add_functions_to_current_scope(node);
+
+	// Analyze functions
+	for (size_t i = 0; i < node.functions.size(); i++) {
+		(void) this->analyze(node.functions[i]);
+	}
 
 	// Analyze statements
 	for (size_t i = 0; i < node.statements.size(); i++) {
@@ -291,6 +293,15 @@ Result<Ok, Error> semantic::Context::analyze(Ast::BlockNode& node) {
 
 	if (this->errors.size() > number_of_errors) return Error {};
 	else                                        return Ok {};
+}
+
+Result<Ok, Error> semantic::Context::analyze(Ast::FunctionNode& node) {
+	// Type infer function
+	type_inference::analyze(&node);
+
+	Ast::print((Ast::Node*)&node);
+
+	return Ok {};
 }
 
 Result<Ok, Error> semantic::Context::analyze(Ast::AssignmentNode& node) {
@@ -377,8 +388,8 @@ Result<Ok, Error> semantic::Context::analyze(Ast::CallNode& node) {
 
 	int recursive = this->is_recursive_call(node);
 	if (recursive != -1) {
-		node.type = this->call_stack[recursive].return_type;
-		node.function = this->call_stack[recursive].function;
+		node.type = this->call_stack[recursive]->return_type;
+		node.function = this->call_stack[recursive];
 		return Ok {};
 	}
 
@@ -393,22 +404,12 @@ Result<Ok, Error> semantic::Context::analyze(Ast::CallNode& node) {
 }
 
 Result<Ok, Error> semantic::Context::analyze(Ast::FloatNode& node) {
-	if (node.type.is_type_variable() && this->type_bindings.find(node.type.to_str()) != this->type_bindings.end()) {
-		node.type = this->type_bindings[node.type.to_str()];
-	}
-	else {
-		node.type = Ast::Type("float64");
-	}
+	node.type = Ast::Type("float64");
 	return Ok {};
 }
 
 Result<Ok, Error> semantic::Context::analyze(Ast::IntegerNode& node) {
-	if (node.type.is_type_variable() && this->type_bindings.find(node.type.to_str()) != this->type_bindings.end()) {
-		node.type = this->type_bindings[node.type.to_str()];
-	}
-	else {
-		node.type = Ast::Type("int64");
-	}
+	node.type = Ast::Type("int64");
 	return Ok {};
 }
 

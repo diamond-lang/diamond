@@ -88,7 +88,7 @@ std::string format_args(std::vector<Ast::Node*> args) {
 	return result;
 }
 
-std::string undefined_function(Ast::CallNode& call, std::filesystem::path file) {
+std::string errors::undefined_function(Ast::CallNode& call, std::filesystem::path file) {
 	auto& identifier = std::get<Ast::IdentifierNode>(*call.identifier).value;
 	return make_header("Undefined function\n\n") +
 	       identifier + "(" + format_args(call.args) + ") is not defined.\n\n" +
