@@ -38,6 +38,7 @@ namespace semantic {
 		std::filesystem::path current_module;
 		std::vector<std::unordered_map<std::string, Binding>> scopes;
 		std::vector<Ast::FunctionNode*> call_stack;
+		std::unordered_map<std::string, Ast::Type> type_bindings;
 		bool inside_loop = false;
 		Errors errors;
 		Ast::Ast& ast;
@@ -46,7 +47,7 @@ namespace semantic {
 
 		Result<Ok, Error> analyze(Ast::Node* node);
 		Result<Ok, Error> analyze(Ast::BlockNode& node);
-		Result<Ok, Error> analyze(Ast::FunctionNode& node);
+		Result<Ok, Error> analyze(Ast::FunctionNode& node) {return Ok {};}
 		Result<Ok, Error> analyze(Ast::AssignmentNode& node);
 		Result<Ok, Error> analyze(Ast::ReturnNode& node);
 		Result<Ok, Error> analyze(Ast::BreakNode& node) {return Ok {};}
@@ -163,11 +164,12 @@ namespace semantic {
 		Result<Ok, Error> get_type_of_intrinsic(Ast::CallNode& call) {
 			auto& identifier = std::get<Ast::IdentifierNode>(*call.identifier).value;
 			if (intrinsics.find(identifier) != intrinsics.end()) {
-				auto args = Ast::get_types(call.args);
+				auto args = this->get_types(call.args);
 				auto prototypes = intrinsics[identifier];
 				for (size_t i = 0; i < prototypes.size(); i++) {
 					if (args == prototypes[i].first) {
 						call.type = prototypes[i].second;
+						std::cout << "asasd";	
 						return Ok {};
 					}
 				}
@@ -176,13 +178,175 @@ namespace semantic {
 			return Error {};
 		}
 
+		Ast::Type find_concrete_type_for_type_variable(Ast::Node* node, std::string type_variable) {
+			switch (node->index()) {
+				case Ast::Block: {
+					auto& block = std::get<Ast::BlockNode>(*node);
+					for (size_t i = 0; i < block.statements.size(); i++) {
+						auto stmt_type = this->find_concrete_type_for_type_variable(block.statements[i], type_variable);
+						if (stmt_type != Ast::Type("")) return stmt_type;
+					}
+					break;
+				}
+				case Ast::Assignment: {
+					return this->find_concrete_type_for_type_variable(std::get<Ast::AssignmentNode>(*node).expression, type_variable);
+				}
+				case Ast::Return: {
+					auto& return_node = std::get<Ast::ReturnNode>(*node);
+					if (return_node.expression.has_value()) return this->find_concrete_type_for_type_variable(return_node.expression.value(), type_variable);
+					break;
+				}
+				case Ast::While: {
+					return this->find_concrete_type_for_type_variable(std::get<Ast::WhileNode>(*node).block, type_variable);
+				}
+				case Ast::Break:
+				case Ast::Continue: {
+					break;
+				}
+				case Ast::IfElse: {
+					auto& if_else = std::get<Ast::IfElseNode>(*node);
+					auto if_branch = this->find_concrete_type_for_type_variable(if_else.if_branch, type_variable);
+					if (if_branch != Ast::Type("")) return if_branch;
+
+					if (if_else.else_branch.has_value()) {
+						auto else_branch = this->find_concrete_type_for_type_variable(if_else.else_branch.value(), type_variable);
+						if (else_branch != Ast::Type("")) return else_branch;
+					}
+					break;
+				}
+				case Ast::Call: {
+					auto& call = std::get<Ast::CallNode>(*node);
+					if (call.type == type_variable) {
+						for (size_t i = 0; i < call.args.size(); i++) {
+							if (Ast::get_type(call.args[i]).to_str() == type_variable) {
+								return this->find_concrete_type_for_type_variable(call.args[i], type_variable);
+							}
+						}
+					}
+					break;
+				}
+				case Ast::Float: {
+					if (Ast::get_type(node) == type_variable) return Ast::Type("float64");
+					break;
+				}
+				case Ast::Integer: {
+					if (Ast::get_type(node) == type_variable) return Ast::Type("int64");
+					break;
+				}
+				case Ast::Identifier: {
+					break;
+				}
+				default: assert(false);
+			}
+			return Ast::Type("");
+		}
+
+		Ast::Type get_type(Ast::Node* node) {
+			if (Ast::get_type(node).is_type_variable()) return this->type_bindings[Ast::get_type(node).to_str()];
+			else return Ast::get_type(node);
+		}
+
+		std::vector<Ast::Type> get_types(std::vector<Ast::Node*> nodes) {
+			std::vector<Ast::Type> types;
+			for (size_t i = 0; i < nodes.size(); i++) {
+				types.push_back(this->get_type(nodes[i]));
+			}
+
+			for (size_t i = 0; i < types.size(); i++) {
+				std::cout << Ast::get_type(nodes[i]).to_str() << " ";
+			}
+			std::cout << "\n";
+			for (size_t i = 0; i < types.size(); i++) {
+				std::cout << types[i].to_str() << " ";
+			}
+			std::cout << "\n\n";
+			return types;
+		}
+
+		Ast::FunctionSpecialization create_and_analyze_specialization(Ast::CallNode& call, Ast::FunctionNode& function) {
+			assert(function.generic);
+
+			// Typer infer function is not type inferred yet
+			if (function.return_type == Ast::Type("")) {
+				type_inference::analyze(&function);
+				Ast::print((Ast::Node*) &function);
+			}
+
+			// Add new specialization
+			Ast::FunctionSpecialization specialization;
+			specialization.args = this->get_types(call.args);
+			specialization.return_type = function.return_type;
+
+			// Create new context
+			Context context(this->ast);
+			context.add_scope();
+			context.call_stack = this->call_stack;
+			context.current_module = this->current_module;
+			context.scopes = this->get_definitions();
+
+			// Add type bindings
+			for (size_t i = 0; i < specialization.args.size(); i++) {
+				// If the arg type is a type variable
+				if (specialization.args[i].is_type_variable()) {
+					std::string type_variable = specialization.args[i].to_str();
+
+					// If is a new type variable
+					if (context.type_bindings.find(type_variable) == context.type_bindings.end()) {
+						context.type_bindings[type_variable] = Ast::get_type(call.args[i]);
+						specialization.args[i] = Ast::get_type(call.args[i]);
+					}
+
+					// Else compare wih previous type founded for her
+					else {
+						if (context.type_bindings[type_variable] != Ast::get_type(call.args[i])) {
+							specialization.valid = false;
+							return specialization;
+						}
+						else {
+							specialization.args[i] = context.type_bindings[type_variable];
+						}
+					}
+				}
+			}
+
+			// If return type is a type variable
+			if (specialization.return_type.is_type_variable()) {
+				if (context.type_bindings.find(specialization.return_type.to_str()) != context.type_bindings.end()) {
+					specialization.return_type = context.type_bindings[specialization.return_type.to_str()];
+				}
+				else {
+					Ast::Type concrete_type = this->find_concrete_type_for_type_variable(function.body, specialization.return_type.to_str());
+					context.type_bindings[specialization.return_type.to_str()] = concrete_type;
+					specialization.return_type = concrete_type;
+				}
+			}
+
+			// Add function to call stack to be able to detect recursion
+			context.call_stack.push_back(&function);
+
+			// Add arguments to new scope
+			for (size_t i = 0; i != function.args.size(); i++) {
+				auto identifier = std::get<Ast::IdentifierNode>(*function.args[i]).value;
+				context.current_scope()[identifier] = function.args[i];
+			}
+
+			// Analyze body
+			auto result = context.analyze(function.body);
+			if (result.is_ok()) {
+				specialization.valid = true;
+				specialization.return_type = this->get_type(function.body);
+			}
+
+			return specialization;
+		}
+
 		Result<Ok, Error> get_type_of_user_defined_function(Ast::CallNode& call) {
 			auto& identifier = std::get<Ast::IdentifierNode>(*call.identifier).value;
 
 			// Create error message
 			std::string error_message = identifier + "(";
 			for (size_t i = 0; i < call.args.size(); i++) {
-				error_message += Ast::get_type(call.args[i]).to_str();
+				error_message += this->get_type(call.args[i]).to_str();
 				if (i != call.args.size() - 1) {
 					error_message += ", ";
 				}
@@ -199,14 +363,49 @@ namespace semantic {
 			// Iterate over functions with same name
 			auto& functions = std::get<std::vector<Ast::FunctionNode*>>(*binding);
 			for (size_t i = 0; i < functions.size(); i++) {
-			
 				// Continue if number of arguments of the function isn't the same as the call
 				if (functions[i]->args.size() != call.args.size()) continue;
 
+				// Check if the function was already checked with current argument types
+				auto args = Ast::get_types(functions[i]->args);
+				std::optional<Ast::FunctionSpecialization> specialization = std::nullopt;
+				for (size_t j = 0; j < functions[i]->specializations.size(); j++) {
+					if (this->get_types(call.args) == functions[i]->specializations[j].args) {
+						specialization = functions[i]->specializations[j];
+					}
+				}
 				
+				// If the function wasn't checked with the arguments
+				if (!specialization.has_value()) {
+					specialization = this->create_and_analyze_specialization(call, *functions[i]);
+					functions[i]->specializations.push_back(specialization.value());
+				}
+
+				// If specialization valid
+				if (specialization.value().valid) {
+					if (call.type == Ast::Type("")) {
+						call.type = specialization.value().return_type;
+						call.function = functions[i];
+						return Ok {};
+					}
+				}
 			}
 
-			return Ok {};
+			this->errors.push_back(error_message);
+			return Error {};
+		}
+
+		std::vector<std::unordered_map<std::string, Binding>> get_definitions() {
+			std::vector<std::unordered_map<std::string, Binding>> scopes;
+			for (size_t i = 0; i < this->scopes.size(); i++) {
+				scopes.push_back(std::unordered_map<std::string, Binding>());
+				for (auto it = this->scopes[i].begin(); it != this->scopes[i].end(); it++) {
+					if (std::holds_alternative<std::vector<Ast::FunctionNode*>>(it->second)) {
+						scopes[i][it->first] = it->second;
+					}
+				}
+			}
+			return scopes;
 		}
 	};
 };
@@ -235,11 +434,6 @@ Result<Ok, Error> semantic::Context::analyze(Ast::BlockNode& node) {
 
 	// Add functions to the current scope
 	this->add_functions_to_current_scope(node);
-
-	// Analyze functions
-	for (size_t i = 0; i < node.functions.size(); i++) {
-		(void) this->analyze(node.functions[i]);
-	}
 
 	// Analyze statements
 	for (size_t i = 0; i < node.statements.size(); i++) {
@@ -295,15 +489,6 @@ Result<Ok, Error> semantic::Context::analyze(Ast::BlockNode& node) {
 	else                                        return Ok {};
 }
 
-Result<Ok, Error> semantic::Context::analyze(Ast::FunctionNode& node) {
-	// Type infer function
-	type_inference::analyze(&node);
-
-	Ast::print((Ast::Node*)&node);
-
-	return Ok {};
-}
-
 Result<Ok, Error> semantic::Context::analyze(Ast::AssignmentNode& node) {
 	auto& identifier = std::get<Ast::IdentifierNode>(*node.identifier).value;
 
@@ -318,11 +503,11 @@ Result<Ok, Error> semantic::Context::analyze(Ast::AssignmentNode& node) {
 			this->errors.push_back(errors::undefined_variable(std::get<Ast::IdentifierNode>(*node.identifier), this->current_module));
 			return Error {};
 		}
-		if (get_type(*binding) != Ast::get_type(node.expression)) {
+		if (semantic::get_type(*binding) != Ast::get_type(node.expression)) {
 			this->errors.push_back(std::string("Error: Incompatible type for variable"));
 			return Error {};
 		}
-		*binding = (Ast::Node*) &node;
+		*binding = &node;
 	}
 
 	// normal assignment
@@ -335,7 +520,7 @@ Result<Ok, Error> semantic::Context::analyze(Ast::AssignmentNode& node) {
 				return Error {};
 			}
 		}
-		this->current_scope()[identifier] = (Ast::Node*) &node;
+		this->current_scope()[identifier] = &node;
 	}
 
 	return Ok {};
@@ -352,7 +537,7 @@ Result<Ok, Error> semantic::Context::analyze(Ast::ReturnNode& node) {
 Result<Ok, Error> semantic::Context::analyze(Ast::IfElseNode& node) {
 	auto condition = this->analyze(node.condition);
 	if (condition.is_error()) return condition;
-	if (Ast::get_type(node.condition) != Ast::Type("bool")) {
+	if (this->get_type(node.condition) != Ast::Type("bool")) {
 		this->errors.push_back(std::string("Error: The condition in a if must be boolean"));
 	}
 
@@ -370,7 +555,7 @@ Result<Ok, Error> semantic::Context::analyze(Ast::IfElseNode& node) {
 Result<Ok, Error> semantic::Context::analyze(Ast::WhileNode& node) {
 	auto condition = this->analyze(node.condition);
 	if (condition.is_error()) return condition;
-	if (Ast::get_type(node.condition) != Ast::Type("bool")) {
+	if (this->get_type(node.condition) != Ast::Type("bool")) {
 		this->errors.push_back(std::string("Error: The condition in a if must be boolean"));
 	}
 
@@ -404,12 +589,16 @@ Result<Ok, Error> semantic::Context::analyze(Ast::CallNode& node) {
 }
 
 Result<Ok, Error> semantic::Context::analyze(Ast::FloatNode& node) {
-	node.type = Ast::Type("float64");
+	if (node.type == Ast::Type("")) {
+		node.type = Ast::Type("float64");
+	}
 	return Ok {};
 }
 
 Result<Ok, Error> semantic::Context::analyze(Ast::IntegerNode& node) {
-	node.type = Ast::Type("int64");
+	if (node.type == Ast::Type("")) {
+		node.type = Ast::Type("int64");
+	}
 	return Ok {};
 }
 

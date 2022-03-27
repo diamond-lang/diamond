@@ -16,7 +16,10 @@ source_files = [
 	'src/lexer.cpp',
 	'src/ast.cpp',
 	'src/utilities.cpp',
-	'src/parser.cpp'
+	'src/parser.cpp',
+	'src/intrinsics.cpp',
+	'src/semantic.cpp',
+	'src/type_inference.cpp'
 ]
 cpp_version = 'c++17'
 

@@ -21,7 +21,7 @@ namespace type_inference {
         size_t current_type_variable_number = 1;
         std::vector<std::set<std::string>> sets;
         std::unordered_map<std::string, std::set<std::string>> labeled_sets;
-        Ast::FunctionNode* function_node;
+        std::vector<Ast::FunctionNode*> function_node;
 
         void analyze(Ast::Node* node);
 		void analyze(Ast::BlockNode& node);
@@ -139,7 +139,7 @@ void type_inference::Context::analyze(Ast::Node* node) {
 }
 
 void type_inference::Context::analyze(Ast::FunctionNode& node) {
-    this->function_node = &node;
+    this->function_node.push_back(&node);
 
     // Add scope
     this->add_scope();
@@ -218,6 +218,7 @@ void type_inference::Context::analyze(Ast::FunctionNode& node) {
 
     // Remove scope
     this->remove_scope();
+    this->function_node.pop_back();
 }
 
 void type_inference::Context::analyze(Ast::BlockNode& block) {
@@ -241,10 +242,10 @@ void type_inference::Context::analyze(Ast::AssignmentNode& node) {
 void type_inference::Context::analyze(Ast::ReturnNode& node) {
     if (node.expression.has_value()) {
         this->analyze(node.expression.value());
-        this->sets.push_back(std::set<std::string>{this->function_node->return_type.to_str(), Ast::get_type(node.expression.value()).to_str()});
+        this->sets.push_back(std::set<std::string>{this->function_node[this->function_node.size() - 1]->return_type.to_str(), Ast::get_type(node.expression.value()).to_str()});
     }
     else {
-        this->sets.push_back(std::set<std::string>{this->function_node->return_type.to_str(), "void"});
+        this->sets.push_back(std::set<std::string>{this->function_node[this->function_node.size() - 1]->return_type.to_str(), "void"});
     }
 }
 

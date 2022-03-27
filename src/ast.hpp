@@ -92,9 +92,10 @@ namespace Ast {
 		std::vector<Node*> use_include_statements;
 	};
 
-	struct FunctionPrototype {
+	struct FunctionSpecialization {
 		std::vector<Type> args;
 		Type return_type;
+		bool valid;
 	};
 
 	struct FunctionNode {
@@ -105,10 +106,10 @@ namespace Ast {
 		Node* identifier;
 		std::vector<Node*> args;
 		Node* body;
-		
+
+		bool generic = false;
 		Type return_type = Type("");
-		std::vector<FunctionPrototype> constraints;
-		std::vector<FunctionPrototype> specializations;
+		std::vector<FunctionSpecialization> specializations;
 	};
 
 	struct AssignmentNode {

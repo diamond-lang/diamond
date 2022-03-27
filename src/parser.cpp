@@ -227,6 +227,7 @@ Result<Ast::Node*, Error> Parser::parse_statement() {
 Result<Ast::Node*, Error> Parser::parse_function() {
 	// Create node
 	auto function = Ast::FunctionNode {this->current().line, this->current().column};
+	function.generic = true;
 
 	// Parse keyword
 	auto keyword = this->parse_token(token::Function);
