@@ -95,7 +95,7 @@ namespace Ast {
 	struct FunctionSpecialization {
 		std::vector<Type> args;
 		Type return_type;
-		bool valid;
+		bool valid = false;
 	};
 
 	struct FunctionNode {

@@ -184,7 +184,12 @@ void Ast::print(Node* node, size_t indent_level, std::vector<bool> last, bool co
 				std::cout << ": " << function.return_type.to_str();
 			}
 			std::cout << "\n";
-			print(function.body, indent_level, last, concrete);
+			if (std::holds_alternative<BlockNode>(*function.body)) {
+				print(function.body, indent_level, last, concrete);
+			}
+			else {
+				print(function.body, indent_level + 1, append(last, true), concrete);
+			}
 			break;
 		}
 		

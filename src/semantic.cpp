@@ -21,8 +21,8 @@ namespace semantic {
 		std::vector<Ast::FunctionNode*>
 	>;
 
-	Ast::Type get_type(Binding& binding) {
-		if (std::holds_alternative<Ast::AssignmentNode*>(binding)) return std::get<Ast::AssignmentNode*>(binding)->type;
+	Ast::Type get_binding_type(Binding& binding) {
+		if (std::holds_alternative<Ast::AssignmentNode*>(binding)) return Ast::get_type(std::get<Ast::AssignmentNode*>(binding)->expression);
 		else if (std::holds_alternative<Ast::Node*>(binding)) return Ast::get_type(std::get<Ast::Node*>(binding));
 		else if (std::holds_alternative<std::vector<Ast::FunctionNode*>>(binding)) return Ast::Type("function");
 		else assert(false);
@@ -168,8 +168,7 @@ namespace semantic {
 				auto prototypes = intrinsics[identifier];
 				for (size_t i = 0; i < prototypes.size(); i++) {
 					if (args == prototypes[i].first) {
-						call.type = prototypes[i].second;
-						std::cout << "asasd";	
+						call.type = prototypes[i].second;	
 						return Ok {};
 					}
 				}
@@ -251,15 +250,6 @@ namespace semantic {
 			for (size_t i = 0; i < nodes.size(); i++) {
 				types.push_back(this->get_type(nodes[i]));
 			}
-
-			for (size_t i = 0; i < types.size(); i++) {
-				std::cout << Ast::get_type(nodes[i]).to_str() << " ";
-			}
-			std::cout << "\n";
-			for (size_t i = 0; i < types.size(); i++) {
-				std::cout << types[i].to_str() << " ";
-			}
-			std::cout << "\n\n";
 			return types;
 		}
 
@@ -269,12 +259,11 @@ namespace semantic {
 			// Typer infer function is not type inferred yet
 			if (function.return_type == Ast::Type("")) {
 				type_inference::analyze(&function);
-				Ast::print((Ast::Node*) &function);
 			}
 
 			// Add new specialization
 			Ast::FunctionSpecialization specialization;
-			specialization.args = this->get_types(call.args);
+			specialization.args = Ast::get_types(function.args);
 			specialization.return_type = function.return_type;
 
 			// Create new context
@@ -290,15 +279,16 @@ namespace semantic {
 				if (specialization.args[i].is_type_variable()) {
 					std::string type_variable = specialization.args[i].to_str();
 
+
 					// If is a new type variable
 					if (context.type_bindings.find(type_variable) == context.type_bindings.end()) {
-						context.type_bindings[type_variable] = Ast::get_type(call.args[i]);
-						specialization.args[i] = Ast::get_type(call.args[i]);
+						context.type_bindings[type_variable] = this->get_type(call.args[i]);
+						specialization.args[i] = this->get_type(call.args[i]);
 					}
 
 					// Else compare wih previous type founded for her
 					else {
-						if (context.type_bindings[type_variable] != Ast::get_type(call.args[i])) {
+						if (context.type_bindings[type_variable] != this->get_type(call.args[i])) {
 							specialization.valid = false;
 							return specialization;
 						}
@@ -334,7 +324,7 @@ namespace semantic {
 			auto result = context.analyze(function.body);
 			if (result.is_ok()) {
 				specialization.valid = true;
-				specialization.return_type = this->get_type(function.body);
+				specialization.return_type = context.get_type(function.body);
 			}
 
 			return specialization;
@@ -383,11 +373,14 @@ namespace semantic {
 
 				// If specialization valid
 				if (specialization.value().valid) {
-					if (call.type == Ast::Type("")) {
-						call.type = specialization.value().return_type;
-						call.function = functions[i];
-						return Ok {};
+					if (call.type.is_type_variable()) {
+						this->type_bindings[call.type.to_str()] = specialization.value().return_type;
 					}
+					else {
+						call.type = specialization.value().return_type;
+					}
+					call.function = functions[i];
+					return Ok {};
 				}
 			}
 
@@ -503,7 +496,7 @@ Result<Ok, Error> semantic::Context::analyze(Ast::AssignmentNode& node) {
 			this->errors.push_back(errors::undefined_variable(std::get<Ast::IdentifierNode>(*node.identifier), this->current_module));
 			return Error {};
 		}
-		if (semantic::get_type(*binding) != Ast::get_type(node.expression)) {
+		if (semantic::get_binding_type(*binding) != Ast::get_type(node.expression)) {
 			this->errors.push_back(std::string("Error: Incompatible type for variable"));
 			return Error {};
 		}
@@ -513,7 +506,7 @@ Result<Ok, Error> semantic::Context::analyze(Ast::AssignmentNode& node) {
 	// normal assignment
 	else {
 		if (this->current_scope().find(identifier) != this->current_scope().end()
-		|| std::holds_alternative<Ast::AssignmentNode*>(this->current_scope()[identifier])) {
+		&& std::holds_alternative<Ast::AssignmentNode*>(this->current_scope()[identifier])) {
 			auto assignment = std::get<Ast::AssignmentNode*>(this->current_scope()[identifier]);
 			if (!assignment->is_mutable) {
 				this->errors.push_back(errors::reassigning_immutable_variable(std::get<Ast::IdentifierNode>(*node.identifier), node, this->current_module));
@@ -609,7 +602,7 @@ Result<Ok, Error> semantic::Context::analyze(Ast::IdentifierNode& node) {
 		return Error {};
 	}
 	else {
-		node.type = semantic::get_type(*binding);
+		node.type = semantic::get_binding_type(*binding);
 		return Ok {};
 	}
 }
