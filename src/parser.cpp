@@ -12,39 +12,39 @@ struct Parser {
 	const std::vector<token::Token>& tokens;
 	size_t position = 0;
 	const std::filesystem::path& file;
-	Ast::Ast ast;
+	ast::Ast ast;
 	std::vector<size_t> indentation_level;
 	Errors errors;
 	
 	Parser(const std::vector<token::Token>& tokens, const std::filesystem::path& file) : tokens(tokens), file(file) {}
-	Parser(Ast::Ast& ast, const std::vector<token::Token>& tokens, const std::filesystem::path& file) : ast(ast), tokens(tokens), file(file) {}
+	Parser(ast::Ast& ast, const std::vector<token::Token>& tokens, const std::filesystem::path& file) : ast(ast), tokens(tokens), file(file) {}
 
 	Result<Ok, Error> parse_program();
-	Result<Ast::Node*, Error> parse_block();
-	Result<Ast::Node*, Error> parse_expression_block();
-	Result<Ast::Node*, Error> parse_function();
-	Result<Ast::Node*, Error> parse_statement();
-	Result<Ast::Node*, Error> parse_assignment();
-	Result<Ast::Node*, Error> parse_return_stmt();
-	Result<Ast::Node*, Error> parse_break_stmt();
-	Result<Ast::Node*, Error> parse_continue_stmt();
-	Result<Ast::Node*, Error> parse_if_else();
-	Result<Ast::Node*, Error> parse_while_stmt();
-	Result<Ast::Node*, Error> parse_use_stmt();
-	Result<Ast::Node*, Error> parse_include_stmt();
-	Result<Ast::Node*, Error> parse_call();
-	Result<Ast::Node*, Error> parse_expression();
-	Result<Ast::Node*, Error> parse_not_expr();
-	Result<Ast::Node*, Error> parse_binary(int precedence = 1);
-	Result<Ast::Node*, Error> parse_negation();
-	Result<Ast::Node*, Error> parse_primary();
-	Result<Ast::Node*, Error> parse_grouping();
-	Result<Ast::Node*, Error> parse_float();
-	Result<Ast::Node*, Error> parse_integer();
-	Result<Ast::Node*, Error> parse_boolean();
-	Result<Ast::Node*, Error> parse_identifier();
-	Result<Ast::Node*, Error> parse_identifier(token::TokenVariant token);
-	Result<Ast::Node*, Error> parse_string();
+	Result<ast::Node*, Error> parse_block();
+	Result<ast::Node*, Error> parse_expression_block();
+	Result<ast::Node*, Error> parse_function();
+	Result<ast::Node*, Error> parse_statement();
+	Result<ast::Node*, Error> parse_assignment();
+	Result<ast::Node*, Error> parse_return_stmt();
+	Result<ast::Node*, Error> parse_break_stmt();
+	Result<ast::Node*, Error> parse_continue_stmt();
+	Result<ast::Node*, Error> parse_if_else();
+	Result<ast::Node*, Error> parse_while_stmt();
+	Result<ast::Node*, Error> parse_use_stmt();
+	Result<ast::Node*, Error> parse_include_stmt();
+	Result<ast::Node*, Error> parse_call();
+	Result<ast::Node*, Error> parse_expression();
+	Result<ast::Node*, Error> parse_not_expr();
+	Result<ast::Node*, Error> parse_binary(int precedence = 1);
+	Result<ast::Node*, Error> parse_negation();
+	Result<ast::Node*, Error> parse_primary();
+	Result<ast::Node*, Error> parse_grouping();
+	Result<ast::Node*, Error> parse_float();
+	Result<ast::Node*, Error> parse_integer();
+	Result<ast::Node*, Error> parse_boolean();
+	Result<ast::Node*, Error> parse_identifier();
+	Result<ast::Node*, Error> parse_identifier(token::TokenVariant token);
+	Result<ast::Node*, Error> parse_string();
 	Result<token::Token, Error> parse_token(token::TokenVariant token);
 
 	token::Token current();
@@ -97,7 +97,7 @@ Location Parser::location() {
 
 // Parsing
 // -------
-Result<Ast::Ast, Errors> parse::program(const std::vector<token::Token>& tokens, const std::filesystem::path& file) {
+Result<ast::Ast, Errors> parse::program(const std::vector<token::Token>& tokens, const std::filesystem::path& file) {
 	Parser parser(tokens, file);
 	auto parsing_result = parser.parse_program();
 	if (parsing_result.is_error()) return parser.errors;
@@ -105,7 +105,7 @@ Result<Ast::Ast, Errors> parse::program(const std::vector<token::Token>& tokens,
 	return parser.ast;
 }
 
-Result<Ok, Errors> parse::module(Ast::Ast& ast, const std::vector<token::Token>& tokens, const std::filesystem::path& file) {
+Result<Ok, Errors> parse::module(ast::Ast& ast, const std::vector<token::Token>& tokens, const std::filesystem::path& file) {
 	Parser parser(ast, tokens, file);
 	auto result = parser.parse_block();
 	if (result.is_error()) return parser.errors;
@@ -120,11 +120,11 @@ Result<Ok, Error> Parser::parse_program() {
 	return Ok {};
 }
 
-Result<Ast::Node*, Error> Parser::parse_block() {
+Result<ast::Node*, Error> Parser::parse_block() {
 	bool there_was_errors = false;
 
 	// Create node
-	Ast::BlockNode block = {this->current().line, this->current().column};
+	ast::BlockNode block = {this->current().line, this->current().column};
 
 	// Advance until next statement
 	this->advance_until_next_statement();
@@ -165,12 +165,12 @@ Result<Ast::Node*, Error> Parser::parse_block() {
 		auto result = this->parse_statement();
 		if (result.is_ok()) {
 			switch (result.get_value()->index()) {
-				case Ast::Function:
+				case ast::Function:
 					block.functions.push_back(result.get_value());
 					break;
 				
-				case Ast::Use:
-				case Ast::Include:
+				case ast::Use:
+				case ast::Include:
 					block.use_include_statements.push_back(result.get_value());
 					break;
 				
@@ -202,7 +202,7 @@ Result<Ast::Node*, Error> Parser::parse_block() {
 	}
 }
 
-Result<Ast::Node*, Error> Parser::parse_statement() {
+Result<ast::Node*, Error> Parser::parse_statement() {
 	switch (this->current().variant) {
 		case token::Function: return this->parse_function();
 		case token::Return:   return this->parse_return_stmt();
@@ -224,9 +224,9 @@ Result<Ast::Node*, Error> Parser::parse_statement() {
 	return Error {};
 }
 
-Result<Ast::Node*, Error> Parser::parse_function() {
+Result<ast::Node*, Error> Parser::parse_function() {
 	// Create node
-	auto function = Ast::FunctionNode {this->current().line, this->current().column};
+	auto function = ast::FunctionNode {this->current().line, this->current().column};
 	function.generic = true;
 
 	// Parse keyword
@@ -276,9 +276,9 @@ Result<Ast::Node*, Error> Parser::parse_function() {
 	return this->ast.last_element();
 }
 
-Result<Ast::Node*, Error> Parser::parse_assignment() {
+Result<ast::Node*, Error> Parser::parse_assignment() {
 	// Create node
-	auto assignment = Ast::AssignmentNode {this->current().line, this->current().column};
+	auto assignment = ast::AssignmentNode {this->current().line, this->current().column};
 
 	// Parse nonlocal
 	if (this->current() == token::NonLocal) {	
@@ -316,9 +316,9 @@ Result<Ast::Node*, Error> Parser::parse_assignment() {
 	return this->ast.last_element();
 }
 
-Result<Ast::Node*, Error> Parser::parse_return_stmt() {
+Result<ast::Node*, Error> Parser::parse_return_stmt() {
 	// Create node
-	auto return_stmt = Ast::ReturnNode {this->current().line, this->current().column};
+	auto return_stmt = ast::ReturnNode {this->current().line, this->current().column};
 
 	// Parse keyword
 	auto keyword = this->parse_token(token::Return);
@@ -335,9 +335,9 @@ Result<Ast::Node*, Error> Parser::parse_return_stmt() {
 	return this->ast.last_element();
 }
 
-Result<Ast::Node*, Error> Parser::parse_break_stmt() {
+Result<ast::Node*, Error> Parser::parse_break_stmt() {
 	// Create node
-	auto break_node = Ast::BreakNode {this->current().line, this->current().column};
+	auto break_node = ast::BreakNode {this->current().line, this->current().column};
 
 	// Parse keyword
 	auto keyword = this->parse_token(token::Break);
@@ -347,9 +347,9 @@ Result<Ast::Node*, Error> Parser::parse_break_stmt() {
 	return this->ast.last_element();
 }
 
-Result<Ast::Node*, Error> Parser::parse_continue_stmt() {
+Result<ast::Node*, Error> Parser::parse_continue_stmt() {
 	// Create node
-	auto continue_node = Ast::ContinueNode {this->current().line, this->current().column};
+	auto continue_node = ast::ContinueNode {this->current().line, this->current().column};
 
 	// Parse keyword
 	auto keyword = this->parse_token(token::Continue);
@@ -359,11 +359,11 @@ Result<Ast::Node*, Error> Parser::parse_continue_stmt() {
 	return this->ast.last_element();
 }
 
-Result<Ast::Node*, Error> Parser::parse_if_else() {
+Result<ast::Node*, Error> Parser::parse_if_else() {
 	size_t indentation_level = this->current().column;
 
 	// Create node
-	auto if_else = Ast::IfElseNode {this->current().line, this->current().column};
+	auto if_else = ast::IfElseNode {this->current().line, this->current().column};
 
 	// Parse keyword
 	auto keyword = this->parse_token(token::If);
@@ -418,9 +418,9 @@ Result<Ast::Node*, Error> Parser::parse_if_else() {
 	return this->ast.last_element();
 }
 
-Result<Ast::Node*, Error> Parser::parse_while_stmt() {
+Result<ast::Node*, Error> Parser::parse_while_stmt() {
 	// Create node
-	auto while_stmt = Ast::WhileNode {this->current().line, this->current().column};
+	auto while_stmt = ast::WhileNode {this->current().line, this->current().column};
 	
 	// Parse keyword
 	auto keyword = this->parse_token(token::While);
@@ -441,9 +441,9 @@ Result<Ast::Node*, Error> Parser::parse_while_stmt() {
 	return this->ast.last_element();
 }
 
-Result<Ast::Node*, Error> Parser::parse_use_stmt() {
+Result<ast::Node*, Error> Parser::parse_use_stmt() {
 	// Create node
-	auto use_stmt = Ast::UseNode {this->current().line, this->current().column};
+	auto use_stmt = ast::UseNode {this->current().line, this->current().column};
 	
 	// Parse keyword
 	auto keyword = this->parse_token(token::Use);
@@ -458,9 +458,9 @@ Result<Ast::Node*, Error> Parser::parse_use_stmt() {
 	return this->ast.last_element();
 }
 
-Result<Ast::Node*, Error> Parser::parse_include_stmt() {
+Result<ast::Node*, Error> Parser::parse_include_stmt() {
 	// Create node
-	auto include_stmt = Ast::IncludeNode {this->current().line, this->current().column};
+	auto include_stmt = ast::IncludeNode {this->current().line, this->current().column};
 
 	// Parse keyword
 	auto keyword = this->parse_token(token::Include);
@@ -476,9 +476,9 @@ Result<Ast::Node*, Error> Parser::parse_include_stmt() {
 	return this->ast.last_element();
 }
 
-Result<Ast::Node*, Error> Parser::parse_call() {
+Result<ast::Node*, Error> Parser::parse_call() {
 	// Create node
-	auto call = Ast::CallNode {this->current().line, this->current().column};
+	auto call = ast::CallNode {this->current().line, this->current().column};
 
 	// Parse indentifier
 	auto identifier = this->parse_identifier();
@@ -507,7 +507,7 @@ Result<Ast::Node*, Error> Parser::parse_call() {
 	return this->ast.last_element();
 }
 
-Result<Ast::Node*, Error> Parser::parse_expression() {
+Result<ast::Node*, Error> Parser::parse_expression() {
 	switch (this->current().variant) {
 		case token::If:  return this->parse_if_else();
 		case token::Not: return this->parse_not_expr();
@@ -515,9 +515,9 @@ Result<Ast::Node*, Error> Parser::parse_expression() {
 	}
 }
 
-Result<Ast::Node*, Error> Parser::parse_not_expr() {
+Result<ast::Node*, Error> Parser::parse_not_expr() {
 	// Create node
-	auto call = Ast::CallNode {this->current().line, this->current().column};
+	auto call = ast::CallNode {this->current().line, this->current().column};
 
 	// Parse indentifier
 	auto identifier = this->parse_identifier(token::Not);
@@ -533,7 +533,7 @@ Result<Ast::Node*, Error> Parser::parse_not_expr() {
 	return this->ast.last_element();
 }
 
-Result<Ast::Node*, Error> Parser::parse_binary(int precedence) {
+Result<ast::Node*, Error> Parser::parse_binary(int precedence) {
 	static std::map<token::TokenVariant, int> operators;
 	operators[token::Or] = 1;
 	operators[token::And] = 2;
@@ -558,7 +558,7 @@ Result<Ast::Node*, Error> Parser::parse_binary(int precedence) {
 
 		while (true) {
 			// Create node
-			auto call = Ast::CallNode {this->current().line, this->current().column};
+			auto call = ast::CallNode {this->current().line, this->current().column};
 	
 			// Parse operator
 			auto op = this->current().variant;
@@ -582,9 +582,9 @@ Result<Ast::Node*, Error> Parser::parse_binary(int precedence) {
 	}
 }
 
-Result<Ast::Node*, Error> Parser::parse_negation() {
+Result<ast::Node*, Error> Parser::parse_negation() {
 	// Create node
-	auto call = Ast::CallNode {this->current().line, this->current().column};
+	auto call = ast::CallNode {this->current().line, this->current().column};
 
 	// Parse indentifier
 	auto identifier = this->parse_identifier(token::Minus);
@@ -600,7 +600,7 @@ Result<Ast::Node*, Error> Parser::parse_negation() {
 	return this->ast.last_element();
 }
 
-Result<Ast::Node*, Error> Parser::parse_primary() {
+Result<ast::Node*, Error> Parser::parse_primary() {
 	switch (this->current().variant) {
 		case token::Minus:     return this->parse_negation();
 		case token::LeftParen: return this->parse_grouping();
@@ -618,7 +618,7 @@ Result<Ast::Node*, Error> Parser::parse_primary() {
 	return Error {};
 }
 
-Result<Ast::Node*, Error> Parser::parse_grouping() {
+Result<ast::Node*, Error> Parser::parse_grouping() {
 	// Parse left paren
 	auto left_paren = this->parse_token(token::LeftParen);
 	if (left_paren.is_error()) return Error {}; 
@@ -634,9 +634,9 @@ Result<Ast::Node*, Error> Parser::parse_grouping() {
 	return expression.get_value();
 }
 
-Result<Ast::Node*, Error> Parser::parse_float() {
+Result<ast::Node*, Error> Parser::parse_float() {
 	// Create node
-	auto float_node = Ast::FloatNode {this->current().line, this->current().column};
+	auto float_node = ast::FloatNode {this->current().line, this->current().column};
 	
 	// Parse float 
 	if (this->current() != token::Float) assert(false);
@@ -647,9 +647,9 @@ Result<Ast::Node*, Error> Parser::parse_float() {
 	return this->ast.last_element();
 }
 
-Result<Ast::Node*, Error> Parser::parse_integer() {
+Result<ast::Node*, Error> Parser::parse_integer() {
 	// Create node
-	auto integer = Ast::IntegerNode {this->current().line, this->current().column};
+	auto integer = ast::IntegerNode {this->current().line, this->current().column};
 
 	// Parse integer
 	if (this->current() != token::Integer) assert(false);
@@ -661,9 +661,9 @@ Result<Ast::Node*, Error> Parser::parse_integer() {
 	return this->ast.last_element();
 }
 
-Result<Ast::Node*, Error> Parser::parse_boolean() {
+Result<ast::Node*, Error> Parser::parse_boolean() {
 	// Create node
-	auto boolean = Ast::BooleanNode {this->current().line, this->current().column};
+	auto boolean = ast::BooleanNode {this->current().line, this->current().column};
 
 	// Parse boolean
 	if (this->current() != token::True && this->current() != token::False) assert(false);
@@ -674,13 +674,13 @@ Result<Ast::Node*, Error> Parser::parse_boolean() {
 	return this->ast.last_element();
 }
 
-Result<Ast::Node*, Error> Parser::parse_identifier() {
+Result<ast::Node*, Error> Parser::parse_identifier() {
 	return this->parse_identifier(token::Identifier);
 }
 
-Result<Ast::Node*, Error> Parser::parse_identifier(token::TokenVariant token) {
+Result<ast::Node*, Error> Parser::parse_identifier(token::TokenVariant token) {
 	// Create node
-	auto identifier = Ast::IdentifierNode {this->current().line, this->current().column};
+	auto identifier = ast::IdentifierNode {this->current().line, this->current().column};
 
 	// Parse identifier
 	auto result = this->parse_token(token);
@@ -691,9 +691,9 @@ Result<Ast::Node*, Error> Parser::parse_identifier(token::TokenVariant token) {
 	return this->ast.last_element();
 }
 
-Result<Ast::Node*, Error> Parser::parse_string() {
+Result<ast::Node*, Error> Parser::parse_string() {
 	// Create node
-	auto string = Ast::StringNode {this->current().line, this->current().column};
+	auto string = ast::StringNode {this->current().line, this->current().column};
 
 	// Parse string
 	auto result = this->parse_token(token::String);

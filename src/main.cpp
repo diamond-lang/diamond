@@ -157,7 +157,7 @@ void emit(Command command) {
 
 	// Emit AST
 	if (command.options[0] == std::string("--ast")) {
-		Ast::print(ast);
+		ast::print(ast);
 		ast.free();
 		return;
 	}
@@ -168,14 +168,14 @@ void emit(Command command) {
 
 	// Emit AST with types
 	if (command.options[0] == std::string("--ast-with-types")) {
-		Ast::print(ast);
+		ast::print(ast);
 		ast.free();
 		return;
 	}
 
 	// Emit AST with concrete types
 	if (command.options[0] == std::string("--ast-with-concrete-types")) {
-		Ast::print_with_concrete_types(ast);
+		ast::print_with_concrete_types(ast);
 		ast.free();
 		return;
 	}

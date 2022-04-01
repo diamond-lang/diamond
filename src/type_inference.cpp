@@ -13,7 +13,7 @@
 namespace type_inference {
     struct Binding {
         std::string identifier;
-        Ast::Type type;
+        ast::Type type;
     };
 
     struct Context {
@@ -21,43 +21,43 @@ namespace type_inference {
         size_t current_type_variable_number = 1;
         std::vector<std::set<std::string>> sets;
         std::unordered_map<std::string, std::set<std::string>> labeled_sets;
-        std::vector<Ast::FunctionNode*> function_node;
+        std::vector<ast::FunctionNode*> function_node;
 
-        void analyze(Ast::Node* node);
-		void analyze(Ast::BlockNode& node);
-		void analyze(Ast::FunctionNode& node);
-		void analyze(Ast::AssignmentNode& node);
-		void analyze(Ast::ReturnNode& node);
-		void analyze(Ast::BreakNode& node) {}
-		void analyze(Ast::ContinueNode& node) {}
-		void analyze(Ast::IfElseNode& node);
-		void analyze(Ast::WhileNode& node);
-		void analyze(Ast::UseNode& node) {}
-		void analyze(Ast::IncludeNode& node) {}
-		void analyze(Ast::CallNode& node);
-		void analyze(Ast::FloatNode& node);
-		void analyze(Ast::IntegerNode& node);
-		void analyze(Ast::IdentifierNode& node);
-		void analyze(Ast::BooleanNode& node);
-		void analyze(Ast::StringNode& node) {}
+        void analyze(ast::Node* node);
+		void analyze(ast::BlockNode& node);
+		void analyze(ast::FunctionNode& node);
+		void analyze(ast::AssignmentNode& node);
+		void analyze(ast::ReturnNode& node);
+		void analyze(ast::BreakNode& node) {}
+		void analyze(ast::ContinueNode& node) {}
+		void analyze(ast::IfElseNode& node);
+		void analyze(ast::WhileNode& node);
+		void analyze(ast::UseNode& node) {}
+		void analyze(ast::IncludeNode& node) {}
+		void analyze(ast::CallNode& node);
+		void analyze(ast::FloatNode& node);
+		void analyze(ast::IntegerNode& node);
+		void analyze(ast::IdentifierNode& node);
+		void analyze(ast::BooleanNode& node);
+		void analyze(ast::StringNode& node) {}
 
-        void unify(Ast::Node* node);
-		void unify(Ast::BlockNode& node);
-		void unify(Ast::FunctionNode& node) {}
-		void unify(Ast::AssignmentNode& node);
-		void unify(Ast::ReturnNode& node);
-		void unify(Ast::BreakNode& node) {}
-		void unify(Ast::ContinueNode& node) {}
-		void unify(Ast::IfElseNode& node);
-		void unify(Ast::WhileNode& node);
-		void unify(Ast::UseNode& node) {}
-		void unify(Ast::IncludeNode& node) {}
-		void unify(Ast::CallNode& node);
-		void unify(Ast::FloatNode& node);
-		void unify(Ast::IntegerNode& node);
-		void unify(Ast::IdentifierNode& node);
-		void unify(Ast::BooleanNode& node) {}
-		void unify(Ast::StringNode& node) {}
+        void unify(ast::Node* node);
+		void unify(ast::BlockNode& node);
+		void unify(ast::FunctionNode& node) {}
+		void unify(ast::AssignmentNode& node);
+		void unify(ast::ReturnNode& node);
+		void unify(ast::BreakNode& node) {}
+		void unify(ast::ContinueNode& node) {}
+		void unify(ast::IfElseNode& node);
+		void unify(ast::WhileNode& node);
+		void unify(ast::UseNode& node) {}
+		void unify(ast::IncludeNode& node) {}
+		void unify(ast::CallNode& node);
+		void unify(ast::FloatNode& node);
+		void unify(ast::IntegerNode& node);
+		void unify(ast::IdentifierNode& node);
+		void unify(ast::BooleanNode& node) {}
+		void unify(ast::StringNode& node) {}
 
         std::unordered_map<std::string, Binding>& current_scope() {
             return this->scopes[this->scopes.size() - 1];
@@ -80,13 +80,13 @@ namespace type_inference {
             return nullptr;
         }
 
-        Ast::Type get_unified_type(std::string type_var) {
+        ast::Type get_unified_type(std::string type_var) {
             for (auto it = this->labeled_sets.begin(); it != this->labeled_sets.end(); it++) {
                 if (it->second.count(type_var)) {
-                    return Ast::Type(it->first);
+                    return ast::Type(it->first);
                 }
             }
-            return Ast::Type("");
+            return ast::Type("");
         }
     };
 
@@ -126,7 +126,7 @@ namespace type_inference {
 
 // Type inference
 // --------------
-void type_inference::analyze(Ast::FunctionNode* function) {
+void type_inference::analyze(ast::FunctionNode* function) {
     // Create context
     type_inference::Context context;
 
@@ -134,11 +134,11 @@ void type_inference::analyze(Ast::FunctionNode* function) {
     context.analyze(*function);
 }
 
-void type_inference::Context::analyze(Ast::Node* node) {
+void type_inference::Context::analyze(ast::Node* node) {
 	return std::visit([this](auto& variant) {return this->analyze(variant);}, *node);
 }
 
-void type_inference::Context::analyze(Ast::FunctionNode& node) {
+void type_inference::Context::analyze(ast::FunctionNode& node) {
     this->function_node.push_back(&node);
 
     // Add scope
@@ -146,18 +146,18 @@ void type_inference::Context::analyze(Ast::FunctionNode& node) {
 
     // Assign a type variable to every argument and return type
     for (size_t i = 0; i < node.args.size(); i++) {
-        if (Ast::get_type(node.args[i]) == Ast::Type("")) { 
-            Ast::set_type(node.args[i], (std::to_string(this->current_type_variable_number)));
+        if (ast::get_type(node.args[i]) == ast::Type("")) { 
+            ast::set_type(node.args[i], (std::to_string(this->current_type_variable_number)));
             this->current_type_variable_number++;
-            this->sets.push_back(std::set<std::string>{Ast::get_type(node.args[i]).to_str()});
+            this->sets.push_back(std::set<std::string>{ast::get_type(node.args[i]).to_str()});
         }
 
         type_inference::Binding binding;
-        binding.identifier = std::get<Ast::IdentifierNode>(*node.args[i]).value;
-        binding.type = Ast::get_type(node.args[i]);
+        binding.identifier = std::get<ast::IdentifierNode>(*node.args[i]).value;
+        binding.type = ast::get_type(node.args[i]);
         this->current_scope()[binding.identifier] = binding;
     }
-    node.return_type = Ast::Type(std::to_string(this->current_type_variable_number));
+    node.return_type = ast::Type(std::to_string(this->current_type_variable_number));
     this->current_type_variable_number++;
     this->sets.push_back(std::set<std::string>{node.return_type.to_str()});
 
@@ -165,9 +165,9 @@ void type_inference::Context::analyze(Ast::FunctionNode& node) {
     this->analyze(node.body);
 
     // Assume it's an expression if it isn't a block
-    if (node.body->index() != Ast::Block) {
+    if (node.body->index() != ast::Block) {
         // Unify expression type with return type
-        this->sets.push_back(std::set<std::string>{node.return_type.to_str(), Ast::get_type(node.body).to_str()});
+        this->sets.push_back(std::set<std::string>{node.return_type.to_str(), ast::get_type(node.body).to_str()});
     }
 
     // Merge sets that share elements
@@ -212,7 +212,7 @@ void type_inference::Context::analyze(Ast::FunctionNode& node) {
 
     // Unify args and return type
     for (size_t i = 0; i < node.args.size(); i++) {
-        Ast::set_type(node.args[i], this->get_unified_type(Ast::get_type(node.args[i]).to_str()));
+        ast::set_type(node.args[i], this->get_unified_type(ast::get_type(node.args[i]).to_str()));
     }
     node.return_type = this->get_unified_type(node.return_type.to_str());
 
@@ -221,7 +221,7 @@ void type_inference::Context::analyze(Ast::FunctionNode& node) {
     this->function_node.pop_back();
 }
 
-void type_inference::Context::analyze(Ast::BlockNode& block) {
+void type_inference::Context::analyze(ast::BlockNode& block) {
     this->add_scope();
 
     for (size_t i = 0; i < block.statements.size(); i++) {
@@ -231,75 +231,75 @@ void type_inference::Context::analyze(Ast::BlockNode& block) {
     this->remove_scope();
 }
 
-void type_inference::Context::analyze(Ast::AssignmentNode& node) {
+void type_inference::Context::analyze(ast::AssignmentNode& node) {
     this->analyze(node.expression);
     type_inference::Binding binding;
-    binding.identifier = std::get<Ast::IdentifierNode>(*node.identifier).value;
-    binding.type = Ast::get_type(node.expression);
+    binding.identifier = std::get<ast::IdentifierNode>(*node.identifier).value;
+    binding.type = ast::get_type(node.expression);
     this->current_scope()[binding.identifier] = binding;
 }
 
-void type_inference::Context::analyze(Ast::ReturnNode& node) {
+void type_inference::Context::analyze(ast::ReturnNode& node) {
     if (node.expression.has_value()) {
         this->analyze(node.expression.value());
-        this->sets.push_back(std::set<std::string>{this->function_node[this->function_node.size() - 1]->return_type.to_str(), Ast::get_type(node.expression.value()).to_str()});
+        this->sets.push_back(std::set<std::string>{this->function_node[this->function_node.size() - 1]->return_type.to_str(), ast::get_type(node.expression.value()).to_str()});
     }
     else {
         this->sets.push_back(std::set<std::string>{this->function_node[this->function_node.size() - 1]->return_type.to_str(), "void"});
     }
 }
 
-void type_inference::Context::analyze(Ast::IfElseNode& node) {
+void type_inference::Context::analyze(ast::IfElseNode& node) {
     this->analyze(node.condition);
     this->analyze(node.if_branch);
     if (node.else_branch.has_value()) this->analyze(node.else_branch.value());
 }
 
-void type_inference::Context::analyze(Ast::WhileNode& node) {
+void type_inference::Context::analyze(ast::WhileNode& node) {
     this->analyze(node.condition);
     this->analyze(node.block);
 }
 
-void type_inference::Context::analyze(Ast::IdentifierNode& node) {
+void type_inference::Context::analyze(ast::IdentifierNode& node) {
 	if (this->get_binding(node.value)) {
 		node.type = this->get_binding(node.value)->type;
 	}
 }
 
-void type_inference::Context::analyze(Ast::IntegerNode& node) {
-    node.type = Ast::Type(std::to_string(this->current_type_variable_number));
+void type_inference::Context::analyze(ast::IntegerNode& node) {
+    node.type = ast::Type(std::to_string(this->current_type_variable_number));
     this->current_type_variable_number++;
 }
 
-void type_inference::Context::analyze(Ast::FloatNode& node) {
-	node.type = Ast::Type(std::to_string(this->current_type_variable_number));
+void type_inference::Context::analyze(ast::FloatNode& node) {
+	node.type = ast::Type(std::to_string(this->current_type_variable_number));
     this->current_type_variable_number++;
 }
 
-void type_inference::Context::analyze(Ast::BooleanNode& node) {
-	node.type = Ast::Type("bool");
+void type_inference::Context::analyze(ast::BooleanNode& node) {
+	node.type = ast::Type("bool");
 }
 
-void type_inference::Context::analyze(Ast::CallNode& node) {
+void type_inference::Context::analyze(ast::CallNode& node) {
 	// Assign a type variable to every argument and return type
 	for (size_t i = 0; i < node.args.size(); i++) {
         this->analyze(node.args[i]);
 	}
-	node.type = Ast::Type(std::to_string(this->current_type_variable_number));
+	node.type = ast::Type(std::to_string(this->current_type_variable_number));
 	this->current_type_variable_number++;
 
 	// Infer things based on interface if exists
-    auto& identifier = std::get<Ast::IdentifierNode>(*node.identifier).value;
+    auto& identifier = std::get<ast::IdentifierNode>(*node.identifier).value;
 	if (interfaces.find(identifier) != interfaces.end()) {
 		auto interface = interfaces[identifier];
 		assert(node.args.size() == interface.first.size());
 
         // Create prototype type vector
-		std::vector<Ast::Type> prototype = Ast::get_types(node.args);
+		std::vector<ast::Type> prototype = ast::get_types(node.args);
 		prototype.push_back(node.type);
 
         // Create interface prototype vector
-		std::vector<Ast::Type> interface_prototype = interface.first;
+		std::vector<ast::Type> interface_prototype = interface.first;
 		interface_prototype.push_back(interface.second);
 
         // Infer stuff, basically is loop trough the interface prototype that groups type variables
@@ -323,48 +323,48 @@ void type_inference::Context::analyze(Ast::CallNode& node) {
 	}
 }
 
-void type_inference::Context::unify(Ast::Node* node) {
+void type_inference::Context::unify(ast::Node* node) {
 	return std::visit([this](auto& variant) {return this->unify(variant);}, *node);
 }
 
-void type_inference::Context::unify(Ast::BlockNode& block) {
+void type_inference::Context::unify(ast::BlockNode& block) {
     for (size_t i = 0; i < block.statements.size(); i++) {
        this->unify(block.statements[i]);
     }
 }
 
-void type_inference::Context::unify(Ast::AssignmentNode& node) {
+void type_inference::Context::unify(ast::AssignmentNode& node) {
     this->unify(node.expression);
 }
 
-void type_inference::Context::unify(Ast::ReturnNode& node) {
+void type_inference::Context::unify(ast::ReturnNode& node) {
     if (node.expression.has_value()) this->unify(node.expression.value());
 }
 
-void type_inference::Context::unify(Ast::IfElseNode& node) {
+void type_inference::Context::unify(ast::IfElseNode& node) {
     this->unify(node.condition);
     this->unify(node.if_branch);
     if (node.else_branch.has_value()) this->unify(node.else_branch.value());
 }
 
-void type_inference::Context::unify(Ast::WhileNode& node) {
+void type_inference::Context::unify(ast::WhileNode& node) {
     this->unify(node.condition);
     this->unify(node.block);
 }
 
-void type_inference::Context::unify(Ast::IdentifierNode& node) {
+void type_inference::Context::unify(ast::IdentifierNode& node) {
     node.type = this->get_unified_type(node.type.to_str());
 }
 
-void type_inference::Context::unify(Ast::IntegerNode& node) {
+void type_inference::Context::unify(ast::IntegerNode& node) {
     node.type = this->get_unified_type(node.type.to_str());
 }
 
-void type_inference::Context::unify(Ast::FloatNode& node) {
+void type_inference::Context::unify(ast::FloatNode& node) {
     node.type = this->get_unified_type(node.type.to_str());
 }
 
-void type_inference::Context::unify(Ast::CallNode& node) {
+void type_inference::Context::unify(ast::CallNode& node) {
 	for (size_t i = 0; i < node.args.size(); i++) {
         this->unify(node.args[i]);
 	}

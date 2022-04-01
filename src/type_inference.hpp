@@ -4,7 +4,7 @@
 #include "ast.hpp"
 
 namespace type_inference {
-    void analyze(Ast::FunctionNode* function);
+    void analyze(ast::FunctionNode* function);
 }
 
 #endif

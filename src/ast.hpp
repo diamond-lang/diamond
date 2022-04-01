@@ -9,7 +9,7 @@
 #include <optional>
 #include <cmath>
 
-namespace Ast {
+namespace ast {
 	struct Type {
 		std::string name;
 		std::vector<Type> parameters;

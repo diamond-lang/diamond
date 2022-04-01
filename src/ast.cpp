@@ -5,7 +5,7 @@
 
 // Type
 // ----
-bool Ast::Type::operator==(const Type &t) const {
+bool ast::Type::operator==(const Type &t) const {
 	if (this->name == t.name && this->parameters.size() == t.parameters.size()) {
 		for (size_t i = 0; i < this->parameters.size(); i++) {
 			if (this->parameters[i] != t.parameters[i]) {
@@ -19,11 +19,11 @@ bool Ast::Type::operator==(const Type &t) const {
 	}
 }
 
-bool Ast::Type::operator!=(const Type &t) const {
+bool ast::Type::operator!=(const Type &t) const {
 	return !(t == *this);
 }
 
-std::string Ast::Type::to_str(std::string output) const {
+std::string ast::Type::to_str(std::string output) const {
 	if (this->parameters.size() == 0) {
 		output += this->name;
 	}
@@ -41,7 +41,7 @@ std::string Ast::Type::to_str(std::string output) const {
 	return output;
 }
 
-bool Ast::Type::is_type_variable() const {
+bool ast::Type::is_type_variable() const {
 	std::string str = this->to_str();
 	if (str.size() > 0 && str[0] == '$') return true;
 	else                                 return false;
@@ -49,15 +49,15 @@ bool Ast::Type::is_type_variable() const {
 
 // Node
 // ----
-Ast::Type Ast::get_type(Node* node) {
+ast::Type ast::get_type(Node* node) {
 	return std::visit([](const auto& variant) {return variant.type;}, *node);	
 }
 
-void Ast::set_type(Node* node, Type type) {
+void ast::set_type(Node* node, Type type) {
 	std::visit([type](auto& variant) {variant.type = type;}, *node);
 }
 
-std::vector<Ast::Type> Ast::get_types(std::vector<Node*> nodes) {
+std::vector<ast::Type> ast::get_types(std::vector<Node*> nodes) {
 	std::vector<Type> types;
 	for (size_t i = 0; i < nodes.size(); i++) {
 		types.push_back(get_type(nodes[i]));
@@ -67,7 +67,7 @@ std::vector<Ast::Type> Ast::get_types(std::vector<Node*> nodes) {
 
 // Ast
 // ---
-size_t Ast::Ast::capacity() {
+size_t ast::Ast::capacity() {
 	size_t result = 0;
 	for (size_t i = 0; i < this->nodes.size(); i++) {
 		result += this->initial_size * pow(this->growth_factor, i);
@@ -75,7 +75,7 @@ size_t Ast::Ast::capacity() {
 	return result;
 }
 
-void Ast::Ast::push_back(Node node) {
+void ast::Ast::push_back(Node node) {
 	if (this->size + 1 > this->capacity()) {
 		Node* array = new Node[this->initial_size * static_cast<unsigned int>(pow(this->growth_factor, this->nodes.size()))];
 		this->nodes.push_back(array);
@@ -85,7 +85,7 @@ void Ast::Ast::push_back(Node node) {
 	this->nodes[this->nodes.size() - 1][this->size - 1 - this->size_of_arrays_filled()] = node;
 }
 
-size_t Ast::Ast::size_of_arrays_filled() {
+size_t ast::Ast::size_of_arrays_filled() {
 	if (this->nodes.size() == 0) return 0;
 	else {
 		size_t size_of_arrays_filled = 0;
@@ -96,12 +96,12 @@ size_t Ast::Ast::size_of_arrays_filled() {
 	}
 }
 
-Ast::Node* Ast::Ast::last_element() {
+ast::Node* ast::Ast::last_element() {
 	if (this->size == 0) return nullptr;
 	else                 return &this->nodes[this->nodes.size() - 1][this->size - 1 - this->size_of_arrays_filled()];
 }
 
-void Ast::Ast::free() {
+void ast::Ast::free() {
 	for (size_t i = 0; i < this->nodes.size(); i++) {
 		delete[] this->nodes[i];
 	}
@@ -131,21 +131,21 @@ void put_indent_level(size_t indent_level, std::vector<bool> last) {
 }
 
 
-void Ast::print(const Ast& ast, size_t indent_level, std::vector<bool> last, bool concrete) {
+void ast::print(const Ast& ast, size_t indent_level, std::vector<bool> last, bool concrete) {
 	std::cout << "program\n";
 	print(ast.program, indent_level, last, concrete);
 }
 
-void Ast::print_with_concrete_types(const Ast& ast, size_t indent_level, std::vector<bool> last) {
+void ast::print_with_concrete_types(const Ast& ast, size_t indent_level, std::vector<bool> last) {
 	std::cout << "program\n";
 	print_with_concrete_types(ast.program, indent_level, last);
 }
 
-void Ast::print_with_concrete_types(Node* node, size_t indent_level, std::vector<bool> last) {
+void ast::print_with_concrete_types(Node* node, size_t indent_level, std::vector<bool> last) {
 	print(node, indent_level, last, true);
 }
 
-void Ast::print(Node* node, size_t indent_level, std::vector<bool> last, bool concrete) {
+void ast::print(Node* node, size_t indent_level, std::vector<bool> last, bool concrete) {
 	switch (node->index()) {
 		case Block: {
 			auto& block = std::get<BlockNode>(*node);

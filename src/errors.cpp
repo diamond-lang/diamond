@@ -19,7 +19,7 @@ std::string current_line(Location location);
 std::string current_line(size_t line, std::string file_path);
 std::string underline_current_char(Location location);
 std::string underline_current_line(Location location);
-std::string underline_identifier(Ast::IdentifierNode& identifier, std::filesystem::path file);
+std::string underline_identifier(ast::IdentifierNode& identifier, std::filesystem::path file);
 
 // Implementantions
 // ----------------
@@ -65,13 +65,13 @@ std::string errors::expecting_new_indentation_level(Location location) {
 	       underline_current_char(location);
 }
 
-std::string errors::undefined_variable(Ast::IdentifierNode& identifier, std::filesystem::path file) {
+std::string errors::undefined_variable(ast::IdentifierNode& identifier, std::filesystem::path file) {
 	return make_header("Undefined variable\n\n") +
 	       std::to_string(identifier.line) + "| " + current_line(identifier.line, file) + "\n" +
 	       underline_identifier(identifier, file);
 }
 
-std::string errors::reassigning_immutable_variable(Ast::IdentifierNode& identifier, Ast::AssignmentNode& assignment, std::filesystem::path file) {
+std::string errors::reassigning_immutable_variable(ast::IdentifierNode& identifier, ast::AssignmentNode& assignment, std::filesystem::path file) {
 	return make_header("Trying to reassign immutable variable\n\n") +
 	       std::to_string(identifier.line) + "| " + current_line(identifier.line, file) + "\n" +
 	       underline_identifier(identifier, file) + "\n" +
@@ -79,27 +79,27 @@ std::string errors::reassigning_immutable_variable(Ast::IdentifierNode& identifi
 	       std::to_string(assignment.line) + "| " + current_line(assignment.line, file);
 }
 
-std::string format_args(std::vector<Ast::Node*> args) {
+std::string format_args(std::vector<ast::Node*> args) {
 	std::string result = "";
-	if (args.size() >= 1) result += Ast::get_type(args[0]).to_str();
+	if (args.size() >= 1) result += ast::get_type(args[0]).to_str();
 	for (size_t i = 1; i < args.size(); i++) {
-		result += ", " + Ast::get_type(args[i]).to_str();
+		result += ", " + ast::get_type(args[i]).to_str();
 	}
 	return result;
 }
 
-std::string errors::undefined_function(Ast::CallNode& call, std::filesystem::path file) {
-	auto& identifier = std::get<Ast::IdentifierNode>(*call.identifier).value;
+std::string errors::undefined_function(ast::CallNode& call, std::filesystem::path file) {
+	auto& identifier = std::get<ast::IdentifierNode>(*call.identifier).value;
 	return make_header("Undefined function\n\n") +
 	       identifier + "(" + format_args(call.args) + ") is not defined.\n\n" +
 	       std::to_string(call.line) + "| " + current_line(call.line, file) + "\n" +
-	       underline_identifier(std::get<Ast::IdentifierNode>(*call.identifier), file);
+	       underline_identifier(std::get<ast::IdentifierNode>(*call.identifier), file);
 }
 
-std::string errors::unhandled_return_value(Ast::CallNode& call, std::filesystem::path file) {
+std::string errors::unhandled_return_value(ast::CallNode& call, std::filesystem::path file) {
 	return make_header("Unhandled return value\n\n") +
 	       std::to_string(call.line) + "| " + current_line(call.line, file) + "\n" +
-	       underline_identifier(std::get<Ast::IdentifierNode>(*call.identifier), file);
+	       underline_identifier(std::get<ast::IdentifierNode>(*call.identifier), file);
 }
 
 std::string errors::file_couldnt_be_found(std::string path) {
@@ -162,7 +162,7 @@ std::string underline_current_line(Location location) {
 	return result;
 }
 
-std::string underline_identifier(Ast::IdentifierNode& identifier, std::filesystem::path file) {
+std::string underline_identifier(ast::IdentifierNode& identifier, std::filesystem::path file) {
 	std::string result = "";
 	for (size_t i = 0; i < std::to_string(identifier.line).size(); i++) {
 		result += " "; // Add space for line number

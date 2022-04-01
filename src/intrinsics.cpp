@@ -1,101 +1,101 @@
 #include "intrinsics.hpp"
 
-std::unordered_map<std::string, std::pair<std::vector<Ast::Type>, Ast::Type>> interfaces = {
+std::unordered_map<std::string, std::pair<std::vector<ast::Type>, ast::Type>> interfaces = {
     {"+", 
-        {{Ast::Type("$t"), Ast::Type("$t")}, Ast::Type("$t")}
+        {{ast::Type("$t"), ast::Type("$t")}, ast::Type("$t")}
     },
     {"*", 
-        {{Ast::Type("$t"), Ast::Type("$t")}, Ast::Type("$t")}
+        {{ast::Type("$t"), ast::Type("$t")}, ast::Type("$t")}
     },
     {"/", 
-        {{Ast::Type("$t"), Ast::Type("$t")}, Ast::Type("$t")}
+        {{ast::Type("$t"), ast::Type("$t")}, ast::Type("$t")}
     },
     {"-",
-        {{Ast::Type("$t"), Ast::Type("$t")}, Ast::Type("$t")}
+        {{ast::Type("$t"), ast::Type("$t")}, ast::Type("$t")}
     },
     {"<",
-        {{Ast::Type("$t"), Ast::Type("$t")}, Ast::Type("bool")}
+        {{ast::Type("$t"), ast::Type("$t")}, ast::Type("bool")}
     },
     {"<=",
-        {{Ast::Type("$t"), Ast::Type("$t")}, Ast::Type("bool")}
+        {{ast::Type("$t"), ast::Type("$t")}, ast::Type("bool")}
     },
     {">",
-        {{Ast::Type("$t"), Ast::Type("$t")}, Ast::Type("bool")}
+        {{ast::Type("$t"), ast::Type("$t")}, ast::Type("bool")}
     },
     {">=",
-        {{Ast::Type("$t"), Ast::Type("$t")}, Ast::Type("bool")}
+        {{ast::Type("$t"), ast::Type("$t")}, ast::Type("bool")}
     },
     {"==",
-        {{Ast::Type("$t"), Ast::Type("$t")}, Ast::Type("bool")}
+        {{ast::Type("$t"), ast::Type("$t")}, ast::Type("bool")}
     },
     {"!=",
-        {{Ast::Type("$t"), Ast::Type("$t")}, Ast::Type("bool")}
+        {{ast::Type("$t"), ast::Type("$t")}, ast::Type("bool")}
     },
     {"print",
-        {{Ast::Type("$t")}, Ast::Type("void")}
+        {{ast::Type("$t")}, ast::Type("void")}
     }
 };
 
-std::unordered_map<std::string, std::vector<std::pair<std::vector<Ast::Type>, Ast::Type>>> intrinsics = {
+std::unordered_map<std::string, std::vector<std::pair<std::vector<ast::Type>, ast::Type>>> intrinsics = {
     {"+", {
-        {{Ast::Type("float64"), Ast::Type("float64")}, Ast::Type("float64")},
-        {{Ast::Type("int64"), Ast::Type("int64")}, Ast::Type("int64")}
+        {{ast::Type("float64"), ast::Type("float64")}, ast::Type("float64")},
+        {{ast::Type("int64"), ast::Type("int64")}, ast::Type("int64")}
     }},
     {"*", {
-        {{Ast::Type("float64"), Ast::Type("float64")}, Ast::Type("float64")},
-        {{Ast::Type("int64"), Ast::Type("int64")}, Ast::Type("int64")}
+        {{ast::Type("float64"), ast::Type("float64")}, ast::Type("float64")},
+        {{ast::Type("int64"), ast::Type("int64")}, ast::Type("int64")}
     }},
     {"/", {
-        {{Ast::Type("float64"), Ast::Type("float64")}, Ast::Type("float64")},
-        {{Ast::Type("int64"), Ast::Type("int64")}, Ast::Type("int64")}
+        {{ast::Type("float64"), ast::Type("float64")}, ast::Type("float64")},
+        {{ast::Type("int64"), ast::Type("int64")}, ast::Type("int64")}
     }},
     {"%", {
-        {{Ast::Type("int64"), Ast::Type("int64")}, Ast::Type("int64")}
+        {{ast::Type("int64"), ast::Type("int64")}, ast::Type("int64")}
     }},
     {"-", {
-        {{Ast::Type("float64")}, Ast::Type("float64")},
-        {{Ast::Type("int64")}, Ast::Type("int64")},
-        {{Ast::Type("float64"), Ast::Type("float64")}, Ast::Type("float64")},
-        {{Ast::Type("int64"), Ast::Type("int64")}, Ast::Type("int64")},
+        {{ast::Type("float64")}, ast::Type("float64")},
+        {{ast::Type("int64")}, ast::Type("int64")},
+        {{ast::Type("float64"), ast::Type("float64")}, ast::Type("float64")},
+        {{ast::Type("int64"), ast::Type("int64")}, ast::Type("int64")},
     }},
     {"<", {
-        {{Ast::Type("float64"), Ast::Type("float64")}, Ast::Type("bool")},
-        {{Ast::Type("int64"), Ast::Type("int64")}, Ast::Type("bool")}
+        {{ast::Type("float64"), ast::Type("float64")}, ast::Type("bool")},
+        {{ast::Type("int64"), ast::Type("int64")}, ast::Type("bool")}
     }},
     {"<=", {
-        {{Ast::Type("float64"), Ast::Type("float64")}, Ast::Type("bool")},
-        {{Ast::Type("int64"), Ast::Type("int64")}, Ast::Type("bool")}
+        {{ast::Type("float64"), ast::Type("float64")}, ast::Type("bool")},
+        {{ast::Type("int64"), ast::Type("int64")}, ast::Type("bool")}
     }},
     {">", {
-        {{Ast::Type("float64"), Ast::Type("float64")}, Ast::Type("bool")},
-        {{Ast::Type("int64"), Ast::Type("int64")}, Ast::Type("bool")}
+        {{ast::Type("float64"), ast::Type("float64")}, ast::Type("bool")},
+        {{ast::Type("int64"), ast::Type("int64")}, ast::Type("bool")}
     }},
     {">=", {
-        {{Ast::Type("float64"), Ast::Type("float64")}, Ast::Type("bool")},
-        {{Ast::Type("int64"), Ast::Type("int64")}, Ast::Type("bool")}
+        {{ast::Type("float64"), ast::Type("float64")}, ast::Type("bool")},
+        {{ast::Type("int64"), ast::Type("int64")}, ast::Type("bool")}
     }},
     {"==", {
-        {{Ast::Type("bool"), Ast::Type("bool")}, Ast::Type("bool")},
-        {{Ast::Type("float64"), Ast::Type("float64")}, Ast::Type("bool")},
-        {{Ast::Type("int64"), Ast::Type("int64")}, Ast::Type("bool")}
+        {{ast::Type("bool"), ast::Type("bool")}, ast::Type("bool")},
+        {{ast::Type("float64"), ast::Type("float64")}, ast::Type("bool")},
+        {{ast::Type("int64"), ast::Type("int64")}, ast::Type("bool")}
     }},
     {"!=", {
-        {{Ast::Type("bool"), Ast::Type("bool")}, Ast::Type("bool")},
-        {{Ast::Type("float64"), Ast::Type("float64")}, Ast::Type("bool")},
-        {{Ast::Type("int64"), Ast::Type("int64")}, Ast::Type("bool")}
+        {{ast::Type("bool"), ast::Type("bool")}, ast::Type("bool")},
+        {{ast::Type("float64"), ast::Type("float64")}, ast::Type("bool")},
+        {{ast::Type("int64"), ast::Type("int64")}, ast::Type("bool")}
     }},
     {"not", {
-        {{Ast::Type("bool")}, Ast::Type("bool")}
+        {{ast::Type("bool")}, ast::Type("bool")}
     }},
     {"and", {
-        {{Ast::Type("bool"), Ast::Type("bool")}, Ast::Type("bool")}
+        {{ast::Type("bool"), ast::Type("bool")}, ast::Type("bool")}
     }},
     {"or", {
-        {{Ast::Type("bool"), Ast::Type("bool")}, Ast::Type("bool")}
+        {{ast::Type("bool"), ast::Type("bool")}, ast::Type("bool")}
     }},
     {"print", {
-        {{Ast::Type("float64")}, Ast::Type("void")},
-        {{Ast::Type("int64")}, Ast::Type("void")},
-        {{Ast::Type("bool")}, Ast::Type("void")}
+        {{ast::Type("float64")}, ast::Type("void")},
+        {{ast::Type("int64")}, ast::Type("void")},
+        {{ast::Type("bool")}, ast::Type("void")}
     }}
 };
