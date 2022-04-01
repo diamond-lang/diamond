@@ -251,6 +251,7 @@ namespace Ast {
 
 	void print(const Ast& ast, size_t indent_level = 0, std::vector<bool> last = {}, bool concrete = false);
 	void print(Node* node, size_t indent_level = 0, std::vector<bool> last = {}, bool concrete = false);
+	void print_with_concrete_types(const Ast& ast, size_t indent_level = 0, std::vector<bool> last = {});
 	void print_with_concrete_types(Node* node, size_t indent_level = 0, std::vector<bool> last = {});
 };
 

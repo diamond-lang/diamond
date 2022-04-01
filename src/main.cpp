@@ -173,12 +173,12 @@ void emit(Command command) {
 		return;
 	}
 
-	// // Emit AST with concrete types
-	// if (command.options[0] == std::string("--ast-with-concrete-types")) {
-	// 	ast->print_with_concrete_types();
-	// ast.free();
-	// return;
-	// }
+	// Emit AST with concrete types
+	if (command.options[0] == std::string("--ast-with-concrete-types")) {
+		Ast::print_with_concrete_types(ast);
+		ast.free();
+		return;
+	}
 
 	// // Emit LLVM-IR
 	// if (command.options[0] == std::string("--llvm-ir")) {

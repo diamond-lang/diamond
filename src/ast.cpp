@@ -136,6 +136,11 @@ void Ast::print(const Ast& ast, size_t indent_level, std::vector<bool> last, boo
 	print(ast.program, indent_level, last, concrete);
 }
 
+void Ast::print_with_concrete_types(const Ast& ast, size_t indent_level, std::vector<bool> last) {
+	std::cout << "program\n";
+	print_with_concrete_types(ast.program, indent_level, last);
+}
+
 void Ast::print_with_concrete_types(Node* node, size_t indent_level, std::vector<bool> last) {
 	print(node, indent_level, last, true);
 }
