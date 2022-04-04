@@ -131,34 +131,39 @@ void put_indent_level(size_t indent_level, std::vector<bool> last) {
 }
 
 
-void ast::print(const Ast& ast, size_t indent_level, std::vector<bool> last, bool concrete) {
+void ast::print(const Ast& ast, PrintContext context) {
 	std::cout << "program\n";
-	print(ast.program, indent_level, last, concrete);
+	print(ast.program, context);
 }
 
-void ast::print_with_concrete_types(const Ast& ast, size_t indent_level, std::vector<bool> last) {
+void ast::print_with_concrete_types(const Ast& ast, PrintContext context) {
+	context.concrete = true;
 	std::cout << "program\n";
-	print_with_concrete_types(ast.program, indent_level, last);
+	print_with_concrete_types(ast.program, context);
 }
 
-void ast::print_with_concrete_types(Node* node, size_t indent_level, std::vector<bool> last) {
-	print(node, indent_level, last, true);
+void ast::print_with_concrete_types(Node* node, PrintContext context) {
+	context.concrete = true;
+	print(node, context);
 }
 
-void ast::print(Node* node, size_t indent_level, std::vector<bool> last, bool concrete) {
+void ast::print(Node* node, PrintContext context) {
 	switch (node->index()) {
 		case Block: {
 			auto& block = std::get<BlockNode>(*node);
 
-			for (size_t i = 0; i < block.use_include_statements.size(); i++) {
-				print(block.use_include_statements[i], indent_level + 1,  append(last, (block.statements.size() == 0 && block.functions.size() == 0 && i == block.use_include_statements.size() - 1)), concrete);
+			for (size_t i = 0; i < block.use_include_statements.size(); i++) {	
+				bool is_last = block.statements.size() == 0 && block.functions.size() == 0 && i == block.use_include_statements.size() - 1;
+				print(block.use_include_statements[i], PrintContext{context.indent_level + 1, append(context.last, is_last), context.concrete});
 			}
 			for (size_t i = 0; i < block.statements.size(); i++) {
-				print(block.statements[i], indent_level + 1, append(last, block.functions.size() == 0 && i == block.statements.size() - 1), concrete);
+				bool is_last = block.functions.size() == 0 && i == block.statements.size() - 1;
+				print(block.statements[i], PrintContext{context.indent_level + 1, append(context.last, is_last), context.concrete});
 			}
 			for (size_t i = 0; i < block.functions.size(); i++) {
-				if (!concrete) {
-					print(block.functions[i], indent_level + 1, append(last, i == block.functions.size() - 1), concrete);
+				if (!context.concrete) {
+					bool is_last = i == block.functions.size() - 1;
+					print(block.functions[i], PrintContext{context.indent_level + 1, append(context.last, is_last), context.concrete});
 				}
 				else {
 					std::cout << "To do\n";
@@ -170,7 +175,7 @@ void ast::print(Node* node, size_t indent_level, std::vector<bool> last, bool co
 		case Function: {
 			auto& function = std::get<FunctionNode>(*node);
 
-			put_indent_level(indent_level, last);
+			put_indent_level(context.indent_level, context.last);
 			std::cout << "function " << std::get<IdentifierNode>(*function.identifier).value << '(';
 			for (size_t i = 0; i < function.args.size(); i++) {
 				auto& arg_name = std::get<IdentifierNode>(*function.args[i]).value;
@@ -190,10 +195,12 @@ void ast::print(Node* node, size_t indent_level, std::vector<bool> last, bool co
 			}
 			std::cout << "\n";
 			if (std::holds_alternative<BlockNode>(*function.body)) {
-				print(function.body, indent_level, last, concrete);
+				print(function.body, context);
 			}
 			else {
-				print(function.body, indent_level + 1, append(last, true), concrete);
+				context.indent_level += 1;
+				context.last.push_back(true);
+				print(function.body, context);
 			}
 			break;
 		}
@@ -201,37 +208,41 @@ void ast::print(Node* node, size_t indent_level, std::vector<bool> last, bool co
 		case Assignment: {
 			auto& assignment = std::get<AssignmentNode>(*node);
 
-			print(assignment.identifier, indent_level, last);
+			print(assignment.identifier, context);
 			if (assignment.nonlocal) {
-				put_indent_level(indent_level + 1, append(last, false));
+				put_indent_level(context.indent_level + 1, append(context.last, false));
 				std::cout << "nonlocal\n";
 			}
-			put_indent_level(indent_level + 1, append(last, false));
+			put_indent_level(context.indent_level + 1, append(context.last, false));
 			std::cout << (assignment.is_mutable ? "=" : "be") << '\n';
 			
-			print(assignment.expression, indent_level + 1, append(last, true), concrete);
+			context.indent_level += 1;
+			context.last.push_back(true);
+			print(assignment.expression, context);
 			break;
 		}
 
 		case Return: {
 			auto& return_node = std::get<ReturnNode>(*node);
 
-			put_indent_level(indent_level, last);
+			put_indent_level(context.indent_level, context.last);
 			std::cout << "return" << '\n';
 			if (return_node.expression.has_value()) {
-				print(return_node.expression.value(), indent_level + 1, append(last, true), concrete);
+				context.indent_level += 1;
+				context.last.push_back(true);
+				print(return_node.expression.value(), context);
 			}
 			break;
 		}
 		
 		case Break: {
-			put_indent_level(indent_level, last);
+			put_indent_level(context.indent_level, context.last);
 			std::cout << "break" << '\n';
 			break;
 		}
 
 		case Continue: {
-			put_indent_level(indent_level, last);
+			put_indent_level(context.indent_level, context.last);
 			std::cout << "continue" << '\n';
 			break;
 		}
@@ -239,19 +250,19 @@ void ast::print(Node* node, size_t indent_level, std::vector<bool> last, bool co
 		case IfElse: {
 			auto& if_else = std::get<IfElseNode>(*node);
 
-			bool is_last = last[last.size() - 1];
-			last.pop_back();
+			bool is_last = context.last[context.last.size() - 1];
+			context.last.pop_back();
 
 			bool has_else_block = if_else.else_branch ? true : false;
-			put_indent_level(indent_level, append(last, is_last && !has_else_block));
+			put_indent_level(context.indent_level, append(context.last, is_last && !has_else_block));
 			std::cout << "if" << '\n';
-			print(if_else.condition, indent_level + 1, append(append(last, is_last && !has_else_block), false), concrete);
-			print(if_else.if_branch, indent_level, append(last, is_last && !has_else_block), concrete);
+			print(if_else.condition, PrintContext{context.indent_level + 1, append(append(context.last, is_last && !has_else_block), false), context.concrete});
+			print(if_else.if_branch, PrintContext{context.indent_level, append(context.last, is_last && !has_else_block), context.concrete});
 		
 			if (if_else.else_branch.has_value()) {
-				put_indent_level(indent_level, append(last, is_last));
+				put_indent_level(context.indent_level, append(context.last, is_last));
 				std::cout << "else" << "\n";
-				print(if_else.else_branch.value(), indent_level, append(last, is_last));
+				print(if_else.else_branch.value(), PrintContext{context.indent_level, append(context.last, is_last), context.concrete});
 			}
 			break;
 		}
@@ -259,10 +270,10 @@ void ast::print(Node* node, size_t indent_level, std::vector<bool> last, bool co
 		case While: {
 			auto& while_node = std::get<WhileNode>(*node);
 
-			put_indent_level(indent_level, last);
+			put_indent_level(context.indent_level, context.last);
 			std::cout << "while" << '\n';
-			print(while_node.condition, indent_level + 1, append(last, false), concrete);
-			print(while_node.block, indent_level, last, concrete);
+			print(while_node.condition, PrintContext{context.indent_level + 1, append(context.last, false), context.concrete});
+			print(while_node.block, PrintContext{context.indent_level, context.last, context.concrete});
 			break;
 		}
 
@@ -281,12 +292,12 @@ void ast::print(Node* node, size_t indent_level, std::vector<bool> last, bool co
 		case Call: {
 			auto& call = std::get<CallNode>(*node);
 
-			put_indent_level(indent_level, last);
+			put_indent_level(context.indent_level, context.last);
 			std::cout << std::get<IdentifierNode>(*call.identifier).value;
 			if (call.type != Type("")) std::cout << ": " << call.type.to_str();
 			std::cout << "\n";
 			for (size_t i = 0; i < call.args.size(); i++) {
-				print(call.args[i], indent_level + 1, append(last, i == call.args.size() - 1), concrete);
+				print(call.args[i], PrintContext{context.indent_level + 1, append(context.last, i == call.args.size() - 1), context.concrete});
 			}
 			break;
 		}
@@ -294,7 +305,7 @@ void ast::print(Node* node, size_t indent_level, std::vector<bool> last, bool co
 		case Float: {
 			auto& float_node = std::get<FloatNode>(*node);
 
-			put_indent_level(indent_level, last);
+			put_indent_level(context.indent_level, context.last);
 			std::cout << float_node.value;
 			if (float_node.type != Type("")) std::cout << ": " << float_node.type.to_str();
 			std::cout << "\n";
@@ -304,7 +315,7 @@ void ast::print(Node* node, size_t indent_level, std::vector<bool> last, bool co
 		case Integer: {
 			auto& integer = std::get<IntegerNode>(*node);
 
-			put_indent_level(indent_level, last);
+			put_indent_level(context.indent_level, context.last);
 			std::cout << integer.value;
 			if (integer.type != Type("")) std::cout << ": " << integer.type.to_str();
 			std::cout << "\n";
@@ -314,7 +325,7 @@ void ast::print(Node* node, size_t indent_level, std::vector<bool> last, bool co
 		case Identifier: {
 			auto& identifier = std::get<IdentifierNode>(*node);
 
-			put_indent_level(indent_level, last);
+			put_indent_level(context.indent_level, context.last);
 			std::cout << identifier.value;
 			if (identifier.type != Type("")) std::cout << ": " << identifier.type.to_str();
 			std::cout << "\n";
@@ -324,7 +335,7 @@ void ast::print(Node* node, size_t indent_level, std::vector<bool> last, bool co
 		case Boolean: {
 			auto& boolean = std::get<BooleanNode>(*node);
 
-			put_indent_level(indent_level, last);
+			put_indent_level(context.indent_level, context.last);
 			std::cout << (boolean.value ? "true" : "false");
 			if (boolean.type != Type("")) std::cout << ": " << boolean.type.to_str();
 			std::cout << "\n";
@@ -334,7 +345,7 @@ void ast::print(Node* node, size_t indent_level, std::vector<bool> last, bool co
 		case String: {
 			auto& string = std::get<StringNode>(*node);
 
-			put_indent_level(indent_level, last);
+			put_indent_level(context.indent_level, context.last);
 			std::cout << "\"" << string.value << "\"";
 			if (string.type != Type("")) std::cout << ": " << string.type.to_str();
 			std::cout << "\n";

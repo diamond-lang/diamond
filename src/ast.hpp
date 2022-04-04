@@ -249,10 +249,16 @@ namespace ast {
 		void free();
     };
 
-	void print(const Ast& ast, size_t indent_level = 0, std::vector<bool> last = {}, bool concrete = false);
-	void print(Node* node, size_t indent_level = 0, std::vector<bool> last = {}, bool concrete = false);
-	void print_with_concrete_types(const Ast& ast, size_t indent_level = 0, std::vector<bool> last = {});
-	void print_with_concrete_types(Node* node, size_t indent_level = 0, std::vector<bool> last = {});
+	struct PrintContext {
+		size_t indent_level = 0;
+		std::vector<bool> last = {};
+		bool concrete = false;
+	};
+
+	void print(const Ast& ast, PrintContext context = PrintContext{});
+	void print(Node* node, PrintContext context = PrintContext{});
+	void print_with_concrete_types(const Ast& ast, PrintContext context = PrintContext{});
+	void print_with_concrete_types(Node* node, PrintContext context = PrintContext{});
 };
 
 #endif
