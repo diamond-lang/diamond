@@ -131,7 +131,7 @@ void put_indent_level(size_t indent_level, std::vector<bool> last) {
 }
 
 ast::Type get_concrete_type(ast::Type type, ast::PrintContext context) {
-	if (type.is_type_variable()) {
+	if (context.concrete && type.is_type_variable()) {
 		return context.type_bindings[type.to_str()];
 	}
 	else {
