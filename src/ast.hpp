@@ -253,6 +253,7 @@ namespace ast {
 		size_t indent_level = 0;
 		std::vector<bool> last = {};
 		bool concrete = false;
+		std::unordered_map<std::string, ast::Type> type_bindings;
 	};
 
 	void print(const Ast& ast, PrintContext context = PrintContext{});

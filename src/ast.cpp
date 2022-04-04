@@ -130,6 +130,14 @@ void put_indent_level(size_t indent_level, std::vector<bool> last) {
 	}
 }
 
+ast::Type get_concrete_type(ast::Type type, ast::PrintContext context) {
+	if (type.is_type_variable()) {
+		return context.type_bindings[type.to_str()];
+	}
+	else {
+		return type;
+	}
+}
 
 void ast::print(const Ast& ast, PrintContext context) {
 	std::cout << "program\n";
@@ -154,19 +162,32 @@ void ast::print(Node* node, PrintContext context) {
 
 			for (size_t i = 0; i < block.use_include_statements.size(); i++) {	
 				bool is_last = block.statements.size() == 0 && block.functions.size() == 0 && i == block.use_include_statements.size() - 1;
-				print(block.use_include_statements[i], PrintContext{context.indent_level + 1, append(context.last, is_last), context.concrete});
+				print(block.use_include_statements[i], PrintContext{context.indent_level + 1, append(context.last, is_last), context.concrete, context.type_bindings});
 			}
 			for (size_t i = 0; i < block.statements.size(); i++) {
 				bool is_last = block.functions.size() == 0 && i == block.statements.size() - 1;
-				print(block.statements[i], PrintContext{context.indent_level + 1, append(context.last, is_last), context.concrete});
+				print(block.statements[i], PrintContext{context.indent_level + 1, append(context.last, is_last), context.concrete, context.type_bindings});
 			}
 			for (size_t i = 0; i < block.functions.size(); i++) {
 				if (!context.concrete) {
 					bool is_last = i == block.functions.size() - 1;
-					print(block.functions[i], PrintContext{context.indent_level + 1, append(context.last, is_last), context.concrete});
+					print(block.functions[i], PrintContext{context.indent_level + 1, append(context.last, is_last), context.concrete, context.type_bindings});
 				}
 				else {
-					std::cout << "To do\n";
+					auto& function = std::get<ast::FunctionNode>(*block.functions[i]);
+					for (size_t j = 0; j < function.specializations.size(); j++) {
+						bool is_last = i == block.functions.size() - 1 && j == std::get<ast::FunctionNode>(*block.functions[i]).specializations.size() - 1;
+						if (function.specializations[j].valid) {
+							context.type_bindings = {};
+							for (size_t k = 0; k < std::get<ast::FunctionNode>(*block.functions[i]).specializations[j].args.size(); k++) {
+								auto type_variable = ast::get_type(function.args[k]).to_str();
+								context.type_bindings[type_variable] = function.specializations[j].args[k];
+							}
+							context.type_bindings[function.return_type.to_str()] = function.specializations[j].return_type;
+			
+							print(block.functions[i], PrintContext{context.indent_level + 1, append(context.last, is_last), context.concrete, context.type_bindings});
+						}
+					}
 				}
 			}
 			break;
@@ -184,14 +205,14 @@ void ast::print(Node* node, PrintContext context) {
 				auto& arg_type = std::get<IdentifierNode>(*function.args[i]).type;
 				
 				if (arg_type != Type("")) {
-					std::cout << ": " << arg_type.to_str();
+					std::cout << ": " << get_concrete_type(arg_type, context).to_str();
 				}
 
 				if (i != function.args.size() - 1) std::cout << ", ";
 			}
 			std::cout << ")";
 			if (function.return_type != Type("")) {
-				std::cout << ": " << function.return_type.to_str();
+				std::cout << ": " << get_concrete_type(function.return_type, context).to_str();
 			}
 			std::cout << "\n";
 			if (std::holds_alternative<BlockNode>(*function.body)) {
@@ -256,13 +277,13 @@ void ast::print(Node* node, PrintContext context) {
 			bool has_else_block = if_else.else_branch ? true : false;
 			put_indent_level(context.indent_level, append(context.last, is_last && !has_else_block));
 			std::cout << "if" << '\n';
-			print(if_else.condition, PrintContext{context.indent_level + 1, append(append(context.last, is_last && !has_else_block), false), context.concrete});
-			print(if_else.if_branch, PrintContext{context.indent_level, append(context.last, is_last && !has_else_block), context.concrete});
+			print(if_else.condition, PrintContext{context.indent_level + 1, append(append(context.last, is_last && !has_else_block), false), context.concrete, context.type_bindings});
+			print(if_else.if_branch, PrintContext{context.indent_level, append(context.last, is_last && !has_else_block), context.concrete, context.type_bindings});
 		
 			if (if_else.else_branch.has_value()) {
 				put_indent_level(context.indent_level, append(context.last, is_last));
 				std::cout << "else" << "\n";
-				print(if_else.else_branch.value(), PrintContext{context.indent_level, append(context.last, is_last), context.concrete});
+				print(if_else.else_branch.value(), PrintContext{context.indent_level, append(context.last, is_last), context.concrete, context.type_bindings});
 			}
 			break;
 		}
@@ -272,8 +293,8 @@ void ast::print(Node* node, PrintContext context) {
 
 			put_indent_level(context.indent_level, context.last);
 			std::cout << "while" << '\n';
-			print(while_node.condition, PrintContext{context.indent_level + 1, append(context.last, false), context.concrete});
-			print(while_node.block, PrintContext{context.indent_level, context.last, context.concrete});
+			print(while_node.condition, PrintContext{context.indent_level + 1, append(context.last, false), context.concrete, context.type_bindings});
+			print(while_node.block, PrintContext{context.indent_level, context.last, context.concrete, context.type_bindings});
 			break;
 		}
 
@@ -294,10 +315,10 @@ void ast::print(Node* node, PrintContext context) {
 
 			put_indent_level(context.indent_level, context.last);
 			std::cout << std::get<IdentifierNode>(*call.identifier).value;
-			if (call.type != Type("")) std::cout << ": " << call.type.to_str();
+			if (call.type != Type("")) std::cout << ": " << get_concrete_type(call.type, context).to_str();
 			std::cout << "\n";
 			for (size_t i = 0; i < call.args.size(); i++) {
-				print(call.args[i], PrintContext{context.indent_level + 1, append(context.last, i == call.args.size() - 1), context.concrete});
+				print(call.args[i], PrintContext{context.indent_level + 1, append(context.last, i == call.args.size() - 1), context.concrete, context.type_bindings});
 			}
 			break;
 		}
@@ -307,7 +328,7 @@ void ast::print(Node* node, PrintContext context) {
 
 			put_indent_level(context.indent_level, context.last);
 			std::cout << float_node.value;
-			if (float_node.type != Type("")) std::cout << ": " << float_node.type.to_str();
+			if (float_node.type != Type("")) std::cout << ": " << get_concrete_type(float_node.type, context).to_str();
 			std::cout << "\n";
 			break;
 		}
@@ -317,7 +338,7 @@ void ast::print(Node* node, PrintContext context) {
 
 			put_indent_level(context.indent_level, context.last);
 			std::cout << integer.value;
-			if (integer.type != Type("")) std::cout << ": " << integer.type.to_str();
+			if (integer.type != Type("")) std::cout << ": " << get_concrete_type(integer.type, context).to_str();
 			std::cout << "\n";
 			break;
 		}
@@ -327,7 +348,7 @@ void ast::print(Node* node, PrintContext context) {
 
 			put_indent_level(context.indent_level, context.last);
 			std::cout << identifier.value;
-			if (identifier.type != Type("")) std::cout << ": " << identifier.type.to_str();
+			if (identifier.type != Type("")) std::cout << ": " << get_concrete_type(identifier.type, context).to_str();
 			std::cout << "\n";
 			break;
 		}
@@ -337,7 +358,7 @@ void ast::print(Node* node, PrintContext context) {
 
 			put_indent_level(context.indent_level, context.last);
 			std::cout << (boolean.value ? "true" : "false");
-			if (boolean.type != Type("")) std::cout << ": " << boolean.type.to_str();
+			if (boolean.type != Type("")) std::cout << ": " << get_concrete_type(boolean.type, context).to_str();
 			std::cout << "\n";
 			break;
 		}
@@ -347,7 +368,7 @@ void ast::print(Node* node, PrintContext context) {
 
 			put_indent_level(context.indent_level, context.last);
 			std::cout << "\"" << string.value << "\"";
-			if (string.type != Type("")) std::cout << ": " << string.type.to_str();
+			if (string.type != Type("")) std::cout << ": " << get_concrete_type(string.type, context).to_str();
 			std::cout << "\n";
 			break;
 		}
