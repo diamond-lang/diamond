@@ -88,6 +88,34 @@ namespace semantic {
 			return nullptr;
 		}
 
+		ast::Type get_type(ast::Node* node) {
+			if (ast::get_type(node).is_type_variable()) {
+				assert(this->call_stack.size() > 0);
+				return this->call_stack[this->call_stack.size() - 1].type_bindings[ast::get_type(node).to_str()];
+			}
+			else {
+				return ast::get_type(node);
+			}
+		}
+
+		ast::Type get_type(ast::Type type) {
+			if (type.is_type_variable()) {
+				assert(this->call_stack.size() > 0);
+				return this->call_stack[this->call_stack.size() - 1].type_bindings[type.to_str()];
+			}
+			else {
+				return type;
+			}
+		}
+
+		std::vector<ast::Type> get_types(std::vector<ast::Node*> nodes) {
+			std::vector<ast::Type> types;
+			for (size_t i = 0; i < nodes.size(); i++) {
+				types.push_back(this->get_type(nodes[i]));
+			}
+			return types;
+		}
+
 		void add_module_functions(std::filesystem::path module_path, std::set<std::filesystem::path> already_included_modules = {}) {
 			if (this->ast.modules.find(module_path.string()) == this->ast.modules.end()) {
 				// Read file
@@ -247,34 +275,6 @@ namespace semantic {
 			return ast::Type("");
 		}
 
-		ast::Type get_type(ast::Node* node) {
-			if (ast::get_type(node).is_type_variable()) {
-				assert(this->call_stack.size() > 0);
-				return this->call_stack[this->call_stack.size() - 1].type_bindings[ast::get_type(node).to_str()];
-			}
-			else {
-				return ast::get_type(node);
-			}
-		}
-
-		ast::Type get_type(ast::Type type) {
-			if (type.is_type_variable()) {
-				assert(this->call_stack.size() > 0);
-				return this->call_stack[this->call_stack.size() - 1].type_bindings[type.to_str()];
-			}
-			else {
-				return type;
-			}
-		}
-
-		std::vector<ast::Type> get_types(std::vector<ast::Node*> nodes) {
-			std::vector<ast::Type> types;
-			for (size_t i = 0; i < nodes.size(); i++) {
-				types.push_back(this->get_type(nodes[i]));
-			}
-			return types;
-		}
-
 		ast::FunctionSpecialization create_and_analyze_specialization(ast::CallNode& call, ast::FunctionNode& function) {
 			assert(function.generic);
 
@@ -304,7 +304,6 @@ namespace semantic {
 				// If the arg type is a type variable
 				if (specialization.args[i].is_type_variable()) {
 					std::string type_variable = specialization.args[i].to_str();
-
 
 					// If is a new type variable
 					if (function_call.type_bindings.find(type_variable) == function_call.type_bindings.end()) {
@@ -507,6 +506,10 @@ Result<Ok, Error> semantic::Context::analyze(ast::BlockNode& node) {
 	// Remove scope
 	this->remove_scope();
 
+	if (node.type == ast::Type("")) {
+		node.type = ast::Type("void");
+	}
+
 	if (this->errors.size() > number_of_errors) return Error {};
 	else                                        return Ok {};
 }
@@ -611,14 +614,16 @@ Result<Ok, Error> semantic::Context::analyze(ast::CallNode& node) {
 }
 
 Result<Ok, Error> semantic::Context::analyze(ast::FloatNode& node) {
-	if (node.type == ast::Type("")) {
+	auto& type_bindings = this->call_stack[this->call_stack.size() - 1].type_bindings;
+	if (node.type == ast::Type("") || type_bindings.find(node.type.to_str()) == type_bindings.end()) {
 		node.type = ast::Type("float64");
 	}
 	return Ok {};
 }
 
 Result<Ok, Error> semantic::Context::analyze(ast::IntegerNode& node) {
-	if (node.type == ast::Type("")) {
+	auto& type_bindings = this->call_stack[this->call_stack.size() - 1].type_bindings;
+	if (node.type == ast::Type("") || type_bindings.find(node.type.to_str()) == type_bindings.end()) {
 		node.type = ast::Type("int64");
 	}
 	return Ok {};
