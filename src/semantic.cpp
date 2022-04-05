@@ -401,6 +401,10 @@ namespace semantic {
 
 				// If specialization valid
 				if (specialization.value().valid) {
+					if (specialization.value().return_type == ast::Type("")) {
+						specialization.value().return_type = ast::Type("void");
+					}
+
 					if (call.type.is_type_variable()) {
 						this->call_stack[this->call_stack.size() - 1].type_bindings[call.type.to_str()] = specialization.value().return_type;
 					}
@@ -474,7 +478,7 @@ Result<Ok, Error> semantic::Context::analyze(ast::BlockNode& node) {
 				if (result.is_ok()) {
 					auto return_type = std::get<ast::ReturnNode>(*node.statements[i]).expression.has_value() ? this->get_type(std::get<ast::ReturnNode>(*node.statements[i]).expression.value()) : ast::Type("void");
 					if (node.type == ast::Type("")) node.type = return_type;
-					else if (node.type != return_type) this->errors.push_back(Error("Error: incompatible return types"));
+					else if (node.type != return_type) this->errors.push_back(Error("Error: Incompatible return type"));
 				}
 				break;
 			}
@@ -483,14 +487,14 @@ Result<Ok, Error> semantic::Context::analyze(ast::BlockNode& node) {
 					auto if_type = this->get_type(std::get<ast::IfElseNode>(*node.statements[i]).if_branch);
 					if (if_type != ast::Type("")) {
 						if (node.type == ast::Type("")) node.type = if_type;
-						else if (node.type != if_type) this->errors.push_back(Error("Error: Incamptible return type"));
+						else if (node.type != if_type) this->errors.push_back(Error("Error: Incompatible return type"));
 					}
 
 					if (std::get<ast::IfElseNode>(*node.statements[i]).else_branch.has_value()) {
 						auto else_type = this->get_type(std::get<ast::IfElseNode>(*node.statements[i]).else_branch.value());
 						if (else_type != ast::Type("")) {
 							if (node.type == ast::Type("")) node.type = else_type;
-							else if (node.type != else_type) this->errors.push_back(Error("Error: Incamptible return type"));
+							else if (node.type != else_type) this->errors.push_back(Error("Error: Incompatible return type"));
 						}
 					}
 				}
@@ -505,10 +509,6 @@ Result<Ok, Error> semantic::Context::analyze(ast::BlockNode& node) {
 
 	// Remove scope
 	this->remove_scope();
-
-	if (node.type == ast::Type("")) {
-		node.type = ast::Type("void");
-	}
 
 	if (this->errors.size() > number_of_errors) return Error {};
 	else                                        return Ok {};
