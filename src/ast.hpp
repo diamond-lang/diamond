@@ -81,6 +81,7 @@ namespace ast {
 	Type get_type(Node* node);
 	void set_type(Node* node, Type type);
 	std::vector<Type> get_types(std::vector<Node*> nodes);
+	bool is_expression(Node* node);
 
 	struct BlockNode {
 		size_t line;

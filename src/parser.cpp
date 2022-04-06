@@ -21,9 +21,10 @@ struct Parser {
 
 	Result<Ok, Error> parse_program();
 	Result<ast::Node*, Error> parse_block();
-	Result<ast::Node*, Error> parse_expression_block();
 	Result<ast::Node*, Error> parse_function();
 	Result<ast::Node*, Error> parse_statement();
+	Result<ast::Node*, Error> parse_block_or_statement();
+	Result<ast::Node*, Error> parse_block_statement_or_expression();
 	Result<ast::Node*, Error> parse_assignment();
 	Result<ast::Node*, Error> parse_return_stmt();
 	Result<ast::Node*, Error> parse_break_stmt();
@@ -34,6 +35,7 @@ struct Parser {
 	Result<ast::Node*, Error> parse_include_stmt();
 	Result<ast::Node*, Error> parse_call();
 	Result<ast::Node*, Error> parse_expression();
+	Result<ast::Node*, Error> parse_if_else_expr();
 	Result<ast::Node*, Error> parse_not_expr();
 	Result<ast::Node*, Error> parse_binary(int precedence = 1);
 	Result<ast::Node*, Error> parse_negation();
@@ -224,6 +226,61 @@ Result<ast::Node*, Error> Parser::parse_statement() {
 	return Error {};
 }
 
+Result<ast::Node*, Error> Parser::parse_block_or_statement() {
+	if (this->current() != token::NewLine) {
+		ast::BlockNode block = {this->current().line, this->current().column};
+		auto statement = this->parse_statement();
+		if (statement.is_ok()) {
+			block.statements.push_back(statement.get_value());
+			this->ast.push_back(block);
+			return this->ast.last_element();
+		}
+		return statement;
+	}
+	return this->parse_block();
+}
+
+Result<ast::Node*, Error> Parser::parse_block_statement_or_expression() {
+	auto position = this->position;
+	auto errors = this->errors;
+	
+	if (this->current() == token::NewLine) {
+		auto block = this->parse_block();
+		if (block.is_ok()) return block.get_value();
+		auto block_position = this->position;
+		auto block_errors = this->errors;
+
+		this->position = position;
+		this->errors = errors;
+		this->advance_until_next_statement();
+		auto expression = this->parse_expression();
+		if (expression.is_ok()) return expression.get_value();
+		else {
+			this->position = block_position;
+			this->errors = block_errors;
+			return Error {};
+		}
+	}
+	else {
+		auto expression = this->parse_expression();
+		if (expression.is_ok()) return expression.get_value();
+
+		position = this->position;
+		errors = this->errors;
+		ast::BlockNode block = {this->current().line, this->current().column};
+		
+		auto statement = this->parse_statement();
+		if (statement.is_ok()) {
+			block.statements.push_back(statement.get_value());
+			this->ast.push_back(block);
+			return this->ast.last_element();
+		}
+		else {
+			return Error {};
+		}
+	}
+}
+
 Result<ast::Node*, Error> Parser::parse_function() {
 	// Create node
 	auto function = ast::FunctionNode {this->current().line, this->current().column};
@@ -257,20 +314,9 @@ Result<ast::Node*, Error> Parser::parse_function() {
 	if (right_paren.is_error()) return Error {}; 
 
 	// Parse body
-	switch (this->current().variant) {
-		case token::NewLine: {
-			auto block = this->parse_block();
-			if (block.is_error()) return Error {};
-			function.body = block.get_value();
-			break;
-		}
-		
-		default: { 
-			auto expression = this->parse_expression();
-			if (expression.is_error()) return Error {};
-			function.body = expression.get_value();
-		}
-	}
+	auto block = this->parse_block_statement_or_expression();
+	if (block.is_error()) return Error {};
+	function.body = block.get_value();
 
 	this->ast.push_back(function);
 	return this->ast.last_element();
@@ -375,20 +421,9 @@ Result<ast::Node*, Error> Parser::parse_if_else() {
 	if_else.condition = condition.get_value();
 
 	// Parse if branch
-	switch (this->current().variant) {
-		case token::NewLine: {
-			auto block = this->parse_block();
-			if (block.is_error()) return Error {};
-			if_else.if_branch = block.get_value();
-			break;
-		}
-		
-		default: { 
-			auto expression = this->parse_expression();
-			if (expression.is_error()) return Error {};
-			if_else.if_branch = expression.get_value();
-		}
-	}
+	auto block = this->parse_block_or_statement();
+	if (block.is_error()) return Error {};
+	if_else.if_branch = block.get_value();
 
 	// Adance until new statement
 	auto position_backup = this->position;
@@ -399,20 +434,9 @@ Result<ast::Node*, Error> Parser::parse_if_else() {
 		this->advance();
 
 		// Parse else branch
-		switch (this->current().variant) {
-			case token::NewLine: {
-				auto block = this->parse_block();
-				if (block.is_error()) return Error {};
-				if_else.else_branch = block.get_value();
-				break;
-			}
-			
-			default: { 
-				auto expression = this->parse_expression();
-				if (expression.is_error()) return Error {};
-				if_else.else_branch = expression.get_value();
-			}
-		}
+		auto block = this->parse_block_or_statement();
+		if (block.is_error()) return Error {};
+		if_else.else_branch = block.get_value();
 	}
 	else {
 		this->position = position_backup;
@@ -513,9 +537,53 @@ Result<ast::Node*, Error> Parser::parse_call() {
 
 Result<ast::Node*, Error> Parser::parse_expression() {
 	switch (this->current().variant) {
-		case token::If:  return this->parse_if_else();
+		case token::If:  return this->parse_if_else_expr();
 		case token::Not: return this->parse_not_expr();
 		default:         return this->parse_binary();
+	}
+}
+
+Result<ast::Node*, Error> Parser::parse_if_else_expr() {
+	size_t indentation_level = this->current().column;
+
+	// Create node
+	auto if_else = ast::IfElseNode {this->current().line, this->current().column};
+
+	// Parse keyword
+	auto keyword = this->parse_token(token::If);
+	if (keyword.is_error()) return Error {};
+
+	// Parse condition
+	auto condition = this->parse_expression();
+	if (condition.is_error()) return condition;
+	if_else.condition = condition.get_value();
+
+	// Parse if branch
+	this->advance_until_next_statement();
+	auto expression = this->parse_expression();
+	if (expression.is_error()) return Error {};
+	if_else.if_branch = expression.get_value();
+
+	// Adance until new statement
+	auto position_backup = this->position;
+	this->advance_until_next_statement();
+
+	// Match else
+	if (this->current().column == indentation_level && this->current() == token::Else) {
+		this->advance();
+
+		// Parse else branch
+		this->advance_until_next_statement();
+		auto expression = this->parse_expression();
+		if (expression.is_error()) return Error {};
+		if_else.else_branch = expression.get_value();
+
+		this->ast.push_back(if_else);
+		return this->ast.last_element();
+	}
+	else {
+		this->errors.push_back(Error("Error: Expecting else branch"));
+		return Error {};
 	}
 }
 

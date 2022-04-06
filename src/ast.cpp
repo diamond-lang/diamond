@@ -65,6 +65,36 @@ std::vector<ast::Type> ast::get_types(std::vector<Node*> nodes) {
 	return types;
 }
 
+bool ast::is_expression(Node* node) {
+	switch (node->index()) {
+		case Block: return false;
+        case Function: return false;
+        case Assignment: return false;
+        case Return: return false;
+        case Break: return false;
+        case Continue: return false;
+        case IfElse: {
+			auto& if_else = std::get<IfElseNode>(*node);
+			if (if_else.else_branch.has_value()
+			&& is_expression(if_else.if_branch) && is_expression(if_else.else_branch.value())) {
+				return true;
+			}
+			return false;
+		}
+        case While: return false;
+        case Use: return false;
+		case Include: return false;
+        case Call: return true;
+        case Float: return true;
+        case Integer: return true;
+        case Identifier: return true;
+        case Boolean: return true;
+        case String: return true;
+		default: assert(false);
+	}
+	return false;
+}
+
 // Ast
 // ---
 size_t ast::Ast::capacity() {
@@ -215,7 +245,7 @@ void ast::print(Node* node, PrintContext context) {
 				std::cout << ": " << get_concrete_type(function.return_type, context).to_str();
 			}
 			std::cout << "\n";
-			if (std::holds_alternative<BlockNode>(*function.body)) {
+			if (!is_expression(function.body)) {
 				print(function.body, context);
 			}
 			else {
@@ -270,21 +300,43 @@ void ast::print(Node* node, PrintContext context) {
 		
 		case IfElse: {
 			auto& if_else = std::get<IfElseNode>(*node);
+			if (!is_expression(node)) {
+				bool is_last = context.last[context.last.size() - 1];
+				context.last.pop_back();
 
-			bool is_last = context.last[context.last.size() - 1];
-			context.last.pop_back();
+				bool has_else_block = if_else.else_branch ? true : false;
+				put_indent_level(context.indent_level, append(context.last, is_last && !has_else_block));
+				std::cout << "if" << '\n';
+				print(if_else.condition, PrintContext{context.indent_level + 1, append(append(context.last, is_last && !has_else_block), false), context.concrete, context.type_bindings});
 
-			bool has_else_block = if_else.else_branch ? true : false;
-			put_indent_level(context.indent_level, append(context.last, is_last && !has_else_block));
-			std::cout << "if" << '\n';
-			print(if_else.condition, PrintContext{context.indent_level + 1, append(append(context.last, is_last && !has_else_block), false), context.concrete, context.type_bindings});
-			print(if_else.if_branch, PrintContext{context.indent_level, append(context.last, is_last && !has_else_block), context.concrete, context.type_bindings});
-		
-			if (if_else.else_branch.has_value()) {
+				print(if_else.if_branch, PrintContext{context.indent_level, append(context.last, is_last && !has_else_block), context.concrete, context.type_bindings});
+			
+				if (if_else.else_branch.has_value()) {
+					put_indent_level(context.indent_level, append(context.last, is_last));
+					std::cout << "else" << "\n";
+					print(if_else.else_branch.value(), PrintContext{context.indent_level, append(context.last, is_last), context.concrete, context.type_bindings});
+				}
+			}
+			else {
+				bool is_last = true;
+				if (context.last.size() > 0) {
+					is_last = context.last[context.last.size() - 1];
+					context.last.pop_back();
+				}
+
+				put_indent_level(context.indent_level, append(context.last, false));
+				std::cout << "if";
+				if (get_concrete_type(if_else.type, context) != Type("")) std::cout << ": " << get_concrete_type(if_else.type, context).to_str();
+				std::cout << "\n";
+				print(if_else.condition, PrintContext{context.indent_level + 1, append(append(context.last, false), false), context.concrete, context.type_bindings});
+				print(if_else.if_branch, PrintContext{context.indent_level + 1, append(append(context.last, false), true), context.concrete, context.type_bindings});
+
+				assert(if_else.else_branch.has_value());
 				put_indent_level(context.indent_level, append(context.last, is_last));
 				std::cout << "else" << "\n";
-				print(if_else.else_branch.value(), PrintContext{context.indent_level, append(context.last, is_last), context.concrete, context.type_bindings});
+				print(if_else.else_branch.value(), PrintContext{context.indent_level + 1, append(append(context.last, is_last), true), context.concrete, context.type_bindings});
 			}
+				
 			break;
 		}
 
