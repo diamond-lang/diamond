@@ -391,6 +391,7 @@ Result<ast::Node*, Error> Parser::parse_if_else() {
 	}
 
 	// Adance until new statement
+	auto position_backup = this->position;
 	this->advance_until_next_statement();
 
 	// Match indentation
@@ -412,6 +413,9 @@ Result<ast::Node*, Error> Parser::parse_if_else() {
 				if_else.else_branch = expression.get_value();
 			}
 		}
+	}
+	else {
+		this->position = position_backup;
 	}
 
 	this->ast.push_back(if_else);
