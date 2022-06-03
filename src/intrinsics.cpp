@@ -1,39 +1,40 @@
 #include "intrinsics.hpp"
 
-std::unordered_map<std::string, std::pair<std::vector<ast::Type>, ast::Type>> interfaces = {
-    {"+", 
+std::unordered_map<std::string, std::vector<std::pair<std::vector<ast::Type>, ast::Type>>> interfaces = {
+    {"+", {
         {{ast::Type("$t"), ast::Type("$t")}, ast::Type("$t")}
-    },
-    {"*", 
+    }},
+    {"*", {
         {{ast::Type("$t"), ast::Type("$t")}, ast::Type("$t")}
-    },
-    {"/", 
+    }},
+    {"/", {
         {{ast::Type("$t"), ast::Type("$t")}, ast::Type("$t")}
-    },
-    {"-",
+    }},
+    {"-", {
+        {{ast::Type("$t")}, ast::Type("$t")},
         {{ast::Type("$t"), ast::Type("$t")}, ast::Type("$t")}
-    },
-    {"<",
+    }},
+    {"<", {
         {{ast::Type("$t"), ast::Type("$t")}, ast::Type("bool")}
-    },
-    {"<=",
+    }},
+    {"<=", {
         {{ast::Type("$t"), ast::Type("$t")}, ast::Type("bool")}
-    },
-    {">",
+    }},
+    {">", {
         {{ast::Type("$t"), ast::Type("$t")}, ast::Type("bool")}
-    },
-    {">=",
+    }},
+    {">=", {
         {{ast::Type("$t"), ast::Type("$t")}, ast::Type("bool")}
-    },
-    {"==",
+    }},
+    {"==", {
         {{ast::Type("$t"), ast::Type("$t")}, ast::Type("bool")}
-    },
-    {"!=",
+    }},
+    {"!=", {
         {{ast::Type("$t"), ast::Type("$t")}, ast::Type("bool")}
-    },
-    {"print",
+    }},
+    {"print", {
         {{ast::Type("$t")}, ast::Type("void")}
-    }
+    }}
 };
 
 std::unordered_map<std::string, std::vector<std::pair<std::vector<ast::Type>, ast::Type>>> intrinsics = {

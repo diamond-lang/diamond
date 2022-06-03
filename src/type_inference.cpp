@@ -291,34 +291,35 @@ void type_inference::Context::analyze(ast::CallNode& node) {
 	// Infer things based on interface if exists
     auto& identifier = std::get<ast::IdentifierNode>(*node.identifier).value;
 	if (interfaces.find(identifier) != interfaces.end()) {
-		auto interface = interfaces[identifier];
-		assert(node.args.size() == interface.first.size());
+        for (auto& interface: interfaces[identifier]) {
+            if (interface.first.size() != node.args.size()) continue;
 
-        // Create prototype type vector
-		std::vector<ast::Type> prototype = ast::get_types(node.args);
-		prototype.push_back(node.type);
+            // Create prototype type vector
+            std::vector<ast::Type> prototype = ast::get_types(node.args);
+            prototype.push_back(node.type);
 
-        // Create interface prototype vector
-		std::vector<ast::Type> interface_prototype = interface.first;
-		interface_prototype.push_back(interface.second);
+            // Create interface prototype vector
+            std::vector<ast::Type> interface_prototype = interface.first;
+            interface_prototype.push_back(interface.second);
 
-        // Infer stuff, basically is loop trough the interface prototype that groups type variables
-        std::unordered_map<std::string, std::set<std::string>> sets;
-        for (size_t i = 0; i < interface_prototype.size(); i++) {
-            if (sets.find(interface_prototype[i].to_str()) == sets.end()) {
-                sets[interface_prototype[i].to_str()] = std::set<std::string>{};
+            // Infer stuff, basically is loop trough the interface prototype that groups type variables
+            std::unordered_map<std::string, std::set<std::string>> sets;
+            for (size_t i = 0; i < interface_prototype.size(); i++) {
+                if (sets.find(interface_prototype[i].to_str()) == sets.end()) {
+                    sets[interface_prototype[i].to_str()] = std::set<std::string>{};
+                }
+
+                sets[interface_prototype[i].to_str()].insert(prototype[i].to_str());
+            
+                if (!interface_prototype[i].is_type_variable()) {
+                    sets[interface_prototype[i].to_str()].insert(interface_prototype[i].to_str());
+                }
             }
 
-            sets[interface_prototype[i].to_str()].insert(prototype[i].to_str());
-         
-            if (!interface_prototype[i].is_type_variable()) {
-                sets[interface_prototype[i].to_str()].insert(interface_prototype[i].to_str());
+            // Save sets found
+            for (auto it = sets.begin(); it != sets.end(); it++) {
+                this->sets.push_back(it->second);
             }
-        }
-
-        // Save sets found
-        for (auto it = sets.begin(); it != sets.end(); it++) {
-            this->sets.push_back(it->second);
         }
 	}
 }
