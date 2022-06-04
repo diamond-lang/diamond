@@ -127,6 +127,9 @@ namespace semantic {
 				else if (std::holds_alternative<std::vector<ast::FunctionNode*>>(scope[identifier])) {
 					std::get<std::vector<ast::FunctionNode*>>(scope[identifier]).push_back((ast::FunctionNode*) block.functions[i]);
 				}
+				else {
+					assert(false);
+				}
 			}
 
 			auto current_directory = std::filesystem::canonical(std::filesystem::current_path() / this->current_module).parent_path();
@@ -166,6 +169,48 @@ namespace semantic {
 			return Error {};
 		}
 
+		bool check_constraints_and_get_type_bindings(ast::FunctionNode* function, ast::CallNode& call) {
+				auto specialization = ast::FunctionSpecialization {};
+				specialization.args = ast::get_types(function->args);
+				specialization.return_type = function->return_type;
+
+				for (size_t i = 0; i < specialization.args.size(); i++) {
+					if (specialization.args[i].is_type_variable()) {
+						std::string type_variable = specialization.args[i].to_str();
+
+						// If is a new type variable
+						if (specialization.type_bindings.find(type_variable) == specialization.type_bindings.end()) {
+							specialization.type_bindings[type_variable] = ast::get_type(call.args[i]);
+							specialization.args[i] = ast::get_type(call.args[i]);
+						}
+
+						// Else compare wih previous type founded for her
+						else {
+							if (specialization.type_bindings[type_variable] != ast::get_type(call.args[i])) {
+								return false;
+							}
+							else {
+								specialization.args[i] = specialization.type_bindings[type_variable];
+							}
+						}
+					}
+				}
+
+				// If return type is a type variable
+				if (specialization.return_type.is_type_variable()) {
+					if (specialization.type_bindings.find(specialization.return_type.to_str()) != specialization.type_bindings.end()) {
+						specialization.return_type = specialization.type_bindings[specialization.return_type.to_str()];
+					}
+					else {
+						assert(false);
+					}
+				}
+
+				function->specializations.push_back(specialization);
+				call.type = specialization.return_type;
+				return true;
+			}
+
 		Result<Ok, Error> get_type_of_user_defined_function(ast::CallNode& call) {
 			auto& identifier = std::get<ast::IdentifierNode>(*call.identifier).value;
 
@@ -191,8 +236,23 @@ namespace semantic {
 			for (size_t i = 0; i < functions.size(); i++) {
 				// Continue if number of arguments of the function isn't the same as the call
 				if (functions[i]->args.size() != call.args.size()) continue;
+				
+				// Check if the specialization already exists
+				for (size_t j = 0; j < functions[i]->specializations.size(); j++) {
+					if (ast::get_types(call.args) == functions[i]->specializations[j].args) {
+						call.type = functions[i]->specializations[j].return_type;
+						return Ok {};
+					}
+				}
 
-				assert(false);
+				// Else arguments can be passed to the function and find type bindings
+				bool ok = this->check_constraints_and_get_type_bindings(functions[i], call);
+				if (!ok) {
+					this->errors.push_back(error_message);
+					return Error {};
+				}
+
+				return Ok {};
 			}
 
 			this->errors.push_back(error_message);
@@ -301,7 +361,6 @@ Result<Ok, Error> semantic::Context::analyze(ast::BlockNode& node) {
 Result<Ok, Error> semantic::Context::analyze(ast::FunctionNode& node) {
 	if (node.generic) {
 		type_inference::analyze(&node);
-		ast::print((ast::Node*) &node);
 	}
 	else assert(false);
 	return Ok {};

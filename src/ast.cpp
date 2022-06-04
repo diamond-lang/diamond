@@ -261,7 +261,7 @@ void ast::print(Node* node, PrintContext context) {
 				std::cout << ": " << get_concrete_type(function.return_type, context).to_str();
 			}
 			
-			if (function.constraints.size() != 0) {
+			if (function.constraints.size() != 0 && !context.concrete) {
 				std::cout << " where ";
 				for (size_t i = 0; i < function.constraints.size(); i++) {
 					std::cout << function.constraints[i].identifier << "(";

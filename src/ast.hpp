@@ -96,7 +96,7 @@ namespace ast {
 	struct FunctionSpecialization {
 		std::vector<Type> args;
 		Type return_type;
-		std::unordered_map<std::string, Type> bindings;
+		std::unordered_map<std::string, Type> type_bindings;
 	};
 
 	struct FunctionPrototype {
