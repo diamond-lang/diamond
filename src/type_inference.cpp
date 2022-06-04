@@ -21,7 +21,7 @@ namespace type_inference {
         size_t current_type_variable_number = 1;
         std::vector<std::set<std::string>> sets;
         std::unordered_map<std::string, std::set<std::string>> labeled_sets;
-        std::vector<ast::FunctionNode*> function_node;
+        ast::FunctionNode* function_node;
 
         void analyze(ast::Node* node);
 		void analyze(ast::BlockNode& node);
@@ -139,7 +139,7 @@ void type_inference::Context::analyze(ast::Node* node) {
 }
 
 void type_inference::Context::analyze(ast::FunctionNode& node) {
-    this->function_node.push_back(&node);
+    this->function_node = &node;
 
     // Add scope
     this->add_scope();
@@ -216,9 +216,16 @@ void type_inference::Context::analyze(ast::FunctionNode& node) {
     }
     node.return_type = this->get_unified_type(node.return_type.to_str());
 
+    // Unify constraints
+    for (size_t i = 0; i < node.constraints.size(); i++) {
+        for (size_t j = 0; j < node.constraints[i].args.size(); j++) {
+            node.constraints[i].args[j] = this->get_unified_type(node.constraints[i].args[j].to_str());
+        }
+        node.constraints[i].return_type = this->get_unified_type(node.constraints[i].return_type.to_str());
+    }
+
     // Remove scope
     this->remove_scope();
-    this->function_node.pop_back();
 }
 
 void type_inference::Context::analyze(ast::BlockNode& block) {
@@ -242,10 +249,10 @@ void type_inference::Context::analyze(ast::AssignmentNode& node) {
 void type_inference::Context::analyze(ast::ReturnNode& node) {
     if (node.expression.has_value()) {
         this->analyze(node.expression.value());
-        this->sets.push_back(std::set<std::string>{this->function_node[this->function_node.size() - 1]->return_type.to_str(), ast::get_type(node.expression.value()).to_str()});
+        this->sets.push_back(std::set<std::string>{this->function_node->return_type.to_str(), ast::get_type(node.expression.value()).to_str()});
     }
     else {
-        this->sets.push_back(std::set<std::string>{this->function_node[this->function_node.size() - 1]->return_type.to_str(), "void"});
+        this->sets.push_back(std::set<std::string>{this->function_node->return_type.to_str(), "void"});
     }
 }
 
@@ -320,8 +327,16 @@ void type_inference::Context::analyze(ast::CallNode& node) {
             for (auto it = sets.begin(); it != sets.end(); it++) {
                 this->sets.push_back(it->second);
             }
+
+            break;
         }
 	}
+
+    // Add constraint
+    auto constraint = ast::FunctionPrototype{identifier, ast::get_types(node.args), node.type};
+    if (std::find(this->function_node->constraints.begin(), this->function_node->constraints.end(), constraint) == this->function_node->constraints.end()) {
+        this->function_node->constraints.push_back(constraint);
+    }
 }
 
 void type_inference::Context::unify(ast::Node* node) {

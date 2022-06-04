@@ -96,8 +96,20 @@ namespace ast {
 	struct FunctionSpecialization {
 		std::vector<Type> args;
 		Type return_type;
-		bool valid = false;
+		std::unordered_map<std::string, Type> bindings;
 	};
+
+	struct FunctionPrototype {
+		std::string identifier;
+		std::vector<Type> args;
+		Type return_type;
+		
+		FunctionPrototype(std::string identifier, std::vector<Type> args, Type return_type) : identifier(identifier), args(args), return_type(return_type) {}
+		bool operator==(const FunctionPrototype &t) const;
+		bool operator!=(const FunctionPrototype &t) const;
+	};
+
+	using FunctionConstraints = std::vector<FunctionPrototype>;
 
 	struct FunctionNode {
 		size_t line;
@@ -111,6 +123,7 @@ namespace ast {
 		bool generic = false;
 		Type return_type = Type("");
 		std::vector<FunctionSpecialization> specializations;
+		FunctionConstraints constraints;
 	};
 
 	struct AssignmentNode {

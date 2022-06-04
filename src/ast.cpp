@@ -47,6 +47,23 @@ bool ast::Type::is_type_variable() const {
 	else                                 return false;
 }
 
+// FunctionPrototype
+bool ast::FunctionPrototype::operator==(const FunctionPrototype &t) const {
+	if (this->identifier == t.identifier && this->args.size() == t.args.size()) {
+		for (size_t i = 0; i < this->args.size(); i++) {
+			if (this->args[i] != t.args[i]) return false;
+		}
+		return this->return_type == t.return_type;
+	}
+	else {
+		return false;
+	}
+}
+
+bool ast::FunctionPrototype::operator!=(const FunctionPrototype &t) const {
+	return !(t == *this);
+}
+
 // Node
 // ----
 ast::Type ast::get_type(Node* node) {
@@ -207,16 +224,15 @@ void ast::print(Node* node, PrintContext context) {
 					auto& function = std::get<ast::FunctionNode>(*block.functions[i]);
 					for (size_t j = 0; j < function.specializations.size(); j++) {
 						bool is_last = i == block.functions.size() - 1 && j == std::get<ast::FunctionNode>(*block.functions[i]).specializations.size() - 1;
-						if (function.specializations[j].valid) {
-							context.type_bindings = {};
-							for (size_t k = 0; k < std::get<ast::FunctionNode>(*block.functions[i]).specializations[j].args.size(); k++) {
-								auto type_variable = ast::get_type(function.args[k]).to_str();
-								context.type_bindings[type_variable] = function.specializations[j].args[k];
-							}
-							context.type_bindings[function.return_type.to_str()] = function.specializations[j].return_type;
-			
-							print(block.functions[i], PrintContext{context.indent_level + 1, append(context.last, is_last), context.concrete, context.type_bindings});
+						
+						context.type_bindings = {};
+						for (size_t k = 0; k < std::get<ast::FunctionNode>(*block.functions[i]).specializations[j].args.size(); k++) {
+							auto type_variable = ast::get_type(function.args[k]).to_str();
+							context.type_bindings[type_variable] = function.specializations[j].args[k];
 						}
+						context.type_bindings[function.return_type.to_str()] = function.specializations[j].return_type;
+		
+						print(block.functions[i], PrintContext{context.indent_level + 1, append(context.last, is_last), context.concrete, context.type_bindings});
 					}
 				}
 			}
@@ -244,6 +260,20 @@ void ast::print(Node* node, PrintContext context) {
 			if (function.return_type != Type("")) {
 				std::cout << ": " << get_concrete_type(function.return_type, context).to_str();
 			}
+			
+			if (function.constraints.size() != 0) {
+				std::cout << " where ";
+				for (size_t i = 0; i < function.constraints.size(); i++) {
+					std::cout << function.constraints[i].identifier << "(";
+					for  (size_t j = 0; j < function.constraints[i].args.size(); j++) {
+						std::cout << function.constraints[i].args[j].to_str();
+						if (j != function.constraints[i].args.size() - 1) std::cout << ", ";
+					}
+					std::cout << "): " << function.constraints[i].return_type.to_str();
+					if (i != function.constraints.size() - 1) std::cout << " | ";
+				}
+			}
+			
 			std::cout << "\n";
 			if (!is_expression(function.body)) {
 				print(function.body, context);
