@@ -89,17 +89,17 @@ std::string format_args(std::vector<ast::Node*> args) {
 }
 
 std::string errors::undefined_function(ast::CallNode& call, std::filesystem::path file) {
-	auto& identifier = std::get<ast::IdentifierNode>(*call.identifier).value;
+	auto& identifier = call.identifier->value;
 	return make_header("Undefined function\n\n") +
 	       identifier + "(" + format_args(call.args) + ") is not defined.\n\n" +
 	       std::to_string(call.line) + "| " + current_line(call.line, file) + "\n" +
-	       underline_identifier(std::get<ast::IdentifierNode>(*call.identifier), file);
+	       underline_identifier(*call.identifier, file);
 }
 
 std::string errors::unhandled_return_value(ast::CallNode& call, std::filesystem::path file) {
 	return make_header("Unhandled return value\n\n") +
 	       std::to_string(call.line) + "| " + current_line(call.line, file) + "\n" +
-	       underline_identifier(std::get<ast::IdentifierNode>(*call.identifier), file);
+	       underline_identifier(*call.identifier, file);
 }
 
 std::string errors::file_couldnt_be_found(std::string path) {

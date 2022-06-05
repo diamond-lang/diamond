@@ -168,7 +168,7 @@ Result<ast::Node*, Error> Parser::parse_block() {
 		if (result.is_ok()) {
 			switch (result.get_value()->index()) {
 				case ast::Function:
-					block.functions.push_back(result.get_value());
+					block.functions.push_back((ast::FunctionNode*) result.get_value());
 					break;
 				
 				case ast::Use:
@@ -293,7 +293,7 @@ Result<ast::Node*, Error> Parser::parse_function() {
 	// Parse indentifier
 	auto identifier = this->parse_identifier();
 	if (identifier.is_error()) return identifier;
-	function.identifier = identifier.get_value();
+	function.identifier = (ast::IdentifierNode*) identifier.get_value();
 
 	// Parse left paren
 	auto left_paren = this->parse_token(token::LeftParen);
@@ -335,7 +335,7 @@ Result<ast::Node*, Error> Parser::parse_assignment() {
 	// Parse identifier
 	auto identifier = this->parse_identifier();
 	if (identifier.is_error()) return Error {};
-	assignment.identifier = identifier.get_value();
+	assignment.identifier = (ast::IdentifierNode*) identifier.get_value();
 
 	// Parse equal or be
 	switch (this->current().variant) {
@@ -480,7 +480,7 @@ Result<ast::Node*, Error> Parser::parse_use_stmt() {
 	// Parse path
 	auto path = this->parse_string();
 	if (path.is_error()) return path;
-	use_stmt.path = path.get_value();
+	use_stmt.path = (ast::StringNode*) path.get_value();
 
 	this->ast.push_back(use_stmt);
 	return this->ast.last_element();
@@ -497,7 +497,7 @@ Result<ast::Node*, Error> Parser::parse_include_stmt() {
 	// Parse path
 	auto path = this->parse_string();
 	if (path.is_error()) return path;
-	include_stmt.path = path.get_value();
+	include_stmt.path = (ast::StringNode*) path.get_value();
 
 	// Return
 	this->ast.push_back(include_stmt);
@@ -511,7 +511,7 @@ Result<ast::Node*, Error> Parser::parse_call() {
 	// Parse indentifier
 	auto identifier = this->parse_identifier();
 	if (identifier.is_error()) return identifier;
-	call.identifier = identifier.get_value();
+	call.identifier = (ast::IdentifierNode*) identifier.get_value();
 
 	// Parse left paren
 	auto left_paren = this->parse_token(token::LeftParen);
@@ -594,7 +594,7 @@ Result<ast::Node*, Error> Parser::parse_not_expr() {
 	// Parse indentifier
 	auto identifier = this->parse_identifier(token::Not);
 	if (identifier.is_error()) return identifier;
-	call.identifier = identifier.get_value();
+	call.identifier = (ast::IdentifierNode*) identifier.get_value();
 
 	// Parse expression
 	auto expression = this->parse_expression();
@@ -643,7 +643,7 @@ Result<ast::Node*, Error> Parser::parse_binary(int precedence) {
 			auto right = this->parse_binary(precedence + 1);
 			if (right.is_error()) return right;
 
-			call.identifier = identifier.get_value();
+			call.identifier = (ast::IdentifierNode*) identifier.get_value();
 			call.args.push_back(left.get_value());
 			call.args.push_back(right.get_value());
 			this->ast.push_back(call);
@@ -661,7 +661,7 @@ Result<ast::Node*, Error> Parser::parse_negation() {
 	// Parse indentifier
 	auto identifier = this->parse_identifier(token::Minus);
 	if (identifier.is_error()) return identifier;
-	call.identifier = identifier.get_value();
+	call.identifier = (ast::IdentifierNode*) identifier.get_value();
 
 	// Parse expression
 	auto expression = this->parse_primary();

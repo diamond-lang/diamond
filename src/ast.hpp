@@ -89,8 +89,8 @@ namespace ast {
 		Type type = Type("");
 
 		std::vector<Node*> statements;
-		std::vector<Node*> functions;
 		std::vector<Node*> use_include_statements;
+		std::vector<FunctionNode*> functions;
 	};
 
 	struct FunctionSpecialization {
@@ -116,7 +116,7 @@ namespace ast {
 		size_t column;
 		Type type = Type("");
 
-		Node* identifier;
+		IdentifierNode* identifier;
 		std::vector<Node*> args;
 		Node* body;
 
@@ -134,7 +134,7 @@ namespace ast {
 		bool is_mutable = false;
 		bool nonlocal = false;
 
-		Node* identifier;
+		IdentifierNode* identifier;
 		Node* expression;
 	};
 
@@ -182,7 +182,7 @@ namespace ast {
 		size_t column;
 		Type type = Type("");
 
-		Node* path;
+		StringNode* path;
 	};
 
 	struct IncludeNode {
@@ -190,7 +190,7 @@ namespace ast {
 		size_t column;
 		Type type = Type("");
 
-		Node* path;
+		StringNode* path;
 	};
 
 	struct CallNode {
@@ -198,7 +198,7 @@ namespace ast {
 		size_t column;
 		Type type = Type("");
 
-		Node* identifier;
+		IdentifierNode* identifier;
 		std::vector<Node*> args;
 		FunctionNode* function; 
 	};

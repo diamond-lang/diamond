@@ -241,7 +241,7 @@ void type_inference::Context::analyze(ast::BlockNode& block) {
 void type_inference::Context::analyze(ast::AssignmentNode& node) {
     this->analyze(node.expression);
     type_inference::Binding binding;
-    binding.identifier = std::get<ast::IdentifierNode>(*node.identifier).value;
+    binding.identifier = node.identifier->value;
     binding.type = ast::get_type(node.expression);
     this->current_scope()[binding.identifier] = binding;
 }
@@ -296,7 +296,7 @@ void type_inference::Context::analyze(ast::CallNode& node) {
 	this->current_type_variable_number++;
 
 	// Infer things based on interface if exists
-    auto& identifier = std::get<ast::IdentifierNode>(*node.identifier).value;
+    auto& identifier = node.identifier->value;
 	if (interfaces.find(identifier) != interfaces.end()) {
         for (auto& interface: interfaces[identifier]) {
             if (interface.first.size() != node.args.size()) continue;

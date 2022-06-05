@@ -116,8 +116,8 @@ namespace semantic {
 		void add_functions_to_current_scope(ast::BlockNode& block) {
 			// Add functions from current block to current context
 			for (size_t i = 0; i < block.functions.size(); i++) {
-				auto& function = std::get<ast::FunctionNode>(*block.functions[i]);
-				auto& identifier = std::get<ast::IdentifierNode>(*function.identifier).value;
+				auto& function = *block.functions[i];
+				auto& identifier = function.identifier->value;
 
 				auto& scope = this->current_scope();
 				if (scope.find(identifier) == scope.end()) {
@@ -138,10 +138,10 @@ namespace semantic {
 			for (size_t i = 0; i < block.use_include_statements.size(); i++) {
 				std::string path;
 				if (std::holds_alternative<ast::UseNode>(*block.use_include_statements[i])) {
-					path = std::get<ast::StringNode>(*std::get<ast::UseNode>(*block.use_include_statements[i]).path).value;
+					path = std::get<ast::UseNode>(*block.use_include_statements[i]).path->value;
 				}
 				else {
-					path = std::get<ast::StringNode>(*std::get<ast::IncludeNode>(*block.use_include_statements[i]).path).value;
+					path = std::get<ast::IncludeNode>(*block.use_include_statements[i]).path->value;
 				}
 				
 				auto module_path = current_directory / (path + ".dmd");
@@ -152,7 +152,7 @@ namespace semantic {
 		}
 
 		Result<Ok, Error> get_type_of_intrinsic(ast::CallNode& call) {
-			auto& identifier = std::get<ast::IdentifierNode>(*call.identifier).value;
+			auto& identifier = call.identifier->value;
 			if (intrinsics.find(identifier) != intrinsics.end()) {
 				auto args = ast::get_types(call.args);
 				auto prototypes = intrinsics[identifier];
@@ -212,7 +212,7 @@ namespace semantic {
 			}
 
 		Result<Ok, Error> get_type_of_user_defined_function(ast::CallNode& call) {
-			auto& identifier = std::get<ast::IdentifierNode>(*call.identifier).value;
+			auto& identifier = call.identifier->value;
 
 			// Create error message
 			std::string error_message = identifier + "(";
@@ -298,7 +298,7 @@ Result<Ok, Error> semantic::Context::analyze(ast::BlockNode& node) {
 
 	// Analyze functions
 	for (size_t i = 0; i < node.functions.size(); i++) {
-		this->analyze(node.functions[i]);
+		this->analyze(*node.functions[i]);
 	}
 
 	// Add functions to the current scope
@@ -367,7 +367,7 @@ Result<Ok, Error> semantic::Context::analyze(ast::FunctionNode& node) {
 }
 
 Result<Ok, Error> semantic::Context::analyze(ast::AssignmentNode& node) {
-	auto& identifier = std::get<ast::IdentifierNode>(*node.identifier).value;
+	auto& identifier = node.identifier->value;
 
 	// Analyze expression
 	auto result = this->analyze(node.expression);
@@ -377,7 +377,7 @@ Result<Ok, Error> semantic::Context::analyze(ast::AssignmentNode& node) {
 	if (node.nonlocal) {
 		Binding* binding = this->get_binding(identifier);
 		if (!binding) {
-			this->errors.push_back(errors::undefined_variable(std::get<ast::IdentifierNode>(*node.identifier), this->current_module));
+			this->errors.push_back(errors::undefined_variable(*node.identifier, this->current_module));
 			return Error {};
 		}
 		if (semantic::get_binding_type(*binding) != ast::get_type(node.expression)) {
@@ -393,7 +393,7 @@ Result<Ok, Error> semantic::Context::analyze(ast::AssignmentNode& node) {
 		&& std::holds_alternative<ast::AssignmentNode*>(this->current_scope()[identifier])) {
 			auto assignment = std::get<ast::AssignmentNode*>(this->current_scope()[identifier]);
 			if (!assignment->is_mutable) {
-				this->errors.push_back(errors::reassigning_immutable_variable(std::get<ast::IdentifierNode>(*node.identifier), node, this->current_module));
+				this->errors.push_back(errors::reassigning_immutable_variable(*node.identifier, node, this->current_module));
 				return Error {};
 			}
 		}

@@ -218,21 +218,21 @@ void ast::print(Node* node, PrintContext context) {
 			for (size_t i = 0; i < block.functions.size(); i++) {
 				if (!context.concrete) {
 					bool is_last = i == block.functions.size() - 1;
-					print(block.functions[i], PrintContext{context.indent_level + 1, append(context.last, is_last), context.concrete, context.type_bindings});
+					print((ast::Node*) block.functions[i], PrintContext{context.indent_level + 1, append(context.last, is_last), context.concrete, context.type_bindings});
 				}
 				else {
-					auto& function = std::get<ast::FunctionNode>(*block.functions[i]);
+					auto& function = *block.functions[i];
 					for (size_t j = 0; j < function.specializations.size(); j++) {
-						bool is_last = i == block.functions.size() - 1 && j == std::get<ast::FunctionNode>(*block.functions[i]).specializations.size() - 1;
+						bool is_last = i == block.functions.size() - 1 && j == function.specializations.size() - 1;
 						
 						context.type_bindings = {};
-						for (size_t k = 0; k < std::get<ast::FunctionNode>(*block.functions[i]).specializations[j].args.size(); k++) {
+						for (size_t k = 0; k < function.specializations[j].args.size(); k++) {
 							auto type_variable = ast::get_type(function.args[k]).to_str();
 							context.type_bindings[type_variable] = function.specializations[j].args[k];
 						}
 						context.type_bindings[function.return_type.to_str()] = function.specializations[j].return_type;
 		
-						print(block.functions[i], PrintContext{context.indent_level + 1, append(context.last, is_last), context.concrete, context.type_bindings});
+						print((ast::Node*) block.functions[i], PrintContext{context.indent_level + 1, append(context.last, is_last), context.concrete, context.type_bindings});
 					}
 				}
 			}
@@ -243,7 +243,7 @@ void ast::print(Node* node, PrintContext context) {
 			auto& function = std::get<FunctionNode>(*node);
 
 			put_indent_level(context.indent_level, context.last);
-			std::cout << "function " << std::get<IdentifierNode>(*function.identifier).value << '(';
+			std::cout << "function " << function.identifier->value << '(';
 			for (size_t i = 0; i < function.args.size(); i++) {
 				auto& arg_name = std::get<IdentifierNode>(*function.args[i]).value;
 				std::cout << arg_name;
@@ -289,7 +289,7 @@ void ast::print(Node* node, PrintContext context) {
 		case Assignment: {
 			auto& assignment = std::get<AssignmentNode>(*node);
 
-			print(assignment.identifier, context);
+			print((ast::Node*) assignment.identifier, context);
 			if (assignment.nonlocal) {
 				put_indent_level(context.indent_level + 1, append(context.last, false));
 				std::cout << "nonlocal\n";
@@ -381,14 +381,14 @@ void ast::print(Node* node, PrintContext context) {
 		}
 
 		case Use: {
-			auto path = std::get<StringNode>(*std::get<UseNode>(*node).path);
-			std::cout << "use \"" << path.value << "\"\n";
+			auto path = std::get<UseNode>(*node).path;
+			std::cout << "use \"" << path->value << "\"\n";
 			break;
 		}
 
 		case Include: {
-			auto path = std::get<StringNode>(*std::get<IncludeNode>(*node).path);
-			std::cout << "include \"" << path.value << "\"\n";
+			auto path = std::get<IncludeNode>(*node).path;
+			std::cout << "include \"" << path->value << "\"\n";
 			break;
 		}
 
@@ -396,7 +396,7 @@ void ast::print(Node* node, PrintContext context) {
 			auto& call = std::get<CallNode>(*node);
 
 			put_indent_level(context.indent_level, context.last);
-			std::cout << std::get<IdentifierNode>(*call.identifier).value;
+			std::cout << call.identifier->value;
 			if (call.type != Type("")) std::cout << ": " << get_concrete_type(call.type, context).to_str();
 			std::cout << "\n";
 			for (size_t i = 0; i < call.args.size(); i++) {
