@@ -5,23 +5,21 @@
 #include <cassert>
 #include <cstring>
 
+#include "semantic.hpp"
 #include "type_inference.hpp"
 #include "intrinsics.hpp"
 
 // Prototypes and definitions
 // --------------------------
 namespace type_inference {
-    struct Binding {
-        std::string identifier;
-        ast::Type type;
-    };
-
     struct Context {
-        std::vector<std::unordered_map<std::string, Binding>> scopes;
+        semantic::Context& semantic_context;
         size_t current_type_variable_number = 1;
         std::vector<std::set<std::string>> sets;
         std::unordered_map<std::string, std::set<std::string>> labeled_sets;
         ast::FunctionNode* function_node;
+
+        Context(semantic::Context& semantic_context) : semantic_context(semantic_context) {}
 
         void analyze(ast::Node* node);
 		void analyze(ast::BlockNode& node);
@@ -58,27 +56,6 @@ namespace type_inference {
 		void unify(ast::IdentifierNode& node);
 		void unify(ast::BooleanNode& node) {}
 		void unify(ast::StringNode& node) {}
-
-        std::unordered_map<std::string, Binding>& current_scope() {
-            return this->scopes[this->scopes.size() - 1];
-        }
-
-        void add_scope() {
-            this->scopes.push_back(std::unordered_map<std::string, Binding>());
-        }
-
-        void remove_scope() {
-            this->scopes.pop_back();
-        }
-
-        Binding* get_binding(std::string identifier) {
-            for (auto scope = this->scopes.rbegin(); scope != this->scopes.rend(); scope++) {
-                if (scope->find(identifier) != scope->end()) {
-                    return &(*scope)[identifier];
-                }
-            }
-            return nullptr;
-        }
 
         ast::Type get_unified_type(std::string type_var) {
             for (auto it = this->labeled_sets.begin(); it != this->labeled_sets.end(); it++) {
@@ -126,9 +103,9 @@ namespace type_inference {
 
 // Type inference
 // --------------
-void type_inference::analyze(ast::FunctionNode* function) {
+void type_inference::analyze(semantic::Context& semantic_context, ast::FunctionNode* function) {
     // Create context
-    type_inference::Context context;
+    type_inference::Context context(semantic_context);
 
     // Analyze function
     context.analyze(*function);
@@ -142,7 +119,7 @@ void type_inference::Context::analyze(ast::FunctionNode& node) {
     this->function_node = &node;
 
     // Add scope
-    this->add_scope();
+    this->semantic_context.add_scope();
 
     // Assign a type variable to every argument and return type
     for (size_t i = 0; i < node.args.size(); i++) {
@@ -152,10 +129,8 @@ void type_inference::Context::analyze(ast::FunctionNode& node) {
             this->sets.push_back(std::set<std::string>{ast::get_type(node.args[i]).to_str()});
         }
 
-        type_inference::Binding binding;
-        binding.identifier = std::get<ast::IdentifierNode>(*node.args[i]).value;
-        binding.type = ast::get_type(node.args[i]);
-        this->current_scope()[binding.identifier] = binding;
+        auto identifier = std::get<ast::IdentifierNode>(*node.args[i]).value;
+        this->semantic_context.current_scope()[identifier] = semantic::Binding(node.args[i]);
     }
     node.return_type = ast::Type(std::to_string(this->current_type_variable_number));
     this->current_type_variable_number++;
@@ -225,25 +200,23 @@ void type_inference::Context::analyze(ast::FunctionNode& node) {
     }
 
     // Remove scope
-    this->remove_scope();
+    this->semantic_context.remove_scope();
 }
 
 void type_inference::Context::analyze(ast::BlockNode& block) {
-    this->add_scope();
+    this->semantic_context.add_scope();
 
     for (size_t i = 0; i < block.statements.size(); i++) {
         this->analyze(block.statements[i]);
     }
 
-    this->remove_scope();
+    this->semantic_context.remove_scope();
 }
 
 void type_inference::Context::analyze(ast::AssignmentNode& node) {
     this->analyze(node.expression);
-    type_inference::Binding binding;
-    binding.identifier = node.identifier->value;
-    binding.type = ast::get_type(node.expression);
-    this->current_scope()[binding.identifier] = binding;
+    std::string identifier = node.identifier->value;
+    this->semantic_context.current_scope()[identifier] = semantic::Binding(&node);
 }
 
 void type_inference::Context::analyze(ast::ReturnNode& node) {
@@ -268,8 +241,8 @@ void type_inference::Context::analyze(ast::WhileNode& node) {
 }
 
 void type_inference::Context::analyze(ast::IdentifierNode& node) {
-	if (this->get_binding(node.value)) {
-		node.type = this->get_binding(node.value)->type;
+	if (this->semantic_context.get_binding(node.value)) {
+		node.type = semantic::get_binding_type(*this->semantic_context.get_binding(node.value));
 	}
 }
 

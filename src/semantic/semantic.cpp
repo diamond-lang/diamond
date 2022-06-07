@@ -1,5 +1,6 @@
 #include "semantic.hpp"
 #include "../semantic.hpp"
+#include "type_inference.hpp"
 
 // Bindings
 // --------
@@ -221,7 +222,7 @@ Result<Ok, Error> semantic::Context::analyze(ast::BlockNode& node) {
 
 Result<Ok, Error> semantic::Context::analyze(ast::FunctionNode& node) {
 	if (node.generic) {
-		type_inference::analyze(&node);
+		type_inference::analyze(*this, &node);
 		ast::print((ast::Node*) &node);
 	}
 	else assert(false);

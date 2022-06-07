@@ -15,7 +15,6 @@
 #include "../lexer.hpp"
 #include "../parser.hpp"
 #include "intrinsics.hpp"
-#include "type_inference.hpp"
 
 namespace semantic {
 	// Bindings

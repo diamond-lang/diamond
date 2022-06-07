@@ -2,9 +2,10 @@
 #define TYPE_INFERENCE_HPP
 
 #include "../ast.hpp"
+#include "semantic.hpp"
 
 namespace type_inference {
-    void analyze(ast::FunctionNode* function);
+    void analyze(semantic::Context& semantic_context, ast::FunctionNode* function);
 }
 
 #endif
