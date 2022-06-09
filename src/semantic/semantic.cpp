@@ -40,7 +40,7 @@ std::vector<ast::FunctionNode*> semantic::get_overloaded_functions(semantic::Bin
 
 ast::Type semantic::get_binding_type(semantic::Binding& binding) {
     switch (binding.type) {
-        case semantic::AssignmentBinding: return ast::get_type(binding.value[0]);
+        case semantic::AssignmentBinding: return ast::get_type(((ast::AssignmentNode*)binding.value[0])->expression);
         case semantic::FunctionArgumentBinding: return ast::get_type(binding.value[0]);
         case semantic::OverloadedFunctionsBinding: return ast::Type("function");
         case semantic::GenericFunctionBinding: return ast::Type("function");
