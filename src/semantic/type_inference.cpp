@@ -58,12 +58,17 @@ namespace type_inference {
 		void unify(ast::StringNode& node) {}
 
         ast::Type get_unified_type(std::string type_var) {
+            std::string alphabet = "abcdefghijklmnopqrstuvwxyz";
             for (auto it = this->labeled_sets.begin(); it != this->labeled_sets.end(); it++) {
-                if (it->second.count(type_var)) {
+                if (it->second.count(type_var) != 0) {
                     return ast::Type(it->first);
                 }
             }
-            return ast::Type("");
+
+            assert(this->current_type_variable_number != alphabet.size());
+            auto result = ast::Type("$" + alphabet[(this->current_type_variable_number + 18) % alphabet.size()]);
+            this->current_type_variable_number++;
+            return result;
         }
     };
 
@@ -158,9 +163,9 @@ void type_inference::Context::analyze(ast::FunctionNode& node) {
     }
 
     // Label sets
+    this->current_type_variable_number = 1;
     std::string alphabet = "abcdefghijklmnopqrstuvwxyz";
-    assert(this->sets.size() <= alphabet.size());
-    size_t j = 19;
+    assert(this->labeled_sets.size() <= alphabet.size());
     for (size_t i = 0; i < this->sets.size(); i++) {
         bool representative_found = false;
         for (auto it = this->sets[i].begin(); it != this->sets[i].end(); it++) {
@@ -177,8 +182,8 @@ void type_inference::Context::analyze(ast::FunctionNode& node) {
         }
 
         if (!representative_found) {
-            this->labeled_sets[std::string("$") + alphabet[j % alphabet.size()]] = this->sets[i];
-            j++;
+            this->labeled_sets[std::string("$") + alphabet[(this->current_type_variable_number + 18) % alphabet.size()]] = this->sets[i];
+            this->current_type_variable_number++;
         }
     }
 
