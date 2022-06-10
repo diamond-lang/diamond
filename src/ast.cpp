@@ -261,19 +261,6 @@ void ast::print(Node* node, PrintContext context) {
 				std::cout << ": " << get_concrete_type(function.return_type, context).to_str();
 			}
 			
-			if (function.constraints.size() != 0 && !context.concrete) {
-				std::cout << " where ";
-				for (size_t i = 0; i < function.constraints.size(); i++) {
-					std::cout << function.constraints[i].identifier << "(";
-					for  (size_t j = 0; j < function.constraints[i].args.size(); j++) {
-						std::cout << function.constraints[i].args[j].to_str();
-						if (j != function.constraints[i].args.size() - 1) std::cout << ", ";
-					}
-					std::cout << "): " << function.constraints[i].return_type.to_str();
-					if (i != function.constraints.size() - 1) std::cout << " | ";
-				}
-			}
-			
 			std::cout << "\n";
 			if (!is_expression(function.body)) {
 				print(function.body, context);
@@ -282,7 +269,24 @@ void ast::print(Node* node, PrintContext context) {
 				context.indent_level += 1;
 				context.last.push_back(true);
 				print(function.body, context);
+				context.indent_level -= 1;
 			}
+
+			if (function.constraints.size() != 0 && !context.concrete) {
+				put_indent_level(context.indent_level, context.last);
+				std::cout << "where\n";
+				for (size_t i = 0; i < function.constraints.size(); i++) {
+					put_indent_level(context.indent_level + 1, i == (function.constraints.size() - 1) ? append(context.last, true) : append(context.last, false));
+					std::cout << function.constraints[i].identifier << "(";
+					for  (size_t j = 0; j < function.constraints[i].args.size(); j++) {
+						std::cout << function.constraints[i].args[j].to_str();
+						if (j != function.constraints[i].args.size() - 1) std::cout << ", ";
+					}
+					std::cout << "): " << function.constraints[i].return_type.to_str();
+					std::cout << "\n";
+				}
+			}
+
 			break;
 		}
 		
