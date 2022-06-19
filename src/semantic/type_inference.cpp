@@ -18,6 +18,7 @@ namespace type_inference {
         std::vector<std::set<std::string>> sets;
         std::unordered_map<std::string, std::set<std::string>> labeled_sets;
         ast::FunctionNode* function_node;
+        std::vector<ast::FunctionNode*> call_stack;
 
         Context(semantic::Context& semantic_context) : semantic_context(semantic_context) {}
 
@@ -122,6 +123,7 @@ void type_inference::Context::analyze(ast::Node* node) {
 
 void type_inference::Context::analyze(ast::FunctionNode& node) {
     this->function_node = &node;
+    this->call_stack.push_back(&node);
 
     // Add scope
     this->semantic_context.add_scope();
@@ -306,9 +308,63 @@ void type_inference::Context::analyze(ast::CallNode& node) {
                 this->sets.push_back(it->second);
             }
 
-            break;
+            // Check binding exists
+            semantic::Binding* binding = this->semantic_context.get_binding(identifier);
+            if (!binding || !is_function(*binding)) {
+                std::cout << "Error: Function " + identifier + " doesn't exists\n";
+                this->semantic_context.errors.push_back(Error{"Error: Function doesn't exists"});
+                return;
+            }
+            
+            // Add constraint
+            auto constraint = ast::FunctionPrototype{identifier, ast::get_types(node.args), node.type};
+            if (std::find(this->function_node->constraints.begin(), this->function_node->constraints.end(), constraint) == this->function_node->constraints.end()) {
+                this->function_node->constraints.push_back(constraint);
+            }
+
+            return;
         }
 	}
+
+    // Check binding exists
+    semantic::Binding* binding = this->semantic_context.get_binding(identifier);
+    if (!binding || !is_function(*binding)) {
+        std::cout << "Error: Function " + identifier + " doesn't exists\n";
+        this->semantic_context.errors.push_back(Error{"Error: Function doesn't exists"});
+        return;
+    }
+    
+    if (binding->type == semantic::GenericFunctionBinding) {
+        ast::FunctionNode* function = semantic::get_generic_function(*binding);
+        assert(function->return_type != ast::Type(""));
+
+        // Create prototype type vector
+        std::vector<ast::Type> prototype = ast::get_types(node.args);
+        prototype.push_back(node.type);
+
+        // Create interface prototype vector
+        std::vector<ast::Type> function_prototype = ast::get_types(function->args);
+        function_prototype.push_back(function->return_type);
+
+        // Infer stuff, basically is loop trough the interface prototype that groups type variables
+        std::unordered_map<std::string, std::set<std::string>> sets;
+        for (size_t i = 0; i < function_prototype.size(); i++) {
+            if (sets.find(function_prototype[i].to_str()) == sets.end()) {
+                sets[function_prototype[i].to_str()] = std::set<std::string>{};
+            }
+
+            sets[function_prototype[i].to_str()].insert(prototype[i].to_str());
+        
+            if (!function_prototype[i].is_type_variable()) {
+                sets[function_prototype[i].to_str()].insert(function_prototype[i].to_str());
+            }
+        }
+
+        // Save sets found
+        for (auto it = sets.begin(); it != sets.end(); it++) {
+            this->sets.push_back(it->second);
+        }
+    }
 
     // Add constraint
     auto constraint = ast::FunctionPrototype{identifier, ast::get_types(node.args), node.type};

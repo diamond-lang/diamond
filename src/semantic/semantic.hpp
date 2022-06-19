@@ -51,7 +51,7 @@ namespace semantic {
 		Errors errors;
 		ast::Ast& ast;
 
-		Context(ast::Ast& ast) : ast(ast) {}
+		Context(ast::Ast& ast);
 
 		Result<Ok, Error> analyze(ast::Node* node);
 		Result<Ok, Error> analyze(ast::BlockNode& node);

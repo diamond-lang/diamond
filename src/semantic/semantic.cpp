@@ -62,6 +62,42 @@ bool semantic::is_function(semantic::Binding& binding) {
 
 // Helper functions
 // ----------------
+semantic::Context::Context(ast::Ast& ast) : ast(ast) {
+	// Add intrinsic functions 
+	this->add_scope();
+	
+	for (auto it = intrinsics.begin(); it != intrinsics.end(); it++) {
+		auto& identifier = it->first;
+		auto& scope = this->current_scope();
+		std::vector<ast::FunctionNode*> overloaded_functions;
+		for (auto& prototype: it->second) {
+			// Create function node
+			auto function_node = ast::FunctionNode {};
+
+			// Create identifier node
+			auto identifier_node = ast::IdentifierNode {};
+			identifier_node.value = identifier;
+			ast.push_back(identifier_node);
+
+			function_node.identifier = (ast::IdentifierNode*) ast.last_element();
+
+			// Create args nodes
+			for (auto& arg: prototype.first) {
+				auto arg_node = ast::IdentifierNode {};
+				arg_node.type = arg;
+				ast.push_back(arg_node);
+				function_node.args.push_back(ast.last_element());
+			}
+
+			function_node.return_type = prototype.second;
+
+			ast.push_back(function_node);
+			overloaded_functions.push_back(&function_node);
+		}
+		scope[identifier] = Binding(overloaded_functions);
+	}
+}
+
 void semantic::Context::add_scope() {
 	this->scopes.push_back(std::unordered_map<std::string, semantic::Binding>());
 }
@@ -221,7 +257,7 @@ Result<Ok, Error> semantic::Context::analyze(ast::BlockNode& node) {
 }
 
 Result<Ok, Error> semantic::Context::analyze(ast::FunctionNode& node) {
-	if (node.generic) {
+	if (node.generic && node.type == ast::Type("")) {
 		type_inference::analyze(*this, &node);
 		ast::print((ast::Node*) &node);
 	}
