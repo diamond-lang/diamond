@@ -18,27 +18,26 @@ namespace type_inference {
         std::vector<std::set<std::string>> sets;
         std::unordered_map<std::string, std::set<std::string>> labeled_sets;
         ast::FunctionNode* function_node;
-        std::vector<ast::FunctionNode*> call_stack;
 
         Context(semantic::Context& semantic_context) : semantic_context(semantic_context) {}
 
-        void analyze(ast::Node* node);
-		void analyze(ast::BlockNode& node);
-		void analyze(ast::FunctionNode& node);
-		void analyze(ast::AssignmentNode& node);
-		void analyze(ast::ReturnNode& node);
-		void analyze(ast::BreakNode& node) {}
-		void analyze(ast::ContinueNode& node) {}
-		void analyze(ast::IfElseNode& node);
-		void analyze(ast::WhileNode& node);
-		void analyze(ast::UseNode& node) {}
-		void analyze(ast::IncludeNode& node) {}
-		void analyze(ast::CallNode& node);
-		void analyze(ast::FloatNode& node);
-		void analyze(ast::IntegerNode& node);
-		void analyze(ast::IdentifierNode& node);
-		void analyze(ast::BooleanNode& node);
-		void analyze(ast::StringNode& node) {}
+        Result<Ok, Error> analyze(ast::Node* node);
+		Result<Ok, Error> analyze(ast::BlockNode& node);
+		Result<Ok, Error> analyze(ast::FunctionNode& node);
+		Result<Ok, Error> analyze(ast::AssignmentNode& node);
+		Result<Ok, Error> analyze(ast::ReturnNode& node);
+		Result<Ok, Error> analyze(ast::BreakNode& node) {return Ok {};}
+		Result<Ok, Error> analyze(ast::ContinueNode& node) {return Ok {};}
+		Result<Ok, Error> analyze(ast::IfElseNode& node);
+		Result<Ok, Error> analyze(ast::WhileNode& node);
+		Result<Ok, Error> analyze(ast::UseNode& node) {return Ok {};}
+		Result<Ok, Error> analyze(ast::IncludeNode& node) {return Ok {};}
+		Result<Ok, Error> analyze(ast::CallNode& node);
+		Result<Ok, Error> analyze(ast::FloatNode& node);
+		Result<Ok, Error> analyze(ast::IntegerNode& node);
+		Result<Ok, Error> analyze(ast::IdentifierNode& node);
+		Result<Ok, Error> analyze(ast::BooleanNode& node);
+		Result<Ok, Error> analyze(ast::StringNode& node) {return Ok {};}
 
         void unify(ast::Node* node);
 		void unify(ast::BlockNode& node);
@@ -109,21 +108,20 @@ namespace type_inference {
 
 // Type inference
 // --------------
-void type_inference::analyze(semantic::Context& semantic_context, ast::FunctionNode* function) {
+Result<Ok, Error> type_inference::analyze(semantic::Context& semantic_context, ast::FunctionNode* function) {
     // Create context
     type_inference::Context context(semantic_context);
 
     // Analyze function
-    context.analyze(*function);
+    return context.analyze(*function);
 }
 
-void type_inference::Context::analyze(ast::Node* node) {
+Result<Ok, Error> type_inference::Context::analyze(ast::Node* node) {
 	return std::visit([this](auto& variant) {return this->analyze(variant);}, *node);
 }
 
-void type_inference::Context::analyze(ast::FunctionNode& node) {
+Result<Ok, Error> type_inference::Context::analyze(ast::FunctionNode& node) {
     this->function_node = &node;
-    this->call_stack.push_back(&node);
 
     // Add scope
     this->semantic_context.add_scope();
@@ -144,7 +142,8 @@ void type_inference::Context::analyze(ast::FunctionNode& node) {
     this->sets.push_back(std::set<std::string>{node.return_type.to_str()});
 
     // Analyze function body
-    this->analyze(node.body);
+    auto result = this->analyze(node.body);
+    if (result.is_error()) return Error {};
 
     // Assume it's an expression if it isn't a block
     if (node.body->index() != ast::Block) {
@@ -208,69 +207,108 @@ void type_inference::Context::analyze(ast::FunctionNode& node) {
 
     // Remove scope
     this->semantic_context.remove_scope();
+
+    // Return
+    return Ok {};
 }
 
-void type_inference::Context::analyze(ast::BlockNode& block) {
+Result<Ok, Error> type_inference::Context::analyze(ast::BlockNode& block) {
     this->semantic_context.add_scope();
 
+    size_t number_of_errors = this->semantic_context.errors.size();
     for (size_t i = 0; i < block.statements.size(); i++) {
         this->analyze(block.statements[i]);
     }
 
     this->semantic_context.remove_scope();
+
+    if (this->semantic_context.errors.size() > number_of_errors) return Error {};
+	else                                                         return Ok {};
 }
 
-void type_inference::Context::analyze(ast::AssignmentNode& node) {
-    this->analyze(node.expression);
+Result<Ok, Error> type_inference::Context::analyze(ast::AssignmentNode& node) {
+    auto result = this->analyze(node.expression);
+    if (result.is_error()) return Error {};
+
     std::string identifier = node.identifier->value;
     this->semantic_context.current_scope()[identifier] = semantic::Binding(&node);
+
+    return Ok {};
 }
 
-void type_inference::Context::analyze(ast::ReturnNode& node) {
+Result<Ok, Error> type_inference::Context::analyze(ast::ReturnNode& node) {
     if (node.expression.has_value()) {
-        this->analyze(node.expression.value());
+        auto result = this->analyze(node.expression.value());
+        if (result.is_error()) return Error {};
         this->sets.push_back(std::set<std::string>{this->function_node->return_type.to_str(), ast::get_type(node.expression.value()).to_str()});
     }
     else {
         this->sets.push_back(std::set<std::string>{this->function_node->return_type.to_str(), "void"});
     }
+
+    return Ok {};
 }
 
-void type_inference::Context::analyze(ast::IfElseNode& node) {
-    this->analyze(node.condition);
-    this->analyze(node.if_branch);
-    if (node.else_branch.has_value()) this->analyze(node.else_branch.value());
+Result<Ok, Error> type_inference::Context::analyze(ast::IfElseNode& node) {
+    auto result = this->analyze(node.condition);
+    if (result.is_error()) return Error {};
+    
+    result = this->analyze(node.if_branch);
+    if (result.is_error()) return Error {};
+    
+    if (node.else_branch.has_value()) {
+        result = this->analyze(node.else_branch.value());
+        if (result.is_error()) return Error {};
+    }
+
+    return Ok {};
 }
 
-void type_inference::Context::analyze(ast::WhileNode& node) {
-    this->analyze(node.condition);
-    this->analyze(node.block);
+Result<Ok, Error> type_inference::Context::analyze(ast::WhileNode& node) {
+    auto result = this->analyze(node.condition);
+    if (result.is_error()) return Error {};
+
+    result = this->analyze(node.block);
+    if (result.is_error()) return Error {};
+
+    return Ok {};
 }
 
-void type_inference::Context::analyze(ast::IdentifierNode& node) {
-	if (this->semantic_context.get_binding(node.value)) {
-		node.type = semantic::get_binding_type(*this->semantic_context.get_binding(node.value));
+Result<Ok, Error> type_inference::Context::analyze(ast::IdentifierNode& node) {
+    semantic::Binding* binding = this->semantic_context.get_binding(node.value);
+	if (!binding) {
+		this->semantic_context.errors.push_back(errors::undefined_variable(node, this->semantic_context.current_module)); // tested in test/errors/undefined_variable.dm
+		return Error {};
 	}
+	else {
+		node.type = semantic::get_binding_type(*binding);
+	}
+
+    return Ok {};
 }
 
-void type_inference::Context::analyze(ast::IntegerNode& node) {
+Result<Ok, Error> type_inference::Context::analyze(ast::IntegerNode& node) {
     node.type = ast::Type(std::to_string(this->current_type_variable_number));
     this->current_type_variable_number++;
+    return Ok {};
 }
 
-void type_inference::Context::analyze(ast::FloatNode& node) {
+Result<Ok, Error> type_inference::Context::analyze(ast::FloatNode& node) {
 	node.type = ast::Type(std::to_string(this->current_type_variable_number));
     this->current_type_variable_number++;
+    return Ok {};
 }
 
-void type_inference::Context::analyze(ast::BooleanNode& node) {
+Result<Ok, Error> type_inference::Context::analyze(ast::BooleanNode& node) {
 	node.type = ast::Type("bool");
+    return Ok {};
 }
 
-void type_inference::Context::analyze(ast::CallNode& node) {
+Result<Ok, Error> type_inference::Context::analyze(ast::CallNode& node) {
 	// Assign a type variable to every argument and return type
 	for (size_t i = 0; i < node.args.size(); i++) {
-        this->analyze(node.args[i]);
+        auto result = this->analyze(node.args[i]);
+        if (result.is_error()) return Error {};
 	}
 	node.type = ast::Type(std::to_string(this->current_type_variable_number));
 	this->current_type_variable_number++;
@@ -311,9 +349,8 @@ void type_inference::Context::analyze(ast::CallNode& node) {
             // Check binding exists
             semantic::Binding* binding = this->semantic_context.get_binding(identifier);
             if (!binding || !is_function(*binding)) {
-                std::cout << "Error: Function " + identifier + " doesn't exists\n";
-                this->semantic_context.errors.push_back(Error{"Error: Function doesn't exists"});
-                return;
+                this->semantic_context.errors.push_back(errors::undefined_function(node, this->semantic_context.current_module));
+                return Error {};
             }
             
             // Add constraint
@@ -322,16 +359,15 @@ void type_inference::Context::analyze(ast::CallNode& node) {
                 this->function_node->constraints.push_back(constraint);
             }
 
-            return;
+            return Ok {};
         }
 	}
 
     // Check binding exists
     semantic::Binding* binding = this->semantic_context.get_binding(identifier);
     if (!binding || !is_function(*binding)) {
-        std::cout << "Error: Function " + identifier + " doesn't exists\n";
-        this->semantic_context.errors.push_back(Error{"Error: Function doesn't exists"});
-        return;
+        this->semantic_context.errors.push_back(errors::undefined_function(node, this->semantic_context.current_module));
+        return Error {};
     }
     
     if (binding->type == semantic::GenericFunctionBinding) {
@@ -371,6 +407,8 @@ void type_inference::Context::analyze(ast::CallNode& node) {
     if (std::find(this->function_node->constraints.begin(), this->function_node->constraints.end(), constraint) == this->function_node->constraints.end()) {
         this->function_node->constraints.push_back(constraint);
     }
+
+    return Ok {};
 }
 
 void type_inference::Context::unify(ast::Node* node) {

@@ -258,7 +258,9 @@ Result<Ok, Error> semantic::Context::analyze(ast::BlockNode& node) {
 
 Result<Ok, Error> semantic::Context::analyze(ast::FunctionNode& node) {
 	if (node.generic && node.type == ast::Type("")) {
-		type_inference::analyze(*this, &node);
+		auto result = type_inference::analyze(*this, &node);
+		if (result.is_error()) return Error {};
+		
 		ast::print((ast::Node*) &node);
 	}
 	else assert(false);
