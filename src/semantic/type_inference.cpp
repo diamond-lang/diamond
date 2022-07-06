@@ -212,12 +212,20 @@ Result<Ok, Error> type_inference::Context::analyze(ast::FunctionNode& node) {
     return Ok {};
 }
 
-Result<Ok, Error> type_inference::Context::analyze(ast::BlockNode& block) {
+Result<Ok, Error> type_inference::Context::analyze(ast::BlockNode& node) {
     this->semantic_context.add_scope();
 
+    // Add functions to the current scope
+	this->semantic_context.add_functions_to_current_scope(node);
+
+	// Analyze functions
+	for (size_t i = 0; i < node.functions.size(); i++) {
+		this->analyze(*node.functions[i]);
+	}
+
     size_t number_of_errors = this->semantic_context.errors.size();
-    for (size_t i = 0; i < block.statements.size(); i++) {
-        this->analyze(block.statements[i]);
+    for (size_t i = 0; i < node.statements.size(); i++) {
+        this->analyze(node.statements[i]);
     }
 
     this->semantic_context.remove_scope();
@@ -372,7 +380,11 @@ Result<Ok, Error> type_inference::Context::analyze(ast::CallNode& node) {
     
     if (binding->type == semantic::GenericFunctionBinding) {
         ast::FunctionNode* function = semantic::get_generic_function(*binding);
-        assert(function->return_type != ast::Type(""));
+        if (function->return_type == ast::Type("")) {
+            semantic::Context context(this->semantic_context.ast);
+            context.scopes = this->semantic_context.get_definitions();
+            context.analyze(*function);
+        }
 
         // Create prototype type vector
         std::vector<ast::Type> prototype = ast::get_types(node.args);

@@ -76,6 +76,7 @@ namespace semantic {
 		std::unordered_map<std::string, Binding>& current_scope();
 		Binding* get_binding(std::string identifier);
 		void add_functions_to_current_scope(ast::BlockNode& block);
+		std::vector<std::unordered_map<std::string, Binding>> get_definitions();
 		Result<Ok, Error> get_type_of_intrinsic(ast::CallNode& call);
 		Result<Ok, Error> get_type_of_user_defined_function(ast::CallNode& call);
 	};

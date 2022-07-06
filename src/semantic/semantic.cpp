@@ -149,6 +149,19 @@ void semantic::Context::add_functions_to_current_scope(ast::BlockNode& block) {
 	}
 }
 
+std::vector<std::unordered_map<std::string, semantic::Binding>> semantic::Context::get_definitions() {
+	std::vector<std::unordered_map<std::string, Binding>> scopes;
+	for (size_t i = 0; i < this->scopes.size(); i++) {
+		scopes.push_back(std::unordered_map<std::string, Binding>());
+		for (auto it = this->scopes[i].begin(); it != this->scopes[i].end(); it++) {
+			if (semantic::is_function(it->second)) {
+				scopes[i][it->first] = it->second;
+			}
+		}
+	}
+	return scopes;
+}
+
 Result<Ok, Error> semantic::Context::get_type_of_intrinsic(ast::CallNode& call) {
 	auto& identifier = call.identifier->value;
 	if (intrinsics.find(identifier) != intrinsics.end()) {
@@ -257,7 +270,7 @@ Result<Ok, Error> semantic::Context::analyze(ast::BlockNode& node) {
 }
 
 Result<Ok, Error> semantic::Context::analyze(ast::FunctionNode& node) {
-	if (node.generic && node.type == ast::Type("")) {
+	if (node.generic && node.return_type == ast::Type("")) {
 		auto result = type_inference::analyze(*this, &node);
 		if (result.is_error()) return Error {};
 		
