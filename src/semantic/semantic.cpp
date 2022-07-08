@@ -73,6 +73,7 @@ semantic::Context::Context(ast::Ast& ast) : ast(ast) {
 		for (auto& prototype: it->second) {
 			// Create function node
 			auto function_node = ast::FunctionNode {};
+			function_node.generic = false;
 
 			// Create identifier node
 			auto identifier_node = ast::IdentifierNode {};
@@ -92,7 +93,7 @@ semantic::Context::Context(ast::Ast& ast) : ast(ast) {
 			function_node.return_type = prototype.second;
 
 			ast.push_back(function_node);
-			overloaded_functions.push_back(&function_node);
+			overloaded_functions.push_back((ast::FunctionNode*) ast.last_element());
 		}
 		scope[identifier] = Binding(overloaded_functions);
 	}
@@ -162,26 +163,115 @@ std::vector<std::unordered_map<std::string, semantic::Binding>> semantic::Contex
 	return scopes;
 }
 
-Result<Ok, Error> semantic::Context::get_type_of_intrinsic(ast::CallNode& call) {
-	auto& identifier = call.identifier->value;
-	if (intrinsics.find(identifier) != intrinsics.end()) {
-		auto args = ast::get_types(call.args);
-		auto prototypes = intrinsics[identifier];
-		for (size_t i = 0; i < prototypes.size(); i++) {
-			if (args == prototypes[i].first) {
-				if (!call.type.is_type_variable()) {
-					call.type = prototypes[i].second;
-				}
+
+Result<Ok, Error> semantic::Context::get_type_of_function(ast::CallNode& call) {
+	semantic::Binding* binding = this->get_binding(call.identifier->value);
+    if (!binding || !is_function(*binding)) {
+        this->errors.push_back(errors::undefined_function(call, this->current_module));
+        return Error {};
+    }
+	else if (binding->type == semantic::OverloadedFunctionsBinding) {
+		for (auto function: semantic::get_overloaded_functions(*binding)) {
+			// Check arguments types match
+			if (ast::get_types(function->args) == ast::get_types(call.args)) {
+				call.type = function->return_type;
 				return Ok {};
 			}
 		}
-	}
 
-	return Error {};
+		this->errors.push_back(errors::undefined_function(call, this->current_module));
+		return Error {};
+	}
+	else if (binding->type == semantic::GenericFunctionBinding) {
+		return this->get_type_of_generic_function(call, semantic::get_generic_function(*binding));
+	}
+	else {
+		this->errors.push_back(errors::undefined_function(call, this->current_module));
+        return Error {};
+	}
 }
 
-Result<Ok, Error> semantic::Context::get_type_of_user_defined_function(ast::CallNode& call) {
-	assert(false);
+Result<Ok, Error> semantic::Context::get_type_of_generic_function(ast::CallNode& call, ast::FunctionNode* function) {
+	// Check specializations
+	for (auto& specialization: function->specializations) {
+		if (specialization.args == ast::get_types(call.args)) {
+			call.type = specialization.return_type;
+			return Ok {};
+		}
+	}
+
+	// Else check constraints and add specialization
+	ast::FunctionSpecialization specialization;
+
+	// Add arguments
+	for (size_t i = 0; i < call.args.size(); i++) {
+		ast::Type type = ast::get_type(call.args[i]);
+		ast::Type type_variable = ast::get_type(function->args[i]);
+
+		// If it was no already included
+		if (specialization.type_bindings.find(type_variable.to_str()) == specialization.type_bindings.end()) {
+			specialization.type_bindings[type_variable.to_str()] = type;	
+		}
+		// Else compare with previous type founded for her
+		else if (specialization.type_bindings[type_variable.to_str()] != type) {
+			this->errors.push_back(Error{"Error: Incompatible types in function arguments"});
+			return Error {};
+		}
+
+		specialization.args.push_back(type);
+	}
+
+	// Check constraints
+	this->check_constraints(specialization.type_bindings, function);
+
+	// Add return type to specialization
+	specialization.return_type = specialization.type_bindings[function->return_type.to_str()];
+
+	// Add specialization to function
+	function->specializations.push_back(specialization);
+
+	// Add type to call
+	call.type = specialization.return_type;
+
+	return Ok {};
+}
+
+Result<Ok, Error> semantic::Context::check_constraints(std::unordered_map<std::string, ast::Type>& type_bindings, ast::FunctionNode* function) {
+	for (auto& constraint: function->constraints) {
+		semantic::Binding* binding = this->get_binding(constraint.identifier);
+		if (!binding || !is_function(*binding)) {
+			this->errors.push_back(Error{"Error: Undefined constraint. The function doesnt exists."});
+			return Error {};
+		}
+		else if (binding->type == semantic::OverloadedFunctionsBinding) {
+			for (auto function: semantic::get_overloaded_functions(*binding)) {
+				// Check arguments types match
+				if (ast::get_types(function->args) == ast::get_concrete_types(constraint.args, type_bindings)) {
+					ast::Type type_variable = constraint.return_type;
+
+					// If return type was not already included
+					if (type_bindings.find(type_variable.to_str()) == type_bindings.end()) {
+						type_bindings[type_variable.to_str()] = function->return_type;	
+					}
+					// Else compare with previous type founded for her
+					else if (type_bindings[type_variable.to_str()] != function->return_type) {
+						this->errors.push_back(Error{"Error: Incompatible types in function constraints"});
+						return Error {};
+					}
+				}
+			}
+			return Error {};
+		}
+		else if (binding->type == semantic::GenericFunctionBinding) {
+			auto result = this->check_constraints(type_bindings, semantic::get_generic_function(*binding));
+			if (result.is_error()) return Error {};
+		}
+		else {
+			this->errors.push_back(Error{"Error: Undefined constraint. The function doesnt exists."});
+			return Error {};
+		}
+	}
+
 	return Ok {};
 }
 
@@ -270,11 +360,11 @@ Result<Ok, Error> semantic::Context::analyze(ast::BlockNode& node) {
 }
 
 Result<Ok, Error> semantic::Context::analyze(ast::FunctionNode& node) {
-	if (node.generic && node.return_type == ast::Type("")) {
-		auto result = type_inference::analyze(*this, &node);
-		if (result.is_error()) return Error {};
-		
-		ast::print((ast::Node*) &node);
+	if (node.generic) {
+		if (node.return_type == ast::Type("")) {
+			auto result = type_inference::analyze(*this, &node);
+			if (result.is_error()) return Error {};	
+		}
 	}
 	else assert(false);
 	return Ok {};
@@ -362,14 +452,7 @@ Result<Ok, Error> semantic::Context::analyze(ast::CallNode& node) {
 		if (result.is_error()) return result;
 	}
 	
-	auto result = this->get_type_of_intrinsic(node);
-	if (result.is_ok()) return Ok {};
-
-	result = this->get_type_of_user_defined_function(node);
-	if (result.is_ok()) return Ok {};
-
-	this->errors.push_back(errors::undefined_function(node, this->current_module)); // tested in test/errors/undefined_function.dmd
-	return Error {};
+	return this->get_type_of_function(node);
 }
 
 Result<Ok, Error> semantic::Context::analyze(ast::FloatNode& node) {

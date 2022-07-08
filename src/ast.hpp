@@ -79,8 +79,12 @@ namespace ast {
 	>;
 
 	Type get_type(Node* node);
+	Type get_concrete_type(Node* node, std::unordered_map<std::string, Type>& type_bindings);
+	Type get_concrete_type(Type type_variable, std::unordered_map<std::string, Type>& type_bindings);
 	void set_type(Node* node, Type type);
 	std::vector<Type> get_types(std::vector<Node*> nodes);
+	std::vector<Type> get_concrete_types(std::vector<Node*> nodes, std::unordered_map<std::string, Type>& type_bindings);
+	std::vector<Type> get_concrete_types(std::vector<Type> type_variables, std::unordered_map<std::string, Type>& type_bindings);
 	bool is_expression(Node* node);
 
 	struct BlockNode {
@@ -270,6 +274,7 @@ namespace ast {
 		std::unordered_map<std::string, ast::Type> type_bindings;
 	};
 
+	Type get_concrete_type(Type type, PrintContext context);
 	void print(const Ast& ast, PrintContext context = PrintContext{});
 	void print(Node* node, PrintContext context = PrintContext{});
 	void print_with_concrete_types(const Ast& ast, PrintContext context = PrintContext{});

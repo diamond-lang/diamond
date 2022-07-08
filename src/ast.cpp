@@ -70,6 +70,17 @@ ast::Type ast::get_type(Node* node) {
 	return std::visit([](const auto& variant) {return variant.type;}, *node);	
 }
 
+ast::Type ast::get_concrete_type(Node* node, std::unordered_map<std::string, Type>& type_bindings) {
+	Type type_variable = get_type(node);
+	assert(type_bindings.find(type_variable.to_str()) != type_bindings.end());
+	return type_bindings[type_variable.to_str()];
+}
+
+ast::Type ast::get_concrete_type(Type type_variable, std::unordered_map<std::string, Type>& type_bindings) {
+	assert(type_bindings.find(type_variable.to_str()) != type_bindings.end());
+	return type_bindings[type_variable.to_str()];
+}
+
 void ast::set_type(Node* node, Type type) {
 	std::visit([type](auto& variant) {variant.type = type;}, *node);
 }
@@ -78,6 +89,23 @@ std::vector<ast::Type> ast::get_types(std::vector<Node*> nodes) {
 	std::vector<Type> types;
 	for (size_t i = 0; i < nodes.size(); i++) {
 		types.push_back(get_type(nodes[i]));
+	}
+	return types;
+}
+
+std::vector<ast::Type> ast::get_concrete_types(std::vector<Node*> nodes, std::unordered_map<std::string, Type>& type_bindings) {
+	std::vector<Type> types;
+	for (size_t i = 0; i < nodes.size(); i++) {
+		types.push_back(get_concrete_type(nodes[i], type_bindings));
+	}
+	return types;
+}
+
+
+std::vector<ast::Type> ast::get_concrete_types(std::vector<ast::Type> type_variables, std::unordered_map<std::string, Type>& type_bindings) {
+	std::vector<Type> types;
+	for (size_t i = 0; i < type_variables.size(); i++) {
+		types.push_back(get_concrete_type(type_variables[i], type_bindings));
 	}
 	return types;
 }
@@ -177,7 +205,7 @@ void put_indent_level(size_t indent_level, std::vector<bool> last) {
 	}
 }
 
-ast::Type get_concrete_type(ast::Type type, ast::PrintContext context) {
+ast::Type ast::get_concrete_type(ast::Type type, ast::PrintContext context) {
 	if (context.concrete && type.is_type_variable()) {
 		return context.type_bindings[type.to_str()];
 	}
