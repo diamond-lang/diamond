@@ -269,8 +269,11 @@ void ast::print(Node* node, PrintContext context) {
 			
 		case Function: {
 			auto& function = std::get<FunctionNode>(*node);
+			bool where_clause = !context.concrete && function.constraints.size() != 0;
+			bool last = context.last[context.last.size() - 1];
+			context.last.pop_back();
 
-			put_indent_level(context.indent_level, context.last);
+			put_indent_level(context.indent_level, append(context.last, !where_clause));
 			std::cout << "function " << function.identifier->value << '(';
 			for (size_t i = 0; i < function.args.size(); i++) {
 				auto& arg_name = std::get<IdentifierNode>(*function.args[i]).value;
@@ -291,20 +294,24 @@ void ast::print(Node* node, PrintContext context) {
 			
 			std::cout << "\n";
 			if (!is_expression(function.body)) {
+				context.last.push_back(!where_clause);
 				print(function.body, context);
+				context.last.pop_back();
 			}
 			else {
 				context.indent_level += 1;
-				context.last.push_back(true);
+				context.last.push_back(last);
+				context.last.push_back(!where_clause);
 				print(function.body, context);
 				context.indent_level -= 1;
+				context.last.pop_back();
 			}
 
 			if (function.constraints.size() != 0 && !context.concrete) {
-				put_indent_level(context.indent_level, context.last);
+				put_indent_level(context.indent_level, append(context.last, last));
 				std::cout << "where\n";
 				for (size_t i = 0; i < function.constraints.size(); i++) {
-					put_indent_level(context.indent_level + 1, i == (function.constraints.size() - 1) ? append(context.last, true) : append(context.last, false));
+					put_indent_level(context.indent_level + 1, i == (function.constraints.size() - 1) ? append(append(context.last, last), true) : append(append(context.last, last), false));
 					std::cout << function.constraints[i].identifier << "(";
 					for  (size_t j = 0; j < function.constraints[i].args.size(); j++) {
 						std::cout << function.constraints[i].args[j].to_str();
