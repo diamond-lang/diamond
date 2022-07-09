@@ -242,40 +242,72 @@ Result<ast::Type, Error> semantic::Context::get_type_of_generic_function(std::ve
 }
 
 Result<Ok, Error> semantic::Context::check_constraint(std::unordered_map<std::string, ast::Type>& type_bindings, ast::FunctionConstraint constraint) {
-	semantic::Binding* binding = this->get_binding(constraint.identifier);
-	if (!binding || !is_function(*binding)) {
-		this->errors.push_back(Error{"Error: Undefined constraint. The function doesnt exists."});
-		return Error {};
-	}
-	else if (binding->type == semantic::OverloadedFunctionsBinding) {
-		for (auto function: semantic::get_overloaded_functions(*binding)) {
-			// Check arguments types match
-			if (ast::get_types(function->args) == ast::get_concrete_types(constraint.args, type_bindings)) {
-				ast::Type type_variable = constraint.return_type;
+	if (constraint.identifier == "Number") {
+		ast::Type type_variable = constraint.args[0];
 
-				// If return type was not already included
-				if (type_bindings.find(type_variable.to_str()) == type_bindings.end()) {
-					type_bindings[type_variable.to_str()] = function->return_type;	
-				}
-				// Else compare with previous type founded for her
-				else if (type_bindings[type_variable.to_str()] != function->return_type) {
-					this->errors.push_back(Error{"Error: Incompatible types in function constraints"});
-					return Error {};
-				}
-			}
+		// If return type was not already included
+		if (type_bindings.find(type_variable.to_str()) == type_bindings.end()) {
+			type_bindings[type_variable.to_str()] = ast::Type("int64");	
 		}
-		return Error {};
+		// Else compare with previous type founded for her
+		else if (type_bindings[type_variable.to_str()] != ast::Type("int64")) {
+			assert(false);
+			return Error {};
+		}
+
+		return Ok {};
 	}
-	else if (binding->type == semantic::GenericFunctionBinding) {
-		auto result = this->get_type_of_generic_function(ast::get_concrete_types(constraint.args, type_bindings), semantic::get_generic_function(*binding));
-		if (result.is_error()) return Error {};
+	else if (constraint.identifier == "Float") {
+		ast::Type type_variable = constraint.args[0];
+
+		// If return type was not already included
+		if (type_bindings.find(type_variable.to_str()) == type_bindings.end()) {
+			type_bindings[type_variable.to_str()] = ast::Type("float64");	
+		}
+		// Else compare with previous type founded for her
+		else if (type_bindings[type_variable.to_str()] != ast::Type("float64")) {
+			assert(false);
+			return Error {};
+		}
+
+		return Ok {};
 	}
 	else {
-		this->errors.push_back(Error{"Error: Undefined constraint. The function doesnt exists."});
-		return Error {};
-	}
+		semantic::Binding* binding = this->get_binding(constraint.identifier);
+		if (!binding || !is_function(*binding)) {
+			this->errors.push_back(Error{"Error: Undefined constraint. The function doesnt exists."});
+			return Error {};
+		}
+		else if (binding->type == semantic::OverloadedFunctionsBinding) {
+			for (auto function: semantic::get_overloaded_functions(*binding)) {
+				// Check arguments types match
+				if (ast::get_types(function->args) == ast::get_concrete_types(constraint.args, type_bindings)) {
+					ast::Type type_variable = constraint.return_type;
 
-	return Ok {};
+					// If return type was not already included
+					if (type_bindings.find(type_variable.to_str()) == type_bindings.end()) {
+						type_bindings[type_variable.to_str()] = function->return_type;	
+					}
+					// Else compare with previous type founded for her
+					else if (type_bindings[type_variable.to_str()] != function->return_type) {
+						this->errors.push_back(Error{"Error: Incompatible types in function constraints"});
+						return Error {};
+					}
+				}
+			}
+			return Error {};
+		}
+		else if (binding->type == semantic::GenericFunctionBinding) {
+			auto result = this->get_type_of_generic_function(ast::get_concrete_types(constraint.args, type_bindings), semantic::get_generic_function(*binding));
+			if (result.is_error()) return Error {};
+		}
+		else {
+			this->errors.push_back(Error{"Error: Undefined constraint. The function doesnt exists."});
+			return Error {};
+		}
+
+		return Ok {};
+	}
 }
 
 // Semantic analysis
