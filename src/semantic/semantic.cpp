@@ -381,8 +381,16 @@ Result<Ok, Error> semantic::Context::analyze(ast::BlockNode& node) {
 				break;
 			}
 			case ast::While: break;
-			case ast::Break: break;
-			case ast::Continue: break;
+			case ast::Break:
+			case ast::Continue: {
+				if (node.type == ast::Type("")) {
+					node.type = ast::Type("void");
+				}
+				else if (node.type != ast::Type("void")) {
+					this->errors.push_back(Error{"Error: Incompatible return types"});
+				}
+				break;
+			}
 			default: assert(false);
 		}
 	}
