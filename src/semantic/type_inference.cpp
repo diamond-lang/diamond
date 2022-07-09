@@ -225,6 +225,55 @@ Result<Ok, Error> type_inference::Context::analyze(ast::BlockNode& node) {
     size_t number_of_errors = this->semantic_context.errors.size();
     for (size_t i = 0; i < node.statements.size(); i++) {
         this->analyze(node.statements[i]);
+
+		auto result = this->analyze(node.statements[i]);
+
+		// Type checking
+		switch (node.statements[i]->index()) {
+			case ast::Assignment: break;
+			case ast::Call: {
+                ast::CallNode* call = (ast::CallNode*) node.statements[i];
+
+                // Add constraint
+                auto constraint = ast::FunctionPrototype{call->identifier->value, ast::get_types(call->args), ast::Type("void")};
+                if (std::find(this->function_node->constraints.begin(), this->function_node->constraints.end(), constraint) == this->function_node->constraints.end()) {
+                    this->function_node->constraints.push_back(constraint);
+                }
+                break;
+            }
+			case ast::Return: {
+				if (result.is_ok()) {
+					auto return_type = std::get<ast::ReturnNode>(*node.statements[i]).expression.has_value() ? ast::get_type(std::get<ast::ReturnNode>(*node.statements[i]).expression.value()) : ast::Type("void");
+                    node.type = return_type;
+				}
+				break;
+			}
+			case ast::IfElse: {
+                if (result.is_ok()) {
+					auto if_type = ast::get_type(std::get<ast::IfElseNode>(*node.statements[i]).if_branch);
+					if (if_type != ast::Type("")) {
+						node.type = if_type;
+					}
+
+					if (std::get<ast::IfElseNode>(*node.statements[i]).else_branch.has_value()) {
+						auto else_type = ast::get_type(std::get<ast::IfElseNode>(*node.statements[i]).else_branch.value());
+						if (else_type != ast::Type("")) {
+							node.type = else_type;
+						}
+					}
+				}
+                break;
+            }
+			case ast::While: break;
+			case ast::Break:
+			case ast::Continue: {
+				if (node.type == ast::Type("")) {
+					node.type = ast::Type("void");
+				}
+				break;
+			}
+			default: assert(false);
+		}
     }
 
     this->semantic_context.remove_scope();
