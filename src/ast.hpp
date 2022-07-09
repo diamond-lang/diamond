@@ -113,7 +113,8 @@ namespace ast {
 		bool operator!=(const FunctionPrototype &t) const;
 	};
 
-	using FunctionConstraints = std::vector<FunctionPrototype>;
+	using FunctionConstraint = FunctionPrototype;
+	using FunctionConstraints = std::vector<FunctionConstraint>;
 
 	struct FunctionNode {
 		size_t line;

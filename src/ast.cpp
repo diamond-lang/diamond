@@ -273,7 +273,7 @@ void ast::print(Node* node, PrintContext context) {
 			bool last = context.last[context.last.size() - 1];
 			context.last.pop_back();
 
-			put_indent_level(context.indent_level, append(context.last, !where_clause));
+			put_indent_level(context.indent_level, append(context.last, last && !where_clause));
 			std::cout << "function " << function.identifier->value << '(';
 			for (size_t i = 0; i < function.args.size(); i++) {
 				auto& arg_name = std::get<IdentifierNode>(*function.args[i]).value;
@@ -294,14 +294,14 @@ void ast::print(Node* node, PrintContext context) {
 			
 			std::cout << "\n";
 			if (!is_expression(function.body)) {
-				context.last.push_back(!where_clause);
+				context.last.push_back(last && !where_clause);
 				print(function.body, context);
 				context.last.pop_back();
 			}
 			else {
 				context.indent_level += 1;
 				context.last.push_back(last);
-				context.last.push_back(!where_clause);
+				context.last.push_back(last && !where_clause);
 				print(function.body, context);
 				context.indent_level -= 1;
 				context.last.pop_back();

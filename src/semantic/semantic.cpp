@@ -183,7 +183,14 @@ Result<Ok, Error> semantic::Context::get_type_of_function(ast::CallNode& call) {
 		return Error {};
 	}
 	else if (binding->type == semantic::GenericFunctionBinding) {
-		return this->get_type_of_generic_function(call, semantic::get_generic_function(*binding));
+		auto result = this->get_type_of_generic_function(ast::get_types(call.args), semantic::get_generic_function(*binding));
+		if (result.is_ok()) {
+			call.type = result.get_value();
+			return Ok {};
+		}
+		else {
+			return Error {};
+		}
 	}
 	else {
 		this->errors.push_back(errors::undefined_function(call, this->current_module));
@@ -191,12 +198,11 @@ Result<Ok, Error> semantic::Context::get_type_of_function(ast::CallNode& call) {
 	}
 }
 
-Result<Ok, Error> semantic::Context::get_type_of_generic_function(ast::CallNode& call, ast::FunctionNode* function) {
+Result<ast::Type, Error> semantic::Context::get_type_of_generic_function(std::vector<ast::Type> args, ast::FunctionNode* function) {
 	// Check specializations
 	for (auto& specialization: function->specializations) {
-		if (specialization.args == ast::get_types(call.args)) {
-			call.type = specialization.return_type;
-			return Ok {};
+		if (specialization.args == args) {
+			return specialization.return_type;
 		}
 	}
 
@@ -204,8 +210,8 @@ Result<Ok, Error> semantic::Context::get_type_of_generic_function(ast::CallNode&
 	ast::FunctionSpecialization specialization;
 
 	// Add arguments
-	for (size_t i = 0; i < call.args.size(); i++) {
-		ast::Type type = ast::get_type(call.args[i]);
+	for (size_t i = 0; i < args.size(); i++) {
+		ast::Type type = args[i];
 		ast::Type type_variable = ast::get_type(function->args[i]);
 
 		// If it was no already included
@@ -222,7 +228,9 @@ Result<Ok, Error> semantic::Context::get_type_of_generic_function(ast::CallNode&
 	}
 
 	// Check constraints
-	this->check_constraints(specialization.type_bindings, function);
+	for (auto& constraint: function->constraints) {
+		this->check_constraint(specialization.type_bindings, constraint);
+	}
 
 	// Add return type to specialization
 	specialization.return_type = specialization.type_bindings[function->return_type.to_str()];
@@ -230,46 +238,41 @@ Result<Ok, Error> semantic::Context::get_type_of_generic_function(ast::CallNode&
 	// Add specialization to function
 	function->specializations.push_back(specialization);
 
-	// Add type to call
-	call.type = specialization.return_type;
-
-	return Ok {};
+	return specialization.return_type;
 }
 
-Result<Ok, Error> semantic::Context::check_constraints(std::unordered_map<std::string, ast::Type>& type_bindings, ast::FunctionNode* function) {
-	for (auto& constraint: function->constraints) {
-		semantic::Binding* binding = this->get_binding(constraint.identifier);
-		if (!binding || !is_function(*binding)) {
-			this->errors.push_back(Error{"Error: Undefined constraint. The function doesnt exists."});
-			return Error {};
-		}
-		else if (binding->type == semantic::OverloadedFunctionsBinding) {
-			for (auto function: semantic::get_overloaded_functions(*binding)) {
-				// Check arguments types match
-				if (ast::get_types(function->args) == ast::get_concrete_types(constraint.args, type_bindings)) {
-					ast::Type type_variable = constraint.return_type;
+Result<Ok, Error> semantic::Context::check_constraint(std::unordered_map<std::string, ast::Type>& type_bindings, ast::FunctionConstraint constraint) {
+	semantic::Binding* binding = this->get_binding(constraint.identifier);
+	if (!binding || !is_function(*binding)) {
+		this->errors.push_back(Error{"Error: Undefined constraint. The function doesnt exists."});
+		return Error {};
+	}
+	else if (binding->type == semantic::OverloadedFunctionsBinding) {
+		for (auto function: semantic::get_overloaded_functions(*binding)) {
+			// Check arguments types match
+			if (ast::get_types(function->args) == ast::get_concrete_types(constraint.args, type_bindings)) {
+				ast::Type type_variable = constraint.return_type;
 
-					// If return type was not already included
-					if (type_bindings.find(type_variable.to_str()) == type_bindings.end()) {
-						type_bindings[type_variable.to_str()] = function->return_type;	
-					}
-					// Else compare with previous type founded for her
-					else if (type_bindings[type_variable.to_str()] != function->return_type) {
-						this->errors.push_back(Error{"Error: Incompatible types in function constraints"});
-						return Error {};
-					}
+				// If return type was not already included
+				if (type_bindings.find(type_variable.to_str()) == type_bindings.end()) {
+					type_bindings[type_variable.to_str()] = function->return_type;	
+				}
+				// Else compare with previous type founded for her
+				else if (type_bindings[type_variable.to_str()] != function->return_type) {
+					this->errors.push_back(Error{"Error: Incompatible types in function constraints"});
+					return Error {};
 				}
 			}
-			return Error {};
 		}
-		else if (binding->type == semantic::GenericFunctionBinding) {
-			auto result = this->check_constraints(type_bindings, semantic::get_generic_function(*binding));
-			if (result.is_error()) return Error {};
-		}
-		else {
-			this->errors.push_back(Error{"Error: Undefined constraint. The function doesnt exists."});
-			return Error {};
-		}
+		return Error {};
+	}
+	else if (binding->type == semantic::GenericFunctionBinding) {
+		auto result = this->get_type_of_generic_function(ast::get_concrete_types(constraint.args, type_bindings), semantic::get_generic_function(*binding));
+		if (result.is_error()) return Error {};
+	}
+	else {
+		this->errors.push_back(Error{"Error: Undefined constraint. The function doesnt exists."});
+		return Error {};
 	}
 
 	return Ok {};
