@@ -6,6 +6,7 @@
 #include "utilities.hpp"
 #include "parser.hpp"
 #include "semantic.hpp"
+#include "codegen.hpp"
 
 // Definitions and prototypes
 // --------------------------
@@ -93,8 +94,8 @@ void build(Command command) {
 	auto analyze_result = semantic::analyze(ast);
 	if (analyze_result.is_error()) print_errors_and_exit(analyze_result.get_error());
 
-	// // Generate executable
-	// generate_executable(ast, program_name);
+	// Generate executable
+	codegen::generate_executable(ast, program_name);
 
 	// Cleanup
 	ast.free();
@@ -121,15 +122,15 @@ void run(Command command) {
 	auto analyze_result = semantic::analyze(ast);
 	if (analyze_result.is_error()) print_errors_and_exit(analyze_result.get_error());
 
-	// // Generate executable
-	// generate_executable(ast, program_name);
+	// Generate executable
+	codegen::generate_executable(ast, program_name);
 
-	// // Run executable
-	// system(utilities::get_run_command(program_name).c_str());
+	// Run executable
+	system(utilities::get_run_command(program_name).c_str());
 
-	// if (!already_existed) {
-	// 	remove(utilities::get_executable_name(program_name).c_str());
-	// }
+	if (!already_existed) {
+		remove(utilities::get_executable_name(program_name).c_str());
+	}
 
 	// Cleanup
 	ast.free();
@@ -180,12 +181,12 @@ void emit(Command command) {
 		return;
 	}
 
-	// // Emit LLVM-IR
-	// if (command.options[0] == std::string("--llvm-ir")) {
-	// 	print_llvm_ir(ast, program_name);
-	//	ast.free();
-	//	return;
-	// }
+	// Emit LLVM-IR
+	if (command.options[0] == std::string("--llvm-ir")) {
+		codegen::print_llvm_ir(ast, program_name);
+		ast.free();
+		return;
+	}
 }
 
 // Main

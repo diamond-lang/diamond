@@ -19,7 +19,8 @@ source_files = [
 	'src/parser.cpp',
 	'src/semantic/intrinsics.cpp',
 	'src/semantic/semantic.cpp',
-	'src/semantic/type_inference.cpp'
+	'src/semantic/type_inference.cpp',
+	'src/codegen.cpp'
 ]
 cpp_version = 'c++17'
 
