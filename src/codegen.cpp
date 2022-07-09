@@ -44,6 +44,7 @@ namespace codegen {
 		llvm::BasicBlock* last_while_block = nullptr; // Needed for continue
 
 		std::vector<std::unordered_map<std::string, llvm::AllocaInst*>> scopes;
+		std::unordered_map<std::string, ast::Type> type_bindings;
 
 		Context() {
 			this->context = new llvm::LLVMContext();
@@ -98,6 +99,24 @@ namespace codegen {
 				llvm_types.push_back(this->as_llvm_type(types[i]));
 			}
 			return llvm_types;
+		}
+
+		ast::Type get_type(ast::Node* node) {
+			if (ast::get_type(node).is_type_variable()) {
+				assert(this->type_bindings.find(ast::get_type(node).to_str()) != this->type_bindings.end());
+				return this->type_bindings[ast::get_type(node).to_str()];
+			}
+			else {
+				return ast::get_type(node);
+			}
+		}
+
+		std::vector<ast::Type> get_types(std::vector<ast::Node*> nodes) {
+			std::vector<ast::Type> types;
+			for (auto& node: nodes) {
+				types.push_back(this->get_type(node));
+			}
+			return types;
 		}
 		
 		llvm::AllocaInst* create_allocation(std::string name, llvm::Type* type) {
@@ -372,6 +391,8 @@ void codegen::Context::codegen_function_bodies(std::vector<ast::FunctionNode*> f
 			}
 
 			// Codegen body
+			this->type_bindings = specialization.type_bindings;
+			
 			if (ast::is_expression(function->body)) {
 				llvm::Value* result = this->codegen(function->body);
 				if (result) {
@@ -384,6 +405,8 @@ void codegen::Context::codegen_function_bodies(std::vector<ast::FunctionNode*> f
 					this->builder->CreateRetVoid();
 				}
 			}
+
+			this->type_bindings = {};
 
 			// Verify function 
 			llvm::verifyFunction(*f);
@@ -715,7 +738,7 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
 	}
 
 	// Get function
-	std::string name = get_function_name(node.identifier->value, ast::get_types(node.args), node.type);
+	std::string name = get_function_name(node.identifier->value, this->get_types(node.args), this->get_type((ast::Node*) &node));
 	llvm::Function* function = this->module->getFunction(name);
 	assert(function);
 
