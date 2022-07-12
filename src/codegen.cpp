@@ -412,7 +412,7 @@ void codegen::Context::codegen_function_bodies(std::vector<ast::FunctionNode*> f
 			llvm::verifyFunction(*f);
 
 			// Run optimizations
-			//this->function_pass_manager->run(*f);
+			this->function_pass_manager->run(*f);
 
 			// Remove scope
 			this->remove_scope();
