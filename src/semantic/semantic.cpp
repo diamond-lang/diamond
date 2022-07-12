@@ -213,13 +213,19 @@ Result<ast::Type, Error> semantic::Context::get_type_of_generic_function(std::ve
 	for (size_t i = 0; i < args.size(); i++) {
 		ast::Type type = args[i];
 		ast::Type type_variable = ast::get_type(function->args[i]);
-
-		// If it was no already included
-		if (specialization.type_bindings.find(type_variable.to_str()) == specialization.type_bindings.end()) {
-			specialization.type_bindings[type_variable.to_str()] = type;	
+		
+		if (type_variable.is_type_variable()) {
+			// If it was no already included
+			if (specialization.type_bindings.find(type_variable.to_str()) == specialization.type_bindings.end()) {
+				specialization.type_bindings[type_variable.to_str()] = type;	
+			}
+			// Else compare with previous type founded for her
+			else if (specialization.type_bindings[type_variable.to_str()] != type) {
+				this->errors.push_back(Error{"Error: Incompatible types in function arguments"});
+				return Error {};
+			}
 		}
-		// Else compare with previous type founded for her
-		else if (specialization.type_bindings[type_variable.to_str()] != type) {
+		else if (type != type_variable) {
 			this->errors.push_back(Error{"Error: Incompatible types in function arguments"});
 			return Error {};
 		}
@@ -233,7 +239,12 @@ Result<ast::Type, Error> semantic::Context::get_type_of_generic_function(std::ve
 	}
 
 	// Add return type to specialization
-	specialization.return_type = specialization.type_bindings[function->return_type.to_str()];
+	if (function->return_type.is_type_variable()) {
+		specialization.return_type = specialization.type_bindings[function->return_type.to_str()];
+	}
+	else {
+		specialization.return_type = function->return_type;
+	}
 
 	// Add specialization to function
 	function->specializations.push_back(specialization);

@@ -72,13 +72,19 @@ ast::Type ast::get_type(Node* node) {
 
 ast::Type ast::get_concrete_type(Node* node, std::unordered_map<std::string, Type>& type_bindings) {
 	Type type_variable = get_type(node);
-	assert(type_bindings.find(type_variable.to_str()) != type_bindings.end());
-	return type_bindings[type_variable.to_str()];
+	if (type_variable.is_type_variable()) {
+		assert(type_bindings.find(type_variable.to_str()) != type_bindings.end());
+		return type_bindings[type_variable.to_str()];
+	}
+	return type_variable;
 }
 
 ast::Type ast::get_concrete_type(Type type_variable, std::unordered_map<std::string, Type>& type_bindings) {
-	assert(type_bindings.find(type_variable.to_str()) != type_bindings.end());
-	return type_bindings[type_variable.to_str()];
+	if (type_variable.is_type_variable()) {
+		assert(type_bindings.find(type_variable.to_str()) != type_bindings.end());
+		return type_bindings[type_variable.to_str()];
+	}
+	return type_variable;
 }
 
 void ast::set_type(Node* node, Type type) {
@@ -324,8 +330,11 @@ void ast::print(Node* node, PrintContext context) {
 		case Function: {
 			auto& function = std::get<FunctionNode>(*node);
 			bool where_clause = !context.concrete && function.constraints.size() != 0;
-			bool last = context.last[context.last.size() - 1];
-			context.last.pop_back();
+			bool last = true;
+			if (context.last.size() != 0) {
+				last = context.last[context.last.size() - 1];
+				context.last.pop_back();
+			}
 
 			put_indent_level(context.indent_level, append(context.last, last && !where_clause));
 			std::cout << "function " << function.identifier->value << '(';

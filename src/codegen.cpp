@@ -393,7 +393,7 @@ void codegen::Context::codegen_function_bodies(std::vector<ast::FunctionNode*> f
 			// Codegen body
 			this->type_bindings = specialization.type_bindings;
 			
-			if (ast::is_expression(function->body)) {
+			if (ast::is_expression(function->body) && function->return_type != ast::Type("void")) {
 				llvm::Value* result = this->codegen(function->body);
 				if (result) {
 					this->builder->CreateRet(result);
@@ -412,7 +412,7 @@ void codegen::Context::codegen_function_bodies(std::vector<ast::FunctionNode*> f
 			llvm::verifyFunction(*f);
 
 			// Run optimizations
-			this->function_pass_manager->run(*f);
+			//this->function_pass_manager->run(*f);
 
 			// Remove scope
 			this->remove_scope();
@@ -468,7 +468,35 @@ llvm::Value* codegen::Context::codegen(ast::ContinueNode& node) {
 }
 
 llvm::Value* codegen::Context::codegen(ast::IfElseNode& node) {
-	if (ast::is_expression((ast::Node*) &node)) {
+	if (ast::is_expression((ast::Node*) &node) && ast::get_type((ast::Node*) &node) == ast::Type("void")) {
+		llvm::Function *current_function = this->builder->GetInsertBlock()->getParent();
+		llvm::BasicBlock *block = llvm::BasicBlock::Create(*(this->context), "then", current_function);
+		llvm::BasicBlock *else_block = llvm::BasicBlock::Create(*(this->context), "else");
+		llvm::BasicBlock *merge_block = llvm::BasicBlock::Create(*(this->context), "merge");
+
+		// Jump to if block or else block depending of the condition
+		this->builder->CreateCondBr(this->codegen(node.condition), block, else_block);
+
+		// Create if block
+		this->builder->SetInsertPoint(block);
+		this->codegen(node.if_branch);
+		
+		// Jump to merge block
+		this->builder->CreateBr(merge_block);
+
+		// Create else block
+		current_function->getBasicBlockList().push_back(else_block);
+		this->builder->SetInsertPoint(else_block);
+		this->codegen(node.else_branch.value());
+		
+		// Jump to merge block
+		this->builder->CreateBr(merge_block);
+
+		// Create merge block
+		current_function->getBasicBlockList().push_back(merge_block);
+		this->builder->SetInsertPoint(merge_block);
+	}
+	else if (ast::is_expression((ast::Node*) &node)) {
 		llvm::Function *current_function = this->builder->GetInsertBlock()->getParent();
 		llvm::BasicBlock *block = llvm::BasicBlock::Create(*(this->context), "then", current_function);
 		llvm::BasicBlock *else_block = llvm::BasicBlock::Create(*(this->context), "else");
@@ -543,7 +571,6 @@ llvm::Value* codegen::Context::codegen(ast::IfElseNode& node) {
 			this->builder->SetInsertPoint(else_block);
 			this->codegen(node.else_branch.value());
 			
-
 			// Jump to merge block if else does not return (Type("") means the block does not return)
 			if (ast::get_type(node.else_branch.value()) == ast::Type("")) {
 				this->builder->CreateBr(merge_block);
