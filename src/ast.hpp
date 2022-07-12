@@ -86,6 +86,8 @@ namespace ast {
 	std::vector<Type> get_concrete_types(std::vector<Node*> nodes, std::unordered_map<std::string, Type>& type_bindings);
 	std::vector<Type> get_concrete_types(std::vector<Type> type_variables, std::unordered_map<std::string, Type>& type_bindings);
 	bool is_expression(Node* node);
+	bool could_be_expression(Node* node);
+	void transform_to_expression(Node*& node);
 
 	struct BlockNode {
 		size_t line;

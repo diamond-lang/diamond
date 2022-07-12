@@ -110,6 +110,67 @@ std::vector<ast::Type> ast::get_concrete_types(std::vector<ast::Type> type_varia
 	return types;
 }
 
+bool ast::could_be_expression(Node* node) {
+	switch (node->index()) {
+		case Block: {
+			auto& block = std::get<BlockNode>(*node);
+			if (block.statements.size() == 1
+			&& could_be_expression(block.statements[0])) return true;
+			return false;
+		}
+        case Function: return false;
+        case Assignment: return false;
+        case Return: return false;
+        case Break: return false;
+        case Continue: return false;
+        case IfElse: {
+			auto& if_else = std::get<IfElseNode>(*node);
+			if (if_else.else_branch.has_value()
+			&& could_be_expression(if_else.if_branch)
+			&& could_be_expression(if_else.else_branch.value())) {
+				return true;
+			}
+			return false;
+		}
+        case While: return false;
+        case Use: return false;
+		case Include: return false;
+        case Call: return true;
+        case Float: return true;
+        case Integer: return true;
+        case Identifier: return true;
+        case Boolean: return true;
+        case String: return true;
+		default: assert(false);
+	}
+	return false;
+}
+
+void ast::transform_to_expression(ast::Node*& node) {
+	assert(could_be_expression(node));
+	switch (node->index()) {
+		case Block: {
+			auto& block = std::get<BlockNode>(*node);
+			node = block.statements[0];
+			transform_to_expression(node);
+			break;
+		}
+        case IfElse: {
+			auto& if_else = std::get<IfElseNode>(*node);
+			transform_to_expression(if_else.if_branch);
+			transform_to_expression(if_else.else_branch.value());
+			break;
+		}
+        case Call: break;
+        case Float: break;
+        case Integer: break;
+        case Identifier: break;
+        case Boolean: break;
+        case String: break;
+		default: assert(false);
+	}
+}
+
 bool ast::is_expression(Node* node) {
 	switch (node->index()) {
 		case Block: return false;

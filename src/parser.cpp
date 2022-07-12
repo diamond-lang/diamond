@@ -314,9 +314,13 @@ Result<ast::Node*, Error> Parser::parse_function() {
 	if (right_paren.is_error()) return Error {}; 
 
 	// Parse body
-	auto block = this->parse_block_statement_or_expression();
-	if (block.is_error()) return Error {};
-	function.body = block.get_value();
+	auto body = this->parse_block_statement_or_expression();
+	if (body.is_error()) return Error {};
+	function.body = body.get_value();
+
+	if (!ast::is_expression(function.body) && ast::could_be_expression(function.body)) {
+		ast::transform_to_expression(function.body);
+	}
 
 	this->ast.push_back(function);
 	return this->ast.last_element();
