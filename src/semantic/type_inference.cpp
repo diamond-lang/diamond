@@ -317,6 +317,18 @@ Result<Ok, Error> type_inference::Context::analyze(ast::IfElseNode& node) {
         if (result.is_error()) return Error {};
     }
 
+    if (ast::is_expression((ast::Node*) &node)) {
+        node.type = ast::Type(std::to_string(this->current_type_variable_number));
+	    this->current_type_variable_number++;
+
+        // Add type restrictions
+        std::set<std::string> set;
+        set.insert(ast::get_type(node.if_branch).to_str());
+        set.insert(ast::get_type(node.else_branch.value()).to_str());
+        set.insert(node.type.to_str());
+        this->sets.push_back(set);
+    }
+
     return Ok {};
 }
 
@@ -504,6 +516,9 @@ void type_inference::Context::unify(ast::ReturnNode& node) {
 }
 
 void type_inference::Context::unify(ast::IfElseNode& node) {
+    if (ast::is_expression((ast::Node*) &node)) {
+        node.type = this->get_unified_type(node.type.to_str());
+    }
     this->unify(node.condition);
     this->unify(node.if_branch);
     if (node.else_branch.has_value()) this->unify(node.else_branch.value());
