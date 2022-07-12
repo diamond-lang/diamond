@@ -78,8 +78,8 @@ namespace semantic {
 		void add_functions_to_current_scope(ast::BlockNode& block);
 		std::vector<std::unordered_map<std::string, Binding>> get_definitions();
 		Result<Ok, Error> get_type_of_function(ast::CallNode& call);
-		Result<ast::Type, Error> get_type_of_generic_function(std::vector<ast::Type> args, ast::FunctionNode* function);
-		Result<Ok, Error> check_constraint(std::unordered_map<std::string, ast::Type>& type_bindings, ast::FunctionConstraint constraint);
+		Result<ast::Type, Error> get_type_of_generic_function(std::vector<ast::Type> args, ast::FunctionNode* function, std::vector<ast::FunctionPrototype> call_stack = {});
+		Result<Ok, Error> check_constraint(std::unordered_map<std::string, ast::Type>& type_bindings, ast::FunctionConstraint constraint, std::vector<ast::FunctionPrototype> call_stack = {});
 	};
 }
 

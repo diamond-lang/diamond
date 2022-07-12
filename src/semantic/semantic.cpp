@@ -198,7 +198,7 @@ Result<Ok, Error> semantic::Context::get_type_of_function(ast::CallNode& call) {
 	}
 }
 
-Result<ast::Type, Error> semantic::Context::get_type_of_generic_function(std::vector<ast::Type> args, ast::FunctionNode* function) {
+Result<ast::Type, Error> semantic::Context::get_type_of_generic_function(std::vector<ast::Type> args, ast::FunctionNode* function, std::vector<ast::FunctionPrototype> call_stack) {
 	// Check specializations
 	for (auto& specialization: function->specializations) {
 		if (specialization.args == args) {
@@ -234,8 +234,9 @@ Result<ast::Type, Error> semantic::Context::get_type_of_generic_function(std::ve
 	}
 
 	// Check constraints
+	call_stack.push_back(ast::FunctionPrototype{function->identifier->value, args, ast::Type("")});
 	for (auto& constraint: function->constraints) {
-		this->check_constraint(specialization.type_bindings, constraint);
+		this->check_constraint(specialization.type_bindings, constraint, call_stack);
 	}
 
 	// Add return type to specialization
@@ -252,7 +253,7 @@ Result<ast::Type, Error> semantic::Context::get_type_of_generic_function(std::ve
 	return specialization.return_type;
 }
 
-Result<Ok, Error> semantic::Context::check_constraint(std::unordered_map<std::string, ast::Type>& type_bindings, ast::FunctionConstraint constraint) {
+Result<Ok, Error> semantic::Context::check_constraint(std::unordered_map<std::string, ast::Type>& type_bindings, ast::FunctionConstraint constraint, std::vector<ast::FunctionPrototype> call_stack) {
 	if (constraint.identifier == "Number") {
 		ast::Type type_variable = constraint.args[0];
 
@@ -309,7 +310,15 @@ Result<Ok, Error> semantic::Context::check_constraint(std::unordered_map<std::st
 			return Error {};
 		}
 		else if (binding->type == semantic::GenericFunctionBinding) {
-			auto result = this->get_type_of_generic_function(ast::get_concrete_types(constraint.args, type_bindings), semantic::get_generic_function(*binding));
+			// Check if constraints are already being checked
+			for (auto i = call_stack.rbegin(); i != call_stack.rend(); i++) {
+				if (*i == ast::FunctionPrototype{constraint.identifier, ast::get_concrete_types(constraint.args, type_bindings), ast::Type("")}) {
+					return Ok {};
+				}
+			}
+
+			// Check constraints otherwise
+			auto result = this->get_type_of_generic_function(ast::get_concrete_types(constraint.args, type_bindings), semantic::get_generic_function(*binding), call_stack);
 			if (result.is_error()) return Error {};
 		}
 		else {
