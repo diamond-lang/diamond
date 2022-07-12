@@ -354,10 +354,11 @@ void ast::print(Node* node, PrintContext context) {
 			}
 			else {
 				context.indent_level += 1;
-				context.last.push_back(last);
 				context.last.push_back(last && !where_clause);
+				context.last.push_back(true);
 				print(function.body, context);
 				context.indent_level -= 1;
+				context.last.pop_back();
 				context.last.pop_back();
 			}
 
