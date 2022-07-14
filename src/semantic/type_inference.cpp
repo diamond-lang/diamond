@@ -196,14 +196,6 @@ Result<Ok, Error> type_inference::Context::analyze(ast::FunctionNode& node) {
     }
     node.return_type = this->get_unified_type(node.return_type.to_str());
 
-    // Unify constraints
-    for (size_t i = 0; i < node.constraints.size(); i++) {
-        for (size_t j = 0; j < node.constraints[i].args.size(); j++) {
-            node.constraints[i].args[j] = this->get_unified_type(node.constraints[i].args[j].to_str());
-        }
-        node.constraints[i].return_type = this->get_unified_type(node.constraints[i].return_type.to_str());
-    }
-
     // Remove scope
     this->semantic_context.remove_scope();
 
@@ -356,26 +348,12 @@ Result<Ok, Error> type_inference::Context::analyze(ast::IdentifierNode& node) {
 Result<Ok, Error> type_inference::Context::analyze(ast::IntegerNode& node) {
     node.type = ast::Type(std::to_string(this->current_type_variable_number));
     this->current_type_variable_number++;
-
-    // Add constraint
-    auto constraint = ast::FunctionPrototype{"Number", std::vector{node.type}, ast::Type("")};
-    if (std::find(this->function_node->constraints.begin(), this->function_node->constraints.end(), constraint) == this->function_node->constraints.end()) {
-        this->function_node->constraints.push_back(constraint);
-    }
-
     return Ok {};
 }
 
 Result<Ok, Error> type_inference::Context::analyze(ast::FloatNode& node) {
 	node.type = ast::Type(std::to_string(this->current_type_variable_number));
     this->current_type_variable_number++;
-
-    // Add constraint
-    auto constraint = ast::FunctionPrototype{"Float", std::vector{node.type}, ast::Type("")};
-    if (std::find(this->function_node->constraints.begin(), this->function_node->constraints.end(), constraint) == this->function_node->constraints.end()) {
-        this->function_node->constraints.push_back(constraint);
-    }
-
     return Ok {};
 }
 
@@ -432,12 +410,6 @@ Result<Ok, Error> type_inference::Context::analyze(ast::CallNode& node) {
                 this->semantic_context.errors.push_back(errors::undefined_function(node, this->semantic_context.current_module));
                 return Error {};
             }
-            
-            // Add constraint
-            auto constraint = ast::FunctionPrototype{identifier, ast::get_types(node.args), node.type};
-            if (std::find(this->function_node->constraints.begin(), this->function_node->constraints.end(), constraint) == this->function_node->constraints.end()) {
-                this->function_node->constraints.push_back(constraint);
-            }
 
             return Ok {};
         }
@@ -486,12 +458,6 @@ Result<Ok, Error> type_inference::Context::analyze(ast::CallNode& node) {
         }
     }
 
-    // Add constraint
-    auto constraint = ast::FunctionPrototype{identifier, ast::get_types(node.args), node.type};
-    if (std::find(this->function_node->constraints.begin(), this->function_node->constraints.end(), constraint) == this->function_node->constraints.end()) {
-        this->function_node->constraints.push_back(constraint);
-    }
-
     return Ok {};
 }
 
@@ -533,10 +499,22 @@ void type_inference::Context::unify(ast::IdentifierNode& node) {
 
 void type_inference::Context::unify(ast::IntegerNode& node) {
     node.type = this->get_unified_type(node.type.to_str());
+
+    // Add constraint
+    auto constraint = ast::FunctionPrototype{"Number", std::vector{node.type}, ast::Type("")};
+    if (std::find(this->function_node->constraints.begin(), this->function_node->constraints.end(), constraint) == this->function_node->constraints.end()) {
+        this->function_node->constraints.push_back(constraint);
+    }
 }
 
 void type_inference::Context::unify(ast::FloatNode& node) {
     node.type = this->get_unified_type(node.type.to_str());
+
+    // Add constraint
+    auto constraint = ast::FunctionPrototype{"Float", std::vector{node.type}, ast::Type("")};
+    if (std::find(this->function_node->constraints.begin(), this->function_node->constraints.end(), constraint) == this->function_node->constraints.end()) {
+        this->function_node->constraints.push_back(constraint);
+    }
 }
 
 void type_inference::Context::unify(ast::CallNode& node) {
@@ -545,4 +523,10 @@ void type_inference::Context::unify(ast::CallNode& node) {
 	}
 
     node.type = this->get_unified_type(node.type.to_str());
+
+    // Add constraint
+    auto constraint = ast::FunctionPrototype{node.identifier->value, ast::get_types(node.args), node.type};
+    if (std::find(this->function_node->constraints.begin(), this->function_node->constraints.end(), constraint) == this->function_node->constraints.end()) {
+        this->function_node->constraints.push_back(constraint);
+    }
 }
