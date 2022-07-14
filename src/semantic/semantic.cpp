@@ -461,7 +461,7 @@ Result<Ok, Error> semantic::Context::analyze(ast::AssignmentNode& node) {
 		&& this->current_scope()[identifier].type == AssignmentBinding) {
 			auto assignment = get_assignment(this->current_scope()[identifier]);
 			if (!assignment->is_mutable) {
-				this->errors.push_back(errors::reassigning_immutable_variable(*node.identifier, node, this->current_module));
+				this->errors.push_back(errors::reassigning_immutable_variable(*node.identifier, *assignment, this->current_module));
 				return Error {};
 			}
 		}
