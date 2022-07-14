@@ -145,6 +145,7 @@ Result<Ok, Error> type_inference::Context::analyze(ast::FunctionNode& node) {
     // Analyze function body
     auto result = this->analyze(node.body);
     if (result.is_error()) return Error {};
+    ast::print((ast::Node*) &node);
 
     // Assume it's an expression if it isn't a block
     if (node.body->index() != ast::Block) {
@@ -224,8 +225,6 @@ Result<Ok, Error> type_inference::Context::analyze(ast::BlockNode& node) {
 
     size_t number_of_errors = this->semantic_context.errors.size();
     for (size_t i = 0; i < node.statements.size(); i++) {
-        this->analyze(node.statements[i]);
-
 		auto result = this->analyze(node.statements[i]);
 
 		// Type checking
@@ -234,11 +233,11 @@ Result<Ok, Error> type_inference::Context::analyze(ast::BlockNode& node) {
 			case ast::Call: {
                 ast::CallNode* call = (ast::CallNode*) node.statements[i];
 
-                // Add constraint
-                auto constraint = ast::FunctionPrototype{call->identifier->value, ast::get_types(call->args), ast::Type("void")};
-                if (std::find(this->function_node->constraints.begin(), this->function_node->constraints.end(), constraint) == this->function_node->constraints.end()) {
-                    this->function_node->constraints.push_back(constraint);
-                }
+                // Is a call as an statement so its type must be void
+                std::set<std::string> set;
+                set.insert(call->type.to_str());
+                set.insert("void");
+                this->sets.push_back(set);
                 break;
             }
 			case ast::Return: {
