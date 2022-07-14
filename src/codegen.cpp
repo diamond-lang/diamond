@@ -778,8 +778,10 @@ llvm::Value* codegen::Context::codegen(ast::FloatNode& node) {
 }
 
 llvm::Value* codegen::Context::codegen(ast::IntegerNode& node) {
-	if (node.type == ast::Type("float64")) return llvm::ConstantFP::get(*(this->context), llvm::APFloat((double)node.value));
-	else                                   return llvm::ConstantInt::get(*(this->context), llvm::APInt(64, node.value, true));
+	if (this->get_type((ast::Node*) &node) == ast::Type("float64"))
+		return llvm::ConstantFP::get(*(this->context), llvm::APFloat((double)node.value));
+	else
+		return llvm::ConstantInt::get(*(this->context), llvm::APInt(64, node.value, true));
 }
 
 llvm::Value* codegen::Context::codegen(ast::IdentifierNode& node) {

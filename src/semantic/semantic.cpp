@@ -257,12 +257,13 @@ Result<Ok, Error> semantic::Context::check_constraint(std::unordered_map<std::st
 	if (constraint.identifier == "Number") {
 		ast::Type type_variable = constraint.args[0];
 
-		// If return type was not already included
+		// If type variable was not already included
 		if (type_bindings.find(type_variable.to_str()) == type_bindings.end()) {
 			type_bindings[type_variable.to_str()] = ast::Type("int64");	
 		}
 		// Else compare with previous type founded for her
-		else if (type_bindings[type_variable.to_str()] != ast::Type("int64")) {
+		else if (type_bindings[type_variable.to_str()] != ast::Type("int64")
+		&&       type_bindings[type_variable.to_str()] != ast::Type("float64")) {
 			assert(false);
 			return Error {};
 		}
