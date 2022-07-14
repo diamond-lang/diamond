@@ -145,7 +145,6 @@ Result<Ok, Error> type_inference::Context::analyze(ast::FunctionNode& node) {
     // Analyze function body
     auto result = this->analyze(node.body);
     if (result.is_error()) return Error {};
-    ast::print((ast::Node*) &node);
 
     // Assume it's an expression if it isn't a block
     if (node.body->index() != ast::Block) {
