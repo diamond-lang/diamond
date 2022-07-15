@@ -242,9 +242,9 @@ namespace ast {
 
     struct Ast {
 		// High level
-		Node* program;
+		BlockNode* program;
 		std::filesystem::path file;
-		std::unordered_map<std::string, Node*> modules; 
+		std::unordered_map<std::string, BlockNode*> modules; 
         
 		// Storage
 		std::vector<Node*> nodes;

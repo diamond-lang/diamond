@@ -111,14 +111,14 @@ Result<Ok, Errors> parse::module(ast::Ast& ast, const std::vector<token::Token>&
 	Parser parser(ast, tokens, file);
 	auto result = parser.parse_block();
 	if (result.is_error()) return parser.errors;
-	parser.ast.modules[file] = result.get_value();
+	parser.ast.modules[file] = (ast::BlockNode*) result.get_value();
 	return Ok {};
 }
 
 Result<Ok, Error> Parser::parse_program() {
 	auto result = this->parse_block();
 	if (result.is_error()) return Error {};
-	this->ast.program = result.get_value();
+	this->ast.program = (ast::BlockNode*) result.get_value();
 	return Ok {};
 }
 

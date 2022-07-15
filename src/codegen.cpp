@@ -302,7 +302,7 @@ void codegen::Context::codegen(ast::Ast& ast) {
 	this->add_scope();
 
 	// Codegen statements
-	this->codegen(ast.program);
+	this->codegen((ast::Node*) ast.program);
 
 	// Create return statement
 	this->builder->CreateRet(llvm::ConstantInt::get(*(this->context), llvm::APInt(32, 0)));

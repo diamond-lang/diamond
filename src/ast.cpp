@@ -281,13 +281,13 @@ ast::Type ast::get_concrete_type(ast::Type type, ast::PrintContext context) {
 
 void ast::print(const Ast& ast, PrintContext context) {
 	std::cout << "program\n";
-	print(ast.program, context);
+	print((ast::Node*) ast.program, context);
 }
 
 void ast::print_with_concrete_types(const Ast& ast, PrintContext context) {
 	context.concrete = true;
 	std::cout << "program\n";
-	print_with_concrete_types(ast.program, context);
+	print_with_concrete_types((ast::Node*) ast.program, context);
 }
 
 void ast::print_with_concrete_types(Node* node, PrintContext context) {

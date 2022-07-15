@@ -336,7 +336,7 @@ Result<Ok, Error> semantic::Context::check_constraint(std::unordered_map<std::st
 Result<Ok, Errors> semantic::analyze(ast::Ast& ast) {
 	semantic::Context context(ast);
 	context.current_module = ast.file;
-	context.analyze(ast.program);
+	context.analyze((ast::Node*) ast.program);
 
 	if (context.errors.size() > 0) return context.errors;
 	else                           return Ok {};
