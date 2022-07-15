@@ -140,7 +140,6 @@ bool ast::could_be_expression(Node* node) {
 		}
         case While: return false;
         case Use: return false;
-		case Include: return false;
         case Call: return true;
         case Float: return true;
         case Integer: return true;
@@ -195,7 +194,6 @@ bool ast::is_expression(Node* node) {
 		}
         case While: return false;
         case Use: return false;
-		case Include: return false;
         case Call: return true;
         case Float: return true;
         case Integer: return true;
@@ -302,9 +300,9 @@ void ast::print(Node* node, PrintContext context) {
 		case Block: {
 			auto& block = std::get<BlockNode>(*node);
 
-			for (size_t i = 0; i < block.use_include_statements.size(); i++) {	
-				bool is_last = block.statements.size() == 0 && block.functions.size() == 0 && i == block.use_include_statements.size() - 1;
-				print(block.use_include_statements[i], PrintContext{context.indent_level + 1, append(context.last, is_last), context.concrete, context.type_bindings});
+			for (size_t i = 0; i < block.use_statements.size(); i++) {	
+				bool is_last = block.statements.size() == 0 && block.functions.size() == 0 && i == block.use_statements.size() - 1;
+				print(block.use_statements[i], PrintContext{context.indent_level + 1, append(context.last, is_last), context.concrete, context.type_bindings});
 			}
 			for (size_t i = 0; i < block.statements.size(); i++) {
 				bool is_last = block.functions.size() == 0 && i == block.statements.size() - 1;
@@ -487,14 +485,10 @@ void ast::print(Node* node, PrintContext context) {
 		}
 
 		case Use: {
-			auto path = std::get<UseNode>(*node).path;
-			std::cout << "use \"" << path->value << "\"\n";
-			break;
-		}
-
-		case Include: {
-			auto path = std::get<IncludeNode>(*node).path;
-			std::cout << "include \"" << path->value << "\"\n";
+			auto& use_node = std::get<UseNode>(*node);
+			if (use_node.include) std::cout << "include";
+			else                  std::cout << "use"; 
+			std::cout << " \"" << use_node.path->value << "\"\n";
 			break;
 		}
 

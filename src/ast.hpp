@@ -32,7 +32,6 @@ namespace ast {
 	struct IfElseNode;
 	struct WhileNode;
 	struct UseNode;
-	struct IncludeNode;
 	struct CallNode;
 	struct FloatNode;
 	struct IntegerNode;
@@ -50,7 +49,6 @@ namespace ast {
         IfElse,
         While,
         Use,
-		Include,
         Call,
         Float,
         Integer,
@@ -69,7 +67,6 @@ namespace ast {
 		IfElseNode,
 		WhileNode,
 		UseNode,
-		IncludeNode,
 		CallNode,
 		FloatNode,
 		IntegerNode,
@@ -95,7 +92,7 @@ namespace ast {
 		Type type = Type("");
 
 		std::vector<Node*> statements;
-		std::vector<Node*> use_include_statements;
+		std::vector<Node*> use_statements;
 		std::vector<FunctionNode*> functions;
 	};
 
@@ -190,14 +187,7 @@ namespace ast {
 		Type type = Type("");
 
 		StringNode* path;
-	};
-
-	struct IncludeNode {
-		size_t line;
-		size_t column;
-		Type type = Type("");
-
-		StringNode* path;
+		bool include = false;
 	};
 
 	struct CallNode {

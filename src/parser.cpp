@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <map>
 #include <cstdlib>
+#include <iostream>
 
 #include "errors.hpp"
 #include "parser.hpp"
@@ -32,7 +33,6 @@ struct Parser {
 	Result<ast::Node*, Error> parse_if_else();
 	Result<ast::Node*, Error> parse_while_stmt();
 	Result<ast::Node*, Error> parse_use_stmt();
-	Result<ast::Node*, Error> parse_include_stmt();
 	Result<ast::Node*, Error> parse_call();
 	Result<ast::Node*, Error> parse_expression();
 	Result<ast::Node*, Error> parse_if_else_expr();
@@ -172,8 +172,7 @@ Result<ast::Node*, Error> Parser::parse_block() {
 					break;
 				
 				case ast::Use:
-				case ast::Include:
-					block.use_include_statements.push_back(result.get_value());
+					block.use_statements.push_back(result.get_value());
 					break;
 				
 				default:
@@ -213,7 +212,7 @@ Result<ast::Node*, Error> Parser::parse_statement() {
 		case token::Break:    return this->parse_break_stmt();
 		case token::Continue: return this->parse_continue_stmt();
 		case token::Use:      return this->parse_use_stmt();
-		case token::Include:  return this->parse_include_stmt();
+		case token::Include:  return this->parse_use_stmt();
 		case token::NonLocal: return this->parse_assignment();
 		case token::Identifier:
 			if (this->match({token::Identifier, token::Equal}))     return this->parse_assignment();
@@ -479,7 +478,11 @@ Result<ast::Node*, Error> Parser::parse_use_stmt() {
 	
 	// Parse keyword
 	auto keyword = this->parse_token(token::Use);
-	if (keyword.is_error()) return Error {};
+	if (keyword.is_error()) {
+		keyword = this->parse_token(token::Include);
+		if (keyword.is_error()) return Error {};
+		use_stmt.include = true;
+	}
 
 	// Parse path
 	auto path = this->parse_string();
@@ -487,24 +490,6 @@ Result<ast::Node*, Error> Parser::parse_use_stmt() {
 	use_stmt.path = (ast::StringNode*) path.get_value();
 
 	this->ast.push_back(use_stmt);
-	return this->ast.last_element();
-}
-
-Result<ast::Node*, Error> Parser::parse_include_stmt() {
-	// Create node
-	auto include_stmt = ast::IncludeNode {this->current().line, this->current().column};
-
-	// Parse keyword
-	auto keyword = this->parse_token(token::Include);
-	if (keyword.is_error()) return Error {};
-
-	// Parse path
-	auto path = this->parse_string();
-	if (path.is_error()) return path;
-	include_stmt.path = (ast::StringNode*) path.get_value();
-
-	// Return
-	this->ast.push_back(include_stmt);
 	return this->ast.last_element();
 }
 
@@ -776,7 +761,6 @@ Result<ast::Node*, Error> Parser::parse_string() {
 	if (result.is_error()) return Error {};
 	string.value = result.get_value().get_literal();
 
-	this->advance();
 	this->ast.push_back(string);
 	return this->ast.last_element();
 }

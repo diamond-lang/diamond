@@ -74,7 +74,6 @@ namespace codegen {
 		llvm::Value* codegen(ast::IfElseNode& node);
 		llvm::Value* codegen(ast::WhileNode& node);
 		llvm::Value* codegen(ast::UseNode& node) {return nullptr;}
-		llvm::Value* codegen(ast::IncludeNode& node) {return nullptr;}
 		llvm::Value* codegen(ast::CallNode& node);
 		llvm::Value* codegen(ast::FloatNode& node);
 		llvm::Value* codegen(ast::IntegerNode& node);

@@ -31,7 +31,6 @@ namespace type_inference {
 		Result<Ok, Error> analyze(ast::IfElseNode& node);
 		Result<Ok, Error> analyze(ast::WhileNode& node);
 		Result<Ok, Error> analyze(ast::UseNode& node) {return Ok {};}
-		Result<Ok, Error> analyze(ast::IncludeNode& node) {return Ok {};}
 		Result<Ok, Error> analyze(ast::CallNode& node);
 		Result<Ok, Error> analyze(ast::FloatNode& node);
 		Result<Ok, Error> analyze(ast::IntegerNode& node);
@@ -49,7 +48,6 @@ namespace type_inference {
 		void unify(ast::IfElseNode& node);
 		void unify(ast::WhileNode& node);
 		void unify(ast::UseNode& node) {}
-		void unify(ast::IncludeNode& node) {}
 		void unify(ast::CallNode& node);
 		void unify(ast::FloatNode& node);
 		void unify(ast::IntegerNode& node);
