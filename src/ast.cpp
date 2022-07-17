@@ -302,7 +302,7 @@ void ast::print(Node* node, PrintContext context) {
 
 			for (size_t i = 0; i < block.use_statements.size(); i++) {	
 				bool is_last = block.statements.size() == 0 && block.functions.size() == 0 && i == block.use_statements.size() - 1;
-				print(block.use_statements[i], PrintContext{context.indent_level + 1, append(context.last, is_last), context.concrete, context.type_bindings});
+				print((ast::Node*) block.use_statements[i], PrintContext{context.indent_level + 1, append(context.last, is_last), context.concrete, context.type_bindings});
 			}
 			for (size_t i = 0; i < block.statements.size(); i++) {
 				bool is_last = block.functions.size() == 0 && i == block.statements.size() - 1;

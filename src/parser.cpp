@@ -13,14 +13,13 @@ struct Parser {
 	const std::vector<token::Token>& tokens;
 	size_t position = 0;
 	const std::filesystem::path& file;
-	ast::Ast ast;
+	ast::Ast& ast;
 	std::vector<size_t> indentation_level;
 	Errors errors;
 	
-	Parser(const std::vector<token::Token>& tokens, const std::filesystem::path& file) : tokens(tokens), file(file) {}
 	Parser(ast::Ast& ast, const std::vector<token::Token>& tokens, const std::filesystem::path& file) : ast(ast), tokens(tokens), file(file) {}
 
-	Result<Ok, Error> parse_program();
+	Result<ast::Node*, Error> parse_program();
 	Result<ast::Node*, Error> parse_block();
 	Result<ast::Node*, Error> parse_function();
 	Result<ast::Node*, Error> parse_statement();
@@ -100,26 +99,31 @@ Location Parser::location() {
 // Parsing
 // -------
 Result<ast::Ast, Errors> parse::program(const std::vector<token::Token>& tokens, const std::filesystem::path& file) {
-	Parser parser(tokens, file);
+	ast::Ast ast;
+	Parser parser(ast, tokens, file);
 	auto parsing_result = parser.parse_program();
 	if (parsing_result.is_error()) return parser.errors;
-	parser.ast.file = file;
-	return parser.ast;
+
+	std::filesystem::path module_path = std::filesystem::canonical(std::filesystem::current_path() / file);
+	ast.module_path = module_path;
+	ast.program = (ast::BlockNode*) parsing_result.get_value();
+	ast.modules[module_path] = (ast::BlockNode*) parsing_result.get_value();
+	ast.modules_indices.push_back(module_path);
+	return ast;
 }
 
 Result<Ok, Errors> parse::module(ast::Ast& ast, const std::vector<token::Token>& tokens, const std::filesystem::path& file) {
 	Parser parser(ast, tokens, file);
-	auto result = parser.parse_block();
-	if (result.is_error()) return parser.errors;
-	parser.ast.modules[file] = (ast::BlockNode*) result.get_value();
+	auto parsing_result = parser.parse_block();
+	if (parsing_result.is_error()) return parser.errors;
+
+	ast.modules[file] = (ast::BlockNode*) parsing_result.get_value();
+	ast.modules_indices.push_back(file);
 	return Ok {};
 }
 
-Result<Ok, Error> Parser::parse_program() {
-	auto result = this->parse_block();
-	if (result.is_error()) return Error {};
-	this->ast.program = (ast::BlockNode*) result.get_value();
-	return Ok {};
+Result<ast::Node*, Error> Parser::parse_program() {
+	return this->parse_block();
 }
 
 Result<ast::Node*, Error> Parser::parse_block() {
@@ -172,7 +176,7 @@ Result<ast::Node*, Error> Parser::parse_block() {
 					break;
 				
 				case ast::Use:
-					block.use_statements.push_back(result.get_value());
+					block.use_statements.push_back((ast::UseNode*) result.get_value());
 					break;
 				
 				default:
@@ -284,6 +288,7 @@ Result<ast::Node*, Error> Parser::parse_function() {
 	// Create node
 	auto function = ast::FunctionNode {this->current().line, this->current().column};
 	function.generic = true;
+	function.module_index = this->ast.modules.size();
 
 	// Parse keyword
 	auto keyword = this->parse_token(token::Function);

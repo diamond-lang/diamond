@@ -92,7 +92,7 @@ namespace ast {
 		Type type = Type("");
 
 		std::vector<Node*> statements;
-		std::vector<Node*> use_statements;
+		std::vector<UseNode*> use_statements;
 		std::vector<FunctionNode*> functions;
 	};
 
@@ -128,6 +128,7 @@ namespace ast {
 		Type return_type = Type("");
 		std::vector<FunctionSpecialization> specializations;
 		FunctionConstraints constraints;
+		size_t module_index; // Used in to tell from which module the function comes from
 	};
 
 	struct AssignmentNode {
@@ -243,8 +244,9 @@ namespace ast {
     struct Ast {
 		// High level
 		BlockNode* program;
-		std::filesystem::path file;
-		std::unordered_map<std::string, BlockNode*> modules; 
+		std::filesystem::path module_path;
+		std::unordered_map<std::string, BlockNode*> modules;
+		std::vector<std::string> modules_indices;
         
 		// Storage
 		std::vector<Node*> nodes;

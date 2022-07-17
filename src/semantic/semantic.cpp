@@ -122,18 +122,17 @@ semantic::Binding* semantic::Context::get_binding(std::string identifier) {
 
 void semantic::Context::add_functions_to_current_scope(ast::BlockNode& block) {
 	// Add functions from current block to current context
-	for (size_t i = 0; i < block.functions.size(); i++) {
-		auto& function = *block.functions[i];
-		auto& identifier = function.identifier->value;
-
+	for (auto& function: block.functions) {
+		auto& identifier = function->identifier->value;
 		auto& scope = this->current_scope();
+		
 		if (scope.find(identifier) == scope.end()) {
-			if (function.generic) {
-				scope[identifier] = Binding(block.functions[i]);
+			if (function->generic) {
+				scope[identifier] = Binding(function);
 
 			}
 			else {
-				scope[identifier] = Binding({block.functions[i]});
+				scope[identifier] = Binding({function});
 			}
 		}
 		else if (is_function(scope[identifier])) {
@@ -141,7 +140,74 @@ void semantic::Context::add_functions_to_current_scope(ast::BlockNode& block) {
 				this->errors.push_back(Error{"Error: Trying to overload generic function!"});
 			}
 			else {
-				scope[identifier].value.push_back((ast::Node*) block.functions[i]);
+				scope[identifier].value.push_back((ast::Node*) function);
+			}
+		}
+		else {
+			assert(false);
+		}
+	}
+
+	auto current_directory = this->current_module.parent_path();
+
+	// Add functions from modules
+	for (auto& use_stmt: block.use_statements) {
+		auto module_path = std::filesystem::canonical(current_directory / (use_stmt->path->value + ".dmd"));
+		assert(std::filesystem::exists(module_path));
+		this->add_module_functions(module_path);
+	}
+}
+
+ void semantic::Context::add_module_functions(std::filesystem::path module_path) {
+	if (this->ast.modules.find(module_path.string()) == this->ast.modules.end()) {
+		// Read file
+		Result<std::string, Error> result = utilities::read_file(module_path.string());
+		if (result.is_error()) {
+			std::cout << result.get_error().value;
+			exit(EXIT_FAILURE);
+		}
+		std::string file = result.get_value();
+
+		// Lex
+		auto tokens = lexer::lex(module_path);
+		if (tokens.is_error()) {
+			for (size_t i = 0; i < tokens.get_error().size(); i++) {
+				std::cout << tokens.get_error()[i].value << "\n";
+			}
+			exit(EXIT_FAILURE);
+		}
+
+		// Parse module and add it to the ast
+		auto parsing_result = parse::module(this->ast, tokens.get_value(), module_path);
+		if (parsing_result.is_error()) {
+			std::vector<Error> errors = parsing_result.get_errors();
+			for (size_t i = 0; i < errors.size(); i++) {
+				std::cout << errors[i].value << '\n';
+			}
+			exit(EXIT_FAILURE);
+		}
+	}
+
+	// Add functions from current module to current context
+	for (auto& function: this->ast.modules[module_path]->functions) {
+		auto& identifier = function->identifier->value;
+		auto& scope = this->current_scope();
+		
+		if (scope.find(identifier) == scope.end()) {
+			if (function->generic) {
+				scope[identifier] = Binding(function);
+
+			}
+			else {
+				scope[identifier] = Binding({function});
+			}
+		}
+		else if (is_function(scope[identifier])) {
+			if (scope[identifier].type == GenericFunctionBinding) {
+				this->errors.push_back(Error{"Error: Trying to overload generic function!"});
+			}
+			else {
+				scope[identifier].value.push_back((ast::Node*) function);
 			}
 		}
 		else {
@@ -335,7 +401,7 @@ Result<Ok, Error> semantic::Context::check_constraint(std::unordered_map<std::st
 // -----------------
 Result<Ok, Errors> semantic::analyze(ast::Ast& ast) {
 	semantic::Context context(ast);
-	context.current_module = ast.file;
+	context.current_module = ast.module_path;
 	context.analyze((ast::Node*) ast.program);
 
 	if (context.errors.size() > 0) return context.errors;
@@ -356,9 +422,15 @@ Result<Ok, Error> semantic::Context::analyze(ast::BlockNode& node) {
 	// Add functions to the current scope
 	this->add_functions_to_current_scope(node);
 
-	// Analyze functions
-	for (size_t i = 0; i < node.functions.size(); i++) {
-		this->analyze(*node.functions[i]);
+	// Analyze functions in current scope
+	for (auto& it: this->current_scope()) {
+		auto& binding = it.second;
+		if (binding.type == semantic::GenericFunctionBinding) {
+			this->analyze(*semantic::get_generic_function(binding));
+		}
+		else if (binding.type == semantic::OverloadedFunctionsBinding) {
+			assert(false);
+		}
 	}
 
 	// Analyze statements
@@ -426,8 +498,17 @@ Result<Ok, Error> semantic::Context::analyze(ast::BlockNode& node) {
 Result<Ok, Error> semantic::Context::analyze(ast::FunctionNode& node) {
 	if (node.generic) {
 		if (node.return_type == ast::Type("")) {
-			auto result = type_inference::analyze(*this, &node);
-			if (result.is_error()) return Error {};	
+			if (this->current_module == this->ast.modules_indices[node.module_index]) {
+				auto result = type_inference::analyze(*this, &node);
+				if (result.is_error()) return Error {};
+			}
+			else {
+				Context context(ast);
+				context.current_module = this->ast.modules_indices[node.module_index];
+				context.add_functions_to_current_scope(*this->ast.modules[context.current_module]);
+				auto result = type_inference::analyze(context, &node);
+				if (result.is_error()) return Error {};
+			}
 		}
 	}
 	else assert(false);
