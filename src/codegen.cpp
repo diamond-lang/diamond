@@ -367,7 +367,7 @@ void codegen::Context::codegen_function_prototypes(std::vector<ast::FunctionNode
 void codegen::Context::codegen_function_bodies(std::vector<ast::FunctionNode*> functions) {
 	for (auto& function: functions) {
 		assert(function->generic);
-
+		
 		for (auto& specialization: function->specializations) {
 			std::string name = get_function_name(function->module_path, function->identifier->value, specialization.args, specialization.return_type);
 			llvm::Function* f = this->module->getFunction(name);

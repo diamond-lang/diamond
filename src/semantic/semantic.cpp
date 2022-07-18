@@ -249,15 +249,26 @@ Result<Ok, Error> semantic::Context::get_type_of_function(ast::CallNode& call) {
 		return Error {};
 	}
 	else if (binding->type == semantic::GenericFunctionBinding) {
-		auto result = this->get_type_of_generic_function(ast::get_types(call.args), semantic::get_generic_function(*binding));
+		auto function = semantic::get_generic_function(*binding);
+
+		Result<ast::Type, Error> result;
+		if (this->current_module == function->module_path) {
+			result = this->get_type_of_generic_function(ast::get_types(call.args), function);
+		}
+		else {
+			Context context(this->ast);
+			context.current_module = function->module_path;
+			context.add_functions_to_current_scope(*this->ast.modules[function->module_path]);
+			result = context.get_type_of_generic_function(ast::get_types(call.args), function);
+		}
+
 		if (result.is_ok()) {
 			call.function = semantic::get_generic_function(*binding);
 			call.type = result.get_value();
 			return Ok {};
 		}
-		else {
-			return Error {};
-		}
+		
+		return Error {};
 	}
 	else {
 		this->errors.push_back(errors::undefined_function(call, this->current_module));
