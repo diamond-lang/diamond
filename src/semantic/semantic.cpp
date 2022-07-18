@@ -148,17 +148,18 @@ void semantic::Context::add_functions_to_current_scope(ast::BlockNode& block) {
 		}
 	}
 
-	auto current_directory = this->current_module.parent_path();
-
 	// Add functions from modules
+	auto current_directory = this->current_module.parent_path();
+	std::set<std::filesystem::path> already_included_modules = {this->current_module};
+
 	for (auto& use_stmt: block.use_statements) {
 		auto module_path = std::filesystem::canonical(current_directory / (use_stmt->path->value + ".dmd"));
-		assert(std::filesystem::exists(module_path));
-		this->add_module_functions(module_path);
+		assert(std::filesystem::exists(module_path));	
+		this->add_module_functions(module_path, already_included_modules);
 	}
 }
 
- void semantic::Context::add_module_functions(std::filesystem::path module_path) {
+ void semantic::Context::add_module_functions(std::filesystem::path module_path, std::set<std::filesystem::path>& already_included_modules) {
 	if (this->ast.modules.find(module_path.string()) == this->ast.modules.end()) {
 		// Read file
 		Result<std::string, Error> result = utilities::read_file(module_path.string());
@@ -188,30 +189,42 @@ void semantic::Context::add_functions_to_current_scope(ast::BlockNode& block) {
 		}
 	}
 
-	// Add functions from current module to current context
-	for (auto& function: this->ast.modules[module_path]->functions) {
-		auto& identifier = function->identifier->value;
-		auto& scope = this->current_scope();
-		
-		if (scope.find(identifier) == scope.end()) {
-			if (function->generic) {
-				scope[identifier] = Binding(function);
+	if (already_included_modules.find(module_path) == already_included_modules.end()) {
+		// Add functions from current module to current context
+		for (auto& function: this->ast.modules[module_path]->functions) {
+			auto& identifier = function->identifier->value;
+			auto& scope = this->current_scope();
+			
+			if (scope.find(identifier) == scope.end()) {
+				if (function->generic) {
+					scope[identifier] = Binding(function);
 
+				}
+				else {
+					scope[identifier] = Binding({function});
+				}
+			}
+			else if (is_function(scope[identifier])) {
+				if (scope[identifier].type == GenericFunctionBinding) {
+					this->errors.push_back(Error{"Error: Trying to overload generic function!"});
+				}
+				else {
+					scope[identifier].value.push_back((ast::Node*) function);
+				}
 			}
 			else {
-				scope[identifier] = Binding({function});
+				assert(false);
 			}
 		}
-		else if (is_function(scope[identifier])) {
-			if (scope[identifier].type == GenericFunctionBinding) {
-				this->errors.push_back(Error{"Error: Trying to overload generic function!"});
+
+		already_included_modules.insert(module_path);
+
+		// Add includes
+		for (auto& use_stmt: this->ast.modules[module_path]->use_statements) {
+			if (use_stmt->include) {
+				auto include_path = std::filesystem::canonical(module_path.parent_path() / (use_stmt->path->value + ".dmd"));
+				this->add_module_functions(include_path, already_included_modules);
 			}
-			else {
-				scope[identifier].value.push_back((ast::Node*) function);
-			}
-		}
-		else {
-			assert(false);
 		}
 	}
 }

@@ -1,0 +1,12 @@
+use "modules/awesome_module"
+use "modules/is_even"
+
+print(is_even(10))
+print(is_even(7))
+print23()
+
+--- Output
+true
+false
+23
+---
