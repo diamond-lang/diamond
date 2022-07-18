@@ -128,7 +128,7 @@ namespace ast {
 		Type return_type = Type("");
 		std::vector<FunctionSpecialization> specializations;
 		FunctionConstraints constraints;
-		size_t module_index; // Used in to tell from which module the function comes from
+		std::filesystem::path module_path; // Used in to tell from which module the function comes from
 	};
 
 	struct AssignmentNode {
@@ -246,7 +246,6 @@ namespace ast {
 		BlockNode* program;
 		std::filesystem::path module_path;
 		std::unordered_map<std::string, BlockNode*> modules;
-		std::vector<std::string> modules_indices;
         
 		// Storage
 		std::vector<Node*> nodes;

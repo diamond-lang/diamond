@@ -35,6 +35,8 @@
 
 namespace codegen {
 	struct Context {
+		ast::Ast& ast;
+
 		llvm::LLVMContext* context;
 		llvm::Module* module;
 		llvm::IRBuilder<>* builder;
@@ -46,7 +48,8 @@ namespace codegen {
 		std::vector<std::unordered_map<std::string, llvm::AllocaInst*>> scopes;
 		std::unordered_map<std::string, ast::Type> type_bindings;
 
-		Context() {
+		Context(ast::Ast& ast) : ast(ast) {
+			// Create llvm context
 			this->context = new llvm::LLVMContext();
 			this->module = new llvm::Module("My cool jit", *(this->context));
 			this->builder = new llvm::IRBuilder(*(this->context));
@@ -151,7 +154,7 @@ namespace codegen {
 // Print LLVM IR
 // -------------
 void codegen::print_llvm_ir(ast::Ast& ast, std::string program_name) {
-	codegen::Context llvm_ir;
+	codegen::Context llvm_ir(ast);
 	llvm_ir.codegen(ast);
 	llvm_ir.module->print(llvm::errs(), nullptr);
 }
@@ -162,7 +165,7 @@ static std::string get_object_file_name(std::string executable_name);
 static void link(std::string executable_name, std::string object_file_name);
 
 void codegen::generate_executable(ast::Ast& ast, std::string program_name) {
-	codegen::Context llvm_ir;
+	codegen::Context llvm_ir(ast);
 	llvm_ir.codegen(ast);
 
 	// Generate object file
@@ -286,8 +289,12 @@ void codegen::Context::codegen(ast::Ast& ast) {
 	llvm::Function::Create(printfType, llvm::Function::ExternalLinkage, "printf", this->module);
 
 	// Codegen functions
-	this->codegen_function_prototypes(node->functions);
-	this->codegen_function_bodies(node->functions);
+	for (auto it = ast.modules.begin(); it != ast.modules.end(); it++) {
+		this->codegen_function_prototypes(it->second->functions);
+	}
+	for (auto it = ast.modules.begin(); it != ast.modules.end(); it++) {
+		this->codegen_function_bodies(it->second->functions);
+	}
  
 	// Crate main function
 	llvm::FunctionType* mainType = llvm::FunctionType::get(this->builder->getInt32Ty(), false);
@@ -324,8 +331,8 @@ llvm::Value* codegen::Context::codegen(ast::BlockNode& node) {
 	return nullptr;
 }
 
-static std::string get_function_name(std::string identifier, std::vector<ast::Type> args, ast::Type return_type) {
-	std::string name = identifier;
+static std::string get_function_name(std::string file, std::string identifier, std::vector<ast::Type> args, ast::Type return_type) {
+	std::string name = file + "::" + identifier;
 	for (size_t i = 0; i < args.size(); i++) {
 		name += "_" + args[i].to_str();
 	}
@@ -343,7 +350,7 @@ void codegen::Context::codegen_function_prototypes(std::vector<ast::FunctionNode
 			llvm::FunctionType* function_type = llvm::FunctionType::get(return_type, args_types, false);
 
 			// Create function
-			std::string name = get_function_name(function->identifier->value, specialization.args, specialization.return_type);
+			std::string name = get_function_name(function->module_path, function->identifier->value, specialization.args, specialization.return_type);
 			llvm::Function* f = llvm::Function::Create(function_type, llvm::Function::ExternalLinkage, name, this->module);
 
 			// Set args for names
@@ -362,7 +369,7 @@ void codegen::Context::codegen_function_bodies(std::vector<ast::FunctionNode*> f
 		assert(function->generic);
 
 		for (auto& specialization: function->specializations) {
-			std::string name = get_function_name(function->identifier->value, specialization.args, specialization.return_type);
+			std::string name = get_function_name(function->module_path, function->identifier->value, specialization.args, specialization.return_type);
 			llvm::Function* f = this->module->getFunction(name);
 
 			// Create the body of the function
@@ -764,7 +771,8 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
 	}
 
 	// Get function
-	std::string name = get_function_name(node.identifier->value, this->get_types(node.args), this->get_type((ast::Node*) &node));
+	assert(node.function);
+	std::string name = get_function_name(node.function->module_path, node.identifier->value, this->get_types(node.args), this->get_type((ast::Node*) &node));
 	llvm::Function* function = this->module->getFunction(name);
 	assert(function);
 

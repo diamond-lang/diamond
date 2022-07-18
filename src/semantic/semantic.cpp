@@ -251,6 +251,7 @@ Result<Ok, Error> semantic::Context::get_type_of_function(ast::CallNode& call) {
 	else if (binding->type == semantic::GenericFunctionBinding) {
 		auto result = this->get_type_of_generic_function(ast::get_types(call.args), semantic::get_generic_function(*binding));
 		if (result.is_ok()) {
+			call.function = semantic::get_generic_function(*binding);
 			call.type = result.get_value();
 			return Ok {};
 		}
@@ -498,13 +499,13 @@ Result<Ok, Error> semantic::Context::analyze(ast::BlockNode& node) {
 Result<Ok, Error> semantic::Context::analyze(ast::FunctionNode& node) {
 	if (node.generic) {
 		if (node.return_type == ast::Type("")) {
-			if (this->current_module == this->ast.modules_indices[node.module_index]) {
+			if (this->current_module == node.module_path) {
 				auto result = type_inference::analyze(*this, &node);
 				if (result.is_error()) return Error {};
 			}
 			else {
 				Context context(ast);
-				context.current_module = this->ast.modules_indices[node.module_index];
+				context.current_module = node.module_path;
 				context.add_functions_to_current_scope(*this->ast.modules[context.current_module]);
 				auto result = type_inference::analyze(context, &node);
 				if (result.is_error()) return Error {};

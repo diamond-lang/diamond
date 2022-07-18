@@ -100,15 +100,15 @@ Location Parser::location() {
 // -------
 Result<ast::Ast, Errors> parse::program(const std::vector<token::Token>& tokens, const std::filesystem::path& file) {
 	ast::Ast ast;
-	Parser parser(ast, tokens, file);
+	std::filesystem::path module_path = std::filesystem::canonical(std::filesystem::current_path() / file);
+	
+	Parser parser(ast, tokens, module_path);
 	auto parsing_result = parser.parse_program();
 	if (parsing_result.is_error()) return parser.errors;
 
-	std::filesystem::path module_path = std::filesystem::canonical(std::filesystem::current_path() / file);
 	ast.module_path = module_path;
 	ast.program = (ast::BlockNode*) parsing_result.get_value();
 	ast.modules[module_path] = (ast::BlockNode*) parsing_result.get_value();
-	ast.modules_indices.push_back(module_path);
 	return ast;
 }
 
@@ -118,7 +118,6 @@ Result<Ok, Errors> parse::module(ast::Ast& ast, const std::vector<token::Token>&
 	if (parsing_result.is_error()) return parser.errors;
 
 	ast.modules[file] = (ast::BlockNode*) parsing_result.get_value();
-	ast.modules_indices.push_back(file);
 	return Ok {};
 }
 
@@ -288,7 +287,7 @@ Result<ast::Node*, Error> Parser::parse_function() {
 	// Create node
 	auto function = ast::FunctionNode {this->current().line, this->current().column};
 	function.generic = true;
-	function.module_index = this->ast.modules.size();
+	function.module_path = this->file;
 
 	// Parse keyword
 	auto keyword = this->parse_token(token::Function);

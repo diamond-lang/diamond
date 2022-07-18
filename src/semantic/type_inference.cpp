@@ -419,6 +419,7 @@ Result<Ok, Error> type_inference::Context::analyze(ast::CallNode& node) {
         this->semantic_context.errors.push_back(errors::undefined_function(node, this->semantic_context.current_module));
         return Error {};
     }
+    node.function = semantic::get_generic_function(*binding);
     
     if (binding->type == semantic::GenericFunctionBinding) {
         ast::FunctionNode* function = semantic::get_generic_function(*binding);
