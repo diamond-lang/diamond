@@ -108,7 +108,7 @@ Result<std::vector<token::Token>, Errors> lexer::lex(std::filesystem::path path)
      Errors errors;
 
     // Read file
-    FILE* file_pointer = fopen(path.string().c_str(), "r");
+    FILE* file_pointer = fopen(path.string().c_str(), "rb");
     if (!file_pointer) {
         errors.push_back(errors::file_couldnt_be_found(path));
         return Result<std::vector<token::Token>, Errors>(errors);
@@ -190,6 +190,7 @@ Result<token::Token, Error> lexer::get_token(Source& source) {
         advance(source);
         return get_token(source);
     }
+    if (match(source, "\r\n"))      return advance(token::Token(token::NewLine, "\\n", source.line, source.column), source, 2);
     if (match(source, "\n"))      return advance(token::Token(token::NewLine, "\\n", source.line, source.column), source, 1);
     if (match(source, "\""))      return get_string(source);
     if (isdigit(current(source))) return get_number(source);
