@@ -63,9 +63,9 @@ bool semantic::is_function(semantic::Binding& binding) {
 // Helper functions
 // ----------------
 semantic::Context::Context(ast::Ast& ast) : ast(ast) {
-	// Add intrinsic functions 
+	// Add intrinsic functions
 	this->add_scope();
-	
+
 	for (auto it = intrinsics.begin(); it != intrinsics.end(); it++) {
 		auto& identifier = it->first;
 		auto& scope = this->current_scope();
@@ -125,7 +125,7 @@ void semantic::Context::add_functions_to_current_scope(ast::BlockNode& block) {
 	for (auto& function: block.functions) {
 		auto& identifier = function->identifier->value;
 		auto& scope = this->current_scope();
-		
+
 		if (scope.find(identifier) == scope.end()) {
 			if (function->generic) {
 				scope[identifier] = Binding(function);
@@ -154,7 +154,7 @@ void semantic::Context::add_functions_to_current_scope(ast::BlockNode& block) {
 
 	for (auto& use_stmt: block.use_statements) {
 		auto module_path = std::filesystem::canonical(current_directory / (use_stmt->path->value + ".dmd"));
-		assert(std::filesystem::exists(module_path));	
+		assert(std::filesystem::exists(module_path));
 		this->add_module_functions(module_path, already_included_modules);
 	}
 }
@@ -191,10 +191,10 @@ void semantic::Context::add_functions_to_current_scope(ast::BlockNode& block) {
 
 	if (already_included_modules.find(module_path) == already_included_modules.end()) {
 		// Add functions from current module to current context
-		for (auto& function: this->ast.modules[module_path]->functions) {
+		for (auto& function: this->ast.modules[module_path.string()]->functions) {
 			auto& identifier = function->identifier->value;
 			auto& scope = this->current_scope();
-			
+
 			if (scope.find(identifier) == scope.end()) {
 				if (function->generic) {
 					scope[identifier] = Binding(function);
@@ -220,7 +220,7 @@ void semantic::Context::add_functions_to_current_scope(ast::BlockNode& block) {
 		already_included_modules.insert(module_path);
 
 		// Add includes
-		for (auto& use_stmt: this->ast.modules[module_path]->use_statements) {
+		for (auto& use_stmt: this->ast.modules[module_path.string()]->use_statements) {
 			if (use_stmt->include) {
 				auto include_path = std::filesystem::canonical(module_path.parent_path() / (use_stmt->path->value + ".dmd"));
 				this->add_module_functions(include_path, already_included_modules);
@@ -271,7 +271,7 @@ Result<Ok, Error> semantic::Context::get_type_of_function(ast::CallNode& call) {
 		else {
 			Context context(this->ast);
 			context.current_module = function->module_path;
-			context.add_functions_to_current_scope(*this->ast.modules[function->module_path]);
+			context.add_functions_to_current_scope(*this->ast.modules[function->module_path.string()]);
 			result = context.get_type_of_generic_function(ast::get_types(call.args), function);
 		}
 
@@ -280,7 +280,7 @@ Result<Ok, Error> semantic::Context::get_type_of_function(ast::CallNode& call) {
 			call.type = result.get_value();
 			return Ok {};
 		}
-		
+
 		return Error {};
 	}
 	else {
@@ -304,11 +304,11 @@ Result<ast::Type, Error> semantic::Context::get_type_of_generic_function(std::ve
 	for (size_t i = 0; i < args.size(); i++) {
 		ast::Type type = args[i];
 		ast::Type type_variable = ast::get_type(function->args[i]);
-		
+
 		if (type_variable.is_type_variable()) {
 			// If it was no already included
 			if (specialization.type_bindings.find(type_variable.to_str()) == specialization.type_bindings.end()) {
-				specialization.type_bindings[type_variable.to_str()] = type;	
+				specialization.type_bindings[type_variable.to_str()] = type;
 			}
 			// Else compare with previous type founded for her
 			else if (specialization.type_bindings[type_variable.to_str()] != type) {
@@ -350,7 +350,7 @@ Result<Ok, Error> semantic::Context::check_constraint(std::unordered_map<std::st
 
 		// If type variable was not already included
 		if (type_bindings.find(type_variable.to_str()) == type_bindings.end()) {
-			type_bindings[type_variable.to_str()] = ast::Type("int64");	
+			type_bindings[type_variable.to_str()] = ast::Type("int64");
 		}
 		// Else compare with previous type founded for her
 		else if (type_bindings[type_variable.to_str()] != ast::Type("int64")
@@ -366,7 +366,7 @@ Result<Ok, Error> semantic::Context::check_constraint(std::unordered_map<std::st
 
 		// If return type was not already included
 		if (type_bindings.find(type_variable.to_str()) == type_bindings.end()) {
-			type_bindings[type_variable.to_str()] = ast::Type("float64");	
+			type_bindings[type_variable.to_str()] = ast::Type("float64");
 		}
 		// Else compare with previous type founded for her
 		else if (type_bindings[type_variable.to_str()] != ast::Type("float64")) {
@@ -390,7 +390,7 @@ Result<Ok, Error> semantic::Context::check_constraint(std::unordered_map<std::st
 
 					// If return type was not already included
 					if (type_bindings.find(type_variable.to_str()) == type_bindings.end()) {
-						type_bindings[type_variable.to_str()] = function->return_type;	
+						type_bindings[type_variable.to_str()] = function->return_type;
 					}
 					// Else compare with previous type founded for her
 					else if (type_bindings[type_variable.to_str()] != function->return_type) {
@@ -530,7 +530,7 @@ Result<Ok, Error> semantic::Context::analyze(ast::FunctionNode& node) {
 			else {
 				Context context(ast);
 				context.current_module = node.module_path;
-				context.add_functions_to_current_scope(*this->ast.modules[context.current_module]);
+				context.add_functions_to_current_scope(*this->ast.modules[context.current_module.string()]);
 				auto result = type_inference::analyze(context, &node);
 				if (result.is_error()) return Error {};
 			}
@@ -621,7 +621,7 @@ Result<Ok, Error> semantic::Context::analyze(ast::CallNode& node) {
 		auto result = this->analyze(node.args[i]);
 		if (result.is_error()) return result;
 	}
-	
+
 	return this->get_type_of_function(node);
 }
 

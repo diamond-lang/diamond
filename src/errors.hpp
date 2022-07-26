@@ -17,7 +17,7 @@ namespace errors {
 	std::string reassigning_immutable_variable(ast::IdentifierNode& identifier, ast::AssignmentNode& assignment, std::filesystem::path file);
 	std::string undefined_function(ast::CallNode& call, std::filesystem::path file);
 	std::string unhandled_return_value(ast::CallNode& call, std::filesystem::path file);
-	std::string file_couldnt_be_found(std::string path);
+	std::string file_couldnt_be_found(std::filesystem::path path);
 }
 
 #endif

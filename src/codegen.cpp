@@ -94,7 +94,7 @@ namespace codegen {
 				assert(false);
 			}
 		}
-		
+
 		std::vector<llvm::Type*> as_llvm_types(std::vector<ast::Type> types) {
 			std::vector<llvm::Type*> llvm_types;
 			for (size_t i = 0; i < types.size(); i++) {
@@ -120,7 +120,7 @@ namespace codegen {
 			}
 			return types;
 		}
-		
+
 		llvm::AllocaInst* create_allocation(std::string name, llvm::Type* type) {
 			assert(this->current_entry_block);
 			llvm::IRBuilder<> block(this->current_entry_block, this->current_entry_block->begin());
@@ -130,15 +130,15 @@ namespace codegen {
 		void add_scope() {
 			this->scopes.push_back(std::unordered_map<std::string, llvm::AllocaInst*>());
 		}
-		
+
 		std::unordered_map<std::string, llvm::AllocaInst*>& current_scope() {
 			return this->scopes[this->scopes.size() - 1];
 		}
-		
+
 		void remove_scope() {
 			this->scopes.pop_back();
 		}
-		
+
 		llvm::Value* get_binding(std::string identifier) {
 			for (auto scope = this->scopes.rbegin(); scope != this->scopes.rend(); scope++) {
 				if (scope->find(identifier) != scope->end()) {
@@ -295,7 +295,7 @@ void codegen::Context::codegen(ast::Ast& ast) {
 	for (auto it = ast.modules.begin(); it != ast.modules.end(); it++) {
 		this->codegen_function_bodies(it->second->functions);
 	}
- 
+
 	// Crate main function
 	llvm::FunctionType* mainType = llvm::FunctionType::get(this->builder->getInt32Ty(), false);
 	llvm::Function* main = llvm::Function::Create(mainType, llvm::Function::ExternalLinkage, "main", this->module);
@@ -327,12 +327,12 @@ llvm::Value* codegen::Context::codegen(ast::BlockNode& node) {
 	}
 
 	this->remove_scope();
-	
+
 	return nullptr;
 }
 
-static std::string get_function_name(std::string file, std::string identifier, std::vector<ast::Type> args, ast::Type return_type) {
-	std::string name = file + "::" + identifier;
+static std::string get_function_name(std::filesystem::path file, std::string identifier, std::vector<ast::Type> args, ast::Type return_type) {
+	std::string name = file.string() + "::" + identifier;
 	for (size_t i = 0; i < args.size(); i++) {
 		name += "_" + args[i].to_str();
 	}
@@ -362,12 +362,12 @@ void codegen::Context::codegen_function_prototypes(std::vector<ast::FunctionNode
 			}
 		}
 	}
-}	
+}
 
 void codegen::Context::codegen_function_bodies(std::vector<ast::FunctionNode*> functions) {
 	for (auto& function: functions) {
 		assert(function->generic);
-		
+
 		for (auto& specialization: function->specializations) {
 			std::string name = get_function_name(function->module_path, function->identifier->value, specialization.args, specialization.return_type);
 			llvm::Function* f = this->module->getFunction(name);
@@ -398,7 +398,7 @@ void codegen::Context::codegen_function_bodies(std::vector<ast::FunctionNode*> f
 
 			// Codegen body
 			this->type_bindings = specialization.type_bindings;
-			
+
 			if (ast::is_expression(function->body) && function->return_type != ast::Type("void")) {
 				llvm::Value* result = this->codegen(function->body);
 				if (result) {
@@ -414,7 +414,7 @@ void codegen::Context::codegen_function_bodies(std::vector<ast::FunctionNode*> f
 
 			this->type_bindings = {};
 
-			// Verify function 
+			// Verify function
 			llvm::verifyFunction(*f);
 
 			// Run optimizations
@@ -433,11 +433,11 @@ llvm::Value* codegen::Context::codegen(ast::AssignmentNode& node) {
 	if (node.nonlocal) {
 		// Store value
 		this->builder->CreateStore(expr, this->get_binding(node.identifier->value));
-	} 
+	}
 	else {
 		// Create allocation if doesn't exists or if already exists, but it has a different type
 		if (this->current_scope().find(node.identifier->value) == this->current_scope().end()
-		||  this->current_scope()[node.identifier->value]->getType() != expr->getType()) { 
+		||  this->current_scope()[node.identifier->value]->getType() != expr->getType()) {
 			this->current_scope()[node.identifier->value] = this->create_allocation(node.identifier->value, expr->getType());
 		}
 
@@ -486,7 +486,7 @@ llvm::Value* codegen::Context::codegen(ast::IfElseNode& node) {
 		// Create if block
 		this->builder->SetInsertPoint(block);
 		this->codegen(node.if_branch);
-		
+
 		// Jump to merge block
 		this->builder->CreateBr(merge_block);
 
@@ -494,7 +494,7 @@ llvm::Value* codegen::Context::codegen(ast::IfElseNode& node) {
 		current_function->getBasicBlockList().push_back(else_block);
 		this->builder->SetInsertPoint(else_block);
 		this->codegen(node.else_branch.value());
-		
+
 		// Jump to merge block
 		this->builder->CreateBr(merge_block);
 
@@ -544,12 +544,12 @@ llvm::Value* codegen::Context::codegen(ast::IfElseNode& node) {
 		// If theres no else block
 		if (!node.else_branch.has_value()) {
 			// Jump to if block or merge block depending of the condition
-			this->builder->CreateCondBr(this->codegen(node.condition), block, merge_block); 
+			this->builder->CreateCondBr(this->codegen(node.condition), block, merge_block);
 
 			// Create if block
 			this->builder->SetInsertPoint(block);
 			this->codegen(node.if_branch);
-			
+
 			// Jump to merge block if does not return (Type("") means the if does not return)
 			if (ast::get_type(node.if_branch) == ast::Type("")) {
 				this->builder->CreateBr(merge_block);
@@ -566,7 +566,7 @@ llvm::Value* codegen::Context::codegen(ast::IfElseNode& node) {
 			// Create if block
 			this->builder->SetInsertPoint(block);
 			this->codegen(node.if_branch);
-			
+
 			// Jump to merge block if if does not return (Type("") means the block does not return)
 			if (ast::get_type(node.if_branch) == ast::Type("")) {
 				this->builder->CreateBr(merge_block);
@@ -576,7 +576,7 @@ llvm::Value* codegen::Context::codegen(ast::IfElseNode& node) {
 			current_function->getBasicBlockList().push_back(else_block);
 			this->builder->SetInsertPoint(else_block);
 			this->codegen(node.else_branch.value());
-			
+
 			// Jump to merge block if else does not return (Type("") means the block does not return)
 			if (ast::get_type(node.else_branch.value()) == ast::Type("")) {
 				this->builder->CreateBr(merge_block);

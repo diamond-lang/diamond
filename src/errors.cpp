@@ -16,7 +16,7 @@ std::string make_red(std::string str);
 std::string make_magenta(std::string str);
 std::string make_bright_magenta(std::string str);
 std::string current_line(Location location);
-std::string current_line(size_t line, std::string file_path);
+std::string current_line(size_t line, std::filesystem::path file_path);
 std::string underline_current_char(Location location);
 std::string underline_current_line(Location location);
 std::string underline_identifier(ast::IdentifierNode& identifier, std::filesystem::path file);
@@ -102,13 +102,13 @@ std::string errors::unhandled_return_value(ast::CallNode& call, std::filesystem:
 	       underline_identifier(*call.identifier, file);
 }
 
-std::string errors::file_couldnt_be_found(std::string path) {
+std::string errors::file_couldnt_be_found(std::filesystem::path path) {
 	return make_header("File not found\n\n") +
-	       "\"" + path + "\"" + " couldn't be found." + "\n";
+	       "\"" + path.string() + "\"" + " couldn't be found." + "\n";
 }
 
 std::string current_line(Location location) {return current_line(location.line, location.file);}
-std::string current_line(size_t line, std::string file_path) {
+std::string current_line(size_t line, std::filesystem::path file_path) {
 	if (file_path == "") return "";
 
 	// Read file
@@ -157,7 +157,7 @@ std::string underline_current_line(Location location) {
 
 	std::string line = current_line(location);
 	for (auto it = line.begin(); it != line.end(); it++) {
-		result += make_red("^");	
+		result += make_red("^");
 	}
 	return result;
 }
