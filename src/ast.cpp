@@ -4,7 +4,8 @@
 #include <iostream>
 
 // Type
-bool Type::operator==(const Type &t) const {
+// ----
+bool ast::Type::operator==(const Type &t) const {
 	if (this->name == t.name && this->parameters.size() == t.parameters.size()) {
 		for (size_t i = 0; i < this->parameters.size(); i++) {
 			if (this->parameters[i] != t.parameters[i]) {
@@ -18,11 +19,11 @@ bool Type::operator==(const Type &t) const {
 	}
 }
 
-bool Type::operator!=(const Type &t) const {
+bool ast::Type::operator!=(const Type &t) const {
 	return !(t == *this);
 }
 
-std::string Type::to_str(std::string output) const {
+std::string ast::Type::to_str(std::string output) const {
 	if (this->parameters.size() == 0) {
 		output += this->name;
 	}
@@ -40,13 +41,214 @@ std::string Type::to_str(std::string output) const {
 	return output;
 }
 
-bool Type::is_type_variable() const {
+bool ast::Type::is_type_variable() const {
 	std::string str = this->to_str();
 	if (str.size() > 0 && str[0] == '$') return true;
 	else                                 return false;
 }
 
-// For printing
+// FunctionPrototype
+bool ast::FunctionPrototype::operator==(const FunctionPrototype &t) const {
+	if (this->identifier == t.identifier && this->args.size() == t.args.size()) {
+		for (size_t i = 0; i < this->args.size(); i++) {
+			if (this->args[i] != t.args[i]) return false;
+		}
+		return this->return_type == t.return_type;
+	}
+	else {
+		return false;
+	}
+}
+
+bool ast::FunctionPrototype::operator!=(const FunctionPrototype &t) const {
+	return !(t == *this);
+}
+
+// Node
+// ----
+ast::Type ast::get_type(Node* node) {
+	return std::visit([](const auto& variant) {return variant.type;}, *node);	
+}
+
+ast::Type ast::get_concrete_type(Node* node, std::unordered_map<std::string, Type>& type_bindings) {
+	Type type_variable = get_type(node);
+	if (type_variable.is_type_variable()) {
+		assert(type_bindings.find(type_variable.to_str()) != type_bindings.end());
+		return type_bindings[type_variable.to_str()];
+	}
+	return type_variable;
+}
+
+ast::Type ast::get_concrete_type(Type type_variable, std::unordered_map<std::string, Type>& type_bindings) {
+	if (type_variable.is_type_variable()) {
+		assert(type_bindings.find(type_variable.to_str()) != type_bindings.end());
+		return type_bindings[type_variable.to_str()];
+	}
+	return type_variable;
+}
+
+void ast::set_type(Node* node, Type type) {
+	std::visit([type](auto& variant) {variant.type = type;}, *node);
+}
+
+std::vector<ast::Type> ast::get_types(std::vector<Node*> nodes) {
+	std::vector<Type> types;
+	for (size_t i = 0; i < nodes.size(); i++) {
+		types.push_back(get_type(nodes[i]));
+	}
+	return types;
+}
+
+std::vector<ast::Type> ast::get_concrete_types(std::vector<Node*> nodes, std::unordered_map<std::string, Type>& type_bindings) {
+	std::vector<Type> types;
+	for (size_t i = 0; i < nodes.size(); i++) {
+		types.push_back(get_concrete_type(nodes[i], type_bindings));
+	}
+	return types;
+}
+
+
+std::vector<ast::Type> ast::get_concrete_types(std::vector<ast::Type> type_variables, std::unordered_map<std::string, Type>& type_bindings) {
+	std::vector<Type> types;
+	for (size_t i = 0; i < type_variables.size(); i++) {
+		types.push_back(get_concrete_type(type_variables[i], type_bindings));
+	}
+	return types;
+}
+
+bool ast::could_be_expression(Node* node) {
+	switch (node->index()) {
+		case Block: {
+			auto& block = std::get<BlockNode>(*node);
+			if (block.statements.size() == 1
+			&& could_be_expression(block.statements[0])) return true;
+			return false;
+		}
+        case Function: return false;
+        case Assignment: return false;
+        case Return: return false;
+        case Break: return false;
+        case Continue: return false;
+        case IfElse: {
+			auto& if_else = std::get<IfElseNode>(*node);
+			if (if_else.else_branch.has_value()
+			&& could_be_expression(if_else.if_branch)
+			&& could_be_expression(if_else.else_branch.value())) {
+				return true;
+			}
+			return false;
+		}
+        case While: return false;
+        case Use: return false;
+        case Call: return true;
+        case Float: return true;
+        case Integer: return true;
+        case Identifier: return true;
+        case Boolean: return true;
+        case String: return true;
+		default: assert(false);
+	}
+	return false;
+}
+
+void ast::transform_to_expression(ast::Node*& node) {
+	assert(could_be_expression(node));
+	switch (node->index()) {
+		case Block: {
+			auto& block = std::get<BlockNode>(*node);
+			node = block.statements[0];
+			transform_to_expression(node);
+			break;
+		}
+        case IfElse: {
+			auto& if_else = std::get<IfElseNode>(*node);
+			transform_to_expression(if_else.if_branch);
+			transform_to_expression(if_else.else_branch.value());
+			break;
+		}
+        case Call: break;
+        case Float: break;
+        case Integer: break;
+        case Identifier: break;
+        case Boolean: break;
+        case String: break;
+		default: assert(false);
+	}
+}
+
+bool ast::is_expression(Node* node) {
+	switch (node->index()) {
+		case Block: return false;
+        case Function: return false;
+        case Assignment: return false;
+        case Return: return false;
+        case Break: return false;
+        case Continue: return false;
+        case IfElse: {
+			auto& if_else = std::get<IfElseNode>(*node);
+			if (if_else.else_branch.has_value()
+			&& is_expression(if_else.if_branch) && is_expression(if_else.else_branch.value())) {
+				return true;
+			}
+			return false;
+		}
+        case While: return false;
+        case Use: return false;
+        case Call: return true;
+        case Float: return true;
+        case Integer: return true;
+        case Identifier: return true;
+        case Boolean: return true;
+        case String: return true;
+		default: assert(false);
+	}
+	return false;
+}
+
+// Ast
+// ---
+size_t ast::Ast::capacity() {
+	size_t result = 0;
+	for (size_t i = 0; i < this->nodes.size(); i++) {
+		result += this->initial_size * pow(this->growth_factor, i);
+	}
+	return result;
+}
+
+void ast::Ast::push_back(Node node) {
+	if (this->size + 1 > this->capacity()) {
+		Node* array = new Node[this->initial_size * static_cast<unsigned int>(pow(this->growth_factor, this->nodes.size()))];
+		this->nodes.push_back(array);
+	}
+
+	this->size++;
+	this->nodes[this->nodes.size() - 1][this->size - 1 - this->size_of_arrays_filled()] = node;
+}
+
+size_t ast::Ast::size_of_arrays_filled() {
+	if (this->nodes.size() == 0) return 0;
+	else {
+		size_t size_of_arrays_filled = 0;
+		for (size_t i = 0; i < this->nodes.size() - 1; i++) {
+			size_of_arrays_filled += this->initial_size * static_cast<unsigned int>(pow(this->growth_factor, i));
+		}
+		return size_of_arrays_filled;
+	}
+}
+
+ast::Node* ast::Ast::last_element() {
+	if (this->size == 0) return nullptr;
+	else                 return &this->nodes[this->nodes.size() - 1][this->size - 1 - this->size_of_arrays_filled()];
+}
+
+void ast::Ast::free() {
+	for (size_t i = 0; i < this->nodes.size(); i++) {
+		delete[] this->nodes[i];
+	}
+}
+
+// Print
+// -----
 std::vector<bool> append(std::vector<bool> vec, bool val) {
 	vec.push_back(val);
 	return vec;
@@ -68,383 +270,291 @@ void put_indent_level(size_t indent_level, std::vector<bool> last) {
 	}
 }
 
-// Program
-void Ast::Program::print(size_t indent_level, std::vector<bool> last, bool concrete)  {
-	std::cout << "program" << '\n';
-	for (size_t i = 0; i < this->use_statements.size(); i++) {
-		this->use_statements[i]->print(indent_level + 1, append(last, (this->statements.size() == 0 && this->functions.size() == 0 && i == this->use_statements.size() - 1)), concrete);
+ast::Type ast::get_concrete_type(ast::Type type, ast::PrintContext context) {
+	if (context.concrete && type.is_type_variable()) {
+		return context.type_bindings[type.to_str()];
 	}
-	for (size_t i = 0; i < this->statements.size(); i++) {
-		this->statements[i]->print(indent_level + 1, append(last, (this->functions.size() == 0 && i == this->statements.size() - 1)), concrete);
+	else {
+		return type;
 	}
-	for (size_t i = 0; i < this->functions.size(); i++) {
-		if (!concrete) {
-			this->functions[i]->print(indent_level + 1, append(last, i == this->functions.size() - 1), concrete);
-		}
-		else {
-			for (size_t j = 0; j < this->functions[i]->specializations.size(); j++) {
-				bool is_last = i == this->functions.size() - 1 && j == this->functions[i]->specializations.size() - 1;
-				this->functions[i]->specializations[j]->print(indent_level + 1, append(last, is_last), concrete);
+}
+
+void ast::print(const Ast& ast, PrintContext context) {
+	std::cout << "program\n";
+	print((ast::Node*) ast.program, context);
+}
+
+void ast::print_with_concrete_types(const Ast& ast, PrintContext context) {
+	context.concrete = true;
+	std::cout << "program\n";
+	print_with_concrete_types((ast::Node*) ast.program, context);
+}
+
+void ast::print_with_concrete_types(Node* node, PrintContext context) {
+	context.concrete = true;
+	print(node, context);
+}
+
+void ast::print(Node* node, PrintContext context) {
+	switch (node->index()) {
+		case Block: {
+			auto& block = std::get<BlockNode>(*node);
+
+			for (size_t i = 0; i < block.use_statements.size(); i++) {	
+				bool is_last = block.statements.size() == 0 && block.functions.size() == 0 && i == block.use_statements.size() - 1;
+				print((ast::Node*) block.use_statements[i], PrintContext{context.indent_level + 1, append(context.last, is_last), context.concrete, context.type_bindings});
 			}
-		}
-	}
-}
-
-void Ast::Program::print_with_concrete_types() {
-	this->print(0, {}, true);
-}
-
-std::shared_ptr<Ast::Node> Ast::Program::clone() {
-	std::vector<std::shared_ptr<Ast::Use>> use_statements;
-	for (size_t i = 0; i < this->use_statements.size(); i++) {
-		use_statements.push_back(std::dynamic_pointer_cast<Ast::Use>(this->use_statements[i]->clone()));
-	}
-	std::vector<std::shared_ptr<Ast::Node>> statements;
-	for (size_t i = 0; i < this->statements.size(); i++) {
-		statements.push_back(this->statements[i]->clone());
-	}
-	std::vector<std::shared_ptr<Ast::Function>> functions;
-	for (size_t i = 0; i < this->functions.size(); i++) {
-		functions.push_back(std::dynamic_pointer_cast<Ast::Function>(this->functions[i]->clone()));
-	}
-	return std::make_shared<Ast::Program>(statements, functions, use_statements, this->line, this->col, this->file);
-}
-
-// Block
-void Ast::Block::print(size_t indent_level, std::vector<bool> last, bool concrete)  {
-	for (size_t i = 0; i < this->use_statements.size(); i++) {
-		this->use_statements[i]->print(indent_level + 1, append(last, (this->statements.size() == 0 && this->functions.size() == 0 && i == this->use_statements.size() - 1)), concrete);
-	}
-	for (size_t i = 0; i < this->statements.size(); i++) {
-		this->statements[i]->print(indent_level + 1, append(last, (this->functions.size() == 0 && i == this->statements.size() - 1)), concrete);
-	}
-	for (size_t i = 0; i < this->functions.size(); i++) {
-		if (!concrete) {
-			this->functions[i]->print(indent_level + 1, append(last, i == this->functions.size() - 1), concrete);
-		}
-		else {
-			for (size_t j = 0; j < this->functions[i]->specializations.size(); j++) {
-				this->functions[i]->specializations[j]->print(indent_level + 1, append(last, j == this->functions[i]->specializations.size() - 1), concrete);
+			for (size_t i = 0; i < block.statements.size(); i++) {
+				bool is_last = block.functions.size() == 0 && i == block.statements.size() - 1;
+				print(block.statements[i], PrintContext{context.indent_level + 1, append(context.last, is_last), context.concrete, context.type_bindings});
 			}
+			for (size_t i = 0; i < block.functions.size(); i++) {
+				if (!context.concrete) {
+					bool is_last = i == block.functions.size() - 1;
+					print((ast::Node*) block.functions[i], PrintContext{context.indent_level + 1, append(context.last, is_last), context.concrete, context.type_bindings});
+				}
+				else {
+					auto& function = *block.functions[i];
+					for (size_t j = 0; j < function.specializations.size(); j++) {
+						bool is_last = i == block.functions.size() - 1 && j == function.specializations.size() - 1;
+						context.type_bindings = function.specializations[j].type_bindings;
+						print((ast::Node*) block.functions[i], PrintContext{context.indent_level + 1, append(context.last, is_last), context.concrete, context.type_bindings});
+					}
+				}
+			}
+			break;
 		}
-	}
-}
+			
+		case Function: {
+			auto& function = std::get<FunctionNode>(*node);
+			bool where_clause = !context.concrete && function.constraints.size() != 0;
+			bool last = true;
+			if (context.last.size() != 0) {
+				last = context.last[context.last.size() - 1];
+				context.last.pop_back();
+			}
 
-std::shared_ptr<Ast::Node> Ast::Block::clone() {
-	std::vector<std::shared_ptr<Ast::Use>> use_statements;
-	for (size_t i = 0; i < this->use_statements.size(); i++) {
-		use_statements.push_back(std::dynamic_pointer_cast<Ast::Use>(this->use_statements[i]->clone()));
-	}
-	std::vector<std::shared_ptr<Ast::Node>> statements;
-	for (size_t i = 0; i < this->statements.size(); i++) {
-		statements.push_back(this->statements[i]->clone());
-	}
-	std::vector<std::shared_ptr<Ast::Function>> functions;
-	for (size_t i = 0; i < this->functions.size(); i++) {
-		functions.push_back(std::dynamic_pointer_cast<Ast::Function>(this->functions[i]->clone()));
-	}
-	return std::make_shared<Ast::Block>(statements, functions, use_statements, this->line, this->col, this->file);
-}
+			put_indent_level(context.indent_level, append(context.last, last && !where_clause));
+			std::cout << "function " << function.identifier->value << '(';
+			for (size_t i = 0; i < function.args.size(); i++) {
+				auto& arg_name = std::get<IdentifierNode>(*function.args[i]).value;
+				std::cout << arg_name;
 
-// Function
-void Ast::Function::print(size_t indent_level, std::vector<bool> last, bool concrete)  {
-	put_indent_level(indent_level, last);
-	std::cout << "function " << this->identifier->value << '(';
-	for (size_t i = 0; i < this->args.size(); i++) {
-		std::cout << this->args[i]->value;
+				auto& arg_type = std::get<IdentifierNode>(*function.args[i]).type;
+				
+				if (arg_type != Type("")) {
+					std::cout << ": " << get_concrete_type(arg_type, context).to_str();
+				}
+
+				if (i != function.args.size() - 1) std::cout << ", ";
+			}
+			std::cout << ")";
+			if (function.return_type != Type("")) {
+				std::cout << ": " << get_concrete_type(function.return_type, context).to_str();
+			}
+			
+			std::cout << "\n";
+			if (!is_expression(function.body)) {
+				context.last.push_back(last && !where_clause);
+				print(function.body, context);
+				context.last.pop_back();
+			}
+			else {
+				context.indent_level += 1;
+				context.last.push_back(last && !where_clause);
+				context.last.push_back(true);
+				print(function.body, context);
+				context.indent_level -= 1;
+				context.last.pop_back();
+				context.last.pop_back();
+			}
+
+			if (function.constraints.size() != 0 && !context.concrete) {
+				put_indent_level(context.indent_level, append(context.last, last));
+				std::cout << "where\n";
+				for (size_t i = 0; i < function.constraints.size(); i++) {
+					put_indent_level(context.indent_level + 1, i == (function.constraints.size() - 1) ? append(append(context.last, last), true) : append(append(context.last, last), false));
+					std::cout << function.constraints[i].identifier << "(";
+					for  (size_t j = 0; j < function.constraints[i].args.size(); j++) {
+						std::cout << function.constraints[i].args[j].to_str();
+						if (j != function.constraints[i].args.size() - 1) std::cout << ", ";
+					}
+					std::cout << ")";
+					if (function.constraints[i].return_type != ast::Type("")) {
+						std::cout << ": " << function.constraints[i].return_type.to_str();
+					}
+					std::cout << "\n";
+				}
+			}
+
+			break;
+		}
 		
-		if (this->args[i]->type != Type("")) {
-			std::cout << ": " << this->args[i]->type.to_str();
+		case Assignment: {
+			auto& assignment = std::get<AssignmentNode>(*node);
+
+			print((ast::Node*) assignment.identifier, context);
+			if (assignment.nonlocal) {
+				put_indent_level(context.indent_level + 1, append(context.last, false));
+				std::cout << "nonlocal\n";
+			}
+			put_indent_level(context.indent_level + 1, append(context.last, false));
+			std::cout << (assignment.is_mutable ? "=" : "be") << '\n';
+			
+			context.indent_level += 1;
+			context.last.push_back(true);
+			print(assignment.expression, context);
+			break;
 		}
 
-		if (i != this->args.size() - 1) std::cout << ", ";
-	}
-	std::cout << ")";
-	if (this->return_type != Type("")) {
-		std::cout << ": " << this->return_type.to_str();
-	}
-	std::cout << "\n";
-	if (std::dynamic_pointer_cast<Ast::Expression>(body)) {
-		this->body->print(indent_level + 1, append(last, true), concrete);
-	}
-	else {
-		this->body->print(indent_level, last, concrete);
-	}
-}
+		case Return: {
+			auto& return_node = std::get<ReturnNode>(*node);
 
-std::shared_ptr<Ast::Node> Ast::Function::clone() {
-	std::vector<std::shared_ptr<Ast::Identifier>> args;
-	for (size_t i = 0; i < this->args.size(); i++) {
-		args.push_back(std::dynamic_pointer_cast<Identifier>(this->args[i]->clone()));
-	}
-	auto function = std::make_shared<Ast::Function>(std::dynamic_pointer_cast<Ast::Identifier>(this->identifier->clone()), args, this->body->clone(), this->line, this->col, this->file);
-	function->return_type = this->return_type;
-	return function;
-}
-
-void Ast::FunctionSpecialization::print(size_t indent_level, std::vector<bool> last, bool concrete)  {
-	put_indent_level(indent_level, last);
-	std::cout << "function " << this->identifier->value << '(';
-	for (size_t i = 0; i < this->args.size(); i++) {
-		std::cout << this->args[i]->value;
+			put_indent_level(context.indent_level, context.last);
+			std::cout << "return" << '\n';
+			if (return_node.expression.has_value()) {
+				context.indent_level += 1;
+				context.last.push_back(true);
+				print(return_node.expression.value(), context);
+			}
+			break;
+		}
 		
-		if (this->args[i]->type != Type("")) {
-			std::cout << ": " << this->args[i]->type.to_str();
+		case Break: {
+			put_indent_level(context.indent_level, context.last);
+			std::cout << "break" << '\n';
+			break;
 		}
 
-		if (i != this->args.size() - 1) std::cout << ", ";
+		case Continue: {
+			put_indent_level(context.indent_level, context.last);
+			std::cout << "continue" << '\n';
+			break;
+		}
+		
+		case IfElse: {
+			auto& if_else = std::get<IfElseNode>(*node);
+			if (!is_expression(node)) {
+				bool is_last = context.last[context.last.size() - 1];
+				context.last.pop_back();
+
+				bool has_else_block = if_else.else_branch ? true : false;
+				put_indent_level(context.indent_level, append(context.last, is_last && !has_else_block));
+				std::cout << "if" << '\n';
+				print(if_else.condition, PrintContext{context.indent_level + 1, append(append(context.last, is_last && !has_else_block), false), context.concrete, context.type_bindings});
+
+				print(if_else.if_branch, PrintContext{context.indent_level, append(context.last, is_last && !has_else_block), context.concrete, context.type_bindings});
+			
+				if (if_else.else_branch.has_value()) {
+					put_indent_level(context.indent_level, append(context.last, is_last));
+					std::cout << "else" << "\n";
+					print(if_else.else_branch.value(), PrintContext{context.indent_level, append(context.last, is_last), context.concrete, context.type_bindings});
+				}
+			}
+			else {
+				bool is_last = true;
+				if (context.last.size() > 0) {
+					is_last = context.last[context.last.size() - 1];
+					context.last.pop_back();
+				}
+
+				put_indent_level(context.indent_level, append(context.last, false));
+				std::cout << "if";
+				if (get_concrete_type(if_else.type, context) != Type("")) std::cout << ": " << get_concrete_type(if_else.type, context).to_str();
+				std::cout << "\n";
+				print(if_else.condition, PrintContext{context.indent_level + 1, append(append(context.last, false), false), context.concrete, context.type_bindings});
+				print(if_else.if_branch, PrintContext{context.indent_level + 1, append(append(context.last, false), true), context.concrete, context.type_bindings});
+
+				assert(if_else.else_branch.has_value());
+				put_indent_level(context.indent_level, append(context.last, is_last));
+				std::cout << "else" << "\n";
+				print(if_else.else_branch.value(), PrintContext{context.indent_level + 1, append(append(context.last, is_last), true), context.concrete, context.type_bindings});
+			}
+				
+			break;
+		}
+
+		case While: {
+			auto& while_node = std::get<WhileNode>(*node);
+
+			put_indent_level(context.indent_level, context.last);
+			std::cout << "while" << '\n';
+			print(while_node.condition, PrintContext{context.indent_level + 1, append(context.last, false), context.concrete, context.type_bindings});
+			print(while_node.block, PrintContext{context.indent_level, context.last, context.concrete, context.type_bindings});
+			break;
+		}
+
+		case Use: {
+			auto& use_node = std::get<UseNode>(*node);
+			if (use_node.include) std::cout << "include";
+			else                  std::cout << "use"; 
+			std::cout << " \"" << use_node.path->value << "\"\n";
+			break;
+		}
+
+		case Call: {
+			auto& call = std::get<CallNode>(*node);
+
+			put_indent_level(context.indent_level, context.last);
+			std::cout << call.identifier->value;
+			if (call.type != Type("")) std::cout << ": " << get_concrete_type(call.type, context).to_str();
+			std::cout << "\n";
+			for (size_t i = 0; i < call.args.size(); i++) {
+				print(call.args[i], PrintContext{context.indent_level + 1, append(context.last, i == call.args.size() - 1), context.concrete, context.type_bindings});
+			}
+			break;
+		}
+
+		case Float: {
+			auto& float_node = std::get<FloatNode>(*node);
+
+			put_indent_level(context.indent_level, context.last);
+			std::cout << float_node.value;
+			if (float_node.type != Type("")) std::cout << ": " << get_concrete_type(float_node.type, context).to_str();
+			std::cout << "\n";
+			break;
+		}
+
+		case Integer: {
+			auto& integer = std::get<IntegerNode>(*node);
+
+			put_indent_level(context.indent_level, context.last);
+			std::cout << integer.value;
+			if (integer.type != Type("")) std::cout << ": " << get_concrete_type(integer.type, context).to_str();
+			std::cout << "\n";
+			break;
+		}
+
+		case Identifier: {
+			auto& identifier = std::get<IdentifierNode>(*node);
+
+			put_indent_level(context.indent_level, context.last);
+			std::cout << identifier.value;
+			if (identifier.type != Type("")) std::cout << ": " << get_concrete_type(identifier.type, context).to_str();
+			std::cout << "\n";
+			break;
+		}
+
+		case Boolean: {
+			auto& boolean = std::get<BooleanNode>(*node);
+
+			put_indent_level(context.indent_level, context.last);
+			std::cout << (boolean.value ? "true" : "false");
+			if (boolean.type != Type("")) std::cout << ": " << get_concrete_type(boolean.type, context).to_str();
+			std::cout << "\n";
+			break;
+		}
+
+		case String: {
+			auto& string = std::get<StringNode>(*node);
+
+			put_indent_level(context.indent_level, context.last);
+			std::cout << "\"" << string.value << "\"";
+			if (string.type != Type("")) std::cout << ": " << get_concrete_type(string.type, context).to_str();
+			std::cout << "\n";
+			break;
+		}
+
+		default: assert(false);
 	}
-	std::cout << ")";
-	if (this->return_type != Type("")) {
-		std::cout << ": " << this->return_type.to_str();
-	}
-	std::cout << "\n";
-	if (std::dynamic_pointer_cast<Ast::Expression>(body)) {
-		this->body->print(indent_level + 1, append(last, true), concrete);
-	}
-	else {
-		this->body->print(indent_level, last, concrete);
-	}
-}
-
-std::shared_ptr<Ast::Node> Ast::FunctionSpecialization::clone() {
-	assert(false);
-	return nullptr;
-}
-
-// Assignment
-void Ast::Assignment::print(size_t indent_level, std::vector<bool> last, bool concrete)  {
-	this->identifier->print(indent_level, last);
-	if (this->nonlocal) {
-		put_indent_level(indent_level + 1, append(last, false));
-		std::cout << "nonlocal\n";
-	}
-	put_indent_level(indent_level + 1, append(last, false));
-	std::cout << (is_mutable ? "=" : "be") << '\n';
-	
-	this->expression->print(indent_level + 1, append(last, true), concrete);
-}
-
-std::shared_ptr<Ast::Node> Ast::Assignment::clone() {
-	return std::make_shared<Ast::Assignment>(std::dynamic_pointer_cast<Ast::Identifier>(this->identifier->clone()), std::dynamic_pointer_cast<Expression>(this->expression->clone()), this->is_mutable, this->nonlocal, this->line, this->col, this->file);
-}
-
-// Return
-void Ast::Return::print(size_t indent_level, std::vector<bool> last, bool concrete)  {
-	put_indent_level(indent_level, last);
-	std::cout << "return" << '\n';
-	if (this->expression) {
-		this->expression->print(indent_level + 1, append(last, true), concrete);
-	}
-}
-
-std::shared_ptr<Ast::Node> Ast::Return::clone() {
-	if (this->expression) return std::make_shared<Ast::Return>(std::dynamic_pointer_cast<Expression>(this->expression->clone()), this->line, this->col, this->file);
-	else                  return std::make_shared<Ast::Return>(nullptr, this->line, this->col, this->file);
-}
-
-// Break
-void Ast::Break::print(size_t indent_level, std::vector<bool> last, bool concrete)  {
-	put_indent_level(indent_level, last);
-	std::cout << "break" << '\n';
-}
-
-std::shared_ptr<Ast::Node> Ast::Break::clone() {
-	return std::make_shared<Ast::Break>(this->line, this->col, this->file);
-}
-
-// Break
-void Ast::Continue::print(size_t indent_level, std::vector<bool> last, bool concrete)  {
-	put_indent_level(indent_level, last);
-	std::cout << "continue" << '\n';
-}
-
-std::shared_ptr<Ast::Node> Ast::Continue::clone() {
-	return std::make_shared<Ast::Continue>(this->line, this->col, this->file);
-}
-
-// IfElseStmt
-void Ast::IfElseStmt::print(size_t indent_level, std::vector<bool> last, bool concrete)  {
-	bool is_last = last[last.size() - 1];
-	last.pop_back();
-
-	bool has_else_block = this->else_block ? true : false;
-	put_indent_level(indent_level, append(last, is_last && !has_else_block));
-	std::cout << "if" << '\n';
-	this->condition->print(indent_level + 1, append(append(last, is_last && !has_else_block), false), concrete);
-	this->block->print(indent_level, append(last, is_last && !has_else_block), concrete);
-
-	if (this->else_block) {
-		put_indent_level(indent_level, append(last, is_last));
-		std::cout << "else" << "\n";
-		this->else_block->print(indent_level, append(last, is_last));
-	}
-}
-
-std::shared_ptr<Ast::Node> Ast::IfElseStmt::clone() {
-	if (this->else_block) return std::make_shared<Ast::IfElseStmt>(std::dynamic_pointer_cast<Ast::Expression>(this->condition->clone()), std::dynamic_pointer_cast<Ast::Block>(this->block->clone()), std::dynamic_pointer_cast<Ast::Block>(this->else_block->clone()), this->line, this->col, this->file);
-	else                  return std::make_shared<Ast::IfElseStmt>(std::dynamic_pointer_cast<Ast::Expression>(this->condition->clone()), std::dynamic_pointer_cast<Ast::Block>(this->block->clone()), this->line, this->col, this->file);
-}
-
-// WhileStmt
-void Ast::WhileStmt::print(size_t indent_level, std::vector<bool> last, bool concrete)  {
-	put_indent_level(indent_level, last);
-	std::cout << "while" << '\n';
-	this->condition->print(indent_level + 1, append(last, false), concrete);
-	this->block->print(indent_level, last, concrete);
-}
-
-std::shared_ptr<Ast::Node> Ast::WhileStmt::clone() {
-	return std::make_shared<Ast::WhileStmt>(std::dynamic_pointer_cast<Ast::Expression>(this->condition->clone()), std::dynamic_pointer_cast<Ast::Block>(this->block->clone()), this->line, this->col, this->file);
-}
-
-// UseStmt
-void Ast::Use::print(size_t indent_level, std::vector<bool> last, bool concrete)  {
-	put_indent_level(indent_level, last);
-	if (this->include) {
-		std::cout << "include \"" << this->path->value << "\"\n";
-	}
-	else {
-		std::cout << "use \"" << this->path->value << "\"\n";
-	}
-}
-
-std::shared_ptr<Ast::Node> Ast::Use::clone() {
-	return std::make_shared<Ast::Use>(std::dynamic_pointer_cast<Ast::String>(this->path->clone()), this->line, this->col, this->file);
-}
-
-// IfElseExpr
-void Ast::IfElseExpr::print(size_t indent_level, std::vector<bool> last, bool concrete)  {
-	bool is_last = true;
-	if (last.size() > 0) {
-		is_last = last[last.size() - 1];
-		last.pop_back();
-	}
-
-	put_indent_level(indent_level, append(last, false));
-	std::cout << "if";
-	if (this->type != Type("")) std::cout << ": " << this->type.to_str();
-	std::cout << "\n";
-	this->condition->print(indent_level + 1, append(append(last, false), false), concrete);
-	this->expression->print(indent_level + 1, append(append(last, false), true), concrete);
-
-	assert(this->else_expression);
-	put_indent_level(indent_level, append(last, is_last));
-	std::cout << "else" << "\n";
-	this->else_expression->print(indent_level + 1, append(append(last, is_last), true), concrete);
-}
-
-std::shared_ptr<Ast::Node> Ast::IfElseExpr::clone() {
-	assert(this->else_expression);
-	auto ifElse = std::make_shared<Ast::IfElseExpr>(std::dynamic_pointer_cast<Ast::Expression>(this->condition->clone()), std::dynamic_pointer_cast<Ast::Expression>(this->expression->clone()), std::dynamic_pointer_cast<Ast::Expression>(this->else_expression->clone()), this->line, this->col, this->file);
-	ifElse->type = this->type;
-	return ifElse;
-}
-
-// Call
-void Ast::Call::print(size_t indent_level, std::vector<bool> last, bool concrete)  {
-	put_indent_level(indent_level, last);
-	std::cout << this->identifier->value;
-	if (this->type != Type("")) std::cout << ": " << this->type.to_str();
-	std::cout << "\n";
-	for (size_t i = 0; i < this->args.size(); i++) {
-		this->args[i]->print(indent_level + 1, append(last, i == this->args.size() - 1), concrete);
-	}
-}
-
-std::shared_ptr<Ast::Node> Ast::Call::clone() {
-	std::vector<std::shared_ptr<Ast::Expression>> args;
-	for (size_t i = 0; i < this->args.size(); i++) {
-		args.push_back(std::dynamic_pointer_cast<Expression>(this->args[i]->clone()));
-	}
-	auto call = std::make_shared<Ast::Call>(std::dynamic_pointer_cast<Ast::Identifier>(this->identifier->clone()), args, this->line, this->col, this->file);
-	call->type = this->type;
-	return call;
-}
-
-// Number
-void Ast::Number::print(size_t indent_level, std::vector<bool> last, bool concrete)  {
-	put_indent_level(indent_level, last);
-	std::cout << this->value;
-	if (this->type != Type("")) std::cout << ": " << this->type.to_str();
-	std::cout << "\n";
-}
-
-std::shared_ptr<Ast::Node> Ast::Number::clone() {
-	auto number = std::make_shared<Ast::Number>(this->value, this->line, this->col, this->file);
-	number->type = this->type;
-	return number;
-}
-
-// Integer
-void Ast::Integer::print(size_t indent_level, std::vector<bool> last, bool concrete)  {
-	put_indent_level(indent_level, last);
-	std::cout << this->value;
-	if (this->type != Type("")) std::cout << ": " << this->type.to_str();
-	std::cout << "\n";
-}
-
-std::shared_ptr<Ast::Node> Ast::Integer::clone() {
-	auto integer = std::make_shared<Ast::Integer>(this->value, this->line, this->col, this->file);
-	integer->type = this->type;
-	return integer;
-}
-
-// Identifier
-void Ast::Identifier::print(size_t indent_level, std::vector<bool> last, bool concrete)  {
-	put_indent_level(indent_level, last);
-	std::cout << this->value;
-	if (this->type != Type("")) std::cout << ": " << this->type.to_str();
-	std::cout << "\n";
-}
-
-std::shared_ptr<Ast::Node> Ast::Identifier::clone() {
-	auto identifier = std::make_shared<Ast::Identifier>(this->value, this->line, this->col, this->file);
-	identifier->type = this->type;
-	return identifier;
-}
-
-// Boolean
-void Ast::Boolean::print(size_t indent_level, std::vector<bool> last, bool concrete)  {
-	put_indent_level(indent_level, last);
-	std::cout << (this->value ? "true" : "false");
-	if (this->type != Type("")) std::cout << ": " << this->type.to_str();
-	std::cout << "\n";
-}
-
-std::shared_ptr<Ast::Node> Ast::Boolean::clone() {
-	auto boolean = std::make_shared<Ast::Boolean>(this->value, this->line, this->col, this->file);
-	boolean->type = this->type;
-	return boolean;
-}
-
-// String
-void Ast::String::print(size_t indent_level, std::vector<bool> last, bool concrete)  {
-	put_indent_level(indent_level, last);
-	std::cout << "\"" << this->value << "\"";
-	if (this->type != Type("")) std::cout << ": " << this->type.to_str();
-	std::cout << "\n";
-}
-
-std::shared_ptr<Ast::Node> Ast::String::clone() {
-	auto str = std::make_shared<Ast::String>(this->value, this->line, this->col, this->file);
-	str->type = this->type;
-	return str;
-}
-
-// Utilities
-std::vector<Type> get_args_types(std::vector<std::shared_ptr<Ast::Identifier>> args) {
-	std::vector<Type> types;
-	for (size_t i = 0; i < args.size(); i++) {
-		types.push_back(args[i]->type);
-	}
-	return types;
-}
-
-std::vector<Type> get_args_types(std::vector<std::shared_ptr<Ast::Expression>> args) {
-	std::vector<Type> types;
-	for (size_t i = 0; i < args.size(); i++) {
-		types.push_back(args[i]->type);
-	}
-	return types;
 }

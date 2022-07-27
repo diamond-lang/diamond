@@ -5,5 +5,5 @@ print(20)
 Unexpected indent
 
 1|   print(10)
-   ^
+     ^
 ---

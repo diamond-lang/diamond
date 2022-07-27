@@ -1,12 +1,10 @@
-use "modules/subtract"
+use "modules/is_even"
+use "modules/is_odd"
 
-function add(a, b)
-    a + b
+print(is_even(9))
+print(is_odd(9))
 
-print(add(5, 5))
-print(subtract(10, 5))
-
---- Output
-10
-5
+--- Ou(tput
+false
+true
 ---

@@ -7,24 +7,8 @@
 #include "ast.hpp"
 
 namespace parse {
-	struct Source {
-		std::vector<token::Token>* tokens;
-		size_t position = 0;
-		size_t line;
-		size_t column;
-		std::vector<size_t> indentation_level;
-		std::filesystem::path file;
-
-		Source() {}
-		Source(std::vector<token::Token>* tokens, std::filesystem::path file) : tokens(tokens), file(file)  {
-			if ((*tokens).size() > 0) {
-				this->line = (*tokens)[0].line;
-				this->column = (*tokens)[0].column;
-			}
-		}
-    };
-
-	::Result<std::shared_ptr<Ast::Program>, Errors> program(std::vector<token::Token> tokens, std::filesystem::path file);
+	Result<ast::Ast, Errors> program(const std::vector<token::Token>& tokens, const std::filesystem::path& file);
+	Result<Ok, Errors> module(ast::Ast& ast, const std::vector<token::Token>& tokens, const std::filesystem::path& file);
 };
 
 #endif

@@ -32,8 +32,8 @@ bool utilities::file_exists(std::string path) {
 	}
 }
 
-std::string utilities::get_program_name(std::string path) {
-	return std::filesystem::path(path).stem().string();
+std::string utilities::get_program_name(std::filesystem::path path) {
+	return path.stem().string();
 }
 
 #ifdef __linux__

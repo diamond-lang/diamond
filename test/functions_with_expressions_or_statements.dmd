@@ -1,0 +1,27 @@
+function add(a, b) a + b
+function add2(a, b) add(a, b)
+
+function expression(a, b)
+    if a == true
+        add2(b, b)
+    else
+        add2(b, 10 * b)
+
+hello = expression(false, 10)
+print(hello)
+
+function log(a)
+    print(a)
+
+function statement(a, b)
+    if a == true
+        log(-b)
+    else
+        log(b)
+
+statement(true, 36)
+
+--- Output
+110
+-36
+---

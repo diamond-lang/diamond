@@ -12,15 +12,15 @@ name = 'diamond'
 source_files = [
 	'src/main.cpp',
 	'src/errors.cpp',
+	'src/tokens.cpp',
 	'src/lexer.cpp',
 	'src/ast.cpp',
 	'src/utilities.cpp',
 	'src/parser.cpp',
-	'src/semantic.cpp',
-	'src/codegen.cpp',
-	'src/utilities.cpp',
-	'src/intrinsics.cpp',
-	'src/type_inference.cpp'
+	'src/semantic/intrinsics.cpp',
+	'src/semantic/semantic.cpp',
+	'src/semantic/type_inference.cpp',
+	'src/codegen.cpp'
 ]
 cpp_version = 'c++17'
 

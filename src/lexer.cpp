@@ -15,9 +15,9 @@ namespace lexer {
         size_t index;
         std::filesystem::path path;
         FILE* file_pointer;
-        
+
         Source() {}
-        Source(std::filesystem::path path, FILE* file_pointer) : line(1), column(1), index(0), path(path), file_pointer(file_pointer) {} 
+        Source(std::filesystem::path path, FILE* file_pointer) : line(1), column(1), index(0), path(path), file_pointer(file_pointer) {}
     };
 
     char current(Source source) {
@@ -108,7 +108,7 @@ Result<std::vector<token::Token>, Errors> lexer::lex(std::filesystem::path path)
      Errors errors;
 
     // Read file
-    FILE* file_pointer = fopen(path.c_str(), "r");
+    FILE* file_pointer = fopen(path.string().c_str(), "rb");
     if (!file_pointer) {
         errors.push_back(errors::file_couldnt_be_found(path));
         return Result<std::vector<token::Token>, Errors>(errors);
@@ -116,8 +116,8 @@ Result<std::vector<token::Token>, Errors> lexer::lex(std::filesystem::path path)
 
     // Create source
     Source source(path, file_pointer);
-   
-    // Tokenize 
+
+    // Tokenize
     while (!at_end(source)) {
         auto result = get_token(source);
         if (result.is_ok() && result.get_value() != token::EndOfFile) {
@@ -127,6 +127,7 @@ Result<std::vector<token::Token>, Errors> lexer::lex(std::filesystem::path path)
             errors.push_back(result.get_error());
         }
     }
+    tokens.push_back(token::Token(token::EndOfFile, source.line, source.column));
 
     // Close file
     fclose(file_pointer);
@@ -170,7 +171,7 @@ Result<token::Token, Error> lexer::get_token(Source& source) {
         if (at_end(source)) {
             return Result<token::Token, Error>(std::string("Error: Unclosed block comment\n"));
         }
-     
+
         advance(source, 3);
         return get_token(source);
     }
@@ -179,7 +180,7 @@ Result<token::Token, Error> lexer::get_token(Source& source) {
         return get_token(source);
     }
     if (match(source, "-")) {
-        return advance(token::Token(token::Less, "-", source.line, source.column), source, 1);
+        return advance(token::Token(token::Minus, "-", source.line, source.column), source, 1);
     }
     if (match(source, " "))  {
         advance(source);
@@ -189,6 +190,7 @@ Result<token::Token, Error> lexer::get_token(Source& source) {
         advance(source);
         return get_token(source);
     }
+    if (match(source, "\r\n"))      return advance(token::Token(token::NewLine, "\\n", source.line, source.column), source, 2);
     if (match(source, "\n"))      return advance(token::Token(token::NewLine, "\\n", source.line, source.column), source, 1);
     if (match(source, "\""))      return get_string(source);
     if (isdigit(current(source))) return get_number(source);
@@ -265,7 +267,7 @@ Result<token::Token, Error> lexer::get_number(Source& source) {
     std::string literal = "";
     size_t line = source.line;
     size_t column = source.column;
-    
+
     // eg: .8
     if (match(source, ".")) {
         advance(source);
@@ -280,7 +282,7 @@ Result<token::Token, Error> lexer::get_number(Source& source) {
         advance(source);
         literal += "." + get_integer(source);
         return token::Token(token::Float, literal, line, column);
-    
+
     // eg: 16
     } else {
         return token::Token(token::Integer, literal, line, column);
@@ -294,15 +296,4 @@ std::string lexer::get_integer(Source& source) {
         advance(source);
     }
     return integer;
-}
-
-void lexer::print(std::vector<token::Token> tokens) {
-    for (size_t i = 0; i < tokens.size(); i++) {
-        if (tokens[i] == token::String) {
-            std::cout << "\"" << tokens[i].get_literal() << "\"\n";
-        }
-        else {
-            std::cout << tokens[i].get_literal() << "\n";
-        }
-    }
 }

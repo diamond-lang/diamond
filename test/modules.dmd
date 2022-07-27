@@ -1,10 +1,17 @@
-use "modules/is_even"
-use "modules/is_odd"
+use "functions"
 
-print(is_even(9))
-print(is_odd(9))
+print(add(4.0, 6.0))
+print(div(7.0, 8.0))
+print(identity(5.0))
+print(identity(false))
+print(identity(64))
+print(sub(7, 4))
 
 --- Output
+10
+0.875
+5
 false
-true
+64
+3
 ---
