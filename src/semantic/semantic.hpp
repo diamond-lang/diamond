@@ -32,7 +32,7 @@ namespace semantic {
 		Binding() {}
         Binding(ast::AssignmentNode* assignment);
         Binding(ast::Node* function_argument);
-        Binding(ast::FunctionNode* function); 
+        Binding(ast::FunctionNode* function);
 		Binding(std::vector<ast::FunctionNode*> functions);
 	};
 
@@ -41,6 +41,7 @@ namespace semantic {
 	ast::FunctionNode* get_generic_function(Binding binding);
 	std::vector<ast::FunctionNode*> get_overloaded_functions(Binding binding);
 	ast::Type get_binding_type(Binding& binding);
+	std::string get_binding_identifier(Binding& binding);
 	bool is_function(Binding& binding);
 
 	// Context

@@ -49,6 +49,17 @@ ast::Type semantic::get_binding_type(semantic::Binding& binding) {
     return ast::Type("");
 }
 
+std::string semantic::get_binding_identifier(semantic::Binding& binding) {
+    switch (binding.type) {
+        case semantic::AssignmentBinding: return ((ast::AssignmentNode*)binding.value[0])->identifier->value;
+        case semantic::FunctionArgumentBinding: return ((ast::IdentifierNode*)binding.value[0])->value;
+        case semantic::OverloadedFunctionsBinding: return ((ast::FunctionNode*)binding.value[0])->identifier->value;
+        case semantic::GenericFunctionBinding: return ((ast::FunctionNode*)binding.value[0])->identifier->value;
+    }
+    assert(false);
+    return "";
+}
+
 bool semantic::is_function(semantic::Binding& binding) {
     switch (binding.type) {
         case semantic::AssignmentBinding: return false;
@@ -448,7 +459,8 @@ Result<Ok, Error> semantic::Context::analyze(ast::BlockNode& node) {
 	this->add_functions_to_current_scope(node);
 
 	// Analyze functions in current scope
-	for (auto& it: this->current_scope()) {
+	auto scope = this->current_scope();
+	for (auto& it: scope) {
 		auto& binding = it.second;
 		if (binding.type == semantic::GenericFunctionBinding) {
 			this->analyze(*semantic::get_generic_function(binding));
