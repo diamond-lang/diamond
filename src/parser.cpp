@@ -34,6 +34,7 @@ struct Parser {
 	Result<ast::Node*, Error> parse_use_stmt();
 	Result<ast::Node*, Error> parse_call();
 	Result<ast::Node*, Error> parse_expression();
+	Result<ast::Node*, Error> parse_expression_2();
 	Result<ast::Node*, Error> parse_if_else_expr();
 	Result<ast::Node*, Error> parse_not_expr();
 	Result<ast::Node*, Error> parse_binary(int precedence = 1);
@@ -529,6 +530,22 @@ Result<ast::Node*, Error> Parser::parse_call() {
 }
 
 Result<ast::Node*, Error> Parser::parse_expression() {
+	auto expr = this->parse_expression_2();
+	if (expr.is_error()) return Error {};
+
+	if (this->current() == token::Colon) {
+		this->advance();
+
+		auto token = this->parse_token(token::Identifier);
+		if (token.is_error()) return Error {};
+
+		ast::set_type(expr.get_value(), ast::Type(token.get_value().get_literal()));
+	}
+
+	return expr;
+}
+
+Result<ast::Node*, Error> Parser::parse_expression_2() {
 	switch (this->current().variant) {
 		case token::If:  return this->parse_if_else_expr();
 		case token::Not: return this->parse_not_expr();
@@ -590,7 +607,7 @@ Result<ast::Node*, Error> Parser::parse_not_expr() {
 	call.identifier = (ast::IdentifierNode*) identifier.get_value();
 
 	// Parse expression
-	auto expression = this->parse_expression();
+	auto expression = this->parse_expression_2();
 	if (expression.is_error()) return expression;
 	call.args.push_back(expression.get_value());
 
