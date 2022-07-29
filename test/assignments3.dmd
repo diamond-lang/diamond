@@ -1,0 +1,17 @@
+function add(a, b)
+    return a + b
+
+a = 10 : float64
+print(a)
+print(add(a, 3.6))
+print(add(a, 20))
+
+result = add(20, 30) : float64
+print(result)
+
+--- Output
+10
+13.6
+30
+50
+---

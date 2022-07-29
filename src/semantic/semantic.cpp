@@ -253,53 +253,6 @@ std::vector<std::unordered_map<std::string, semantic::Binding>> semantic::Contex
 	return scopes;
 }
 
-
-Result<Ok, Error> semantic::Context::get_type_of_function(ast::CallNode& call) {
-	semantic::Binding* binding = this->get_binding(call.identifier->value);
-    if (!binding || !is_function(*binding)) {
-        this->errors.push_back(errors::undefined_function(call, this->current_module));
-        return Error {};
-    }
-	else if (binding->type == semantic::OverloadedFunctionsBinding) {
-		for (auto function: semantic::get_overloaded_functions(*binding)) {
-			// Check arguments types match
-			if (ast::get_types(function->args) == ast::get_types(call.args)) {
-				call.type = function->return_type;
-				return Ok {};
-			}
-		}
-
-		this->errors.push_back(errors::undefined_function(call, this->current_module));
-		return Error {};
-	}
-	else if (binding->type == semantic::GenericFunctionBinding) {
-		auto function = semantic::get_generic_function(*binding);
-
-		Result<ast::Type, Error> result;
-		if (this->current_module == function->module_path) {
-			result = this->get_type_of_generic_function(ast::get_types(call.args), function);
-		}
-		else {
-			Context context(this->ast);
-			context.current_module = function->module_path;
-			context.add_functions_to_current_scope(*this->ast.modules[function->module_path.string()]);
-			result = context.get_type_of_generic_function(ast::get_types(call.args), function);
-		}
-
-		if (result.is_ok()) {
-			call.function = semantic::get_generic_function(*binding);
-			call.type = result.get_value();
-			return Ok {};
-		}
-
-		return Error {};
-	}
-	else {
-		this->errors.push_back(errors::undefined_function(call, this->current_module));
-        return Error {};
-	}
-}
-
 Result<ast::Type, Error> semantic::Context::get_type_of_generic_function(std::vector<ast::Type> args, ast::FunctionNode* function, std::vector<ast::FunctionPrototype> call_stack) {
 	// Check specializations
 	for (auto& specialization: function->specializations) {
@@ -431,6 +384,51 @@ Result<Ok, Error> semantic::Context::check_constraint(std::unordered_map<std::st
 
 		return Ok {};
 	}
+}
+
+bool semantic::Context::depends_on_binding_with_concrete_type(ast::Node* node) {
+	switch (node->index()) {
+		case ast::Block: assert(false);
+        case ast::Function: assert(false);
+        case ast::Assignment: assert(false);
+        case ast::Return: assert(false);
+        case ast::Break: assert(false);
+        case ast::Continue: assert(false);
+        case ast::IfElse: {
+			assert(ast::is_expression(node));
+			auto& if_else = std::get<ast::IfElseNode>(*node);
+			return this->depends_on_binding_with_concrete_type(if_else.if_branch)
+			||     this->depends_on_binding_with_concrete_type(if_else.else_branch.value());
+		}
+        case ast::While: assert(false);
+        case ast::Use: assert(false);
+        case ast::Call: {
+			auto& call = std::get<ast::CallNode>(*node);
+			for (size_t i = 0; i != call.args.size(); i++) {
+				if (this->depends_on_binding_with_concrete_type(call.args[i])) {
+					return true;
+				}
+			}
+			return false;
+		}
+        case ast::Float: return false;
+        case ast::Integer: return false;
+        case ast::Identifier: {
+			auto& identifier = std::get<ast::IdentifierNode>(*node);
+			semantic::Binding* binding = this->get_binding(identifier.value);
+			if (binding) {
+				if (binding->type == semantic::AssignmentBinding
+				|| binding->type == semantic::FunctionArgumentBinding) {
+					return true;
+				}
+			}
+			return false;
+		}
+        case ast::Boolean: return false;
+        case ast::String: return false;
+		default: assert(false);
+	}
+	return false;
 }
 
 // Semantic analysis
@@ -629,21 +627,130 @@ Result<Ok, Error> semantic::Context::analyze(ast::WhileNode& node) {
 }
 
 Result<Ok, Error> semantic::Context::analyze(ast::CallNode& node) {
-	for (size_t i = 0; i < node.args.size(); i++) {
-		auto result = this->analyze(node.args[i]);
-		if (result.is_error()) return result;
+	// Check function exists
+	semantic::Binding* binding = this->get_binding(node.identifier->value);
+    if (!binding || !is_function(*binding)) {
+		// Analyze arguments
+		for (size_t i = 0; i < node.args.size(); i++) {
+			auto result = this->analyze(node.args[i]);
+			if (result.is_error()) return result;
+		}
+
+        this->errors.push_back(errors::undefined_function(node, this->current_module));
+        return Error {};
+    }
+	
+	// If is a overloaded function
+	else if (binding->type == semantic::OverloadedFunctionsBinding) {
+		// Analyze arguments
+		for (size_t i = 0; i < node.args.size(); i++) {
+			auto result = this->analyze(node.args[i]);
+			if (result.is_error()) return result;
+		}
+
+		// Search definition that match arguments
+		for (auto function: semantic::get_overloaded_functions(*binding)) {
+			// Check arguments types match
+			if (ast::get_types(function->args) == ast::get_types(node.args)) {
+				node.type = function->return_type;
+				return Ok {};
+			}
+		}
+
+		this->errors.push_back(errors::undefined_function(node, this->current_module));
+		return Error {};
 	}
 
-	return this->get_type_of_function(node);
+	// If is a generic function
+	else if (binding->type == semantic::GenericFunctionBinding) {
+		auto function = semantic::get_generic_function(*binding);
+
+		std::unordered_map<std::string, ast::Type> type_bindings;
+		for (size_t i = 0; i < node.args.size(); i++) {
+			bool type_variable = ast::get_type(function->args[i]).is_type_variable();
+			bool has_type_annotation = ast::get_type(node.args[i]) != ast::Type("");
+	
+			if (type_variable && (has_type_annotation || this->depends_on_binding_with_concrete_type(node.args[i]))) {
+				if (type_bindings.find(ast::get_type(function->args[i]).to_str()) == type_bindings.end()) {
+					if (this->depends_on_binding_with_concrete_type(node.args[i])) {
+						this->analyze(node.args[i]);
+					}
+					type_bindings[ast::get_type(function->args[i]).to_str()] = ast::get_type(node.args[i]);
+				}
+				else if (type_bindings[ast::get_type(function->args[i]).to_str()] != ast::get_type(node.args[i])) {
+					this->errors.push_back(Error{"Error: Incompatible types in function arguments"});
+					return Error {};
+				}
+			}
+		}
+		if (function->return_type.is_type_variable() && node.type != ast::Type("")) {
+			if (type_bindings.find(function->return_type.to_str()) == type_bindings.end()) {
+				type_bindings[function->return_type.to_str()] = node.type;
+			}
+			else if (type_bindings[function->return_type.to_str()] != node.type) {
+				this->errors.push_back(Error{"Error: Incompatible types in function arguments"});
+				return Error {};
+			}
+		}
+
+		// Analyze arguments
+		for (size_t i = 0; i < node.args.size(); i++) {
+			// Set expected type
+			if (type_bindings.find(ast::get_type(function->args[i]).to_str()) != type_bindings.end()) {
+				ast::set_type(node.args[i], type_bindings[ast::get_type(function->args[i]).to_str()]);
+			}
+
+			// Analyze argument
+			auto result = this->analyze(node.args[i]);
+			if (result.is_error()) return result;
+		}
+
+		// Get return type and analyze body
+		Result<ast::Type, Error> result;
+		if (this->current_module == function->module_path) {
+			result = this->get_type_of_generic_function(ast::get_types(node.args), function);
+		}
+		else {
+			Context context(this->ast);
+			context.current_module = function->module_path;
+			context.add_functions_to_current_scope(*this->ast.modules[function->module_path.string()]);
+			result = context.get_type_of_generic_function(ast::get_types(node.args), function);
+		}
+
+		if (result.is_ok()) {
+			node.function = semantic::get_generic_function(*binding);
+			node.type = result.get_value();
+			return Ok {};
+		}
+
+		return Error {};
+	}
+	else {
+		assert(false);
+		return Error {};
+	}
 }
 
 Result<Ok, Error> semantic::Context::analyze(ast::FloatNode& node) {
-	node.type = ast::Type("float64");
+	if (node.type == ast::Type("")) {
+		node.type = ast::Type("float64");
+	}
+	else if (node.type != ast::Type("float64")){
+		this->errors.push_back(Error("Error: Type mismatch between type annotation and expression"));
+		return Error {};
+	}
 	return Ok {};
 }
 
 Result<Ok, Error> semantic::Context::analyze(ast::IntegerNode& node) {
-	node.type = ast::Type("int64");
+	if (node.type == ast::Type("")) {
+		node.type = ast::Type("int64");
+	}
+	else if (node.type != ast::Type("int64")
+	&&       node.type != ast::Type("float64")) {
+		this->errors.push_back(Error("Error: Type mismatch between type annotation and expression"));
+		return Error {};
+	}
 	return Ok {};
 }
 
@@ -654,12 +761,24 @@ Result<Ok, Error> semantic::Context::analyze(ast::IdentifierNode& node) {
 		return Error {};
 	}
 	else {
-		node.type = semantic::get_binding_type(*binding);
+		if (node.type == ast::Type("")) {
+			node.type = semantic::get_binding_type(*binding);
+		}
+		else if (node.type != semantic::get_binding_type(*binding)) {
+			this->errors.push_back(Error("Error: Type mismatch between type annotation and expression"));
+			return Error {};
+		}
 		return Ok {};
 	}
 }
 
 Result<Ok, Error> semantic::Context::analyze(ast::BooleanNode& node) {
-	node.type = ast::Type("bool");
+	if (node.type == ast::Type("")) {
+		node.type = ast::Type("bool");
+	}
+	else if (node.type != ast::Type("bool")) {
+		this->errors.push_back(Error("Error: Type mismatch between type annotation and expression"));
+		return Error {};
+	}
 	return Ok {};
 }
