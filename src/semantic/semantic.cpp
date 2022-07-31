@@ -602,13 +602,29 @@ Result<Ok, Error> semantic::Context::analyze(ast::IfElseNode& node) {
 		this->errors.push_back(std::string("Error: The condition in a if must be boolean"));
 	}
 
-	auto if_branch = this->analyze(node.if_branch);
-	if (if_branch.is_error()) return if_branch;
+	if (ast::is_expression((ast::Node*) &node)) {
+		auto if_branch = this->analyze(node.if_branch);
+		if (if_branch.is_error()) return if_branch;
 
-	if (!node.else_branch.has_value()) return Ok {};
+		auto else_branch = this->analyze(node.else_branch.value());
+		if (else_branch.is_error()) return else_branch;
 
-	auto else_branch = this->analyze(node.else_branch.value());
-	if (else_branch.is_error()) return else_branch;
+		if (ast::get_type(node.if_branch) != ast::get_type(node.else_branch.value())) {
+			this->errors.push_back(std::string("Error: Both branches of if else expression must have the same type"));
+			return Error {};
+		}
+
+		node.type = ast::get_type(node.if_branch);
+	}
+	else {
+		auto if_branch = this->analyze(node.if_branch);
+		if (if_branch.is_error()) return if_branch;
+
+		if (!node.else_branch.has_value()) return Ok {};
+
+		auto else_branch = this->analyze(node.else_branch.value());
+		if (else_branch.is_error()) return else_branch;
+	}
 
 	return Ok {};
 }

@@ -255,7 +255,6 @@ Result<ast::Node*, Error> Parser::parse_block_statement_or_expression() {
 
 		this->position = position;
 		this->errors = errors;
-		this->advance_until_next_statement();
 		auto expression = this->parse_expression();
 		if (expression.is_ok()) return expression.get_value();
 		else {
@@ -530,6 +529,8 @@ Result<ast::Node*, Error> Parser::parse_call() {
 }
 
 Result<ast::Node*, Error> Parser::parse_expression() {
+	this->advance_until_next_statement();
+
 	auto expr = this->parse_expression_2();
 	if (expr.is_error()) return Error {};
 
@@ -579,7 +580,7 @@ Result<ast::Node*, Error> Parser::parse_if_else_expr() {
 	this->advance_until_next_statement();
 
 	// Match else
-	if (this->current().column == indentation_level && this->current() == token::Else) {
+	if (this->current() == token::Else) {
 		this->advance();
 
 		// Parse else branch

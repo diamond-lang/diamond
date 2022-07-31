@@ -1,0 +1,40 @@
+function add(a, b)
+    if true
+        20
+    else
+        20
+
+a = if true 20 else 30
+
+b = if false 
+        3.5
+    else
+        3.6
+
+c = if false 209
+    else     10
+
+d = if true
+   234
+else
+   200
+
+e = 
+   if true
+      35
+    else
+      25
+
+print(a)
+print(b)
+print(c)
+print(d)
+print(e)
+
+--- Output
+20
+3.6
+10
+234
+35
+---
