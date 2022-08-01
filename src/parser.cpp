@@ -286,7 +286,6 @@ Result<ast::Node*, Error> Parser::parse_block_statement_or_expression() {
 Result<ast::Node*, Error> Parser::parse_function() {
 	// Create node
 	auto function = ast::FunctionNode {this->current().line, this->current().column};
-	function.generic = true;
 	function.module_path = this->file;
 
 	// Parse keyword
@@ -306,6 +305,16 @@ Result<ast::Node*, Error> Parser::parse_function() {
 	while (this->current() != token::RightParen && !this->at_end()) {
 		auto arg = this->parse_identifier();
 		if (arg.is_error()) return arg;
+
+		// Parse type annotation
+		if (this->current() == token::Colon) {
+			this->advance();
+			
+			auto token = this->parse_token(token::Identifier);
+			if (token.is_error()) return Error {};
+			
+			ast::set_type(arg.get_value(), ast::Type(token.get_value().get_literal()));
+		}
 		function.args.push_back(arg.get_value());
 
 		if (this->current() == token::Comma) this->advance();
@@ -316,6 +325,16 @@ Result<ast::Node*, Error> Parser::parse_function() {
 	auto right_paren = this->parse_token(token::RightParen);
 	if (right_paren.is_error()) return Error {};
 
+	// Parse type annotation
+	if (this->current() == token::Colon) {
+		this->advance();
+		
+		auto token = this->parse_token(token::Identifier);
+		if (token.is_error()) return Error {};
+		
+		function.return_type = ast::Type(token.get_value().get_literal());
+	}
+
 	// Parse body
 	auto body = this->parse_block_statement_or_expression();
 	if (body.is_error()) return Error {};
@@ -323,6 +342,17 @@ Result<ast::Node*, Error> Parser::parse_function() {
 
 	if (!ast::is_expression(function.body) && ast::could_be_expression(function.body)) {
 		ast::transform_to_expression(function.body);
+	}
+
+	// Check if function is generic or not
+	for (auto arg: function.args) {
+		if (ast::get_type(arg) == ast::Type("")) {
+			function.generic = true;
+			break;
+		}
+	}
+	if (function.return_type == ast::Type("")) {
+		function.generic = true;
 	}
 
 	this->ast.push_back(function);
