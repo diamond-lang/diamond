@@ -1,0 +1,7 @@
+b = if true 30 else 40 : float64
+b = b + 3.5
+print(b)
+
+--- Output
+33.5
+---

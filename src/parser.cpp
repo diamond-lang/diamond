@@ -543,6 +543,12 @@ Result<ast::Node*, Error> Parser::parse_expression() {
 		ast::set_type(expr.get_value(), ast::Type(token.get_value().get_literal()));
 	}
 
+	if (expr.get_value()->index() == ast::IfElse) {
+		auto& if_else = std::get<ast::IfElseNode>(*expr.get_value());
+		ast::set_type(if_else.if_branch, ast::get_type(expr.get_value()));
+		ast::set_type(if_else.else_branch.value(), ast::get_type(expr.get_value()));
+	}
+
 	return expr;
 }
 
@@ -571,7 +577,7 @@ Result<ast::Node*, Error> Parser::parse_if_else_expr() {
 
 	// Parse if branch
 	this->advance_until_next_statement();
-	auto expression = this->parse_expression();
+	auto expression = this->parse_expression_2();
 	if (expression.is_error()) return Error {};
 	if_else.if_branch = expression.get_value();
 
@@ -585,7 +591,7 @@ Result<ast::Node*, Error> Parser::parse_if_else_expr() {
 
 		// Parse else branch
 		this->advance_until_next_statement();
-		auto expression = this->parse_expression();
+		auto expression = this->parse_expression_2();
 		if (expression.is_error()) return Error {};
 		if_else.else_branch = expression.get_value();
 
