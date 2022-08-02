@@ -143,7 +143,7 @@ void semantic::Context::add_functions_to_current_scope(ast::BlockNode& block) {
 
 			}
 			else {
-				scope[identifier] = Binding({function});
+				scope[identifier] = Binding(std::vector{function});
 			}
 		}
 		else if (is_function(scope[identifier])) {
@@ -212,7 +212,7 @@ void semantic::Context::add_functions_to_current_scope(ast::BlockNode& block) {
 
 				}
 				else {
-					scope[identifier] = Binding({function});
+					scope[identifier] = Binding(std::vector{function});
 				}
 			}
 			else if (is_function(scope[identifier])) {
@@ -464,7 +464,10 @@ Result<Ok, Error> semantic::Context::analyze(ast::BlockNode& node) {
 			this->analyze(*semantic::get_generic_function(binding));
 		}
 		else if (binding.type == semantic::OverloadedFunctionsBinding) {
-			assert(false);
+			auto functions = semantic::get_overloaded_functions(binding);
+			for (size_t i = 0; i < functions.size(); i++) {
+				this->analyze(*functions[i]);
+			}
 		}
 	}
 
@@ -538,7 +541,7 @@ Result<Ok, Error> semantic::Context::analyze(ast::FunctionNode& node) {
 				if (result.is_error()) return Error {};
 			}
 			else {
-				Context context(ast);
+				Context context(this->ast);
 				context.current_module = node.module_path;
 				context.add_functions_to_current_scope(*this->ast.modules[context.current_module.string()]);
 				auto result = type_inference::analyze(context, &node);
@@ -546,7 +549,27 @@ Result<Ok, Error> semantic::Context::analyze(ast::FunctionNode& node) {
 			}
 		}
 	}
-	else assert(false);
+	else {
+		Context context(this->ast);
+		context.current_module = node.module_path;
+
+		if (this->current_module == node.module_path) {
+			context.scopes = this->get_definitions();
+		}
+		else {
+			context.add_functions_to_current_scope(*this->ast.modules[context.current_module.string()]);
+		}
+
+		context.add_scope();
+		for (auto arg: node.args) {
+			assert(arg->index() == ast::Identifier);
+			auto& identifier = std::get<ast::IdentifierNode>(*arg);
+			context.current_scope()[identifier.value] = semantic::Binding(arg);
+		}
+
+		auto result = context.analyze(node.body);
+		if (result.is_error()) return Error {};
+	}
 	return Ok {};
 }
 
