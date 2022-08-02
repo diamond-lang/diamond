@@ -38,6 +38,7 @@ namespace token {
 		Else,
 		While,
 		Function,
+		Type,
 		NonLocal,
 		True,
 		False,
