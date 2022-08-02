@@ -341,16 +341,34 @@ static std::string get_function_name(std::filesystem::path file, std::string ide
 
 void codegen::Context::codegen_function_prototypes(std::vector<ast::FunctionNode*> functions) {
 	for (auto& function: functions) {
-		assert(function->generic);
+		if (function->generic) {
+			for (auto& specialization: function->specializations) {
+				// Make function type
+				std::vector<llvm::Type*> args_types = this->as_llvm_types(specialization.args);
+				auto return_type = this->as_llvm_type(specialization.return_type);
+				llvm::FunctionType* function_type = llvm::FunctionType::get(return_type, args_types, false);
 
-		for (auto& specialization: function->specializations) {
+				// Create function
+				std::string name = get_function_name(function->module_path, function->identifier->value, specialization.args, specialization.return_type);
+				llvm::Function* f = llvm::Function::Create(function_type, llvm::Function::ExternalLinkage, name, this->module);
+
+				// Set args for names
+				size_t j = 0;
+				for (auto &arg : f->args()) {
+					assert(function->args[j]->index() == ast::Identifier);
+					arg.setName(((ast::IdentifierNode*) function->args[j])->value);
+					j++;
+				}
+			}
+		}
+		else {
 			// Make function type
-			std::vector<llvm::Type*> args_types = this->as_llvm_types(specialization.args);
-			auto return_type = this->as_llvm_type(specialization.return_type);
+			std::vector<llvm::Type*> args_types = this->as_llvm_types(ast::get_types(function->args));
+			auto return_type = this->as_llvm_type(function->return_type);
 			llvm::FunctionType* function_type = llvm::FunctionType::get(return_type, args_types, false);
 
 			// Create function
-			std::string name = get_function_name(function->module_path, function->identifier->value, specialization.args, specialization.return_type);
+			std::string name = get_function_name(function->module_path, function->identifier->value, ast::get_types(function->args), function->return_type);
 			llvm::Function* f = llvm::Function::Create(function_type, llvm::Function::ExternalLinkage, name, this->module);
 
 			// Set args for names
@@ -366,10 +384,65 @@ void codegen::Context::codegen_function_prototypes(std::vector<ast::FunctionNode
 
 void codegen::Context::codegen_function_bodies(std::vector<ast::FunctionNode*> functions) {
 	for (auto& function: functions) {
-		assert(function->generic);
+		if (function->generic) {
+			for (auto& specialization: function->specializations) {
+				std::string name = get_function_name(function->module_path, function->identifier->value, specialization.args, specialization.return_type);
+				llvm::Function* f = this->module->getFunction(name);
 
-		for (auto& specialization: function->specializations) {
-			std::string name = get_function_name(function->module_path, function->identifier->value, specialization.args, specialization.return_type);
+				// Create the body of the function
+				llvm::BasicBlock *body = llvm::BasicBlock::Create(*(this->context), "entry", f);
+				this->builder->SetInsertPoint(body);
+
+				// Set current entry block
+				this->current_entry_block = &f->getEntryBlock();
+
+				// Add arguments to scope
+				this->add_scope();
+				size_t j = 0;
+				for (auto &arg : f->args()) {
+					assert(function->args[j]->index() == ast::Identifier);
+
+					// Create allocation for argument
+					auto allocation = this->create_allocation(((ast::IdentifierNode*) function->args[j])->value, arg.getType());
+
+					// Store initial value
+					this->builder->CreateStore(&arg, allocation);
+
+					// Add arguments to scope
+					this->current_scope()[((ast::IdentifierNode*) function->args[j])->value] = allocation;
+					j++;
+				}
+
+				// Codegen body
+				this->type_bindings = specialization.type_bindings;
+
+				if (ast::is_expression(function->body) && function->return_type != ast::Type("void")) {
+					llvm::Value* result = this->codegen(function->body);
+					if (result) {
+						this->builder->CreateRet(result);
+					}
+				}
+				else {
+					this->codegen(function->body);
+					if (specialization.return_type == ast::Type("void")) {
+						this->builder->CreateRetVoid();
+					}
+				}
+
+				this->type_bindings = {};
+
+				// Verify function
+				llvm::verifyFunction(*f);
+
+				// Run optimizations
+				this->function_pass_manager->run(*f);
+
+				// Remove scope
+				this->remove_scope();
+			}
+		}
+		else {
+			std::string name = get_function_name(function->module_path, function->identifier->value, ast::get_types(function->args), function->return_type);
 			llvm::Function* f = this->module->getFunction(name);
 
 			// Create the body of the function
@@ -397,7 +470,7 @@ void codegen::Context::codegen_function_bodies(std::vector<ast::FunctionNode*> f
 			}
 
 			// Codegen body
-			this->type_bindings = specialization.type_bindings;
+			this->type_bindings = {};
 
 			if (ast::is_expression(function->body) && function->return_type != ast::Type("void")) {
 				llvm::Value* result = this->codegen(function->body);
@@ -407,12 +480,10 @@ void codegen::Context::codegen_function_bodies(std::vector<ast::FunctionNode*> f
 			}
 			else {
 				this->codegen(function->body);
-				if (specialization.return_type == ast::Type("void")) {
+				if (function->return_type == ast::Type("void")) {
 					this->builder->CreateRetVoid();
 				}
 			}
-
-			this->type_bindings = {};
 
 			// Verify function
 			llvm::verifyFunction(*f);

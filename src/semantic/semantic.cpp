@@ -691,6 +691,7 @@ Result<Ok, Error> semantic::Context::analyze(ast::CallNode& node) {
 		for (auto function: semantic::get_overloaded_functions(*binding)) {
 			// Check arguments types match
 			if (ast::get_types(function->args) == ast::get_types(node.args)) {
+				node.function = function;
 				node.type = function->return_type;
 				return Ok {};
 			}
