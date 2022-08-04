@@ -25,6 +25,7 @@ namespace ast {
 
 	struct BlockNode;
 	struct FunctionNode;
+	struct TypeNode;
 	struct AssignmentNode;
 	struct ReturnNode;
 	struct BreakNode;
@@ -42,6 +43,7 @@ namespace ast {
 	enum NodeVariant {
         Block,
         Function,
+		TypeDef,
         Assignment,
         Return,
         Break,
@@ -60,6 +62,7 @@ namespace ast {
 	using Node = std::variant<
 		BlockNode,
 		FunctionNode,
+		TypeNode,
 		AssignmentNode,
 		ReturnNode,
 		BreakNode,
@@ -94,6 +97,7 @@ namespace ast {
 		std::vector<Node*> statements;
 		std::vector<UseNode*> use_statements;
 		std::vector<FunctionNode*> functions;
+		std::vector<TypeNode*> types;
 	};
 
 	struct FunctionSpecialization {
@@ -129,6 +133,15 @@ namespace ast {
 		std::vector<FunctionSpecialization> specializations;
 		FunctionConstraints constraints;
 		std::filesystem::path module_path; // Used in to tell from which module the function comes from
+	};
+
+	struct TypeNode {
+		size_t line;
+		size_t column;
+		Type type = Type("");
+
+		IdentifierNode* identifier;
+		std::vector<IdentifierNode*> fields;
 	};
 
 	struct AssignmentNode {

@@ -24,6 +24,7 @@ namespace type_inference {
         Result<Ok, Error> analyze(ast::Node* node);
 		Result<Ok, Error> analyze(ast::BlockNode& node);
 		Result<Ok, Error> analyze(ast::FunctionNode& node);
+        Result<Ok, Error> analyze(ast::TypeNode& node) {return Ok {};}
 		Result<Ok, Error> analyze(ast::AssignmentNode& node);
 		Result<Ok, Error> analyze(ast::ReturnNode& node);
 		Result<Ok, Error> analyze(ast::BreakNode& node) {return Ok {};}
@@ -41,6 +42,7 @@ namespace type_inference {
         void unify(ast::Node* node);
 		void unify(ast::BlockNode& node);
 		void unify(ast::FunctionNode& node) {}
+        void unify(ast::TypeNode& node) {}
 		void unify(ast::AssignmentNode& node);
 		void unify(ast::ReturnNode& node);
 		void unify(ast::BreakNode& node) {}

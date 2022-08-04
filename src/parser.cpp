@@ -22,6 +22,7 @@ struct Parser {
 	Result<ast::Node*, Error> parse_program();
 	Result<ast::Node*, Error> parse_block();
 	Result<ast::Node*, Error> parse_function();
+	Result<ast::Node*, Error> parse_type();
 	Result<ast::Node*, Error> parse_statement();
 	Result<ast::Node*, Error> parse_block_or_statement();
 	Result<ast::Node*, Error> parse_block_statement_or_expression();
@@ -174,6 +175,10 @@ Result<ast::Node*, Error> Parser::parse_block() {
 				case ast::Function:
 					block.functions.push_back((ast::FunctionNode*) result.get_value());
 					break;
+				
+				case ast::TypeDef:
+					block.types.push_back((ast::TypeNode*) result.get_value());
+					break;
 
 				case ast::Use:
 					block.use_statements.push_back((ast::UseNode*) result.get_value());
@@ -210,6 +215,7 @@ Result<ast::Node*, Error> Parser::parse_block() {
 Result<ast::Node*, Error> Parser::parse_statement() {
 	switch (this->current().variant) {
 		case token::Function: return this->parse_function();
+		case token::Type:     return this->parse_type();
 		case token::Return:   return this->parse_return_stmt();
 		case token::If:       return this->parse_if_else();
 		case token::While:    return this->parse_while_stmt();
@@ -356,6 +362,68 @@ Result<ast::Node*, Error> Parser::parse_function() {
 	}
 
 	this->ast.push_back(function);
+	return this->ast.last_element();
+}
+
+Result<ast::Node*, Error> Parser::parse_type() {
+	// Create node
+	auto type = ast::TypeNode {this->current().line, this->current().column};
+
+	// Parse keyword
+	auto keyword = this->parse_token(token::Type);
+	if (keyword.is_error()) return Error {};
+
+	// Parse indentifier
+	auto identifier = this->parse_identifier();
+	if (identifier.is_error()) return identifier;
+	type.identifier = (ast::IdentifierNode*) identifier.get_value();
+
+	// Set new indentation level
+	this->advance_until_next_statement();
+	size_t previous = this->current_indentation();
+	this->indentation_level.push_back(this->current().column);
+	if (previous >= this->current_indentation()) {
+		this->errors.push_back(errors::expecting_new_indentation_level(this->location())); // tested in errors/expecting_new_indentation_level.dm
+		return Error {};
+	}
+
+	while (!this->at_end()) {
+		// Advance until next field
+		size_t backup = this->position;
+		this->advance_until_next_statement();
+		if (this->at_end()) break;
+
+		// Check indentation
+		if (this->current().column < this->current_indentation()) {
+			this->position = backup;
+			break;
+		}
+		else if (this->current().column > this->current_indentation()) {
+			this->errors.push_back(errors::unexpected_indent(this->location())); // tested in test/errors/unexpected_indentation_1.dm and test/errors/unexpected_indentation_2.dm
+			return Error {};
+		}
+
+		// Parse field
+		auto field = this->parse_identifier();
+		if (field.is_error()) return Error {};
+		
+		// Parse colon
+		auto colon = this->parse_token(token::Colon);
+		if (colon.is_error()) return Error {};
+
+		auto type_identifier = this->parse_token(token::Identifier);
+		if (type_identifier.is_error()) return Error {};
+
+		ast::set_type(field.get_value(), ast::Type(type_identifier.get_value().get_literal()));
+
+		this->ast.push_back(*field.get_value());
+		type.fields.push_back((ast::IdentifierNode*) this->ast.last_element());
+	}
+
+	// Pop indentation level
+	this->indentation_level.pop_back();
+
+	this->ast.push_back(type);
 	return this->ast.last_element();
 }
 

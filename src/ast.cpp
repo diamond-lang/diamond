@@ -299,26 +299,43 @@ void ast::print(Node* node, PrintContext context) {
 	switch (node->index()) {
 		case Block: {
 			auto& block = std::get<BlockNode>(*node);
-
+			
+			// Put all nodes of block in a vector
+			std::vector<Node*> nodes = {};
 			for (size_t i = 0; i < block.use_statements.size(); i++) {	
-				bool is_last = block.statements.size() == 0 && block.functions.size() == 0 && i == block.use_statements.size() - 1;
-				print((ast::Node*) block.use_statements[i], PrintContext{context.indent_level + 1, append(context.last, is_last), context.concrete, context.type_bindings});
+				nodes.push_back((Node*) block.use_statements[i]);
 			}
 			for (size_t i = 0; i < block.statements.size(); i++) {
-				bool is_last = block.functions.size() == 0 && i == block.statements.size() - 1;
-				print(block.statements[i], PrintContext{context.indent_level + 1, append(context.last, is_last), context.concrete, context.type_bindings});
+				nodes.push_back(block.statements[i]);
+			}
+			for (size_t i = 0; i < block.types.size(); i++) {
+				nodes.push_back((Node*) block.types[i]);
 			}
 			for (size_t i = 0; i < block.functions.size(); i++) {
-				if (!context.concrete) {
-					bool is_last = i == block.functions.size() - 1;
-					print((ast::Node*) block.functions[i], PrintContext{context.indent_level + 1, append(context.last, is_last), context.concrete, context.type_bindings});
+				nodes.push_back((Node*) block.functions[i]);
+			}
+			
+			// Print all nodes
+			for (size_t i = 0; i < nodes.size(); i++) {
+				if (!context.concrete || nodes[i]->index() != Function) {
+					bool is_last = i == nodes.size() - 1;
+					print(nodes[i], PrintContext{context.indent_level + 1, append(context.last, is_last), context.concrete, context.type_bindings});
 				}
 				else {
-					auto& function = *block.functions[i];
-					for (size_t j = 0; j < function.specializations.size(); j++) {
-						bool is_last = i == block.functions.size() - 1 && j == function.specializations.size() - 1;
-						context.type_bindings = function.specializations[j].type_bindings;
-						print((ast::Node*) block.functions[i], PrintContext{context.indent_level + 1, append(context.last, is_last), context.concrete, context.type_bindings});
+					auto function = (ast::FunctionNode*) nodes[i];
+					for (size_t j = 0; j < function->specializations.size(); j++) {
+						
+						// Check if is last specialization
+						bool is_last = j == function->specializations.size() - 1;
+						for (size_t k = i + 1; k < nodes.size(); k++) {
+							if (((FunctionNode*)nodes[k])->specializations.size() != 0) {
+								is_last = false;
+								break;
+							}
+						}
+
+						context.type_bindings = function->specializations[j].type_bindings;
+						print((ast::Node*) nodes[i], PrintContext{context.indent_level + 1, append(context.last, is_last), context.concrete, context.type_bindings});
 					}
 				}
 			}
@@ -385,6 +402,20 @@ void ast::print(Node* node, PrintContext context) {
 					}
 					std::cout << "\n";
 				}
+			}
+
+			break;
+		}
+
+		case TypeDef: {
+			auto& type = std::get<TypeNode>(*node);
+			
+			put_indent_level(context.indent_level, append(context.last, type.fields.size() == 0));
+			std::cout << "type " << type.identifier->value << '\n';
+
+			for (size_t i = 0; i < type.fields.size(); i++) {
+				bool is_last = i == type.fields.size() - 1;
+				print((Node*) type.fields[i], PrintContext{context.indent_level + 1, append(context.last, is_last), context.concrete, context.type_bindings});
 			}
 
 			break;

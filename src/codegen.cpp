@@ -70,6 +70,7 @@ namespace codegen {
 		llvm::Value* codegen(ast::FunctionNode& node) {return nullptr;}
 		void codegen_function_prototypes(std::vector<ast::FunctionNode*> functions);
 		void codegen_function_bodies(std::vector<ast::FunctionNode*> functions);
+		llvm::Value* codegen(ast::TypeNode& node) {return nullptr;}
 		llvm::Value* codegen(ast::AssignmentNode& node);
 		llvm::Value* codegen(ast::ReturnNode& node);
 		llvm::Value* codegen(ast::BreakNode& node);
