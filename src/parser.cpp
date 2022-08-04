@@ -35,7 +35,6 @@ struct Parser {
 	Result<ast::Node*, Error> parse_use_stmt();
 	Result<ast::Node*, Error> parse_call();
 	Result<ast::Node*, Error> parse_expression();
-	Result<ast::Node*, Error> parse_expression_2();
 	Result<ast::Node*, Error> parse_if_else_expr();
 	Result<ast::Node*, Error> parse_not_expr();
 	Result<ast::Node*, Error> parse_binary(int precedence = 1);
@@ -463,6 +462,21 @@ Result<ast::Node*, Error> Parser::parse_assignment() {
 	if (expression.is_error()) return expression;
 	assignment.expression = expression.get_value();
 
+	if (this->current() == token::Colon) {
+		this->advance();
+
+		auto token = this->parse_token(token::Identifier);
+		if (token.is_error()) return Error {};
+
+		ast::set_type(assignment.expression, ast::Type(token.get_value().get_literal()));
+
+		if (assignment.expression->index() == ast::IfElse) {
+			auto& if_else = std::get<ast::IfElseNode>(*assignment.expression);
+			ast::set_type(if_else.if_branch, ast::get_type(assignment.expression));
+			ast::set_type(if_else.else_branch.value(), ast::get_type(assignment.expression));
+		}
+	}
+
 	this->ast.push_back(assignment);
 	return this->ast.last_element();
 }
@@ -629,28 +643,6 @@ Result<ast::Node*, Error> Parser::parse_call() {
 Result<ast::Node*, Error> Parser::parse_expression() {
 	this->advance_until_next_statement();
 
-	auto expr = this->parse_expression_2();
-	if (expr.is_error()) return Error {};
-
-	if (this->current() == token::Colon) {
-		this->advance();
-
-		auto token = this->parse_token(token::Identifier);
-		if (token.is_error()) return Error {};
-
-		ast::set_type(expr.get_value(), ast::Type(token.get_value().get_literal()));
-	}
-
-	if (expr.get_value()->index() == ast::IfElse) {
-		auto& if_else = std::get<ast::IfElseNode>(*expr.get_value());
-		ast::set_type(if_else.if_branch, ast::get_type(expr.get_value()));
-		ast::set_type(if_else.else_branch.value(), ast::get_type(expr.get_value()));
-	}
-
-	return expr;
-}
-
-Result<ast::Node*, Error> Parser::parse_expression_2() {
 	switch (this->current().variant) {
 		case token::If:  return this->parse_if_else_expr();
 		case token::Not: return this->parse_not_expr();
@@ -675,7 +667,7 @@ Result<ast::Node*, Error> Parser::parse_if_else_expr() {
 
 	// Parse if branch
 	this->advance_until_next_statement();
-	auto expression = this->parse_expression_2();
+	auto expression = this->parse_expression();
 	if (expression.is_error()) return Error {};
 	if_else.if_branch = expression.get_value();
 
@@ -689,7 +681,7 @@ Result<ast::Node*, Error> Parser::parse_if_else_expr() {
 
 		// Parse else branch
 		this->advance_until_next_statement();
-		auto expression = this->parse_expression_2();
+		auto expression = this->parse_expression();
 		if (expression.is_error()) return Error {};
 		if_else.else_branch = expression.get_value();
 
@@ -712,7 +704,7 @@ Result<ast::Node*, Error> Parser::parse_not_expr() {
 	call.identifier = (ast::IdentifierNode*) identifier.get_value();
 
 	// Parse expression
-	auto expression = this->parse_expression_2();
+	auto expression = this->parse_expression();
 	if (expression.is_error()) return expression;
 	call.args.push_back(expression.get_value());
 
