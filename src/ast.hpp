@@ -33,6 +33,7 @@ namespace ast {
 	struct IfElseNode;
 	struct WhileNode;
 	struct UseNode;
+	struct CallArgumentNode;
 	struct CallNode;
 	struct FloatNode;
 	struct IntegerNode;
@@ -51,6 +52,7 @@ namespace ast {
         IfElse,
         While,
         Use,
+		CallArgument,
         Call,
         Float,
         Integer,
@@ -70,6 +72,7 @@ namespace ast {
 		IfElseNode,
 		WhileNode,
 		UseNode,
+		CallArgumentNode,
 		CallNode,
 		FloatNode,
 		IntegerNode,
@@ -83,6 +86,7 @@ namespace ast {
 	Type get_concrete_type(Type type_variable, std::unordered_map<std::string, Type>& type_bindings);
 	void set_type(Node* node, Type type);
 	std::vector<Type> get_types(std::vector<Node*> nodes);
+	std::vector<Type> get_types(std::vector<CallArgumentNode*> nodes);
 	std::vector<Type> get_concrete_types(std::vector<Node*> nodes, std::unordered_map<std::string, Type>& type_bindings);
 	std::vector<Type> get_concrete_types(std::vector<Type> type_variables, std::unordered_map<std::string, Type>& type_bindings);
 	bool is_expression(Node* node);
@@ -204,13 +208,22 @@ namespace ast {
 		bool include = false;
 	};
 
+	struct CallArgumentNode {
+		size_t line;
+		size_t column;
+		Type type = Type("");
+
+		std::optional<IdentifierNode*> identifier = std::nullopt;
+		Node* expression;
+	};
+
 	struct CallNode {
 		size_t line;
 		size_t column;
 		Type type = Type("");
 
 		IdentifierNode* identifier;
-		std::vector<Node*> args;
+		std::vector<CallArgumentNode*> args;
 		FunctionNode* function; 
 	};
 

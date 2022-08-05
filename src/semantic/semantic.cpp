@@ -405,7 +405,7 @@ bool semantic::Context::depends_on_binding_with_concrete_type(ast::Node* node) {
         case ast::Call: {
 			auto& call = std::get<ast::CallNode>(*node);
 			for (size_t i = 0; i != call.args.size(); i++) {
-				if (this->depends_on_binding_with_concrete_type(call.args[i])) {
+				if (this->depends_on_binding_with_concrete_type(call.args[i]->expression)) {
 					return true;
 				}
 			}
@@ -671,7 +671,7 @@ Result<Ok, Error> semantic::Context::analyze(ast::CallNode& node) {
     if (!binding || !is_function(*binding)) {
 		// Analyze arguments
 		for (size_t i = 0; i < node.args.size(); i++) {
-			auto result = this->analyze(node.args[i]);
+			auto result = this->analyze(node.args[i]->expression);
 			if (result.is_error()) return result;
 		}
 
@@ -683,7 +683,7 @@ Result<Ok, Error> semantic::Context::analyze(ast::CallNode& node) {
 	else if (binding->type == semantic::OverloadedFunctionsBinding) {
 		// Analyze arguments
 		for (size_t i = 0; i < node.args.size(); i++) {
-			auto result = this->analyze(node.args[i]);
+			auto result = this->analyze(node.args[i]->expression);
 			if (result.is_error()) return result;
 		}
 
@@ -708,16 +708,16 @@ Result<Ok, Error> semantic::Context::analyze(ast::CallNode& node) {
 		std::unordered_map<std::string, ast::Type> type_bindings;
 		for (size_t i = 0; i < node.args.size(); i++) {
 			bool type_variable = ast::get_type(function->args[i]).is_type_variable();
-			bool has_type_annotation = ast::get_type(node.args[i]) != ast::Type("");
+			bool has_type_annotation = ast::get_type(node.args[i]->expression) != ast::Type("");
 	
-			if (type_variable && (has_type_annotation || this->depends_on_binding_with_concrete_type(node.args[i]))) {
+			if (type_variable && (has_type_annotation || this->depends_on_binding_with_concrete_type(node.args[i]->expression))) {
 				if (type_bindings.find(ast::get_type(function->args[i]).to_str()) == type_bindings.end()) {
-					if (this->depends_on_binding_with_concrete_type(node.args[i])) {
-						this->analyze(node.args[i]);
+					if (this->depends_on_binding_with_concrete_type(node.args[i]->expression)) {
+						this->analyze(node.args[i]->expression);
 					}
-					type_bindings[ast::get_type(function->args[i]).to_str()] = ast::get_type(node.args[i]);
+					type_bindings[ast::get_type(function->args[i]).to_str()] = ast::get_type(node.args[i]->expression);
 				}
-				else if (type_bindings[ast::get_type(function->args[i]).to_str()] != ast::get_type(node.args[i])) {
+				else if (type_bindings[ast::get_type(function->args[i]).to_str()] != ast::get_type(node.args[i]->expression)) {
 					this->errors.push_back(Error{"Error: Incompatible types in function arguments"});
 					return Error {};
 				}
@@ -737,11 +737,11 @@ Result<Ok, Error> semantic::Context::analyze(ast::CallNode& node) {
 		for (size_t i = 0; i < node.args.size(); i++) {
 			// Set expected type
 			if (type_bindings.find(ast::get_type(function->args[i]).to_str()) != type_bindings.end()) {
-				ast::set_type(node.args[i], type_bindings[ast::get_type(function->args[i]).to_str()]);
+				ast::set_type(node.args[i]->expression, type_bindings[ast::get_type(function->args[i]).to_str()]);
 			}
 
 			// Analyze argument
-			auto result = this->analyze(node.args[i]);
+			auto result = this->analyze(node.args[i]->expression);
 			if (result.is_error()) return result;
 		}
 

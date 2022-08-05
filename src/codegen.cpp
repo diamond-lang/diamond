@@ -78,6 +78,7 @@ namespace codegen {
 		llvm::Value* codegen(ast::IfElseNode& node);
 		llvm::Value* codegen(ast::WhileNode& node);
 		llvm::Value* codegen(ast::UseNode& node) {return nullptr;}
+		llvm::Value* codegen(ast::CallArgumentNode& node) {return nullptr;}
 		llvm::Value* codegen(ast::CallNode& node);
 		llvm::Value* codegen(ast::FloatNode& node);
 		llvm::Value* codegen(ast::IntegerNode& node);
@@ -118,6 +119,14 @@ namespace codegen {
 			std::vector<ast::Type> types;
 			for (auto& node: nodes) {
 				types.push_back(this->get_type(node));
+			}
+			return types;
+		}
+
+		std::vector<ast::Type> get_types(std::vector<ast::CallArgumentNode*> nodes) {
+			std::vector<ast::Type> types;
+			for (auto& node: nodes) {
+				types.push_back(this->get_type(node->expression));
 			}
 			return types;
 		}
@@ -693,7 +702,7 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
 	// Codegen args
 	std::vector<llvm::Value*> args;
 	for (size_t i = 0; i < node.args.size(); i++) {
-		args.push_back(this->codegen(node.args[i]));
+		args.push_back(this->codegen(node.args[i]->expression));
 	}
 
 	if (node.args.size() == 2) {

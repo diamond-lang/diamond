@@ -65,6 +65,7 @@ namespace semantic {
 		Result<Ok, Error> analyze(ast::IfElseNode& node);
 		Result<Ok, Error> analyze(ast::WhileNode& node);
 		Result<Ok, Error> analyze(ast::UseNode& node) {return Ok {};}
+		Result<Ok, Error> analyze(ast::CallArgumentNode& node) {return Ok {};}
 		Result<Ok, Error> analyze(ast::CallNode& node);
 		Result<Ok, Error> analyze(ast::FloatNode& node);
 		Result<Ok, Error> analyze(ast::IntegerNode& node);

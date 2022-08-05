@@ -99,6 +99,14 @@ std::vector<ast::Type> ast::get_types(std::vector<Node*> nodes) {
 	return types;
 }
 
+std::vector<ast::Type> ast::get_types(std::vector<CallArgumentNode*> nodes) {
+	std::vector<Type> types;
+	for (size_t i = 0; i < nodes.size(); i++) {
+		types.push_back(get_type(nodes[i]->expression));
+	}
+	return types;
+}
+
 std::vector<ast::Type> ast::get_concrete_types(std::vector<Node*> nodes, std::unordered_map<std::string, Type>& type_bindings) {
 	std::vector<Type> types;
 	for (size_t i = 0; i < nodes.size(); i++) {
@@ -531,7 +539,7 @@ void ast::print(Node* node, PrintContext context) {
 			if (call.type != Type("")) std::cout << ": " << get_concrete_type(call.type, context).to_str();
 			std::cout << "\n";
 			for (size_t i = 0; i < call.args.size(); i++) {
-				print(call.args[i], PrintContext{context.indent_level + 1, append(context.last, i == call.args.size() - 1), context.concrete, context.type_bindings});
+				print(call.args[i]->expression, PrintContext{context.indent_level + 1, append(context.last, i == call.args.size() - 1), context.concrete, context.type_bindings});
 			}
 			break;
 		}

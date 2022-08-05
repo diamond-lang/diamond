@@ -32,6 +32,7 @@ namespace type_inference {
 		Result<Ok, Error> analyze(ast::IfElseNode& node);
 		Result<Ok, Error> analyze(ast::WhileNode& node);
 		Result<Ok, Error> analyze(ast::UseNode& node) {return Ok {};}
+        Result<Ok, Error> analyze(ast::CallArgumentNode& node) {return Ok {};}
 		Result<Ok, Error> analyze(ast::CallNode& node);
 		Result<Ok, Error> analyze(ast::FloatNode& node);
 		Result<Ok, Error> analyze(ast::IntegerNode& node);
@@ -50,6 +51,7 @@ namespace type_inference {
 		void unify(ast::IfElseNode& node);
 		void unify(ast::WhileNode& node);
 		void unify(ast::UseNode& node) {}
+        void unify(ast::CallArgumentNode& node) {}
 		void unify(ast::CallNode& node);
 		void unify(ast::FloatNode& node);
 		void unify(ast::IntegerNode& node);
@@ -365,7 +367,7 @@ Result<Ok, Error> type_inference::Context::analyze(ast::BooleanNode& node) {
 Result<Ok, Error> type_inference::Context::analyze(ast::CallNode& node) {
 	// Assign a type variable to every argument and return type
 	for (size_t i = 0; i < node.args.size(); i++) {
-        auto result = this->analyze(node.args[i]);
+        auto result = this->analyze(node.args[i]->expression);
         if (result.is_error()) return Error {};
 	}
 	node.type = ast::Type(std::to_string(this->current_type_variable_number));
@@ -520,7 +522,7 @@ void type_inference::Context::unify(ast::FloatNode& node) {
 
 void type_inference::Context::unify(ast::CallNode& node) {
 	for (size_t i = 0; i < node.args.size(); i++) {
-        this->unify(node.args[i]);
+        this->unify(node.args[i]->expression);
 	}
 
     node.type = this->get_unified_type(node.type.to_str());

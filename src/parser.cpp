@@ -33,6 +33,7 @@ struct Parser {
 	Result<ast::Node*, Error> parse_if_else();
 	Result<ast::Node*, Error> parse_while_stmt();
 	Result<ast::Node*, Error> parse_use_stmt();
+	Result<ast::Node*, Error> parse_call_argument();
 	Result<ast::Node*, Error> parse_call();
 	Result<ast::Node*, Error> parse_expression();
 	Result<ast::Node*, Error> parse_if_else_expr();
@@ -462,6 +463,7 @@ Result<ast::Node*, Error> Parser::parse_assignment() {
 	if (expression.is_error()) return expression;
 	assignment.expression = expression.get_value();
 
+	// Parse type annotation
 	if (this->current() == token::Colon) {
 		this->advance();
 
@@ -609,6 +611,17 @@ Result<ast::Node*, Error> Parser::parse_use_stmt() {
 	return this->ast.last_element();
 }
 
+Result<ast::Node*, Error> Parser::parse_call_argument() {
+	auto arg = ast::CallArgumentNode {this->current().line, this->current().column};
+
+	auto expression = this->parse_expression();
+	if (expression.is_error()) return Error {};
+	arg.expression = expression.get_value();
+	
+	this->ast.push_back(arg);
+	return this->ast.last_element();
+}
+
 Result<ast::Node*, Error> Parser::parse_call() {
 	// Create node
 	auto call = ast::CallNode {this->current().line, this->current().column};
@@ -624,9 +637,9 @@ Result<ast::Node*, Error> Parser::parse_call() {
 
 	// Parse args
 	while (this->current() != token::RightParen && !this->at_end()) {
-		auto arg = this->parse_expression();
-		if (arg.is_error()) return arg;
-		call.args.push_back(arg.get_value());
+		auto arg = this->parse_call_argument();
+		if (arg.is_error()) return Error {};
+		call.args.push_back((ast::CallArgumentNode*) arg.get_value());
 
 		if (this->current() == token::Comma) this->advance();
 		else                                 break;
@@ -704,10 +717,14 @@ Result<ast::Node*, Error> Parser::parse_not_expr() {
 	call.identifier = (ast::IdentifierNode*) identifier.get_value();
 
 	// Parse expression
+	auto arg = ast::CallArgumentNode {this->current().line, this->current().column};
 	auto expression = this->parse_expression();
-	if (expression.is_error()) return expression;
-	call.args.push_back(expression.get_value());
+	if (expression.is_error()) return Error {};
+	arg.expression = expression.get_value();
+	this->ast.push_back(arg);
+	call.args.push_back((ast::CallArgumentNode*) this->ast.last_element());
 
+	// Push node to ast
 	this->ast.push_back(call);
 	return this->ast.last_element();
 }
@@ -732,11 +749,13 @@ Result<ast::Node*, Error> Parser::parse_binary(int precedence) {
 	}
 	else {
 		// Parse left
-		auto left = this->parse_binary(precedence + 1);
-		if (left.is_error()) return left;
+		auto left_node = ast::CallArgumentNode {this->current().line, this->current().column};
+		auto left_expression = this->parse_binary(precedence + 1);
+		if (left_expression.is_error()) return Error {};
+		left_node.expression = left_expression.get_value();
 
 		while (true) {
-			// Create node
+			// Create call node
 			auto call = ast::CallNode {this->current().line, this->current().column};
 
 			// Parse operator
@@ -747,17 +766,29 @@ Result<ast::Node*, Error> Parser::parse_binary(int precedence) {
 			if (identifier.is_error()) return identifier;
 
 			// Parse right
-			auto right = this->parse_binary(precedence + 1);
-			if (right.is_error()) return right;
+			auto right_node = ast::CallArgumentNode {this->current().line, this->current().column};
+			auto right_expression = this->parse_binary(precedence + 1);
+			if (right_expression.is_error()) return Error {};
+			right_node.expression = right_expression.get_value();
 
+			// Add identifier to call
 			call.identifier = (ast::IdentifierNode*) identifier.get_value();
-			call.args.push_back(left.get_value());
-			call.args.push_back(right.get_value());
+
+			// Add left node to call
+			this->ast.push_back(left_node);
+			call.args.push_back((ast::CallArgumentNode*) this->ast.last_element());
+			
+			// Add right node to call
+			this->ast.push_back(right_node);
+			call.args.push_back((ast::CallArgumentNode*) this->ast.last_element());
+			
+			// Iterate
 			this->ast.push_back(call);
-			left = this->ast.last_element();
+			left_node = ast::CallArgumentNode{call.column, call.line};
+			left_node.expression = this->ast.last_element();
 		}
 
-		return left;
+		return left_node.expression;
 	}
 }
 
@@ -771,10 +802,14 @@ Result<ast::Node*, Error> Parser::parse_negation() {
 	call.identifier = (ast::IdentifierNode*) identifier.get_value();
 
 	// Parse expression
+	auto arg = ast::CallArgumentNode {this->current().line, this->current().column};
 	auto expression = this->parse_primary();
-	if (expression.is_error()) return expression;
-	call.args.push_back(expression.get_value());
+	if (expression.is_error()) return Error {};
+	arg.expression = expression.get_value();
+	this->ast.push_back(arg);
+	call.args.push_back((ast::CallArgumentNode*) this->ast.last_element());
 
+	// Add call to ast
 	this->ast.push_back(call);
 	return this->ast.last_element();
 }
