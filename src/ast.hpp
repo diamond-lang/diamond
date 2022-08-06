@@ -40,6 +40,7 @@ namespace ast {
 	struct IdentifierNode;
 	struct BooleanNode;
 	struct StringNode;
+	struct FieldAccessNode;
 
 	enum NodeVariant {
         Block,
@@ -58,7 +59,8 @@ namespace ast {
         Integer,
         Identifier,
         Boolean,
-        String
+        String,
+		FieldAccess
     };
 
 	using Node = std::variant<
@@ -78,7 +80,8 @@ namespace ast {
 		IntegerNode,
 		IdentifierNode,
 		BooleanNode,
-		StringNode
+		StringNode,
+		FieldAccessNode
 	>;
 
 	Type get_type(Node* node);
@@ -265,6 +268,15 @@ namespace ast {
 		Type type = Type("");
 
 		std::string value;
+	};
+
+	struct FieldAccessNode {
+		size_t line;
+		size_t column;
+		Type type = Type("");
+
+		ast::IdentifierNode* identifier;
+		ast::Node* field; // Could be a identifier or another field access
 	};
 
     struct Ast {

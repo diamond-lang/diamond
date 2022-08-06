@@ -39,6 +39,7 @@ namespace type_inference {
 		Result<Ok, Error> analyze(ast::IdentifierNode& node);
 		Result<Ok, Error> analyze(ast::BooleanNode& node);
 		Result<Ok, Error> analyze(ast::StringNode& node) {return Ok {};}
+        Result<Ok, Error> analyze(ast::FieldAccessNode& node) {return Ok {};}
 
         void unify(ast::Node* node);
 		void unify(ast::BlockNode& node);
@@ -58,6 +59,7 @@ namespace type_inference {
 		void unify(ast::IdentifierNode& node);
 		void unify(ast::BooleanNode& node) {}
 		void unify(ast::StringNode& node) {}
+        void unify(ast::FieldAccessNode& node) {}
 
         ast::Type get_unified_type(std::string type_var) {
             if (type_var != "") {

@@ -85,6 +85,7 @@ namespace codegen {
 		llvm::Value* codegen(ast::IdentifierNode& node);
 		llvm::Value* codegen(ast::BooleanNode& node);
 		llvm::Value* codegen(ast::StringNode& node) {return nullptr;}
+		llvm::Value* codegen(ast::FieldAccessNode& node) {return nullptr;}
 
 		llvm::Type* as_llvm_type(ast::Type type) {
 			if      (type == ast::Type("float64")) return llvm::Type::getDoubleTy(*(this->context));
