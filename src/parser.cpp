@@ -617,6 +617,17 @@ Result<ast::Node*, Error> Parser::parse_call_argument() {
 	auto expression = this->parse_expression();
 	if (expression.is_error()) return Error {};
 	arg.expression = expression.get_value();
+
+	// Parse expression if previous was a identifier
+	if (arg.expression->index() == ast::Identifier
+	&&  this->current() == token::Colon) {
+		this->advance();
+		arg.identifier = (ast::IdentifierNode*) arg.expression;
+
+		expression = this->parse_expression();
+		if (expression.is_error()) return Error {};
+		arg.expression = expression.get_value();
+	}
 	
 	this->ast.push_back(arg);
 	return this->ast.last_element();

@@ -531,6 +531,20 @@ void ast::print(Node* node, PrintContext context) {
 			break;
 		}
 
+		case CallArgument: {
+			auto& call_argument = std::get<CallArgumentNode>(*node);
+			if (call_argument.identifier.has_value()) {
+				put_indent_level(context.indent_level, context.last);
+				std::cout << call_argument.identifier.value()->value << ":\n";
+				print(call_argument.expression, PrintContext{context.indent_level + 1, append(context.last, true), context.concrete, context.type_bindings});
+			}
+			else {
+				print(call_argument.expression, PrintContext{context.indent_level, context.last, context.concrete, context.type_bindings});
+			}
+
+			break;
+		}
+
 		case Call: {
 			auto& call = std::get<CallNode>(*node);
 
@@ -539,7 +553,7 @@ void ast::print(Node* node, PrintContext context) {
 			if (call.type != Type("")) std::cout << ": " << get_concrete_type(call.type, context).to_str();
 			std::cout << "\n";
 			for (size_t i = 0; i < call.args.size(); i++) {
-				print(call.args[i]->expression, PrintContext{context.indent_level + 1, append(context.last, i == call.args.size() - 1), context.concrete, context.type_bindings});
+				print((ast::Node*) call.args[i], PrintContext{context.indent_level + 1, append(context.last, i == call.args.size() - 1), context.concrete, context.type_bindings});
 			}
 			break;
 		}
