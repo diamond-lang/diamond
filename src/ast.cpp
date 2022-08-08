@@ -608,6 +608,17 @@ void ast::print(Node* node, PrintContext context) {
 			break;
 		}
 
+		case FieldAccess: {
+			auto& field_access = std::get<FieldAccessNode>(*node);
+			put_indent_level(context.indent_level, context.last);
+			std::cout << field_access.identifier->value;
+			for (size_t i = 0; i < field_access.fields_accessed.size(); i++) {
+				std::cout << "." << field_access.fields_accessed[i]->value;
+			}
+			std::cout << "\n";
+			break;
+		}
+
 		default: assert(false);
 	}
 }

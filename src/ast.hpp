@@ -276,7 +276,7 @@ namespace ast {
 		Type type = Type("");
 
 		ast::IdentifierNode* identifier;
-		ast::Node* field; // Could be a identifier or another field access
+		std::vector<ast::IdentifierNode*> fields_accessed;
 	};
 
     struct Ast {

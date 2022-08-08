@@ -48,6 +48,7 @@ struct Parser {
 	Result<ast::Node*, Error> parse_identifier();
 	Result<ast::Node*, Error> parse_identifier(token::TokenVariant token);
 	Result<ast::Node*, Error> parse_string();
+	Result<ast::Node*, Error> parse_field_access();
 	Result<token::Token, Error> parse_token(token::TokenVariant token);
 
 	token::Token current();
@@ -835,6 +836,7 @@ Result<ast::Node*, Error> Parser::parse_primary() {
 		case token::False:     return this->parse_boolean();
 		case token::Identifier: {
 			if (this->match({token::Identifier, token::LeftParen})) return this->parse_call();
+			if (this->match({token::Identifier, token::Dot}))       return this->parse_field_access();
 			else                                                    return this->parse_identifier();
 		}
 		default: break;
@@ -926,6 +928,32 @@ Result<ast::Node*, Error> Parser::parse_string() {
 	string.value = result.get_value().get_literal();
 
 	this->ast.push_back(string);
+	return this->ast.last_element();
+}
+
+Result<ast::Node*, Error> Parser::parse_field_access() {
+	// Create node
+	auto field_access = ast::FieldAccessNode {this->current().line, this->current().column};
+
+	// Parse identifier
+	auto identifier = this->parse_identifier();
+	if (identifier.is_error()) return Error();
+	field_access.identifier = (ast::IdentifierNode*) identifier.get_value();
+
+	auto dot = this->parse_token(token::Dot);
+	if (dot.is_error()) return Error {};
+
+	while (this->current() == token::Identifier) {
+		// Parse identifier
+		auto identifier = this->parse_identifier();
+		if (identifier.is_error()) return Error();
+		field_access.fields_accessed.push_back((ast::IdentifierNode*) identifier.get_value());
+
+		if (this->current() == token::Dot) this->advance();
+		else                               break;
+	}
+
+	this->ast.push_back(field_access);
 	return this->ast.last_element();
 }
 
