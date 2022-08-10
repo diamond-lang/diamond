@@ -13,6 +13,7 @@ semantic::Binding::Binding(std::vector<ast::FunctionNode*> functions) {
         this->value.push_back((ast::Node*) functions[i]);
     }
 }
+semantic::Binding::Binding(ast::TypeNode* type) : type(TypeBinding), value({(ast::Node*) type}) {}
 
 ast::AssignmentNode* semantic::get_assignment(semantic::Binding binding) {
     assert(binding.type == semantic::AssignmentBinding);
@@ -38,12 +39,18 @@ std::vector<ast::FunctionNode*> semantic::get_overloaded_functions(semantic::Bin
     return functions;
 }
 
+ast::TypeNode* semantic::get_type_definition(semantic::Binding binding) {
+    assert(binding.type == semantic::TypeBinding);
+    return (ast::TypeNode*) binding.value[0];
+}
+
 ast::Type semantic::get_binding_type(semantic::Binding& binding) {
     switch (binding.type) {
         case semantic::AssignmentBinding: return ast::get_type(((ast::AssignmentNode*)binding.value[0])->expression);
         case semantic::FunctionArgumentBinding: return ast::get_type(binding.value[0]);
         case semantic::OverloadedFunctionsBinding: return ast::Type("function");
         case semantic::GenericFunctionBinding: return ast::Type("function");
+		case semantic::TypeBinding: return ast::Type("type");
     }
     assert(false);
     return ast::Type("");
@@ -55,6 +62,7 @@ std::string semantic::get_binding_identifier(semantic::Binding& binding) {
         case semantic::FunctionArgumentBinding: return ((ast::IdentifierNode*)binding.value[0])->value;
         case semantic::OverloadedFunctionsBinding: return ((ast::FunctionNode*)binding.value[0])->identifier->value;
         case semantic::GenericFunctionBinding: return ((ast::FunctionNode*)binding.value[0])->identifier->value;
+		case semantic::TypeBinding: return ((ast::TypeNode*)binding.value[0])->identifier->value;
     }
     assert(false);
     return "";
@@ -66,6 +74,7 @@ bool semantic::is_function(semantic::Binding& binding) {
         case semantic::FunctionArgumentBinding: return false;
         case semantic::OverloadedFunctionsBinding: return true;
         case semantic::GenericFunctionBinding: return true;
+		case semantic::TypeBinding: return false;
     }
     assert(false);
     return false;
@@ -132,7 +141,7 @@ semantic::Binding* semantic::Context::get_binding(std::string identifier) {
 }
 
 void semantic::Context::add_functions_to_current_scope(ast::BlockNode& block) {
-	// Add functions from current block to current context
+	// Add functions from block to current scope
 	for (auto& function: block.functions) {
 		auto& identifier = function->identifier->value;
 		auto& scope = this->current_scope();
@@ -157,6 +166,19 @@ void semantic::Context::add_functions_to_current_scope(ast::BlockNode& block) {
 		else {
 			assert(false);
 		}
+	}
+
+	// Add types from current block to current scope
+	for (auto& type: block.types) {
+		auto& identifier = type->identifier->value;
+		auto& scope = this->current_scope();
+
+		if (scope.find(identifier) == scope.end()) {
+			scope[identifier] = Binding(type);
+		}
+		else {
+			this->errors.push_back(Error{"Error: Type defined multiple times"});
+		}	
 	}
 
 	// Add functions from modules
@@ -226,6 +248,19 @@ void semantic::Context::add_functions_to_current_scope(ast::BlockNode& block) {
 			else {
 				assert(false);
 			}
+		}
+
+		// Add types from current block to current scope
+		for (auto& type: this->ast.modules[module_path.string()]->types) {
+			auto& identifier = type->identifier->value;
+			auto& scope = this->current_scope();
+
+			if (scope.find(identifier) == scope.end()) {
+				scope[identifier] = Binding(type);
+			}
+			else {
+				this->errors.push_back(Error{"Error: Type defined multiple times"});
+			}	
 		}
 
 		already_included_modules.insert(module_path);
@@ -668,7 +703,7 @@ Result<Ok, Error> semantic::Context::analyze(ast::WhileNode& node) {
 Result<Ok, Error> semantic::Context::analyze(ast::CallNode& node) {
 	// Check function exists
 	semantic::Binding* binding = this->get_binding(node.identifier->value);
-    if (!binding || !is_function(*binding)) {
+    if (!binding || (!is_function(*binding) && binding->type != semantic::TypeBinding)) {
 		// Analyze arguments
 		for (size_t i = 0; i < node.args.size(); i++) {
 			auto result = this->analyze(node.args[i]->expression);
@@ -678,6 +713,40 @@ Result<Ok, Error> semantic::Context::analyze(ast::CallNode& node) {
         this->errors.push_back(errors::undefined_function(node, this->current_module));
         return Error {};
     }
+
+	// If is a type constructor
+	if (binding->type == semantic::TypeBinding) {
+		auto type = semantic::get_type_definition(*binding);
+
+		// Check all fields are initialized and give them a expected type
+		for (auto& field: type->fields) {
+			auto identifier = field->value;
+			bool founded = false;
+			for (auto& arg: node.args) {
+				assert(arg->identifier.has_value());
+				if (arg->identifier.value()->value == identifier) {
+					founded = true;
+					ast::set_type(arg->expression, field->type);
+					break;
+				}
+			}
+			
+			if (!founded) {
+				this->errors.push_back(Error{"Error: Not all fields are initialized"});
+        		return Error {};
+			}
+		}
+
+		// Analyze arguments
+		for (size_t i = 0; i < node.args.size(); i++) {
+			auto result = this->analyze(node.args[i]->expression);
+			if (result.is_error()) return Error {};
+		}
+
+		node.type = ast::Type(type->identifier->value);
+
+		return Ok {};
+	}
 	
 	// If is a overloaded function
 	else if (binding->type == semantic::OverloadedFunctionsBinding) {

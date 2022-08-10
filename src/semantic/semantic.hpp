@@ -22,7 +22,8 @@ namespace semantic {
 		AssignmentBinding,
 		FunctionArgumentBinding,
 		OverloadedFunctionsBinding,
-		GenericFunctionBinding
+		GenericFunctionBinding,
+		TypeBinding
 	};
 
 	struct Binding {
@@ -34,12 +35,14 @@ namespace semantic {
         Binding(ast::Node* function_argument);
         Binding(ast::FunctionNode* function);
 		Binding(std::vector<ast::FunctionNode*> functions);
+		Binding(ast::TypeNode* type);
 	};
 
 	ast::AssignmentNode* get_assignment(Binding binding);
 	ast::Node* get_function_argument(Binding binding);
 	ast::FunctionNode* get_generic_function(Binding binding);
 	std::vector<ast::FunctionNode*> get_overloaded_functions(Binding binding);
+	ast::TypeNode* get_type_definition(Binding binding);
 	ast::Type get_binding_type(Binding& binding);
 	std::string get_binding_identifier(Binding& binding);
 	bool is_function(Binding& binding);
