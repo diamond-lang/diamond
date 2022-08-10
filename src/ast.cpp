@@ -615,6 +615,7 @@ void ast::print(Node* node, PrintContext context) {
 			for (size_t i = 0; i < field_access.fields_accessed.size(); i++) {
 				std::cout << "." << field_access.fields_accessed[i]->value;
 			}
+			if (field_access.type != Type("")) std::cout << ": " << get_concrete_type(field_access.type, context).to_str();
 			std::cout << "\n";
 			break;
 		}

@@ -891,3 +891,52 @@ Result<Ok, Error> semantic::Context::analyze(ast::BooleanNode& node) {
 	}
 	return Ok {};
 }
+
+Result<Ok, Error> semantic::Context::analyze(ast::FieldAccessNode& node) {
+	Binding* binding = this->get_binding(node.identifier->value);
+	if (!binding) {
+		this->errors.push_back(errors::undefined_variable(*node.identifier, this->current_module)); // tested in test/errors/undefined_variable.dm
+		return Error {};
+	}
+	else {
+		auto type_name = semantic::get_binding_type(*binding).to_str();
+		Binding* binding = nullptr;
+		ast::TypeNode* type = nullptr;
+		size_t i = 0;
+		while (true) {
+			binding = this->get_binding(type_name);
+			if (binding->type != semantic::TypeBinding) {
+				this->errors.push_back(Error{"Error: Binding is not a type\n"});
+				return Error {};
+			}
+			type = semantic::get_type_definition(*binding);
+
+			i += 1;
+			if (i >= node.fields_accessed.size()) break;
+			
+			bool founded = false;
+			for (auto field: type->fields) {
+				if (node.fields_accessed[i]->value == field->value) {
+					type_name = field->type.to_str();
+					founded = true;
+					break;
+				}
+			}
+			if (!founded){
+				this->errors.push_back(Error{"Error: Type does not have that field\n"});
+				return Error {};
+			}
+		}
+		i -= 1;
+
+		for (auto field: type->fields) {
+			if (node.fields_accessed[i]->value == field->value) {
+				node.type = field->type;
+				return Ok {};
+			}
+		}
+
+		this->errors.push_back(Error{"Error: Type does not have that field\n"});
+		return Error {};
+	}
+}
