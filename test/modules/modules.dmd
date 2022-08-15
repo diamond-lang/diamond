@@ -1,4 +1,4 @@
-use "functions"
+use "../functions/functions"
 
 print(add(4.0, 6.0))
 print(div(7.0, 8.0))
