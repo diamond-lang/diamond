@@ -4,7 +4,7 @@ use "modules/is_odd"
 print(is_even(9))
 print(is_odd(9))
 
---- Ou(tput
+--- Output
 false
 true
 ---
