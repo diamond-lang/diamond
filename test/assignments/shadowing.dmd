@@ -1,11 +1,9 @@
-function something(n)
-    a be n
-    if a == n
-        a be false
-        print(a)
+a be 10
+if a == 10
+    a be false
     print(a)
 
-something(10)
+print(a)
 
 --- Output
 false
