@@ -67,10 +67,12 @@ namespace codegen {
         void codegen(ast::Ast& ast);
         llvm::Value* codegen(ast::Node* node);
         llvm::Value* codegen(ast::BlockNode& node);
+        llvm::Value* codegen(ast::TypeNode& node) {return nullptr;}
+        void codegen_types_prototypes(std::vector<ast::TypeNode*> types);
+        void codegen_types_bodies(std::vector<ast::TypeNode*> functions);
         llvm::Value* codegen(ast::FunctionNode& node) {return nullptr;}
         void codegen_function_prototypes(std::vector<ast::FunctionNode*> functions);
         void codegen_function_bodies(std::vector<ast::FunctionNode*> functions);
-        llvm::Value* codegen(ast::TypeNode& node) {return nullptr;}
         llvm::Value* codegen(ast::AssignmentNode& node);
         llvm::Value* codegen(ast::ReturnNode& node);
         llvm::Value* codegen(ast::BreakNode& node);
@@ -299,6 +301,14 @@ void codegen::Context::codegen(ast::Ast& ast) {
     llvm::FunctionType *printfType = llvm::FunctionType::get(this->builder->getInt32Ty(), args, true); // `true` specifies the function as variadic
     llvm::Function::Create(printfType, llvm::Function::ExternalLinkage, "printf", this->module);
 
+    // Codegen types
+    for (auto it = ast.modules.begin(); it != ast.modules.end(); it++) {
+        this->codegen_types_prototypes(it->second->types);
+    }
+    for (auto it = ast.modules.begin(); it != ast.modules.end(); it++) {
+        this->codegen_types_bodies(it->second->types);
+    }
+
     // Codegen functions
     for (auto it = ast.modules.begin(); it != ast.modules.end(); it++) {
         this->codegen_function_prototypes(it->second->functions);
@@ -340,6 +350,29 @@ llvm::Value* codegen::Context::codegen(ast::BlockNode& node) {
     this->remove_scope();
 
     return nullptr;
+}
+
+static std::string get_type_name(std::filesystem::path file, std::string identifier) {
+    return file.string() + "::" + identifier;
+}
+
+void codegen::Context::codegen_types_prototypes(std::vector<ast::TypeNode*> types) {
+    for (auto type: types) {
+        (void) llvm::StructType::create(*this->context, get_type_name(type->module_path, type->identifier->value));
+    }
+}
+
+void codegen::Context::codegen_types_bodies(std::vector<ast::TypeNode*> types) {
+    for (auto type: types) {
+        llvm::StructType* struct_type = llvm::StructType::getTypeByName(*this->context, get_type_name(type->module_path, type->identifier->value));
+        
+        std::vector<llvm::Type*> fields;
+        for (auto field: type->fields) {
+            fields.push_back(as_llvm_type(field->type));
+        }
+
+        struct_type->setBody(fields);
+    }
 }
 
 static std::string get_function_name(std::filesystem::path file, std::string identifier, std::vector<ast::Type> args, ast::Type return_type) {

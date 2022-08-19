@@ -717,6 +717,7 @@ Result<Ok, Error> semantic::Context::analyze(ast::CallNode& node) {
     // If is a type constructor
     if (binding->type == semantic::TypeBinding) {
         auto type = semantic::get_type_definition(*binding);
+        node.type_definition = type;
 
         // Check all fields are initialized and give them a expected type
         for (auto& field: type->fields) {

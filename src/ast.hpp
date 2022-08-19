@@ -149,6 +149,7 @@ namespace ast {
 
         IdentifierNode* identifier;
         std::vector<IdentifierNode*> fields;
+        std::filesystem::path module_path; // Used in to tell from which module the type comes from
     };
 
     struct AssignmentNode {
@@ -227,7 +228,8 @@ namespace ast {
 
         IdentifierNode* identifier;
         std::vector<CallArgumentNode*> args;
-        FunctionNode* function;
+        FunctionNode* function = nullptr;
+        TypeNode* type_definition = nullptr;
     };
 
     struct FloatNode {

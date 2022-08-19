@@ -369,6 +369,7 @@ Result<ast::Node*, Error> Parser::parse_function() {
 Result<ast::Node*, Error> Parser::parse_type() {
     // Create node
     auto type = ast::TypeNode {this->current().line, this->current().column};
+    type.module_path = this->file;
 
     // Parse keyword
     auto keyword = this->parse_token(token::Type);
