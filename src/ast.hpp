@@ -279,6 +279,9 @@ namespace ast {
 
         ast::IdentifierNode* identifier;
         std::vector<ast::IdentifierNode*> fields_accessed;
+        std::vector<size_t> fields_accessed_indices;
+        std::vector<TypeNode*> fields_accessed_type_definitions;
+        TypeNode* type_definition = nullptr;
     };
 
     struct Ast {

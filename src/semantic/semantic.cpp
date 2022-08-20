@@ -894,50 +894,74 @@ Result<Ok, Error> semantic::Context::analyze(ast::BooleanNode& node) {
 }
 
 Result<Ok, Error> semantic::Context::analyze(ast::FieldAccessNode& node) {
-    Binding* binding = this->get_binding(node.identifier->value);
-    if (!binding) {
-        this->errors.push_back(errors::undefined_variable(*node.identifier, this->current_module)); // tested in test/errors/undefined_variable.dm
+    // Get variable binding
+    Binding* variable_binding = this->get_binding(node.identifier->value);
+    if (!variable_binding) {
+        this->errors.push_back(errors::undefined_variable(*node.identifier, this->current_module)); 
         return Error {};
     }
-    else {
-        auto type_name = semantic::get_binding_type(*binding).to_str();
-        Binding* binding = nullptr;
-        ast::TypeNode* type = nullptr;
-        size_t i = 0;
-        while (true) {
-            binding = this->get_binding(type_name);
-            if (binding->type != semantic::TypeBinding) {
-                this->errors.push_back(Error{"Error: Binding is not a type\n"});
-                return Error {};
-            }
-            type = semantic::get_type_definition(*binding);
 
-            i += 1;
-            if (i >= node.fields_accessed.size()) break;
-
-            bool founded = false;
-            for (auto field: type->fields) {
-                if (node.fields_accessed[i]->value == field->value) {
-                    type_name = field->type.to_str();
-                    founded = true;
-                    break;
-                }
-            }
-            if (!founded){
-                this->errors.push_back(Error{"Error: Type does not have that field\n"});
-                return Error {};
-            }
-        }
-        i -= 1;
-
-        for (auto field: type->fields) {
-            if (node.fields_accessed[i]->value == field->value) {
-                node.type = field->type;
-                return Ok {};
-            }
-        }
-
-        this->errors.push_back(Error{"Error: Type does not have that field\n"});
+    // Get type binding
+    std::string type_name = semantic::get_binding_type(*variable_binding).to_str();
+    Binding* type_binding = this->get_binding(type_name);
+    if (!type_binding) {
+        this->errors.push_back(Error{"Errors: Undefined type"});
         return Error {};
     }
+    if (type_binding->type != semantic::TypeBinding) {
+        this->errors.push_back(Error{"Error: Binding is not a type\n"});
+        return Error {};
+    }
+    
+    // Get type definition
+    ast::TypeNode* type_definition = semantic::get_type_definition(*type_binding);
+    node.type_definition = type_definition;
+
+    // Iterate over fields accessed
+    for (size_t i = 0; i < node.fields_accessed.size() - 1; i++) {
+        // Search for field in type definition
+        bool founded = false;
+        for (size_t j = 0; j < type_definition->fields.size(); j++) {
+            if (node.fields_accessed[i]->value == type_definition->fields[j]->value) {
+                type_name = type_definition->fields[j]->type.to_str();
+                node.fields_accessed_indices.push_back(j);
+                node.fields_accessed_type_definitions.push_back(type_definition);
+                founded = true;
+                break;
+            }
+        }
+        if (!founded){
+            this->errors.push_back(Error{"Error: Type does not have that field\n"});
+            return Error {};
+        }
+
+        // Get type binding
+        std::string type_name = node.fields_accessed[i]->type.to_str();
+        Binding* type_binding = this->get_binding(type_name);
+        if (!type_binding) {
+            this->errors.push_back(Error{"Errors: Undefined type"});
+            return Error {};
+        }
+        if (type_binding->type != semantic::TypeBinding) {
+            this->errors.push_back(Error{"Error: Binding is not a type\n"});
+            return Error {};
+        }
+        
+        // Get type definition
+        type_definition = semantic::get_type_definition(*type_binding);
+    }
+
+    // Seatch for field in type definition
+    size_t last_element = node.fields_accessed.size() - 1;
+    for (size_t j = 0; j < type_definition->fields.size(); j++) {
+        if (node.fields_accessed[last_element]->value == type_definition->fields[j]->value) {
+            node.type = type_definition->fields[j]->type;
+            node.fields_accessed_indices.push_back(j);
+            node.fields_accessed_type_definitions.push_back(type_definition);
+            return Ok {};
+        }
+    }
+
+    this->errors.push_back(Error{"Error: Type does not have that field\n"});
+    return Error {};
 }

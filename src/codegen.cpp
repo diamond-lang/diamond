@@ -943,5 +943,22 @@ llvm::Value* codegen::Context::codegen(ast::BooleanNode& node) {
 
 
 llvm::Value* codegen::Context::codegen(ast::FieldAccessNode& node) {
-    assert(false);
+    llvm::Value* struct_allocation = this->get_binding(node.identifier->value);
+    llvm::StructType* struct_type = llvm::StructType::getTypeByName(*this->context, get_type_name(node.type_definition->module_path, node.type_definition->identifier->value));
+
+    for (size_t i = 0; i < node.fields_accessed.size() - 1; i++) {
+        // Get pointer to accessed fieldd
+        llvm::Value* ptr = this->builder->CreateStructGEP(struct_type, struct_allocation, node.fields_accessed_indices[i]);
+        
+        // Create load
+        struct_allocation = this->builder->CreateLoad(ptr);
+        struct_type = llvm::StructType::getTypeByName(*this->context, get_type_name(node.fields_accessed_type_definitions[i]->module_path, node.fields_accessed_type_definitions[i]->identifier->value));
+    }
+    
+    // Get pointer to accessed fieldd
+    size_t last_element = node.fields_accessed.size() - 1;
+    llvm::Value* ptr = this->builder->CreateStructGEP(struct_type, struct_allocation, node.fields_accessed_indices[last_element]);
+        
+    // Create load
+    return this->builder->CreateLoad(ptr);
 }
