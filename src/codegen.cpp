@@ -87,7 +87,7 @@ namespace codegen {
         llvm::Value* codegen(ast::IdentifierNode& node);
         llvm::Value* codegen(ast::BooleanNode& node);
         llvm::Value* codegen(ast::StringNode& node) {return nullptr;}
-        llvm::Value* codegen(ast::FieldAccessNode& node) {return nullptr;}
+        llvm::Value* codegen(ast::FieldAccessNode& node);
 
         llvm::Type* as_llvm_type(ast::Type type) {
             if      (type == ast::Type("float64")) return llvm::Type::getDoubleTy(*(this->context));
@@ -541,25 +541,52 @@ void codegen::Context::codegen_function_bodies(std::vector<ast::FunctionNode*> f
     }
 }
 
-llvm::Value* codegen::Context::codegen(ast::AssignmentNode& node) {
-    // Generate value of expression
-    llvm::Value* expr = this->codegen(node.expression);
+static bool is_type_constructor(ast::Node* expression) {
+    if (expression->index() == ast::Call) {
+        auto& call = std::get<ast::CallNode>(*expression);
+        if (call.type_definition) {
+            return true;
+        }
+    }
+    return false;
+}
 
-    if (node.nonlocal) {
-        // Store value
-        this->builder->CreateStore(expr, this->get_binding(node.identifier->value));
+llvm::Value* codegen::Context::codegen(ast::AssignmentNode& node) {
+    if (!is_type_constructor(node.expression)) {
+        // Generate value of expression
+        llvm::Value* expr = this->codegen(node.expression);
+
+        if (node.nonlocal) {
+            // Store value
+            this->builder->CreateStore(expr, this->get_binding(node.identifier->value));
+        }
+        else {
+            // Create allocation if doesn't exists or if already exists, but it has a different type
+            if (this->current_scope().find(node.identifier->value) == this->current_scope().end()
+            ||  this->current_scope()[node.identifier->value]->getType() != expr->getType()) {
+                this->current_scope()[node.identifier->value] = this->create_allocation(node.identifier->value, expr->getType());
+            }
+
+            // Store value
+            this->builder->CreateStore(expr, this->current_scope()[node.identifier->value]);
+        }
+        return nullptr;
     }
     else {
-        // Create allocation if doesn't exists or if already exists, but it has a different type
-        if (this->current_scope().find(node.identifier->value) == this->current_scope().end()
-        ||  this->current_scope()[node.identifier->value]->getType() != expr->getType()) {
-            this->current_scope()[node.identifier->value] = this->create_allocation(node.identifier->value, expr->getType());
+        auto& struct_expression = std::get<ast::CallNode>(*node.expression);
+        llvm::StructType* struct_type = llvm::StructType::getTypeByName(*this->context, get_type_name(struct_expression.type_definition->module_path, struct_expression.type_definition->identifier->value));
+
+        // Create allocation
+        this->current_scope()[node.identifier->value] = this->create_allocation(node.identifier->value, struct_type);
+
+        // Store fields
+        for (size_t i = 0; i < struct_expression.args.size(); i++) {
+            llvm::Value* ptr = this->builder->CreateStructGEP(struct_type, this->current_scope()[node.identifier->value], i);
+            this->builder->CreateStore(this->codegen(struct_expression.args[i]->expression), ptr);
         }
 
-        // Store value
-        this->builder->CreateStore(expr, this->current_scope()[node.identifier->value]);
+        return nullptr;
     }
-    return nullptr;
 }
 
 llvm::Value* codegen::Context::codegen(ast::ReturnNode& node) {
@@ -912,4 +939,9 @@ llvm::Value* codegen::Context::codegen(ast::IdentifierNode& node) {
 
 llvm::Value* codegen::Context::codegen(ast::BooleanNode& node) {
     return llvm::ConstantInt::getBool(*(this->context), node.value);
+}
+
+
+llvm::Value* codegen::Context::codegen(ast::FieldAccessNode& node) {
+    assert(false);
 }
