@@ -610,9 +610,13 @@ void ast::print(Node* node, PrintContext context) {
 
         case FieldAccess: {
             auto& field_access = std::get<FieldAccessNode>(*node);
+
+            // There should be at least 2 identifiers in fields accessed. eg: circle.radius
+            assert(field_access.fields_accessed.size() >= 2);
+
             put_indent_level(context.indent_level, context.last);
-            std::cout << field_access.identifier->value;
-            for (size_t i = 0; i < field_access.fields_accessed.size(); i++) {
+            std::cout << field_access.fields_accessed[0]->value;
+            for (size_t i = 1; i < field_access.fields_accessed.size(); i++) {
                 std::cout << "." << field_access.fields_accessed[i]->value;
             }
             if (field_access.type != Type("")) std::cout << ": " << get_concrete_type(field_access.type, context).to_str();

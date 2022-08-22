@@ -6,7 +6,7 @@ a = Point(x: 20, y: 30)
 print(a.x)
 print(a.y)
 
---- Output 
+--- Output
 20
 30
 ---

@@ -10,19 +10,6 @@
 #include <cmath>
 
 namespace ast {
-    struct Type {
-        std::string name;
-        std::vector<Type> parameters;
-
-        Type() : name("") {}
-        Type(std::string name) : name(name) {}
-        Type(std::string name, std::vector<Type> parameters) : name(name), parameters(parameters) {}
-        bool operator==(const Type &t) const;
-        bool operator!=(const Type &t) const;
-        std::string to_str(std::string output = "") const;
-        bool is_type_variable() const;
-    };
-
     struct BlockNode;
     struct FunctionNode;
     struct TypeNode;
@@ -83,6 +70,21 @@ namespace ast {
         StringNode,
         FieldAccessNode
     >;
+
+    struct Type {
+        std::string name;
+        std::vector<Type> parameters;
+        TypeNode* type_definition = nullptr;
+
+        Type() : name("") {}
+        Type(std::string name) : name(name) {}
+        Type(std::string name, std::vector<Type> parameters) : name(name), parameters(parameters) {}
+        Type(std::string name, TypeNode* type_definition) : name(name), type_definition(type_definition) {}
+        bool operator==(const Type &t) const;
+        bool operator!=(const Type &t) const;
+        std::string to_str(std::string output = "") const;
+        bool is_type_variable() const;
+    };
 
     Type get_type(Node* node);
     Type get_concrete_type(Node* node, std::unordered_map<std::string, Type>& type_bindings);
@@ -229,7 +231,6 @@ namespace ast {
         IdentifierNode* identifier;
         std::vector<CallArgumentNode*> args;
         FunctionNode* function = nullptr;
-        TypeNode* type_definition = nullptr;
     };
 
     struct FloatNode {
@@ -277,11 +278,7 @@ namespace ast {
         size_t column;
         Type type = Type("");
 
-        ast::IdentifierNode* identifier;
         std::vector<ast::IdentifierNode*> fields_accessed;
-        std::vector<size_t> fields_accessed_indices;
-        std::vector<TypeNode*> fields_accessed_type_definitions;
-        TypeNode* type_definition = nullptr;
     };
 
     struct Ast {

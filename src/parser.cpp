@@ -940,7 +940,7 @@ Result<ast::Node*, Error> Parser::parse_field_access() {
     // Parse identifier
     auto identifier = this->parse_identifier();
     if (identifier.is_error()) return Error();
-    field_access.identifier = (ast::IdentifierNode*) identifier.get_value();
+    field_access.fields_accessed.push_back((ast::IdentifierNode*) identifier.get_value());
 
     auto dot = this->parse_token(token::Dot);
     if (dot.is_error()) return Error {};

@@ -89,6 +89,18 @@ namespace codegen {
         llvm::Value* codegen(ast::StringNode& node) {return nullptr;}
         llvm::Value* codegen(ast::FieldAccessNode& node);
 
+        std::string get_mangled_type_name(std::filesystem::path module, std::string identifier) {
+            return module.string() + "::" + identifier;
+        }
+
+       std::string get_mangled_function_name(std::filesystem::path module, std::string identifier, std::vector<ast::Type> args, ast::Type return_type) {
+            std::string name = module.string() + "::" + identifier;
+            for (size_t i = 0; i < args.size(); i++) {
+                name += "_" + args[i].to_str();
+            }
+            return name + "_" + return_type.to_str();
+        }
+
         llvm::Type* as_llvm_type(ast::Type type) {
             if      (type == ast::Type("float64")) return llvm::Type::getDoubleTy(*(this->context));
             else if (type == ast::Type("int64"))   return llvm::Type::getInt64Ty(*(this->context));
@@ -98,6 +110,10 @@ namespace codegen {
                 std::cout <<"type: " << type.to_str() << "\n";
                 assert(false);
             }
+        }
+
+        llvm::StructType* get_struct_type(ast::TypeNode* type_definition) {
+            return llvm::StructType::getTypeByName(*this->context, this->get_mangled_type_name(type_definition->module_path, type_definition->identifier->value));
         }
 
         std::vector<llvm::Type*> as_llvm_types(std::vector<ast::Type> types) {
@@ -192,9 +208,6 @@ void codegen::generate_executable(ast::Ast& ast, std::string program_name) {
     std::string Error;
     auto Target = llvm::TargetRegistry::lookupTarget(TargetTriple, Error);
 
-    // Print an error and exit if we couldn't find the requested target.
-    // This generally occurs if we've forgotten to initialise the
-    // TargetRegistry or we have a bogus target triple.
     if (!Target) {
         llvm::errs() << Error;
     }
@@ -352,19 +365,15 @@ llvm::Value* codegen::Context::codegen(ast::BlockNode& node) {
     return nullptr;
 }
 
-static std::string get_type_name(std::filesystem::path file, std::string identifier) {
-    return file.string() + "::" + identifier;
-}
-
 void codegen::Context::codegen_types_prototypes(std::vector<ast::TypeNode*> types) {
     for (auto type: types) {
-        (void) llvm::StructType::create(*this->context, get_type_name(type->module_path, type->identifier->value));
+        (void) llvm::StructType::create(*this->context, this->get_mangled_type_name(type->module_path, type->identifier->value));
     }
 }
 
 void codegen::Context::codegen_types_bodies(std::vector<ast::TypeNode*> types) {
     for (auto type: types) {
-        llvm::StructType* struct_type = llvm::StructType::getTypeByName(*this->context, get_type_name(type->module_path, type->identifier->value));
+        llvm::StructType* struct_type = this->get_struct_type(type);
         
         std::vector<llvm::Type*> fields;
         for (auto field: type->fields) {
@@ -373,14 +382,6 @@ void codegen::Context::codegen_types_bodies(std::vector<ast::TypeNode*> types) {
 
         struct_type->setBody(fields);
     }
-}
-
-static std::string get_function_name(std::filesystem::path file, std::string identifier, std::vector<ast::Type> args, ast::Type return_type) {
-    std::string name = file.string() + "::" + identifier;
-    for (size_t i = 0; i < args.size(); i++) {
-        name += "_" + args[i].to_str();
-    }
-    return name + "_" + return_type.to_str();
 }
 
 void codegen::Context::codegen_function_prototypes(std::vector<ast::FunctionNode*> functions) {
@@ -393,7 +394,7 @@ void codegen::Context::codegen_function_prototypes(std::vector<ast::FunctionNode
                 llvm::FunctionType* function_type = llvm::FunctionType::get(return_type, args_types, false);
 
                 // Create function
-                std::string name = get_function_name(function->module_path, function->identifier->value, specialization.args, specialization.return_type);
+                std::string name = this->get_mangled_function_name(function->module_path, function->identifier->value, specialization.args, specialization.return_type);
                 llvm::Function* f = llvm::Function::Create(function_type, llvm::Function::ExternalLinkage, name, this->module);
 
                 // Set args for names
@@ -412,7 +413,7 @@ void codegen::Context::codegen_function_prototypes(std::vector<ast::FunctionNode
             llvm::FunctionType* function_type = llvm::FunctionType::get(return_type, args_types, false);
 
             // Create function
-            std::string name = get_function_name(function->module_path, function->identifier->value, ast::get_types(function->args), function->return_type);
+            std::string name = this->get_mangled_function_name(function->module_path, function->identifier->value, ast::get_types(function->args), function->return_type);
             llvm::Function* f = llvm::Function::Create(function_type, llvm::Function::ExternalLinkage, name, this->module);
 
             // Set args for names
@@ -430,7 +431,7 @@ void codegen::Context::codegen_function_bodies(std::vector<ast::FunctionNode*> f
     for (auto& function: functions) {
         if (function->generic) {
             for (auto& specialization: function->specializations) {
-                std::string name = get_function_name(function->module_path, function->identifier->value, specialization.args, specialization.return_type);
+                std::string name = this->get_mangled_function_name(function->module_path, function->identifier->value, specialization.args, specialization.return_type);
                 llvm::Function* f = this->module->getFunction(name);
 
                 // Create the body of the function
@@ -486,7 +487,7 @@ void codegen::Context::codegen_function_bodies(std::vector<ast::FunctionNode*> f
             }
         }
         else {
-            std::string name = get_function_name(function->module_path, function->identifier->value, ast::get_types(function->args), function->return_type);
+            std::string name = this->get_mangled_function_name(function->module_path, function->identifier->value, ast::get_types(function->args), function->return_type);
             llvm::Function* f = this->module->getFunction(name);
 
             // Create the body of the function
@@ -544,7 +545,7 @@ void codegen::Context::codegen_function_bodies(std::vector<ast::FunctionNode*> f
 static bool is_type_constructor(ast::Node* expression) {
     if (expression->index() == ast::Call) {
         auto& call = std::get<ast::CallNode>(*expression);
-        if (call.type_definition) {
+        if (call.type.type_definition) {
             return true;
         }
     }
@@ -574,7 +575,7 @@ llvm::Value* codegen::Context::codegen(ast::AssignmentNode& node) {
     }
     else {
         auto& struct_expression = std::get<ast::CallNode>(*node.expression);
-        llvm::StructType* struct_type = llvm::StructType::getTypeByName(*this->context, get_type_name(struct_expression.type_definition->module_path, struct_expression.type_definition->identifier->value));
+        llvm::StructType* struct_type = this->get_struct_type(struct_expression.type.type_definition);
 
         // Create allocation
         this->current_scope()[node.identifier->value] = this->create_allocation(node.identifier->value, struct_type);
@@ -914,7 +915,7 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
 
     // Get function
     assert(node.function);
-    std::string name = get_function_name(node.function->module_path, node.identifier->value, this->get_types(node.args), this->get_type((ast::Node*) &node));
+    std::string name = this->get_mangled_function_name(node.function->module_path, node.identifier->value, this->get_types(node.args), this->get_type((ast::Node*) &node));
     llvm::Function* function = this->module->getFunction(name);
     assert(function);
 
@@ -941,23 +942,42 @@ llvm::Value* codegen::Context::codegen(ast::BooleanNode& node) {
     return llvm::ConstantInt::getBool(*(this->context), node.value);
 }
 
+static size_t get_index_of_field(std::string field, ast::TypeNode* type_definition) {
+    for (size_t i = 0; i < type_definition->fields.size(); i++) {
+        if (field == type_definition->fields[i]->value) {
+            return i;
+        }
+    }
+    assert(false);
+    return 0;
+}
 
 llvm::Value* codegen::Context::codegen(ast::FieldAccessNode& node) {
-    llvm::Value* struct_allocation = this->get_binding(node.identifier->value);
-    llvm::StructType* struct_type = llvm::StructType::getTypeByName(*this->context, get_type_name(node.type_definition->module_path, node.type_definition->identifier->value));
+    // There should be at least 2 identifiers in fields accessed. eg: circle.radius
+    assert(node.fields_accessed.size() >= 2);
 
-    for (size_t i = 0; i < node.fields_accessed.size() - 1; i++) {
+    // Get struct allocation and type
+    llvm::Value* struct_allocation = this->get_binding(node.fields_accessed[0]->value);
+    llvm::StructType* struct_type = this->get_struct_type(node.fields_accessed[0]->type.type_definition);
+
+    // Get type definition
+    ast::TypeNode* type_definition = node.fields_accessed[0]->type.type_definition;
+
+    for (size_t i = 1; i < node.fields_accessed.size() - 1; i++) {
         // Get pointer to accessed fieldd
-        llvm::Value* ptr = this->builder->CreateStructGEP(struct_type, struct_allocation, node.fields_accessed_indices[i]);
+        llvm::Value* ptr = this->builder->CreateStructGEP(struct_type, struct_allocation, get_index_of_field(node.fields_accessed[i]->value, type_definition));
         
         // Create load
         struct_allocation = this->builder->CreateLoad(ptr);
-        struct_type = llvm::StructType::getTypeByName(*this->context, get_type_name(node.fields_accessed_type_definitions[i]->module_path, node.fields_accessed_type_definitions[i]->identifier->value));
+        struct_type = this->get_struct_type(node.fields_accessed[i]->type.type_definition);
+
+        // Update current type definition
+        type_definition = node.fields_accessed[i]->type.type_definition;
     }
     
     // Get pointer to accessed fieldd
     size_t last_element = node.fields_accessed.size() - 1;
-    llvm::Value* ptr = this->builder->CreateStructGEP(struct_type, struct_allocation, node.fields_accessed_indices[last_element]);
+    llvm::Value* ptr = this->builder->CreateStructGEP(struct_type, struct_allocation, get_index_of_field(node.fields_accessed[last_element]->value, type_definition));
         
     // Create load
     return this->builder->CreateLoad(ptr);

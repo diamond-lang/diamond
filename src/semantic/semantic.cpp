@@ -716,11 +716,13 @@ Result<Ok, Error> semantic::Context::analyze(ast::CallNode& node) {
 
     // If is a type constructor
     if (binding->type == semantic::TypeBinding) {
-        auto type = semantic::get_type_definition(*binding);
-        node.type_definition = type;
+        ast::TypeNode* type_definition = semantic::get_type_definition(*binding);
+       
+       // Set call type
+       node.type = ast::Type(node.identifier->value, type_definition);
 
         // Check all fields are initialized and give them a expected type
-        for (auto& field: type->fields) {
+        for (auto& field: type_definition->fields) {
             auto identifier = field->value;
             bool founded = false;
             for (auto& arg: node.args) {
@@ -743,8 +745,6 @@ Result<Ok, Error> semantic::Context::analyze(ast::CallNode& node) {
             auto result = this->analyze(node.args[i]->expression);
             if (result.is_error()) return Error {};
         }
-
-        node.type = ast::Type(type->identifier->value);
 
         return Ok {};
     }
@@ -894,10 +894,13 @@ Result<Ok, Error> semantic::Context::analyze(ast::BooleanNode& node) {
 }
 
 Result<Ok, Error> semantic::Context::analyze(ast::FieldAccessNode& node) {
+    // There should be at least 2 identifiers in fields accessed. eg: circle.radius
+    assert(node.fields_accessed.size() >= 2);
+
     // Get variable binding
-    Binding* variable_binding = this->get_binding(node.identifier->value);
+    Binding* variable_binding = this->get_binding(node.fields_accessed[0]->value);
     if (!variable_binding) {
-        this->errors.push_back(errors::undefined_variable(*node.identifier, this->current_module)); 
+        this->errors.push_back(errors::undefined_variable(*node.fields_accessed[0], this->current_module)); 
         return Error {};
     }
 
@@ -915,17 +918,17 @@ Result<Ok, Error> semantic::Context::analyze(ast::FieldAccessNode& node) {
     
     // Get type definition
     ast::TypeNode* type_definition = semantic::get_type_definition(*type_binding);
-    node.type_definition = type_definition;
 
-    // Iterate over fields accessed
-    for (size_t i = 0; i < node.fields_accessed.size() - 1; i++) {
+    // Set type of accessed field 0
+    node.fields_accessed[0]->type = ast::Type(type_name, type_definition);
+
+    // Iterate over accessed fields
+    for (size_t i = 1; i < node.fields_accessed.size() - 1; i++) {
         // Search for field in type definition
         bool founded = false;
         for (size_t j = 0; j < type_definition->fields.size(); j++) {
             if (node.fields_accessed[i]->value == type_definition->fields[j]->value) {
                 type_name = type_definition->fields[j]->type.to_str();
-                node.fields_accessed_indices.push_back(j);
-                node.fields_accessed_type_definitions.push_back(type_definition);
                 founded = true;
                 break;
             }
@@ -948,15 +951,22 @@ Result<Ok, Error> semantic::Context::analyze(ast::FieldAccessNode& node) {
         
         // Get type definition
         type_definition = semantic::get_type_definition(*type_binding);
+
+        // Set node type
+        node.fields_accessed[i]->type = ast::Type(type_name, type_definition);
     }
 
-    // Seatch for field in type definition
+    // Search for field in type definition
     size_t last_element = node.fields_accessed.size() - 1;
     for (size_t j = 0; j < type_definition->fields.size(); j++) {
         if (node.fields_accessed[last_element]->value == type_definition->fields[j]->value) {
+            // Set type of last field accessed
+            node.fields_accessed[last_element]->type = type_definition->fields[j]->type;
+
+            // Set type of overall node
             node.type = type_definition->fields[j]->type;
-            node.fields_accessed_indices.push_back(j);
-            node.fields_accessed_type_definitions.push_back(type_definition);
+
+            // Return error
             return Ok {};
         }
     }
