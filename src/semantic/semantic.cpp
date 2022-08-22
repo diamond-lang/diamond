@@ -936,7 +936,6 @@ Result<Ok, Error> semantic::Context::analyze(ast::FieldAccessNode& node) {
         }
 
         // Get type binding
-        std::string type_name = node.fields_accessed[i]->type.to_str();
         Binding* type_binding = this->get_binding(type_name);
         if (!type_binding) {
             this->errors.push_back(Error{"Errors: Undefined type"});
