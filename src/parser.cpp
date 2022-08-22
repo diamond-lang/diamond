@@ -655,7 +655,8 @@ Result<ast::Node*, Error> Parser::parse_call() {
         call.args.push_back((ast::CallArgumentNode*) arg.get_value());
 
         if (this->current() == token::Comma) this->advance();
-        else                                 break;
+        else if (this->current() == token::NewLine) this->advance_until_next_statement();
+        else break;
     }
 
     // Parse right paren
