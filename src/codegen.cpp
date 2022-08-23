@@ -106,6 +106,7 @@ namespace codegen {
             else if (type == ast::Type("int64"))   return llvm::Type::getInt64Ty(*(this->context));
             else if (type == ast::Type("bool"))    return llvm::Type::getInt1Ty(*(this->context));
             else if (type == ast::Type("void"))    return llvm::Type::getVoidTy(*(this->context));
+            else if (type.type_definition)         return this->get_struct_type(type.type_definition);
             else {
                 std::cout <<"type: " << type.to_str() << "\n";
                 assert(false);
@@ -155,6 +156,8 @@ namespace codegen {
             llvm::IRBuilder<> block(this->current_entry_block, this->current_entry_block->begin());
             return block.CreateAlloca(type, 0, name.c_str());
         }
+
+        void store_fields(llvm::StructType* struct_type, llvm::Value* struct_allocation, std::vector<ast::CallArgumentNode*> args);
 
         void add_scope() {
             this->scopes.push_back(std::unordered_map<std::string, llvm::AllocaInst*>());
@@ -552,6 +555,20 @@ static bool is_type_constructor(ast::Node* expression) {
     return false;
 }
 
+void codegen::Context::store_fields(llvm::StructType* struct_type, llvm::Value* struct_allocation, std::vector<ast::CallArgumentNode*> args) {
+    for (size_t i = 0; i < args.size(); i++) {
+        llvm::Value* ptr = this->builder->CreateStructGEP(struct_type, struct_allocation, i);
+        if (ast::get_type(args[i]->expression).type_definition) {
+            ast::CallNode* struct_expression = (ast::CallNode*) args[i]->expression;
+            llvm::StructType* struct_type = this->get_struct_type(ast::get_type(args[i]->expression).type_definition);
+            this->store_fields(struct_type, ptr, struct_expression->args);
+        }
+        else {
+            this->builder->CreateStore(this->codegen(args[i]->expression), ptr);
+        }
+    }
+}
+
 llvm::Value* codegen::Context::codegen(ast::AssignmentNode& node) {
     if (!is_type_constructor(node.expression)) {
         // Generate value of expression
@@ -581,10 +598,7 @@ llvm::Value* codegen::Context::codegen(ast::AssignmentNode& node) {
         this->current_scope()[node.identifier->value] = this->create_allocation(node.identifier->value, struct_type);
 
         // Store fields
-        for (size_t i = 0; i < struct_expression.args.size(); i++) {
-            llvm::Value* ptr = this->builder->CreateStructGEP(struct_type, this->current_scope()[node.identifier->value], i);
-            this->builder->CreateStore(this->codegen(struct_expression.args[i]->expression), ptr);
-        }
+        this->store_fields(struct_type, this->current_scope()[node.identifier->value], struct_expression.args);
 
         return nullptr;
     }
@@ -957,7 +971,7 @@ llvm::Value* codegen::Context::codegen(ast::FieldAccessNode& node) {
     assert(node.fields_accessed.size() >= 2);
 
     // Get struct allocation and type
-    llvm::Value* struct_allocation = this->get_binding(node.fields_accessed[0]->value);
+    llvm::Value* struct_ptr = this->get_binding(node.fields_accessed[0]->value);
     llvm::StructType* struct_type = this->get_struct_type(node.fields_accessed[0]->type.type_definition);
 
     // Get type definition
@@ -965,19 +979,16 @@ llvm::Value* codegen::Context::codegen(ast::FieldAccessNode& node) {
 
     for (size_t i = 1; i < node.fields_accessed.size() - 1; i++) {
         // Get pointer to accessed fieldd
-        llvm::Value* ptr = this->builder->CreateStructGEP(struct_type, struct_allocation, get_index_of_field(node.fields_accessed[i]->value, type_definition));
+        struct_ptr = this->builder->CreateStructGEP(struct_type, struct_ptr, get_index_of_field(node.fields_accessed[i]->value, type_definition));
         
-        // Create load
-        struct_allocation = this->builder->CreateLoad(ptr);
-        struct_type = this->get_struct_type(node.fields_accessed[i]->type.type_definition);
-
         // Update current type definition
         type_definition = node.fields_accessed[i]->type.type_definition;
+        struct_type = this->get_struct_type(type_definition);
     }
     
     // Get pointer to accessed fieldd
     size_t last_element = node.fields_accessed.size() - 1;
-    llvm::Value* ptr = this->builder->CreateStructGEP(struct_type, struct_allocation, get_index_of_field(node.fields_accessed[last_element]->value, type_definition));
+    llvm::Value* ptr = this->builder->CreateStructGEP(struct_type, struct_ptr, get_index_of_field(node.fields_accessed[last_element]->value, type_definition));
         
     // Create load
     return this->builder->CreateLoad(ptr);
