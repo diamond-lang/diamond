@@ -81,7 +81,7 @@ namespace semantic {
         void remove_scope();
         std::unordered_map<std::string, Binding>& current_scope();
         Binding* get_binding(std::string identifier);
-        void add_functions_to_current_scope(ast::BlockNode& block);
+        void add_definitions_to_current_scope(ast::BlockNode& block);
         void add_module_functions(std::filesystem::path module_path, std::set<std::filesystem::path>& already_included_modules);
         std::vector<std::unordered_map<std::string, Binding>> get_definitions();
         Result<ast::Type, Error> get_type_of_generic_function(std::vector<ast::Type> args, ast::FunctionNode* function, std::vector<ast::FunctionPrototype> call_stack = {});

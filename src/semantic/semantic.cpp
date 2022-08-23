@@ -140,7 +140,7 @@ semantic::Binding* semantic::Context::get_binding(std::string identifier) {
     return nullptr;
 }
 
-void semantic::Context::add_functions_to_current_scope(ast::BlockNode& block) {
+void semantic::Context::add_definitions_to_current_scope(ast::BlockNode& block) {
     // Add functions from block to current scope
     for (auto& function: block.functions) {
         auto& identifier = function->identifier->value;
@@ -281,6 +281,9 @@ std::vector<std::unordered_map<std::string, semantic::Binding>> semantic::Contex
         scopes.push_back(std::unordered_map<std::string, Binding>());
         for (auto it = this->scopes[i].begin(); it != this->scopes[i].end(); it++) {
             if (semantic::is_function(it->second)) {
+                scopes[i][it->first] = it->second;
+            }
+            else if (it->second.type == semantic::TypeBinding) {
                 scopes[i][it->first] = it->second;
             }
         }
@@ -489,7 +492,7 @@ Result<Ok, Error> semantic::Context::analyze(ast::BlockNode& node) {
     this->add_scope();
 
     // Add functions to the current scope
-    this->add_functions_to_current_scope(node);
+    this->add_definitions_to_current_scope(node);
 
     // Analyze functions and types in current scope
     auto scope = this->current_scope();
@@ -584,7 +587,7 @@ Result<Ok, Error> semantic::Context::analyze(ast::FunctionNode& node) {
             else {
                 Context context(this->ast);
                 context.current_module = node.module_path;
-                context.add_functions_to_current_scope(*this->ast.modules[context.current_module.string()]);
+                context.add_definitions_to_current_scope(*this->ast.modules[context.current_module.string()]);
                 auto result = type_inference::analyze(context, &node);
                 if (result.is_error()) return Error {};
             }
@@ -598,7 +601,7 @@ Result<Ok, Error> semantic::Context::analyze(ast::FunctionNode& node) {
             context.scopes = this->get_definitions();
         }
         else {
-            context.add_functions_to_current_scope(*this->ast.modules[context.current_module.string()]);
+            context.add_definitions_to_current_scope(*this->ast.modules[context.current_module.string()]);
         }
 
         context.add_scope();
@@ -609,7 +612,10 @@ Result<Ok, Error> semantic::Context::analyze(ast::FunctionNode& node) {
         }
 
         auto result = context.analyze(node.body);
-        if (result.is_error()) return Error {};
+        if (result.is_error()) {
+            this->errors.insert(this->errors.end(), context.errors.begin(), context.errors.end());
+            return Error {};
+        }
     }
     return Ok {};
 }
@@ -852,7 +858,7 @@ Result<Ok, Error> semantic::Context::analyze(ast::CallNode& node) {
         else {
             Context context(this->ast);
             context.current_module = function->module_path;
-            context.add_functions_to_current_scope(*this->ast.modules[function->module_path.string()]);
+            context.add_definitions_to_current_scope(*this->ast.modules[function->module_path.string()]);
             result = context.get_type_of_generic_function(ast::get_types(node.args), function);
         }
 

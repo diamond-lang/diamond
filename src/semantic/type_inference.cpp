@@ -211,7 +211,7 @@ Result<Ok, Error> type_inference::Context::analyze(ast::BlockNode& node) {
     this->semantic_context.add_scope();
 
     // Add functions to the current scope
-    this->semantic_context.add_functions_to_current_scope(node);
+    this->semantic_context.add_definitions_to_current_scope(node);
 
     // Analyze functions
     for (size_t i = 0; i < node.functions.size(); i++) {
