@@ -608,8 +608,11 @@ Result<Ok, Error> semantic::Context::analyze(ast::FunctionNode& node) {
         for (auto arg: node.args) {
             assert(arg->index() == ast::Identifier);
             auto& identifier = std::get<ast::IdentifierNode>(*arg);
+            context.analyze(identifier.type);
             context.current_scope()[identifier.value] = semantic::Binding(arg);
         }
+
+        context.analyze(node.return_type);
 
         auto result = context.analyze(node.body);
         if (result.is_error()) {
@@ -620,24 +623,32 @@ Result<Ok, Error> semantic::Context::analyze(ast::FunctionNode& node) {
     return Ok {};
 }
 
+Result<Ok, Error> semantic::Context::analyze(ast::Type& type) {
+    if (type == ast::Type("int64")) return Ok {};
+    else if (type == ast::Type("float64")) return Ok {};
+    else if (type == ast::Type("bool")) return Ok {};
+    else {
+        Binding* type_binding = this->get_binding(type.to_str());
+        if (!type_binding) {
+            this->errors.push_back(Error{"Errors: Undefined type"});
+            return Error {};
+        }
+        if (type_binding->type != semantic::TypeBinding) {
+            this->errors.push_back(Error{"Error: Binding is not a type\n"});
+            return Error {};
+        }
+
+        type.type_definition = semantic::get_type_definition(*type_binding);
+        return Ok {};
+    }
+    assert(false);
+    return Error {};
+}
+
 Result<Ok, Error> semantic::Context::analyze(ast::TypeNode& node) {
     for (auto field: node.fields) {
-        if (field->type == ast::Type("int64")) continue;
-        else if (field->type == ast::Type("float64")) continue;
-        else if (field->type == ast::Type("bool")) continue;
-        else {
-            Binding* type_binding = this->get_binding(field->type.to_str());
-            if (!type_binding) {
-                this->errors.push_back(Error{"Errors: Undefined type"});
-                return Error {};
-            }
-            if (type_binding->type != semantic::TypeBinding) {
-                this->errors.push_back(Error{"Error: Binding is not a type\n"});
-                return Error {};
-            }
-
-            field->type.type_definition = semantic::get_type_definition(*type_binding);
-        }
+        auto result = this->analyze(field->type);
+        if (result.is_error()) return Error {};
     }
 
     return Ok {};

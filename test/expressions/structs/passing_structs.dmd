@@ -1,0 +1,27 @@
+type Point
+    x: float64
+    y: float64
+
+type Rectangle
+    p1: Point
+    p2: Point
+
+function print_rectangle(rectangle: Rectangle): void
+    print(rectangle.p1.x)
+    print(rectangle.p1.y)
+    print(rectangle.p2.x)
+    print(rectangle.p2.y)
+
+rectangle = Rectangle(
+    p1: Point(x: 10, y: 10)
+    p2: Point(x: 110, y: 60)
+)
+
+print_rectangle(rectangle)
+
+--- Output
+10
+10
+110
+60
+---
