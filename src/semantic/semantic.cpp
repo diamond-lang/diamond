@@ -813,8 +813,37 @@ Result<Ok, Error> semantic::Context::analyze(ast::CallNode& node) {
             }
         }
 
-        this->errors.push_back(errors::undefined_function(node, this->current_module));
-        return Error {};
+        // If no function was founded for default arguments types
+        std::vector<ast::FunctionNode*> functions_that_can_be_called;
+        for (auto function: semantic::get_overloaded_functions(*binding)) {
+            for (size_t i = 0; i < node.args.size(); i++) {
+                // Set expected type 
+                ast::set_type(node.args[i]->expression,  ast::get_type(function->args[i]));
+                
+                // Analyze if expression works with expected type
+                std::vector<Error> errors = this->errors;
+                auto result = this->analyze(node.args[i]->expression);
+                this->errors = errors;
+                if (result.is_error()) continue;
+            }
+
+            // Everything Ok so add function to functions_that_can_be_called
+            functions_that_can_be_called.push_back(function);
+        }
+
+        if (functions_that_can_be_called.size() < 1) {
+            this->errors.push_back(errors::undefined_function(node, this->current_module));
+            return Error {};
+        }
+        if (functions_that_can_be_called.size() > 1) {
+            this->errors.push_back(Error{"Error: Is ambiguous what function to call"});
+            return Error {};
+        }
+        else {
+            node.function = functions_that_can_be_called[0];
+            node.type = functions_that_can_be_called[0]->return_type;
+            return Ok {};
+        }
     }
 
     // If is a generic function
