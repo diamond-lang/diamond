@@ -107,6 +107,14 @@ std::vector<ast::Type> ast::get_types(std::vector<CallArgumentNode*> nodes) {
     return types;
 }
 
+std::vector<ast::Type> ast::get_types(std::vector<FunctionArgumentNode*> nodes) {
+    std::vector<Type> types;
+    for (size_t i = 0; i < nodes.size(); i++) {
+        types.push_back(nodes[i]->type);
+    }
+    return types;
+}
+
 std::vector<ast::Type> ast::get_concrete_types(std::vector<Node*> nodes, std::unordered_map<std::string, Type>& type_bindings) {
     std::vector<Type> types;
     for (size_t i = 0; i < nodes.size(); i++) {
@@ -362,10 +370,10 @@ void ast::print(Node* node, PrintContext context) {
             put_indent_level(context.indent_level, append(context.last, last && !where_clause));
             std::cout << "function " << function.identifier->value << '(';
             for (size_t i = 0; i < function.args.size(); i++) {
-                auto& arg_name = std::get<IdentifierNode>(*function.args[i]).value;
+                auto& arg_name = function.args[i]->value;
                 std::cout << arg_name;
 
-                auto& arg_type = std::get<IdentifierNode>(*function.args[i]).type;
+                auto& arg_type = function.args[i]->type;
 
                 if (arg_type != Type("")) {
                     std::cout << ": " << get_concrete_type(arg_type, context).to_str();

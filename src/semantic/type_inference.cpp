@@ -133,14 +133,14 @@ Result<Ok, Error> type_inference::Context::analyze(ast::FunctionNode& node) {
 
     // Assign a type variable to every argument and return type
     for (size_t i = 0; i < node.args.size(); i++) {
-        if (ast::get_type(node.args[i]) == ast::Type("")) {
-            ast::set_type(node.args[i], (std::to_string(this->current_type_variable_number)));
+        if (node.args[i]->type == ast::Type("")) {
+            node.args[i]->type = ast::Type(std::to_string(this->current_type_variable_number));
             this->current_type_variable_number++;
-            this->sets.push_back(std::set<std::string>{ast::get_type(node.args[i]).to_str()});
+            this->sets.push_back(std::set<std::string>{node.args[i]->type.to_str()});
         }
 
-        auto identifier = std::get<ast::IdentifierNode>(*node.args[i]).value;
-        this->semantic_context.current_scope()[identifier] = semantic::Binding(node.args[i]);
+        auto identifier = node.args[i]->value;
+        this->semantic_context.current_scope()[identifier] = semantic::Binding((ast::Node*) node.args[i]);
     }
     node.return_type = ast::Type(std::to_string(this->current_type_variable_number));
     this->current_type_variable_number++;
@@ -196,7 +196,7 @@ Result<Ok, Error> type_inference::Context::analyze(ast::FunctionNode& node) {
 
     // Unify args and return type
     for (size_t i = 0; i < node.args.size(); i++) {
-        ast::set_type(node.args[i], this->get_unified_type(ast::get_type(node.args[i]).to_str()));
+        node.args[i]->type = this->get_unified_type(node.args[i]->type.to_str());
     }
     node.return_type = this->get_unified_type(node.return_type.to_str());
 

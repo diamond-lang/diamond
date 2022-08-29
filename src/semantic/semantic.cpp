@@ -107,7 +107,7 @@ semantic::Context::Context(ast::Ast& ast) : ast(ast) {
                 auto arg_node = ast::IdentifierNode {};
                 arg_node.type = arg;
                 ast.push_back(arg_node);
-                function_node.args.push_back(ast.last_element());
+                function_node.args.push_back((ast::FunctionArgumentNode*) ast.last_element());
             }
 
             function_node.return_type = prototype.second;
@@ -305,7 +305,7 @@ Result<ast::Type, Error> semantic::Context::get_type_of_generic_function(std::ve
     // Add arguments
     for (size_t i = 0; i < args.size(); i++) {
         ast::Type type = args[i];
-        ast::Type type_variable = ast::get_type(function->args[i]);
+        ast::Type type_variable = function->args[i]->type;
 
         if (type_variable.is_type_variable()) {
             // If it was no already included
@@ -606,10 +606,9 @@ Result<Ok, Error> semantic::Context::analyze(ast::FunctionNode& node) {
 
         context.add_scope();
         for (auto arg: node.args) {
-            assert(arg->index() == ast::Identifier);
-            auto& identifier = std::get<ast::IdentifierNode>(*arg);
-            context.analyze(identifier.type);
-            context.current_scope()[identifier.value] = semantic::Binding(arg);
+            auto identifier = arg;
+            context.analyze(identifier->type);
+            context.current_scope()[identifier->value] = semantic::Binding((ast::Node*) arg);
         }
 
         context.analyze(node.return_type);
@@ -818,7 +817,7 @@ Result<Ok, Error> semantic::Context::analyze(ast::CallNode& node) {
         for (auto function: semantic::get_overloaded_functions(*binding)) {
             for (size_t i = 0; i < node.args.size(); i++) {
                 // Set expected type 
-                ast::set_type(node.args[i]->expression,  ast::get_type(function->args[i]));
+                ast::set_type(node.args[i]->expression, function->args[i]->type);
                 
                 // Analyze if expression works with expected type
                 std::vector<Error> errors = this->errors;
@@ -852,17 +851,17 @@ Result<Ok, Error> semantic::Context::analyze(ast::CallNode& node) {
 
         std::unordered_map<std::string, ast::Type> type_bindings;
         for (size_t i = 0; i < node.args.size(); i++) {
-            bool type_variable = ast::get_type(function->args[i]).is_type_variable();
+            bool type_variable = function->args[i]->type.is_type_variable();
             bool has_type_annotation = ast::get_type(node.args[i]->expression) != ast::Type("");
 
             if (type_variable && (has_type_annotation || this->depends_on_binding_with_concrete_type(node.args[i]->expression))) {
-                if (type_bindings.find(ast::get_type(function->args[i]).to_str()) == type_bindings.end()) {
+                if (type_bindings.find(function->args[i]->type.to_str()) == type_bindings.end()) {
                     if (this->depends_on_binding_with_concrete_type(node.args[i]->expression)) {
                         this->analyze(node.args[i]->expression);
                     }
-                    type_bindings[ast::get_type(function->args[i]).to_str()] = ast::get_type(node.args[i]->expression);
+                    type_bindings[function->args[i]->type.to_str()] = ast::get_type(node.args[i]->expression);
                 }
-                else if (type_bindings[ast::get_type(function->args[i]).to_str()] != ast::get_type(node.args[i]->expression)) {
+                else if (type_bindings[function->args[i]->type.to_str()] != ast::get_type(node.args[i]->expression)) {
                     this->errors.push_back(Error{"Error: Incompatible types in function arguments"});
                     return Error {};
                 }
@@ -881,8 +880,8 @@ Result<Ok, Error> semantic::Context::analyze(ast::CallNode& node) {
         // Analyze arguments
         for (size_t i = 0; i < node.args.size(); i++) {
             // Set expected type
-            if (type_bindings.find(ast::get_type(function->args[i]).to_str()) != type_bindings.end()) {
-                ast::set_type(node.args[i]->expression, type_bindings[ast::get_type(function->args[i]).to_str()]);
+            if (type_bindings.find(function->args[i]->type.to_str()) != type_bindings.end()) {
+                ast::set_type(node.args[i]->expression, type_bindings[function->args[i]->type.to_str()]);
             }
 
             // Analyze argument

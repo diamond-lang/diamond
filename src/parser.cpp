@@ -322,7 +322,7 @@ Result<ast::Node*, Error> Parser::parse_function() {
 
             ast::set_type(arg.get_value(), ast::Type(token.get_value().get_literal()));
         }
-        function.args.push_back(arg.get_value());
+        function.args.push_back((ast::FunctionArgumentNode*) arg.get_value());
 
         if (this->current() == token::Comma) this->advance();
         else                                 break;
@@ -353,7 +353,7 @@ Result<ast::Node*, Error> Parser::parse_function() {
 
     // Check if function is generic or not
     for (auto arg: function.args) {
-        if (ast::get_type(arg) == ast::Type("")) {
+        if (arg->type == ast::Type("")) {
             function.generic = true;
             break;
         }

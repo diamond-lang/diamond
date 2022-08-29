@@ -403,8 +403,7 @@ void codegen::Context::codegen_function_prototypes(std::vector<ast::FunctionNode
                 // Set args for names
                 size_t j = 0;
                 for (auto &arg : f->args()) {
-                    assert(function->args[j]->index() == ast::Identifier);
-                    arg.setName(((ast::IdentifierNode*) function->args[j])->value);
+                    arg.setName(function->args[j]->value);
                     j++;
                 }
             }
@@ -422,8 +421,7 @@ void codegen::Context::codegen_function_prototypes(std::vector<ast::FunctionNode
             // Set args for names
             size_t j = 0;
             for (auto &arg : f->args()) {
-                assert(function->args[j]->index() == ast::Identifier);
-                arg.setName(((ast::IdentifierNode*) function->args[j])->value);
+                arg.setName(function->args[j]->value);
                 j++;
             }
         }
@@ -448,16 +446,14 @@ void codegen::Context::codegen_function_bodies(std::vector<ast::FunctionNode*> f
                 this->add_scope();
                 size_t j = 0;
                 for (auto &arg : f->args()) {
-                    assert(function->args[j]->index() == ast::Identifier);
-
                     // Create allocation for argument
-                    auto allocation = this->create_allocation(((ast::IdentifierNode*) function->args[j])->value, arg.getType());
+                    auto allocation = this->create_allocation(function->args[j]->value, arg.getType());
 
                     // Store initial value
                     this->builder->CreateStore(&arg, allocation);
 
                     // Add arguments to scope
-                    this->current_scope()[((ast::IdentifierNode*) function->args[j])->value] = allocation;
+                    this->current_scope()[function->args[j]->value] = allocation;
                     j++;
                 }
 
@@ -504,16 +500,14 @@ void codegen::Context::codegen_function_bodies(std::vector<ast::FunctionNode*> f
             this->add_scope();
             size_t j = 0;
             for (auto &arg : f->args()) {
-                assert(function->args[j]->index() == ast::Identifier);
-
                 // Create allocation for argument
-                auto allocation = this->create_allocation(((ast::IdentifierNode*) function->args[j])->value, arg.getType());
+                auto allocation = this->create_allocation(function->args[j]->value, arg.getType());
 
                 // Store initial value
                 this->builder->CreateStore(&arg, allocation);
 
                 // Add arguments to scope
-                this->current_scope()[((ast::IdentifierNode*) function->args[j])->value] = allocation;
+                this->current_scope()[function->args[j]->value] = allocation;
                 j++;
             }
 

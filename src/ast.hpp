@@ -28,6 +28,7 @@ namespace ast {
     struct BooleanNode;
     struct StringNode;
     struct FieldAccessNode;
+    using FunctionArgumentNode = IdentifierNode;
 
     enum NodeVariant {
         Block,
@@ -92,6 +93,7 @@ namespace ast {
     void set_type(Node* node, Type type);
     std::vector<Type> get_types(std::vector<Node*> nodes);
     std::vector<Type> get_types(std::vector<CallArgumentNode*> nodes);
+    std::vector<Type> get_types(std::vector<FunctionArgumentNode*> nodes);
     std::vector<Type> get_concrete_types(std::vector<Node*> nodes, std::unordered_map<std::string, Type>& type_bindings);
     std::vector<Type> get_concrete_types(std::vector<Type> type_variables, std::unordered_map<std::string, Type>& type_bindings);
     bool is_expression(Node* node);
@@ -134,7 +136,7 @@ namespace ast {
         Type type = Type("");
 
         IdentifierNode* identifier;
-        std::vector<Node*> args;
+        std::vector<FunctionArgumentNode*> args;
         Node* body;
 
         bool generic = false;
