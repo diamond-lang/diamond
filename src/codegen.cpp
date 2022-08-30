@@ -280,8 +280,6 @@ void codegen::generate_executable(ast::Ast& ast, std::string program_name) {
         llvm::raw_string_ostream errors_stream(errors);
 
         bool result = lld::elf::link(args, false, output_stream, errors_stream);
-
-        remove(object_file_name.c_str());
     }
 #elif _WIN32
     static std::string get_object_file_name(std::string executable_name) {
@@ -416,7 +414,11 @@ void codegen::Context::codegen_function_prototypes(std::vector<ast::FunctionNode
 
 void codegen::Context::codegen_function_prototypes(std::filesystem::path module_path, std::string identifier, std::vector<ast::FunctionArgumentNode*> args_names, std::vector<ast::Type> args_types, ast::Type return_type) {
     // Make function type
-    std::vector<llvm::Type*> llvm_args_types = this->as_llvm_types(args_types);
+    std::vector<llvm::Type*> llvm_args_types;
+    for (auto arg: args_types) {
+        if (arg.type_definition) llvm_args_types.push_back(this->as_llvm_type(arg)->getPointerTo());
+        else llvm_args_types.push_back(this->as_llvm_type(arg));
+    }
     llvm::Type* llvm_return_type = this->as_llvm_type(return_type);
     llvm::FunctionType* function_type = llvm::FunctionType::get(llvm_return_type, llvm::ArrayRef(llvm_args_types), false);
 
@@ -917,6 +919,9 @@ llvm::Value* codegen::Context::codegen(ast::IntegerNode& node) {
 }
 
 llvm::Value* codegen::Context::codegen(ast::IdentifierNode& node) {
+    if (node.type.type_definition) {
+        return this->get_binding(node.value);
+    }
     return this->builder->CreateLoad(this->get_binding(node.value), node.value.c_str());
 }
 
@@ -940,6 +945,9 @@ llvm::Value* codegen::Context::codegen(ast::FieldAccessNode& node) {
 
     // Get struct allocation and type
     llvm::Value* struct_ptr = this->get_binding(node.fields_accessed[0]->value);
+    if (((llvm::AllocaInst*)struct_ptr)->getAllocatedType()->isPointerTy()) {
+        struct_ptr = this->builder->CreateLoad(struct_ptr);
+    }
     llvm::StructType* struct_type = this->get_struct_type(node.fields_accessed[0]->type.type_definition);
 
     // Get type definition
