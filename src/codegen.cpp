@@ -842,6 +842,39 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
         args.push_back(this->codegen(node.args[i]->expression));
     }
 
+    // If type is struct
+    if (node.type.type_definition) {
+        auto& struct_expression = node;
+        llvm::StructType* struct_type = this->get_struct_type(struct_expression.type.type_definition);
+
+        // Create allocation
+        llvm::AllocaInst* allocation = this->create_allocation(node.identifier->value, struct_type);
+            
+        // Store fields
+        if (struct_expression.identifier->value == struct_expression.type.to_str()) {
+            this->store_fields(struct_type, allocation, struct_expression.args);
+        }
+        else {
+            // Get function
+            assert(struct_expression.function);
+            std::string name = this->get_mangled_function_name(struct_expression.function->module_path, struct_expression.identifier->value, this->get_types(struct_expression.args), this->get_type((ast::Node*) &struct_expression));
+            llvm::Function* function = this->module->getFunction(name);
+            assert(function);
+            
+            // Codegen args
+            std::vector<llvm::Value*> args;
+            args.push_back(allocation);
+            for (size_t i = 0; i < struct_expression.args.size(); i++) {
+                args.push_back(this->codegen(struct_expression.args[i]->expression));
+            }
+
+            // Make call
+            this->builder->CreateCall(function, args, "calltmp");
+        }
+
+        return allocation;
+    }
+
     if (node.args.size() == 2) {
         if (node.identifier->value == "+") {
             if (args[0]->getType()->isDoubleTy() && args[1]->getType()->isDoubleTy()) {
