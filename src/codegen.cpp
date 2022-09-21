@@ -92,11 +92,11 @@ namespace codegen {
         llvm::Value* codegen(ast::FieldAccessNode& node);
 
         std::string get_mangled_type_name(std::filesystem::path module, std::string identifier) {
-            return module.string() + "::" + identifier;
+            return /*module.string() + "::" + */ identifier;
         }
 
        std::string get_mangled_function_name(std::filesystem::path module, std::string identifier, std::vector<ast::Type> args, ast::Type return_type) {
-            std::string name = module.string() + "::"  + identifier;
+            std::string name = /* module.string() + "::"  + */ identifier;
             for (size_t i = 0; i < args.size(); i++) {
                 name += "_" + args[i].to_str();
             }
@@ -836,12 +836,6 @@ llvm::Value* codegen::Context::codegen(ast::WhileNode& node) {
 }
 
 llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
-    // Codegen args
-    std::vector<llvm::Value*> args;
-    for (size_t i = 0; i < node.args.size(); i++) {
-        args.push_back(this->codegen(node.args[i]->expression));
-    }
-
     // If type is struct
     if (node.type.type_definition) {
         auto& struct_expression = node;
@@ -873,6 +867,12 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
         }
 
         return allocation;
+    }
+
+    // Codegen args
+    std::vector<llvm::Value*> args;
+    for (size_t i = 0; i < node.args.size(); i++) {
+        args.push_back(this->codegen(node.args[i]->expression));
     }
 
     if (node.args.size() == 2) {
