@@ -1040,7 +1040,7 @@ Result<Ok, Error> semantic::Context::analyze(ast::FieldAccessNode& node) {
             // Set type of overall node
             node.type = type_definition->fields[j]->type;
 
-            // Return error
+            // Return
             return Ok {};
         }
     }

@@ -622,13 +622,15 @@ void ast::print(Node* node, PrintContext context) {
             // There should be at least 2 identifiers in fields accessed. eg: circle.radius
             assert(field_access.fields_accessed.size() >= 2);
 
-            put_indent_level(context.indent_level, context.last);
-            std::cout << field_access.fields_accessed[0]->value;
-            for (size_t i = 1; i < field_access.fields_accessed.size(); i++) {
-                std::cout << "." << field_access.fields_accessed[i]->value;
+            std::vector<bool> last = context.last;
+            for (size_t i = 0; i < field_access.fields_accessed.size(); i++) {
+                put_indent_level(context.indent_level + i, last);
+                std::cout << field_access.fields_accessed[i]->value;
+                if (field_access.fields_accessed[i]->type != Type("")) std::cout << ": " << get_concrete_type(field_access.fields_accessed[i]->type, context).to_str();
+                std::cout << "\n";
+                last.push_back(true);
             }
-            if (field_access.type != Type("")) std::cout << ": " << get_concrete_type(field_access.type, context).to_str();
-            std::cout << "\n";
+
             break;
         }
 
