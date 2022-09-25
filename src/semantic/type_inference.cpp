@@ -109,6 +109,13 @@ namespace type_inference {
 
         return sets;
     }
+
+    bool has_type_variables(std::vector<ast::Type> types) {
+        for (auto& type: types) {
+            if (type.is_type_variable()) return true;
+        }
+        return false;
+    }
 };
 
 // Type inference
@@ -367,6 +374,8 @@ Result<Ok, Error> type_inference::Context::analyze(ast::BooleanNode& node) {
 }
 
 Result<Ok, Error> type_inference::Context::analyze(ast::CallNode& node) {
+    auto& identifier = node.identifier->value;
+
     // Assign a type variable to every argument and return type
     for (size_t i = 0; i < node.args.size(); i++) {
         auto result = this->analyze(node.args[i]->expression);
@@ -374,32 +383,119 @@ Result<Ok, Error> type_inference::Context::analyze(ast::CallNode& node) {
     }
     node.type = ast::Type(std::to_string(this->current_type_variable_number));
     this->current_type_variable_number++;
+      
+    // Check binding exists
+    semantic::Binding* binding = this->semantic_context.get_binding(identifier);
+    if (!binding) {
+        this->semantic_context.errors.push_back(errors::undefined_function(node, this->semantic_context.current_module));
+        return Error {};
+    }
 
-    // Infer things based on interface if exists
-    auto& identifier = node.identifier->value;
-    if (interfaces.find(identifier) != interfaces.end()) {
-        for (auto& interface: interfaces[identifier]) {
-            if (interface.first.size() != node.args.size()) continue;
+    if (binding->type == semantic::TypeBinding) {
+        ast::TypeNode* type_definition = semantic::get_type_definition(*binding);
+        
+        // Add type constraint
+        std::set<std::string> set;
+        set.insert(node.type.to_str());
+        set.insert(type_definition->identifier->value);
+        this->sets.push_back(set);
+
+        // Add types constraints on fields
+        for (auto& field: type_definition->fields) {
+            auto identifier = field->value;
+            bool founded = false;
+            for (auto& arg: node.args) {
+                assert(arg->identifier.has_value());
+                if (arg->identifier.value()->value == identifier) {
+                    founded = true;
+ 
+                    std::set<std::string> set;
+                    set.insert(ast::get_type(arg->expression).to_str());
+                    set.insert(field->type.to_str());
+                    this->sets.push_back(set);
+                    break;
+                }
+            }
+
+            if (!founded) {
+                this->semantic_context.errors.push_back(Error{"Error: Not all fields are initialized"});
+                return Error {};
+            }
+        }
+
+        return Ok {};
+    }
+    else if (is_function(*binding)) {
+        // Infer things based on interface if exists
+        if (interfaces.find(identifier) != interfaces.end()) {
+            for (auto& interface: interfaces[identifier]) {
+                if (interface.first.size() != node.args.size()) continue;
+
+                // Create prototype type vector
+                std::vector<ast::Type> prototype = ast::get_types(node.args);
+                prototype.push_back(node.type);
+
+                // Create interface prototype vector
+                std::vector<ast::Type> interface_prototype = interface.first;
+                interface_prototype.push_back(interface.second);
+
+                // Infer stuff, basically is loop trough the interface prototype that groups type variables
+                std::unordered_map<std::string, std::set<std::string>> sets;
+                for (size_t i = 0; i < interface_prototype.size(); i++) {
+                    if (sets.find(interface_prototype[i].to_str()) == sets.end()) {
+                        sets[interface_prototype[i].to_str()] = std::set<std::string>{};
+                    }
+
+                    sets[interface_prototype[i].to_str()].insert(prototype[i].to_str());
+
+                    if (!interface_prototype[i].is_type_variable()) {
+                        sets[interface_prototype[i].to_str()].insert(interface_prototype[i].to_str());
+                    }
+                }
+
+                // Save sets found
+                for (auto it = sets.begin(); it != sets.end(); it++) {
+                    this->sets.push_back(it->second);
+                }
+
+                // Check binding exists
+                semantic::Binding* binding = this->semantic_context.get_binding(identifier);
+                if (!binding || !is_function(*binding)) {
+                    this->semantic_context.errors.push_back(errors::undefined_function(node, this->semantic_context.current_module));
+                    return Error {};
+                }
+
+                return Ok {};
+            }
+        }
+
+        if (binding->type == semantic::GenericFunctionBinding) {
+            node.function = semantic::get_generic_function(*binding);
+            if (node.function->return_type == ast::Type("")) {
+                semantic::Context context(this->semantic_context.ast);
+                context.scopes = this->semantic_context.get_definitions();
+                context.analyze(*node.function);
+            }
 
             // Create prototype type vector
             std::vector<ast::Type> prototype = ast::get_types(node.args);
             prototype.push_back(node.type);
 
             // Create interface prototype vector
-            std::vector<ast::Type> interface_prototype = interface.first;
-            interface_prototype.push_back(interface.second);
+            std::vector<ast::Type> function_prototype = ast::get_types(node.function->args);
+            function_prototype.push_back(node.function->return_type);
 
             // Infer stuff, basically is loop trough the interface prototype that groups type variables
             std::unordered_map<std::string, std::set<std::string>> sets;
-            for (size_t i = 0; i < interface_prototype.size(); i++) {
-                if (sets.find(interface_prototype[i].to_str()) == sets.end()) {
-                    sets[interface_prototype[i].to_str()] = std::set<std::string>{};
+            for (size_t i = 0; i < function_prototype.size(); i++) {
+                if (sets.find(function_prototype[i].to_str()) == sets.end()) {
+                    sets[function_prototype[i].to_str()] = std::set<std::string>{};
                 }
 
-                sets[interface_prototype[i].to_str()].insert(prototype[i].to_str());
+                sets[function_prototype[i].to_str()].insert(prototype[i].to_str());
 
-                if (!interface_prototype[i].is_type_variable()) {
-                    sets[interface_prototype[i].to_str()].insert(interface_prototype[i].to_str());
+                if (!function_prototype[i].is_type_variable()) {
+                    sets[function_prototype[i].to_str()].insert(function_prototype[i].to_str());
                 }
             }
 
@@ -407,63 +503,13 @@ Result<Ok, Error> type_inference::Context::analyze(ast::CallNode& node) {
             for (auto it = sets.begin(); it != sets.end(); it++) {
                 this->sets.push_back(it->second);
             }
-
-            // Check binding exists
-            semantic::Binding* binding = this->semantic_context.get_binding(identifier);
-            if (!binding || !is_function(*binding)) {
-                this->semantic_context.errors.push_back(errors::undefined_function(node, this->semantic_context.current_module));
-                return Error {};
-            }
-
-            return Ok {};
         }
+
+        return Ok {};
     }
 
-    // Check binding exists
-    semantic::Binding* binding = this->semantic_context.get_binding(identifier);
-    if (!binding || !is_function(*binding)) {
-        this->semantic_context.errors.push_back(errors::undefined_function(node, this->semantic_context.current_module));
-        return Error {};
-    }
-    node.function = semantic::get_generic_function(*binding);
-
-    if (binding->type == semantic::GenericFunctionBinding) {
-        ast::FunctionNode* function = semantic::get_generic_function(*binding);
-        if (function->return_type == ast::Type("")) {
-            semantic::Context context(this->semantic_context.ast);
-            context.scopes = this->semantic_context.get_definitions();
-            context.analyze(*function);
-        }
-
-        // Create prototype type vector
-        std::vector<ast::Type> prototype = ast::get_types(node.args);
-        prototype.push_back(node.type);
-
-        // Create interface prototype vector
-        std::vector<ast::Type> function_prototype = ast::get_types(function->args);
-        function_prototype.push_back(function->return_type);
-
-        // Infer stuff, basically is loop trough the interface prototype that groups type variables
-        std::unordered_map<std::string, std::set<std::string>> sets;
-        for (size_t i = 0; i < function_prototype.size(); i++) {
-            if (sets.find(function_prototype[i].to_str()) == sets.end()) {
-                sets[function_prototype[i].to_str()] = std::set<std::string>{};
-            }
-
-            sets[function_prototype[i].to_str()].insert(prototype[i].to_str());
-
-            if (!function_prototype[i].is_type_variable()) {
-                sets[function_prototype[i].to_str()].insert(function_prototype[i].to_str());
-            }
-        }
-
-        // Save sets found
-        for (auto it = sets.begin(); it != sets.end(); it++) {
-            this->sets.push_back(it->second);
-        }
-    }
-
-    return Ok {};
+    assert(false);
+    return Error {};
 }
 
 void type_inference::Context::unify(ast::Node* node) {
@@ -506,9 +552,11 @@ void type_inference::Context::unify(ast::IntegerNode& node) {
     node.type = this->get_unified_type(node.type.to_str());
 
     // Add constraint
-    auto constraint = ast::FunctionPrototype{"Number", std::vector{node.type}, ast::Type("")};
-    if (std::find(this->function_node->constraints.begin(), this->function_node->constraints.end(), constraint) == this->function_node->constraints.end()) {
-        this->function_node->constraints.push_back(constraint);
+    if (node.type.is_type_variable()) {
+        auto constraint = ast::FunctionPrototype{"Number", std::vector{node.type}, ast::Type("")};
+        if (std::find(this->function_node->constraints.begin(), this->function_node->constraints.end(), constraint) == this->function_node->constraints.end()) {
+            this->function_node->constraints.push_back(constraint);
+        }
     }
 }
 
@@ -516,9 +564,11 @@ void type_inference::Context::unify(ast::FloatNode& node) {
     node.type = this->get_unified_type(node.type.to_str());
 
     // Add constraint
-    auto constraint = ast::FunctionPrototype{"Float", std::vector{node.type}, ast::Type("")};
-    if (std::find(this->function_node->constraints.begin(), this->function_node->constraints.end(), constraint) == this->function_node->constraints.end()) {
-        this->function_node->constraints.push_back(constraint);
+    if (node.type.is_type_variable()) {
+        auto constraint = ast::FunctionPrototype{"Float", std::vector{node.type}, ast::Type("")};
+        if (std::find(this->function_node->constraints.begin(), this->function_node->constraints.end(), constraint) == this->function_node->constraints.end()) {
+            this->function_node->constraints.push_back(constraint);
+        }
     }
 }
 
@@ -530,8 +580,10 @@ void type_inference::Context::unify(ast::CallNode& node) {
     node.type = this->get_unified_type(node.type.to_str());
 
     // Add constraint
-    auto constraint = ast::FunctionPrototype{node.identifier->value, ast::get_types(node.args), node.type};
-    if (std::find(this->function_node->constraints.begin(), this->function_node->constraints.end(), constraint) == this->function_node->constraints.end()) {
-        this->function_node->constraints.push_back(constraint);
+    if (node.type.is_type_variable() || has_type_variables(ast::get_types(node.args))) {
+        auto constraint = ast::FunctionPrototype{node.identifier->value, ast::get_types(node.args), node.type};
+        if (std::find(this->function_node->constraints.begin(), this->function_node->constraints.end(), constraint) == this->function_node->constraints.end()) {
+            this->function_node->constraints.push_back(constraint);
+        }
     }
 }
