@@ -61,6 +61,16 @@ namespace type_inference {
         void unify(ast::StringNode& node) {}
         void unify(ast::FieldAccessNode& node) {}
 
+        ast::Type new_type_variable() {
+            ast::Type new_type = ast::Type(std::to_string(this->current_type_variable_number));
+            this->current_type_variable_number++;
+            return new_type;
+        }
+
+        void add_constraint(std::set<std::string> constraint) {
+            this->sets.push_back(constraint);
+        }
+
         ast::Type get_unified_type(std::string type_var) {
             if (type_var != "") {
                 for (auto it = this->labeled_sets.begin(); it != this->labeled_sets.end(); it++) {
@@ -76,13 +86,6 @@ namespace type_inference {
             return ast::Type("");
         }
     };
-
-    bool is_number(std::string str) {
-        for (size_t i = 0; i < str.size(); i++) {
-            if (!isdigit((int)str[i])) return false;
-        }
-        return true;
-    }
 
     std::vector<std::set<std::string>> merge_sets_with_shared_elements(std::vector<std::set<std::string>> sets) {
         size_t i = 0;
@@ -116,6 +119,13 @@ namespace type_inference {
         }
         return false;
     }
+
+    bool is_number(std::string str) {
+        for (size_t i = 0; i < str.size(); i++) {
+            if (!isdigit((int)str[i])) return false;
+        }
+        return true;
+    }
 };
 
 // Type inference
@@ -141,17 +151,15 @@ Result<Ok, Error> type_inference::Context::analyze(ast::FunctionNode& node) {
     // Assign a type variable to every argument and return type
     for (size_t i = 0; i < node.args.size(); i++) {
         if (node.args[i]->type == ast::Type("")) {
-            node.args[i]->type = ast::Type(std::to_string(this->current_type_variable_number));
-            this->current_type_variable_number++;
-            this->sets.push_back(std::set<std::string>{node.args[i]->type.to_str()});
+            node.args[i]->type = this->new_type_variable();
+            this->add_constraint({node.args[i]->type.to_str()});
         }
 
         auto identifier = node.args[i]->value;
         this->semantic_context.current_scope()[identifier] = semantic::Binding((ast::Node*) node.args[i]);
     }
-    node.return_type = ast::Type(std::to_string(this->current_type_variable_number));
-    this->current_type_variable_number++;
-    this->sets.push_back(std::set<std::string>{node.return_type.to_str()});
+    node.return_type = this->new_type_variable();
+    this->add_constraint({node.return_type.to_str()});
 
     // Analyze function body
     auto result = this->analyze(node.body);
@@ -160,7 +168,7 @@ Result<Ok, Error> type_inference::Context::analyze(ast::FunctionNode& node) {
     // Assume it's an expression if it isn't a block
     if (node.body->index() != ast::Block) {
         // Unify expression type with return type
-        this->sets.push_back(std::set<std::string>{node.return_type.to_str(), ast::get_type(node.body).to_str()});
+        this->add_constraint({node.return_type.to_str(), ast::get_type(node.body).to_str()});
     }
 
     // Merge sets that share elements
@@ -236,10 +244,7 @@ Result<Ok, Error> type_inference::Context::analyze(ast::BlockNode& node) {
                 ast::CallNode* call = (ast::CallNode*) node.statements[i];
 
                 // Is a call as an statement so its type must be void
-                std::set<std::string> set;
-                set.insert(call->type.to_str());
-                set.insert("void");
-                this->sets.push_back(set);
+                this->add_constraint({call->type.to_str(), "void"});
                 break;
             }
             case ast::Return: {
@@ -322,12 +327,12 @@ Result<Ok, Error> type_inference::Context::analyze(ast::IfElseNode& node) {
         node.type = ast::Type(std::to_string(this->current_type_variable_number));
         this->current_type_variable_number++;
 
-        // Add type restrictions
-        std::set<std::string> set;
-        set.insert(ast::get_type(node.if_branch).to_str());
-        set.insert(ast::get_type(node.else_branch.value()).to_str());
-        set.insert(node.type.to_str());
-        this->sets.push_back(set);
+        // Add constraints
+        this->add_constraint({
+            ast::get_type(node.if_branch).to_str(),
+            ast::get_type(node.else_branch.value()).to_str(),
+            node.type.to_str()
+        });
     }
 
     return Ok {};
@@ -357,14 +362,12 @@ Result<Ok, Error> type_inference::Context::analyze(ast::IdentifierNode& node) {
 }
 
 Result<Ok, Error> type_inference::Context::analyze(ast::IntegerNode& node) {
-    node.type = ast::Type(std::to_string(this->current_type_variable_number));
-    this->current_type_variable_number++;
+    node.type = this->new_type_variable();
     return Ok {};
 }
 
 Result<Ok, Error> type_inference::Context::analyze(ast::FloatNode& node) {
-    node.type = ast::Type(std::to_string(this->current_type_variable_number));
-    this->current_type_variable_number++;
+    node.type = this->new_type_variable();
     return Ok {};
 }
 
@@ -381,8 +384,7 @@ Result<Ok, Error> type_inference::Context::analyze(ast::CallNode& node) {
         auto result = this->analyze(node.args[i]->expression);
         if (result.is_error()) return Error {};
     }
-    node.type = ast::Type(std::to_string(this->current_type_variable_number));
-    this->current_type_variable_number++;
+    node.type = this->new_type_variable();
       
     // Check binding exists
     semantic::Binding* binding = this->semantic_context.get_binding(identifier);
@@ -395,10 +397,7 @@ Result<Ok, Error> type_inference::Context::analyze(ast::CallNode& node) {
         ast::TypeNode* type_definition = semantic::get_type_definition(*binding);
         
         // Add type constraint
-        std::set<std::string> set;
-        set.insert(node.type.to_str());
-        set.insert(type_definition->identifier->value);
-        this->sets.push_back(set);
+        this->add_constraint({node.type.to_str(), type_definition->identifier->value});
 
         // Add types constraints on fields
         for (auto& field: type_definition->fields) {
@@ -408,11 +407,7 @@ Result<Ok, Error> type_inference::Context::analyze(ast::CallNode& node) {
                 assert(arg->identifier.has_value());
                 if (arg->identifier.value()->value == identifier) {
                     founded = true;
- 
-                    std::set<std::string> set;
-                    set.insert(ast::get_type(arg->expression).to_str());
-                    set.insert(field->type.to_str());
-                    this->sets.push_back(set);
+                    this->add_constraint({ast::get_type(arg->expression).to_str(), field->type.to_str()});
                     break;
                 }
             }
@@ -453,9 +448,9 @@ Result<Ok, Error> type_inference::Context::analyze(ast::CallNode& node) {
                     }
                 }
 
-                // Save sets found
+                // Add constraints found
                 for (auto it = sets.begin(); it != sets.end(); it++) {
-                    this->sets.push_back(it->second);
+                    this->add_constraint(it->second);
                 }
 
                 // Check binding exists
@@ -501,7 +496,7 @@ Result<Ok, Error> type_inference::Context::analyze(ast::CallNode& node) {
 
             // Save sets found
             for (auto it = sets.begin(); it != sets.end(); it++) {
-                this->sets.push_back(it->second);
+                this->add_constraint(it->second);
             }
         }
 
