@@ -317,4 +317,12 @@ namespace ast {
     void print_with_concrete_types(Node* node, PrintContext context = PrintContext{});
 };
 
+// Add hash struct for ast::Type to be able to use ast::Type as keys of std::unordered_map
+namespace std {
+    template <>
+    struct hash<ast::Type> {
+        std::size_t operator()(const ast::Type& type) const;
+    };
+};
+
 #endif

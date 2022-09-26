@@ -47,6 +47,11 @@ bool ast::Type::is_type_variable() const {
     else                                 return false;
 }
 
+// Add hash struct for ast::Type to be able to use ast::Type as keys of std::unordered_map
+std::size_t std::hash<ast::Type>::operator()(const ast::Type& type) const {
+    return std::hash<std::string>()(type.to_str());
+}
+
 // FunctionPrototype
 bool ast::FunctionPrototype::operator==(const FunctionPrototype &t) const {
     if (this->identifier == t.identifier && this->args.size() == t.args.size()) {

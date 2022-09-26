@@ -12,11 +12,60 @@
 // Prototypes and definitions
 // --------------------------
 namespace type_inference {
+    template <typename T>
+    struct Set {
+        std::vector<T> elements;
+
+        void insert(T element) {
+            for (size_t i = 0; i < this->elements.size(); i++) {
+                if (this->elements[i] == element) {
+                    return;
+                }
+            }
+            this->elements.push_back(element);
+        }
+
+        bool contains(T element) {
+            for (size_t i = 0; i < this->elements.size(); i++) {
+                if (this->elements[i] == element) return true;
+            }
+            return false;
+        }
+
+        size_t size() {
+            return this->elements.size();
+        }
+
+        void merge(Set<T>& set) {
+            for (size_t i = 0; i < set.elements.size(); i++) {
+                this->insert(set.elements[i]);
+            }
+        }
+
+        Set<T> intersect(Set<T> set) {        
+            Set<T> intersection = Set<T>();
+            for (auto& element: this->elements) {
+                if (set.contains(element)) {
+                    intersection.elements.push_back(element);
+                }
+            }
+            return intersection;
+        }
+
+        Set() : elements({}) {}
+        Set(std::vector<T> elements) {
+            for (size_t i = 0; i < elements.size(); i++) {
+                this->insert(elements[i]);
+            }
+        }
+        ~Set() {}
+    };
+
     struct Context {
         semantic::Context& semantic_context;
         size_t current_type_variable_number = 1;
-        std::vector<std::set<std::string>> sets;
-        std::unordered_map<std::string, std::set<std::string>> labeled_sets;
+        std::vector<Set<ast::Type>> sets;
+        std::unordered_map<ast::Type, Set<ast::Type>> labeled_sets;
         ast::FunctionNode* function_node;
 
         Context(semantic::Context& semantic_context) : semantic_context(semantic_context) {}
@@ -62,41 +111,37 @@ namespace type_inference {
         void unify(ast::FieldAccessNode& node) {}
 
         ast::Type new_type_variable() {
-            ast::Type new_type = ast::Type(std::to_string(this->current_type_variable_number));
+            ast::Type new_type = ast::Type("$" + std::to_string(this->current_type_variable_number));
             this->current_type_variable_number++;
             return new_type;
         }
 
-        void add_constraint(std::set<std::string> constraint) {
+        void add_constraint(Set<ast::Type> constraint) {
             this->sets.push_back(constraint);
         }
 
-        ast::Type get_unified_type(std::string type_var) {
-            if (type_var != "") {
+        ast::Type get_unified_type(ast::Type type_var) {
+            if (type_var.is_type_variable()) {
                 for (auto it = this->labeled_sets.begin(); it != this->labeled_sets.end(); it++) {
-                    if (it->second.count(type_var) != 0) {
+                    if (it->second.contains(type_var)) {
                         return ast::Type(it->first);
                     }
                 }
 
-                auto result = ast::Type("$" + std::to_string(this->current_type_variable_number));
-                this->current_type_variable_number++;
-                return result;
+                return this->new_type_variable();
             }
             return ast::Type("");
         }
     };
 
-    std::vector<std::set<std::string>> merge_sets_with_shared_elements(std::vector<std::set<std::string>> sets) {
+    std::vector<Set<ast::Type>> merge_sets_with_shared_elements(std::vector<Set<ast::Type>> sets) {
         size_t i = 0;
         while (i < sets.size()) {
             bool merged = false;
 
             for (size_t j = i + 1; j < sets.size(); j++) {
-                std::set<std::string> intersect;
-                std::set_intersection(sets[i].begin(), sets[i].end(), sets[j].begin(), sets[j].end(), std::inserter(intersect, intersect.begin()));
-
-                if (intersect.size() != 0) {
+                Set<ast::Type> intersection = sets[i].intersect(sets[j]);
+                if (intersection.size() != 0) {
                     // Merge sets
                     sets[i].merge(sets[j]);
 
@@ -118,13 +163,6 @@ namespace type_inference {
             if (type.is_type_variable()) return true;
         }
         return false;
-    }
-
-    bool is_number(std::string str) {
-        for (size_t i = 0; i < str.size(); i++) {
-            if (!isdigit((int)str[i])) return false;
-        }
-        return true;
     }
 };
 
@@ -152,14 +190,14 @@ Result<Ok, Error> type_inference::Context::analyze(ast::FunctionNode& node) {
     for (size_t i = 0; i < node.args.size(); i++) {
         if (node.args[i]->type == ast::Type("")) {
             node.args[i]->type = this->new_type_variable();
-            this->add_constraint({node.args[i]->type.to_str()});
+            this->add_constraint(Set<ast::Type>({node.args[i]->type}));
         }
 
         auto identifier = node.args[i]->value;
         this->semantic_context.current_scope()[identifier] = semantic::Binding((ast::Node*) node.args[i]);
     }
     node.return_type = this->new_type_variable();
-    this->add_constraint({node.return_type.to_str()});
+    this->add_constraint(Set<ast::Type>({node.return_type}));
 
     // Analyze function body
     auto result = this->analyze(node.body);
@@ -168,17 +206,17 @@ Result<Ok, Error> type_inference::Context::analyze(ast::FunctionNode& node) {
     // Assume it's an expression if it isn't a block
     if (node.body->index() != ast::Block) {
         // Unify expression type with return type
-        this->add_constraint({node.return_type.to_str(), ast::get_type(node.body).to_str()});
+        this->add_constraint(Set<ast::Type>({node.return_type, ast::get_type(node.body)}));
     }
 
     // Merge sets that share elements
     this->sets = type_inference::merge_sets_with_shared_elements(this->sets);
 
-     // Check if return type is alone, if is alone it means the function is void
+    // Check if return type is alone, if is alone it means the function is void
     for (size_t i = 0; i < this->sets.size(); i++) {
-        if (this->sets[i].count(node.return_type.to_str())) {
+        if (this->sets[i].contains(node.return_type)) {
             if (this->sets[i].size() == 1) {
-                this->sets[i].insert("void");
+                this->sets[i].insert(ast::Type("void"));
             }
         }
     }
@@ -187,22 +225,21 @@ Result<Ok, Error> type_inference::Context::analyze(ast::FunctionNode& node) {
     this->current_type_variable_number = 1;
     for (size_t i = 0; i < this->sets.size(); i++) {
         bool representative_found = false;
-        for (auto it = this->sets[i].begin(); it != this->sets[i].end(); it++) {
-            if (!type_inference::is_number(*it)) {
+        for (auto& type: this->sets[i].elements) {
+            if (!type.is_type_variable()) {
                 assert(!representative_found);
                 representative_found = true;
-                if (this->labeled_sets.find(*it) != this->labeled_sets.end()) {
-                        this->labeled_sets[*it].merge(this->sets[i]);
+                if (this->labeled_sets.find(type) != this->labeled_sets.end()) {
+                        this->labeled_sets[type].merge(this->sets[i]);
                 }
                 else {
-                    this->labeled_sets[*it] = this->sets[i];
+                    this->labeled_sets[type] = this->sets[i];
                 }
             }
         }
 
         if (!representative_found) {
-            this->labeled_sets[std::string("$") + std::to_string(this->current_type_variable_number)] = this->sets[i];
-            this->current_type_variable_number++;
+            this->labeled_sets[this->new_type_variable()] = this->sets[i];
         }
     }
 
@@ -211,9 +248,9 @@ Result<Ok, Error> type_inference::Context::analyze(ast::FunctionNode& node) {
 
     // Unify args and return type
     for (size_t i = 0; i < node.args.size(); i++) {
-        node.args[i]->type = this->get_unified_type(node.args[i]->type.to_str());
+        node.args[i]->type = this->get_unified_type(node.args[i]->type);
     }
-    node.return_type = this->get_unified_type(node.return_type.to_str());
+    node.return_type = this->get_unified_type(node.return_type);
 
     // Remove scope
     this->semantic_context.remove_scope();
@@ -244,7 +281,7 @@ Result<Ok, Error> type_inference::Context::analyze(ast::BlockNode& node) {
                 ast::CallNode* call = (ast::CallNode*) node.statements[i];
 
                 // Is a call as an statement so its type must be void
-                this->add_constraint({call->type.to_str(), "void"});
+                this->add_constraint(Set<ast::Type>({call->type, ast::Type("void")}));
                 break;
             }
             case ast::Return: {
@@ -302,10 +339,10 @@ Result<Ok, Error> type_inference::Context::analyze(ast::ReturnNode& node) {
     if (node.expression.has_value()) {
         auto result = this->analyze(node.expression.value());
         if (result.is_error()) return Error {};
-        this->sets.push_back(std::set<std::string>{this->function_node->return_type.to_str(), ast::get_type(node.expression.value()).to_str()});
+        this->add_constraint(Set<ast::Type>({this->function_node->return_type, ast::get_type(node.expression.value())}));
     }
     else {
-        this->sets.push_back(std::set<std::string>{this->function_node->return_type.to_str(), "void"});
+        this->add_constraint(Set<ast::Type>({this->function_node->return_type, ast::Type("void")}));
     }
 
     return Ok {};
@@ -324,15 +361,14 @@ Result<Ok, Error> type_inference::Context::analyze(ast::IfElseNode& node) {
     }
 
     if (ast::is_expression((ast::Node*) &node)) {
-        node.type = ast::Type(std::to_string(this->current_type_variable_number));
-        this->current_type_variable_number++;
+        node.type = this->new_type_variable();
 
         // Add constraints
-        this->add_constraint({
-            ast::get_type(node.if_branch).to_str(),
-            ast::get_type(node.else_branch.value()).to_str(),
-            node.type.to_str()
-        });
+        this->add_constraint(Set<ast::Type>({
+            ast::get_type(node.if_branch),
+            ast::get_type(node.else_branch.value()),
+            node.type
+        }));
     }
 
     return Ok {};
@@ -397,7 +433,7 @@ Result<Ok, Error> type_inference::Context::analyze(ast::CallNode& node) {
         ast::TypeNode* type_definition = semantic::get_type_definition(*binding);
         
         // Add type constraint
-        this->add_constraint({node.type.to_str(), type_definition->identifier->value});
+        this->add_constraint(Set<ast::Type>({node.type, type_definition->identifier->value}));
 
         // Add types constraints on fields
         for (auto& field: type_definition->fields) {
@@ -407,7 +443,7 @@ Result<Ok, Error> type_inference::Context::analyze(ast::CallNode& node) {
                 assert(arg->identifier.has_value());
                 if (arg->identifier.value()->value == identifier) {
                     founded = true;
-                    this->add_constraint({ast::get_type(arg->expression).to_str(), field->type.to_str()});
+                    this->add_constraint(Set<ast::Type>({ast::get_type(arg->expression), field->type}));
                     break;
                 }
             }
@@ -435,16 +471,16 @@ Result<Ok, Error> type_inference::Context::analyze(ast::CallNode& node) {
                 interface_prototype.push_back(interface.second);
 
                 // Infer stuff, basically is loop trough the interface prototype that groups type variables
-                std::unordered_map<std::string, std::set<std::string>> sets;
+                std::unordered_map<ast::Type, Set<ast::Type>> sets;
                 for (size_t i = 0; i < interface_prototype.size(); i++) {
-                    if (sets.find(interface_prototype[i].to_str()) == sets.end()) {
-                        sets[interface_prototype[i].to_str()] = std::set<std::string>{};
+                    if (sets.find(interface_prototype[i]) == sets.end()) {
+                        sets[interface_prototype[i]] = Set<ast::Type>();
                     }
 
-                    sets[interface_prototype[i].to_str()].insert(prototype[i].to_str());
+                    sets[interface_prototype[i]].insert(prototype[i]);
 
                     if (!interface_prototype[i].is_type_variable()) {
-                        sets[interface_prototype[i].to_str()].insert(interface_prototype[i].to_str());
+                        sets[interface_prototype[i]].insert(interface_prototype[i]);
                     }
                 }
 
@@ -481,16 +517,16 @@ Result<Ok, Error> type_inference::Context::analyze(ast::CallNode& node) {
             function_prototype.push_back(node.function->return_type);
 
             // Infer stuff, basically is loop trough the interface prototype that groups type variables
-            std::unordered_map<std::string, std::set<std::string>> sets;
+            std::unordered_map<ast::Type, Set<ast::Type>> sets;
             for (size_t i = 0; i < function_prototype.size(); i++) {
-                if (sets.find(function_prototype[i].to_str()) == sets.end()) {
-                    sets[function_prototype[i].to_str()] = std::set<std::string>{};
+                if (sets.find(function_prototype[i]) == sets.end()) {
+                    sets[function_prototype[i]] = Set<ast::Type>();
                 }
 
-                sets[function_prototype[i].to_str()].insert(prototype[i].to_str());
+                sets[function_prototype[i]].insert(prototype[i]);
 
                 if (!function_prototype[i].is_type_variable()) {
-                    sets[function_prototype[i].to_str()].insert(function_prototype[i].to_str());
+                    sets[function_prototype[i]].insert(function_prototype[i]);
                 }
             }
 
@@ -527,7 +563,7 @@ void type_inference::Context::unify(ast::ReturnNode& node) {
 
 void type_inference::Context::unify(ast::IfElseNode& node) {
     if (ast::is_expression((ast::Node*) &node)) {
-        node.type = this->get_unified_type(node.type.to_str());
+        node.type = this->get_unified_type(node.type);
     }
     this->unify(node.condition);
     this->unify(node.if_branch);
@@ -540,11 +576,11 @@ void type_inference::Context::unify(ast::WhileNode& node) {
 }
 
 void type_inference::Context::unify(ast::IdentifierNode& node) {
-    node.type = this->get_unified_type(node.type.to_str());
+    node.type = this->get_unified_type(node.type);
 }
 
 void type_inference::Context::unify(ast::IntegerNode& node) {
-    node.type = this->get_unified_type(node.type.to_str());
+    node.type = this->get_unified_type(node.type);
 
     // Add constraint
     if (node.type.is_type_variable()) {
@@ -556,7 +592,7 @@ void type_inference::Context::unify(ast::IntegerNode& node) {
 }
 
 void type_inference::Context::unify(ast::FloatNode& node) {
-    node.type = this->get_unified_type(node.type.to_str());
+    node.type = this->get_unified_type(node.type);
 
     // Add constraint
     if (node.type.is_type_variable()) {
@@ -572,7 +608,7 @@ void type_inference::Context::unify(ast::CallNode& node) {
         this->unify(node.args[i]->expression);
     }
 
-    node.type = this->get_unified_type(node.type.to_str());
+    node.type = this->get_unified_type(node.type);
 
     // Add constraint
     if (node.type.is_type_variable() || has_type_variables(ast::get_types(node.args))) {
