@@ -378,6 +378,30 @@ Result<Ok, Error> semantic::Context::check_constraint(std::unordered_map<std::st
 
         return Ok {};
     }
+    else if (constraint.identifier[0] == '.') {
+        std::string type_name = type_bindings[constraint.args[0].to_str()].to_str();
+        Binding* type_binding = this->get_binding(type_name);
+        if (!type_binding) {
+            this->errors.push_back(Error{"Errors: Undefined type"});
+            return Error {};
+        }
+        if (type_binding->type != semantic::TypeBinding) {
+            this->errors.push_back(Error{"Error: Binding is not a type\n"});
+            return Error {};
+        }
+        ast::TypeNode* type_definition = semantic::get_type_definition(*type_binding);
+        
+        // Search for field
+        for (auto field: type_definition->fields) {
+            if ("." + field->value == constraint.identifier) {
+                type_bindings[constraint.return_type.to_str()] = field->type;
+                return Ok {};
+            }
+        }
+
+        this->errors.push_back(Error{"Error: Struct type doesn't have that field"});
+        return Error {};
+    }
     else {
         semantic::Binding* binding = this->get_binding(constraint.identifier);
         if (!binding || !is_function(*binding)) {

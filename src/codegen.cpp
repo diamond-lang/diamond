@@ -1072,17 +1072,18 @@ llvm::Value* codegen::Context::codegen(ast::FieldAccessNode& node) {
     if (((llvm::AllocaInst*)struct_ptr)->getAllocatedType()->isPointerTy()) {
         struct_ptr = this->builder->CreateLoad(struct_ptr);
     }
-    llvm::StructType* struct_type = this->get_struct_type(node.fields_accessed[0]->type.type_definition);
+    assert(this->get_type((ast::Node*) node.fields_accessed[0]).type_definition);
+    llvm::StructType* struct_type = this->get_struct_type(this->get_type((ast::Node*) node.fields_accessed[0]).type_definition);
 
     // Get type definition
-    ast::TypeNode* type_definition = node.fields_accessed[0]->type.type_definition;
+    ast::TypeNode* type_definition = this->get_type((ast::Node*) node.fields_accessed[0]).type_definition;
 
     for (size_t i = 1; i < node.fields_accessed.size() - 1; i++) {
         // Get pointer to accessed fieldd
         struct_ptr = this->builder->CreateStructGEP(struct_type, struct_ptr, get_index_of_field(node.fields_accessed[i]->value, type_definition));
         
         // Update current type definition
-        type_definition = node.fields_accessed[i]->type.type_definition;
+        type_definition = this->get_type((ast::Node*) node.fields_accessed[i]).type_definition;
         struct_type = this->get_struct_type(type_definition);
     }
     

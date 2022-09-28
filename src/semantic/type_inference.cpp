@@ -61,12 +61,32 @@ namespace type_inference {
         ~Set() {}
     };
 
+    struct StructType {
+        std::unordered_map<std::string, ast::Type> fields;
+    };
+
+    // Used for debugging
+    void print(std::unordered_map<ast::Type, StructType> struct_types) {
+        for (auto it = struct_types.begin(); it != struct_types.end(); it++) {
+            std::cout << it->first.to_str() << ": {\n";
+            for (auto it2 = it->second.fields.begin(); it2 != it->second.fields.end(); it2++) {
+                std::cout << "    " << it2->first << ": " << it2->second.to_str() << "\n";
+            }
+            std::cout << "}";
+            if (std::distance(it,struct_types.end()) > 1) {
+                std::cout << ",";
+            }
+            std::cout << "\n";
+        }
+    }
+
     struct Context {
         semantic::Context& semantic_context;
         size_t current_type_variable_number = 1;
         std::vector<Set<ast::Type>> sets;
         std::unordered_map<ast::Type, Set<ast::Type>> labeled_sets;
         ast::FunctionNode* function_node;
+        std::unordered_map<ast::Type, StructType> struct_types;
 
         Context(semantic::Context& semantic_context) : semantic_context(semantic_context) {}
 
@@ -88,7 +108,7 @@ namespace type_inference {
         Result<Ok, Error> analyze(ast::IdentifierNode& node);
         Result<Ok, Error> analyze(ast::BooleanNode& node);
         Result<Ok, Error> analyze(ast::StringNode& node) {return Ok {};}
-        Result<Ok, Error> analyze(ast::FieldAccessNode& node) {return Ok {};}
+        Result<Ok, Error> analyze(ast::FieldAccessNode& node);
 
         void unify(ast::Node* node);
         void unify(ast::BlockNode& node);
@@ -108,7 +128,7 @@ namespace type_inference {
         void unify(ast::IdentifierNode& node);
         void unify(ast::BooleanNode& node) {}
         void unify(ast::StringNode& node) {}
-        void unify(ast::FieldAccessNode& node) {}
+        void unify(ast::FieldAccessNode& node);
 
         ast::Type new_type_variable() {
             ast::Type new_type = ast::Type("$" + std::to_string(this->current_type_variable_number));
@@ -128,7 +148,9 @@ namespace type_inference {
                     }
                 }
 
-                return this->new_type_variable();
+                ast::Type new_type_var = this->new_type_variable();
+                this->labeled_sets[new_type_var] = Set<ast::Type>({type_var});
+                return new_type_var;
             }
             return ast::Type("");
         }
@@ -543,6 +565,34 @@ Result<Ok, Error> type_inference::Context::analyze(ast::CallNode& node) {
     return Error {};
 }
 
+Result<Ok, Error> type_inference::Context::analyze(ast::FieldAccessNode& node) {
+    assert(node.fields_accessed.size() >= 2);
+    auto result = this->analyze(*node.fields_accessed[0]);
+    if (result.is_error()) return Error {};
+
+    if (this->struct_types.find(node.fields_accessed[0]->type) == this->struct_types.end()) {
+        this->struct_types[node.fields_accessed[0]->type] = {};
+    }
+    type_inference::StructType* struct_type = &this->struct_types[node.fields_accessed[0]->type];
+
+    for (size_t i = 1; i < node.fields_accessed.size(); i++) {
+        std::string field = node.fields_accessed[i]->value;
+        if (struct_type->fields.find(field) == struct_type->fields.end()) {
+            struct_type->fields[field] = this->new_type_variable();
+        }
+
+        node.fields_accessed[i]->type = struct_type->fields[field];
+        if (i != node.fields_accessed.size() - 1) {
+            if (this->struct_types.find(node.fields_accessed[i]->type) == this->struct_types.end()) {
+                this->struct_types[node.fields_accessed[i]->type] = {};
+            }
+            struct_type = &this->struct_types[node.fields_accessed[i]->type];
+        }
+    }
+
+    return Ok {};
+}
+
 void type_inference::Context::unify(ast::Node* node) {
     return std::visit([this](auto& variant) {return this->unify(variant);}, *node);
 }
@@ -615,6 +665,25 @@ void type_inference::Context::unify(ast::CallNode& node) {
         auto constraint = ast::FunctionPrototype{node.identifier->value, ast::get_types(node.args), node.type};
         if (std::find(this->function_node->constraints.begin(), this->function_node->constraints.end(), constraint) == this->function_node->constraints.end()) {
             this->function_node->constraints.push_back(constraint);
+        }
+    }
+}
+
+void type_inference::Context::unify(ast::FieldAccessNode& node) {
+    assert(node.fields_accessed.size() >= 2);
+    this->unify(*node.fields_accessed[0]);
+
+    type_inference::StructType* struct_type = &this->struct_types[node.fields_accessed[0]->type];
+
+    for (size_t i = 1; i < node.fields_accessed.size(); i++) {
+        std::string field = node.fields_accessed[i]->value;
+        node.fields_accessed[i]->type = this->get_unified_type(struct_type->fields[field]);
+        auto constraint = ast::FunctionPrototype{"." + node.fields_accessed[i]->value, {node.fields_accessed[0]->type}, node.fields_accessed[i]->type};
+        if (std::find(this->function_node->constraints.begin(), this->function_node->constraints.end(), constraint) == this->function_node->constraints.end()) {
+            this->function_node->constraints.push_back(constraint);
+        }
+        if (i != node.fields_accessed.size() - 1) {
+            struct_type = &this->struct_types[node.fields_accessed[i]->type];
         }
     }
 }
