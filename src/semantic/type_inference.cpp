@@ -80,6 +80,28 @@ namespace type_inference {
         }
     }
 
+    void print(Set<ast::Type> set) {
+        std::cout << "{";
+        for (size_t i = 0; i < set.elements.size(); i++) {
+            std::cout << set.elements[i].to_str();
+            if (i != set.elements.size() - 1) std::cout << ", ";
+        }
+        std::cout << "}\n";
+    }
+
+    void print(std::vector<Set<ast::Type>> sets) {
+        for (auto& set: sets) {
+            print(set);
+        }
+    }
+
+    void print(std::unordered_map<ast::Type, Set<ast::Type>> labeled_sets) {
+        for (auto it: labeled_sets) {
+            std::cout << it.first.to_str();
+            print(it.second);
+        }
+    }
+
     struct Context {
         semantic::Context& semantic_context;
         size_t current_type_variable_number = 1;
@@ -152,7 +174,7 @@ namespace type_inference {
                 this->labeled_sets[new_type_var] = Set<ast::Type>({type_var});
                 return new_type_var;
             }
-            return ast::Type("");
+            return type_var;
         }
     };
 
@@ -436,13 +458,6 @@ Result<Ok, Error> type_inference::Context::analyze(ast::BooleanNode& node) {
 
 Result<Ok, Error> type_inference::Context::analyze(ast::CallNode& node) {
     auto& identifier = node.identifier->value;
-
-    // Assign a type variable to every argument and return type
-    for (size_t i = 0; i < node.args.size(); i++) {
-        auto result = this->analyze(node.args[i]->expression);
-        if (result.is_error()) return Error {};
-    }
-    node.type = this->new_type_variable();
       
     // Check binding exists
     semantic::Binding* binding = this->semantic_context.get_binding(identifier);
@@ -453,20 +468,36 @@ Result<Ok, Error> type_inference::Context::analyze(ast::CallNode& node) {
 
     if (binding->type == semantic::TypeBinding) {
         ast::TypeNode* type_definition = semantic::get_type_definition(*binding);
+        ast::Type type = ast::Type(type_definition->identifier->value, type_definition);
         
-        // Add type constraint
-        this->add_constraint(Set<ast::Type>({node.type, type_definition->identifier->value}));
+        // Set type
+        node.type = type;
+
+        // Add type to struct_types if doesn't exists yet
+        if (this->struct_types.find(type) == this->struct_types.end()) {
+            this->struct_types[type] = {};
+        }
+        type_inference::StructType* struct_type = &this->struct_types[type];
 
         // Add types constraints on fields
-        for (auto& field: type_definition->fields) {
-            auto identifier = field->value;
+        for (size_t i = 0; i < type_definition->fields.size(); i++) {
+            std::string field = type_definition->fields[i]->value;
             bool founded = false;
+
             for (auto& arg: node.args) {
                 assert(arg->identifier.has_value());
-                if (arg->identifier.value()->value == identifier) {
+
+                if (arg->identifier.value()->value == field) {
                     founded = true;
-                    this->add_constraint(Set<ast::Type>({ast::get_type(arg->expression), field->type}));
-                    break;
+
+                    auto result = this->analyze(node.args[i]->expression);
+                    if (result.is_error()) return Error {};
+
+                    if (struct_type->fields.find(field) == struct_type->fields.end()) {
+                        struct_type->fields[field] = type_definition->fields[i]->type;
+                    }
+
+                    this->add_constraint(Set<ast::Type>({struct_type->fields[field], ast::get_type(arg->expression)}));
                 }
             }
 
@@ -479,6 +510,13 @@ Result<Ok, Error> type_inference::Context::analyze(ast::CallNode& node) {
         return Ok {};
     }
     else if (is_function(*binding)) {
+        // Assign a type variable to every argument and return type
+        for (size_t i = 0; i < node.args.size(); i++) {
+            auto result = this->analyze(node.args[i]->expression);
+            if (result.is_error()) return Error {};
+        }
+        node.type = this->new_type_variable();
+
         // Infer things based on interface if exists
         if (interfaces.find(identifier) != interfaces.end()) {
             for (auto& interface: interfaces[identifier]) {
@@ -492,7 +530,7 @@ Result<Ok, Error> type_inference::Context::analyze(ast::CallNode& node) {
                 std::vector<ast::Type> interface_prototype = interface.first;
                 interface_prototype.push_back(interface.second);
 
-                // Infer stuff, basically is loop trough the interface prototype that groups type variables
+                // Infer stuff, basically is loop trough the each type of the interface prototype
                 std::unordered_map<ast::Type, Set<ast::Type>> sets;
                 for (size_t i = 0; i < interface_prototype.size(); i++) {
                     if (sets.find(interface_prototype[i]) == sets.end()) {
@@ -521,7 +559,7 @@ Result<Ok, Error> type_inference::Context::analyze(ast::CallNode& node) {
                 return Ok {};
             }
         }
-
+        
         if (binding->type == semantic::GenericFunctionBinding) {
             node.function = semantic::get_generic_function(*binding);
             if (node.function->return_type == ast::Type("")) {
@@ -576,12 +614,14 @@ Result<Ok, Error> type_inference::Context::analyze(ast::FieldAccessNode& node) {
     type_inference::StructType* struct_type = &this->struct_types[node.fields_accessed[0]->type];
 
     for (size_t i = 1; i < node.fields_accessed.size(); i++) {
+        // Set type of field
         std::string field = node.fields_accessed[i]->value;
         if (struct_type->fields.find(field) == struct_type->fields.end()) {
             struct_type->fields[field] = this->new_type_variable();
         }
-
         node.fields_accessed[i]->type = struct_type->fields[field];
+
+        // Iterate on struct_type
         if (i != node.fields_accessed.size() - 1) {
             if (this->struct_types.find(node.fields_accessed[i]->type) == this->struct_types.end()) {
                 this->struct_types[node.fields_accessed[i]->type] = {};
@@ -589,6 +629,9 @@ Result<Ok, Error> type_inference::Context::analyze(ast::FieldAccessNode& node) {
             struct_type = &this->struct_types[node.fields_accessed[i]->type];
         }
     }
+
+    // Set overall node type
+    node.type = node.fields_accessed[node.fields_accessed.size() - 1]->type;
 
     return Ok {};
 }
@@ -678,10 +721,16 @@ void type_inference::Context::unify(ast::FieldAccessNode& node) {
     for (size_t i = 1; i < node.fields_accessed.size(); i++) {
         std::string field = node.fields_accessed[i]->value;
         node.fields_accessed[i]->type = this->get_unified_type(struct_type->fields[field]);
-        auto constraint = ast::FunctionPrototype{"." + node.fields_accessed[i]->value, {node.fields_accessed[0]->type}, node.fields_accessed[i]->type};
-        if (std::find(this->function_node->constraints.begin(), this->function_node->constraints.end(), constraint) == this->function_node->constraints.end()) {
-            this->function_node->constraints.push_back(constraint);
+        
+        // Add constraint
+        if (node.fields_accessed[0]->type.is_type_variable() || node.fields_accessed[i]->type.is_type_variable()) {
+            auto constraint = ast::FunctionPrototype{"." + node.fields_accessed[i]->value, {node.fields_accessed[0]->type}, node.fields_accessed[i]->type};
+            if (std::find(this->function_node->constraints.begin(), this->function_node->constraints.end(), constraint) == this->function_node->constraints.end()) {
+                this->function_node->constraints.push_back(constraint);
+            }
         }
+        
+        // Iterate
         if (i != node.fields_accessed.size() - 1) {
             struct_type = &this->struct_types[node.fields_accessed[i]->type];
         }
