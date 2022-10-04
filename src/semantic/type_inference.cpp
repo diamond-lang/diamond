@@ -97,7 +97,7 @@ namespace type_inference {
 
     void print(std::unordered_map<ast::Type, Set<ast::Type>> labeled_sets) {
         for (auto it: labeled_sets) {
-            std::cout << it.first.to_str();
+            std::cout << it.first.to_str() << ": ";
             print(it.second);
         }
     }
@@ -153,6 +153,12 @@ namespace type_inference {
         void unify(ast::FieldAccessNode& node);
 
         ast::Type new_type_variable() {
+            ast::Type new_type = ast::Type(std::to_string(this->current_type_variable_number));
+            this->current_type_variable_number++;
+            return new_type;
+        }
+
+        ast::Type new_final_type_variable() {
             ast::Type new_type = ast::Type("$" + std::to_string(this->current_type_variable_number));
             this->current_type_variable_number++;
             return new_type;
@@ -170,7 +176,7 @@ namespace type_inference {
                     }
                 }
 
-                ast::Type new_type_var = this->new_type_variable();
+                ast::Type new_type_var = this->new_final_type_variable();
                 this->labeled_sets[new_type_var] = Set<ast::Type>({type_var});
                 return new_type_var;
             }
@@ -207,6 +213,13 @@ namespace type_inference {
             if (type.is_type_variable()) return true;
         }
         return false;
+    }
+
+    bool is_number(std::string str) {
+        for (size_t i = 0; i < str.size(); i++) {
+            if (!isdigit((int)str[i])) return false;
+        }
+        return true;
     }
 };
 
@@ -283,7 +296,7 @@ Result<Ok, Error> type_inference::Context::analyze(ast::FunctionNode& node) {
         }
 
         if (!representative_found) {
-            this->labeled_sets[this->new_type_variable()] = this->sets[i];
+            this->labeled_sets[this->new_final_type_variable()] = this->sets[i];
         }
     }
 
@@ -714,12 +727,18 @@ void type_inference::Context::unify(ast::CallNode& node) {
 
 void type_inference::Context::unify(ast::FieldAccessNode& node) {
     assert(node.fields_accessed.size() >= 2);
-    this->unify(*node.fields_accessed[0]);
 
+    // Get struct type
     type_inference::StructType* struct_type = &this->struct_types[node.fields_accessed[0]->type];
+    
+    // Unify
+    this->unify(*node.fields_accessed[0]);
 
     for (size_t i = 1; i < node.fields_accessed.size(); i++) {
         std::string field = node.fields_accessed[i]->value;
+        ast::Type type = node.fields_accessed[i]->type;
+
+        // Get unified type
         node.fields_accessed[i]->type = this->get_unified_type(struct_type->fields[field]);
         
         // Add constraint
@@ -732,7 +751,10 @@ void type_inference::Context::unify(ast::FieldAccessNode& node) {
         
         // Iterate
         if (i != node.fields_accessed.size() - 1) {
-            struct_type = &this->struct_types[node.fields_accessed[i]->type];
+            struct_type = &this->struct_types[type];
         }
     }
+
+    // Unify overall node type
+    node.type = node.fields_accessed[node.fields_accessed.size() - 1]->type;
 }

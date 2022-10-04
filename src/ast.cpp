@@ -41,9 +41,17 @@ std::string ast::Type::to_str(std::string output) const {
     return output;
 }
 
+static bool is_number(std::string str) {
+    for (size_t i = 0; i < str.size(); i++) {
+        if (!isdigit((int)str[i])) return false;
+    }
+    return true;
+}
+
 bool ast::Type::is_type_variable() const {
     std::string str = this->to_str();
     if (str.size() > 0 && str[0] == '$') return true;
+    else if (is_number(str))             return true;
     else                                 return false;
 }
 
