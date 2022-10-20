@@ -76,7 +76,7 @@ namespace codegen {
         void codegen_function_bodies(std::vector<ast::FunctionNode*> functions);
         void codegen_function_bodies(std::filesystem::path module_path, std::string identifier, std::vector<ast::FunctionArgumentNode*> args_names, std::vector<ast::Type> args_types, ast::Type return_type, ast::Node* function_body);
         llvm::Value* codegen(ast::AssignmentNode& node);
-        llvm::Value* codegen(ast::FieldAssignmentNode& node) {assert(false); return nullptr;}
+        llvm::Value* codegen(ast::FieldAssignmentNode& node);
         llvm::Value* codegen(ast::ReturnNode& node);
         llvm::Value* codegen(ast::BreakNode& node);
         llvm::Value* codegen(ast::ContinueNode& node);
@@ -212,6 +212,8 @@ namespace codegen {
             }
             return false;
         }
+
+        llvm::Value* get_field_pointer(ast::FieldAccessNode& node);
     };
 };
 
@@ -651,6 +653,31 @@ llvm::Value* codegen::Context::codegen(ast::AssignmentNode& node) {
     }
 }
 
+llvm::Value* codegen::Context::codegen(ast::FieldAssignmentNode& node) {
+    if (!this->has_struct_type(node.expression)) {
+        // Generate value of expression
+        llvm::Value* expr = this->codegen(node.expression);
+
+        // Get field pointer
+        llvm::Value* ptr = this->get_field_pointer(*node.identifier);
+
+        // Store value
+        this->builder->CreateStore(expr, ptr);
+    }
+    else {
+        // Get field pointer
+        llvm::Value* ptr = this->get_field_pointer(*node.identifier);
+
+        // Store fields
+        this->store_fields(node.expression, ptr);
+  
+        // Return
+        return nullptr;
+    }
+
+    return nullptr;
+}
+
 llvm::Value* codegen::Context::codegen(ast::ReturnNode& node) {
     if (node.expression.has_value()) {
         if (!this->has_struct_type(node.expression.value())) {
@@ -1038,7 +1065,7 @@ static size_t get_index_of_field(std::string field, ast::TypeNode* type_definiti
     return 0;
 }
 
-llvm::Value* codegen::Context::codegen(ast::FieldAccessNode& node) {
+llvm::Value* codegen::Context::get_field_pointer(ast::FieldAccessNode& node) {
     // There should be at least 2 identifiers in fields accessed. eg: circle.radius
     assert(node.fields_accessed.size() >= 2);
 
@@ -1065,7 +1092,9 @@ llvm::Value* codegen::Context::codegen(ast::FieldAccessNode& node) {
     // Get pointer to accessed fieldd
     size_t last_element = node.fields_accessed.size() - 1;
     llvm::Value* ptr = this->builder->CreateStructGEP(struct_type, struct_ptr, get_index_of_field(node.fields_accessed[last_element]->value, type_definition));
-        
-    // Create load
-    return this->builder->CreateLoad(ptr);
+    return ptr;
+}
+
+llvm::Value* codegen::Context::codegen(ast::FieldAccessNode& node) {
+    return this->builder->CreateLoad(this->get_field_pointer(node));
 }

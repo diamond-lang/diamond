@@ -3,7 +3,12 @@ type Point
     y: float64
 
 a = Point(x: 20, y: 30)
-a.x = -20
-a.y = -30
+a.x = 40
+a.y = 50
 print(a.x)
 print(a.y)
+
+--- Output
+40
+50
+---
