@@ -181,7 +181,7 @@ namespace codegen {
             return block.CreateAlloca(type, 0, name.c_str());
         }
 
-        void store_fields(llvm::StructType* struct_type, llvm::Value* struct_allocation, std::vector<ast::CallArgumentNode*> args);
+        void store_fields(ast::CallNode& struct_expression, llvm::StructType* struct_type, llvm::Value* struct_allocation);
 
         void add_scope() {
             this->scopes.push_back(std::unordered_map<std::string, llvm::AllocaInst*>());
@@ -566,17 +566,35 @@ static bool is_struct_type(ast::Node* expression) {
     return false;
 }
 
-void codegen::Context::store_fields(llvm::StructType* struct_type, llvm::Value* struct_allocation, std::vector<ast::CallArgumentNode*> args) {
-    for (size_t i = 0; i < args.size(); i++) {
-        llvm::Value* ptr = this->builder->CreateStructGEP(struct_type, struct_allocation, i);
-        if (ast::get_type(args[i]->expression).type_definition) {
-            ast::CallNode* struct_expression = (ast::CallNode*) args[i]->expression;
-            llvm::StructType* struct_type = this->get_struct_type(ast::get_type(args[i]->expression).type_definition);
-            this->store_fields(struct_type, ptr, struct_expression->args);
+void codegen::Context::store_fields(ast::CallNode& struct_expression, llvm::StructType* struct_type, llvm::Value* struct_allocation) {
+    if (struct_expression.identifier->value == struct_expression.type.to_str()) {
+        for (size_t i = 0; i < struct_expression.args.size(); i++) {
+            llvm::Value* ptr = this->builder->CreateStructGEP(struct_type, struct_allocation, i);
+            if (ast::get_type(struct_expression.args[i]->expression).type_definition) {
+                ast::CallNode* field_struct_expression = (ast::CallNode*) struct_expression.args[i]->expression;
+                llvm::StructType* struct_type = this->get_struct_type(ast::get_type(struct_expression.args[i]->expression).type_definition);
+                this->store_fields(*field_struct_expression, struct_type, ptr);
+            }
+            else {
+                this->builder->CreateStore(this->codegen(struct_expression.args[i]->expression), ptr);
+            }
         }
-        else {
-            this->builder->CreateStore(this->codegen(args[i]->expression), ptr);
+    }
+    else {
+        assert(struct_expression.function);
+        std::string name = this->get_mangled_function_name(struct_expression.function->module_path, struct_expression.identifier->value, this->get_types(struct_expression.args), this->get_type((ast::Node*) &struct_expression));
+        llvm::Function* function = this->module->getFunction(name);
+        assert(function);
+        
+        // Codegen args
+        std::vector<llvm::Value*> args;
+        args.push_back(struct_allocation);
+        for (size_t i = 0; i < struct_expression.args.size(); i++) {
+            args.push_back(this->codegen(struct_expression.args[i]->expression));
         }
+
+        // Make call
+        this->builder->CreateCall(function, args, "calltmp");
     }
 }
 
@@ -609,26 +627,9 @@ llvm::Value* codegen::Context::codegen(ast::AssignmentNode& node) {
         this->current_scope()[node.identifier->value] = this->create_allocation(node.identifier->value, struct_type);
 
         // Store fields
-        if (struct_expression.identifier->value == struct_expression.type.to_str()) {
-            this->store_fields(struct_type, this->current_scope()[node.identifier->value], struct_expression.args);
-        }
-        else {
-            assert(struct_expression.function);
-            std::string name = this->get_mangled_function_name(struct_expression.function->module_path, struct_expression.identifier->value, this->get_types(struct_expression.args), this->get_type((ast::Node*) &struct_expression));
-            llvm::Function* function = this->module->getFunction(name);
-            assert(function);
-            
-            // Codegen args
-            std::vector<llvm::Value*> args;
-            args.push_back(this->current_scope()[node.identifier->value]);
-            for (size_t i = 0; i < struct_expression.args.size(); i++) {
-                args.push_back(this->codegen(struct_expression.args[i]->expression));
-            }
-
-            // Make call
-            this->builder->CreateCall(function, args, "calltmp");
-        }
-
+        this->store_fields(struct_expression, struct_type, this->current_scope()[node.identifier->value]);
+  
+        // Return
         return nullptr;
     }
 }
@@ -647,29 +648,9 @@ llvm::Value* codegen::Context::codegen(ast::ReturnNode& node) {
             llvm::StructType* struct_type = this->get_struct_type(struct_expression.type.type_definition);
             
             // Store fields
-            if (struct_expression.identifier->value == struct_expression.type.to_str()) {
-                assert(this->get_binding("$result") != nullptr);
-                this->store_fields(struct_type, this->builder->CreateLoad(this->get_binding("$result")), struct_expression.args);
-            }
-            else {
-                // Get function
-                assert(struct_expression.function);
-                std::string name = this->get_mangled_function_name(struct_expression.function->module_path, struct_expression.identifier->value, this->get_types(struct_expression.args), this->get_type((ast::Node*) &struct_expression));
-                llvm::Function* function = this->module->getFunction(name);
-                assert(function);
-                
-                // Codegen args
-                std::vector<llvm::Value*> args;
-                args.push_back(this->builder->CreateLoad(this->get_binding("$result")));
-                for (size_t i = 0; i < struct_expression.args.size(); i++) {
-                    args.push_back(this->codegen(struct_expression.args[i]->expression));
-                }
-
-                // Make call
-                this->builder->CreateCall(function, args, "calltmp");
-            }
-
-            // Create void ret
+            this->store_fields(struct_expression, struct_type, this->builder->CreateLoad(this->get_binding("$result")));
+            
+            // Return
             this->builder->CreateRetVoid();
         }
     }
@@ -845,27 +826,9 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
         llvm::AllocaInst* allocation = this->create_allocation(node.identifier->value, struct_type);
             
         // Store fields
-        if (struct_expression.identifier->value == struct_expression.type.to_str()) {
-            this->store_fields(struct_type, allocation, struct_expression.args);
-        }
-        else {
-            // Get function
-            assert(struct_expression.function);
-            std::string name = this->get_mangled_function_name(struct_expression.function->module_path, struct_expression.identifier->value, this->get_types(struct_expression.args), this->get_type((ast::Node*) &struct_expression));
-            llvm::Function* function = this->module->getFunction(name);
-            assert(function);
-            
-            // Codegen args
-            std::vector<llvm::Value*> args;
-            args.push_back(allocation);
-            for (size_t i = 0; i < struct_expression.args.size(); i++) {
-                args.push_back(this->codegen(struct_expression.args[i]->expression));
-            }
+        this->store_fields(struct_expression, struct_type, allocation);
 
-            // Make call
-            this->builder->CreateCall(function, args, "calltmp");
-        }
-
+        // Return
         return allocation;
     }
 
