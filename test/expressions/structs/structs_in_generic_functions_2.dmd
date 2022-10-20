@@ -1,0 +1,41 @@
+type Point
+    x: float64
+    y: float64
+
+type Rectangle
+    p1: Point
+    p2: Point
+
+function generic1(rectangle)
+    print(rectangle.p1.x)
+    print(rectangle.p1.y)
+    print(rectangle.p2.x)
+    print(rectangle.p2.y)
+
+function generic2()
+    b = 110
+    rectangle = Rectangle(
+        p1: Point(x: 10, y: 10)
+        p2: Point(x: b, y: 60)
+    )
+    print(rectangle.p1.x)
+    print(rectangle.p1.y)
+    print(rectangle.p2.x)
+    print(rectangle.p2.y)
+
+generic1(Rectangle(
+    p1: Point(x: 10, y: 10)
+    p2: Point(x: 110, y: 60)
+))
+generic2()
+
+---
+10
+10
+110
+60
+10
+10
+110
+60
+---

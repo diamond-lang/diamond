@@ -743,7 +743,7 @@ void type_inference::Context::unify(ast::FieldAccessNode& node) {
         
         // Add constraint
         if (node.fields_accessed[0]->type.is_type_variable() || node.fields_accessed[i]->type.is_type_variable()) {
-            auto constraint = ast::FunctionPrototype{"." + node.fields_accessed[i]->value, {node.fields_accessed[0]->type}, node.fields_accessed[i]->type};
+            auto constraint = ast::FunctionPrototype{"." + node.fields_accessed[i]->value, {node.fields_accessed[i - 1]->type}, node.fields_accessed[i]->type};
             if (std::find(this->function_node->constraints.begin(), this->function_node->constraints.end(), constraint) == this->function_node->constraints.end()) {
                 this->function_node->constraints.push_back(constraint);
             }
