@@ -27,6 +27,7 @@ struct Parser {
     Result<ast::Node*, Error> parse_block_or_statement();
     Result<ast::Node*, Error> parse_block_statement_or_expression();
     Result<ast::Node*, Error> parse_assignment();
+    Result<ast::Node*, Error> parse_field_assignment();
     Result<ast::Node*, Error> parse_return_stmt();
     Result<ast::Node*, Error> parse_break_stmt();
     Result<ast::Node*, Error> parse_continue_stmt();
@@ -228,6 +229,7 @@ Result<ast::Node*, Error> Parser::parse_statement() {
         case token::Identifier:
             if (this->match({token::Identifier, token::Equal}))     return this->parse_assignment();
             if (this->match({token::Identifier, token::Be}))        return this->parse_assignment();
+            if (this->match({token::Identifier, token::Dot}))       return this->parse_field_assignment();
             if (this->match({token::Identifier, token::LeftParen})) return this->parse_call();
         default:
             break;
@@ -460,6 +462,44 @@ Result<ast::Node*, Error> Parser::parse_assignment() {
     }
     this->advance();
 
+    // Parse expression
+    auto expression = this->parse_expression();
+    if (expression.is_error()) return expression;
+    assignment.expression = expression.get_value();
+
+    // Parse type annotation
+    if (this->current() == token::Colon) {
+        this->advance();
+
+        auto token = this->parse_token(token::Identifier);
+        if (token.is_error()) return Error {};
+
+        ast::set_type(assignment.expression, ast::Type(token.get_value().get_literal()));
+
+        if (assignment.expression->index() == ast::IfElse) {
+            auto& if_else = std::get<ast::IfElseNode>(*assignment.expression);
+            ast::set_type(if_else.if_branch, ast::get_type(assignment.expression));
+            ast::set_type(if_else.else_branch.value(), ast::get_type(assignment.expression));
+        }
+    }
+
+    this->ast.push_back(assignment);
+    return this->ast.last_element();
+}
+
+Result<ast::Node*, Error> Parser::parse_field_assignment() {
+    // Create node
+    auto assignment = ast::FieldAssignmentNode {this->current().line, this->current().column};
+
+    // Parse field access
+    auto identifier = this->parse_field_access();
+    if (identifier.is_error()) return Error {};
+    assignment.identifier = (ast::FieldAccessNode*) identifier.get_value();
+
+    // Parse equal
+    auto equal = this->parse_token(token::Equal);
+    if (equal.is_error()) return Error {};
+    
     // Parse expression
     auto expression = this->parse_expression();
     if (expression.is_error()) return expression;

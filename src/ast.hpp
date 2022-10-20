@@ -14,6 +14,7 @@ namespace ast {
     struct FunctionNode;
     struct TypeNode;
     struct AssignmentNode;
+    struct FieldAssignmentNode;
     struct ReturnNode;
     struct BreakNode;
     struct ContinueNode;
@@ -35,6 +36,7 @@ namespace ast {
         Function,
         TypeDef,
         Assignment,
+        FieldAssignment,
         Return,
         Break,
         Continue,
@@ -56,6 +58,7 @@ namespace ast {
         FunctionNode,
         TypeNode,
         AssignmentNode,
+        FieldAssignmentNode,
         ReturnNode,
         BreakNode,
         ContinueNode,
@@ -165,6 +168,18 @@ namespace ast {
         bool nonlocal = false;
 
         IdentifierNode* identifier;
+        Node* expression;
+    };
+
+    struct FieldAssignmentNode {
+        size_t line;
+        size_t column;
+        Type type = Type("");
+
+        bool is_mutable = false;
+        bool nonlocal = false;
+
+        FieldAccessNode* identifier;
         Node* expression;
     };
 

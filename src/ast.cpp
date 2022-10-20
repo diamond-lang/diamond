@@ -155,6 +155,7 @@ bool ast::could_be_expression(Node* node) {
         }
         case Function: return false;
         case Assignment: return false;
+        case FieldAssignment: return false;
         case Return: return false;
         case Break: return false;
         case Continue: return false;
@@ -210,6 +211,7 @@ bool ast::is_expression(Node* node) {
         case Block: return false;
         case Function: return false;
         case Assignment: return false;
+        case FieldAssignment: return false;
         case Return: return false;
         case Break: return false;
         case Continue: return false;
@@ -461,6 +463,21 @@ void ast::print(Node* node, PrintContext context) {
             put_indent_level(context.indent_level + 1, append(context.last, false));
             std::cout << (assignment.is_mutable ? "=" : "be") << '\n';
 
+            context.indent_level += 1;
+            context.last.push_back(true);
+            print(assignment.expression, context);
+            break;
+        }
+
+        case FieldAssignment: {
+            auto& assignment = std::get<FieldAssignmentNode>(*node);
+
+            put_indent_level(context.indent_level, context.last);
+            std::cout << assignment.identifier->fields_accessed[0]->value;
+            for (size_t i = 1; i < assignment.identifier->fields_accessed.size(); i++) {
+                std::cout << "." << assignment.identifier->fields_accessed[i]->value;
+            }
+            std::cout << " =" << "\n";
             context.indent_level += 1;
             context.last.push_back(true);
             print(assignment.expression, context);
