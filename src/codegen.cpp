@@ -874,7 +874,20 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
     // Codegen args
     std::vector<llvm::Value*> args;
     for (size_t i = 0; i < node.args.size(); i++) {
-        args.push_back(this->codegen(node.args[i]->expression));
+        if (this->has_struct_type(node.args[i]->expression)) {
+            // Create allocation
+            llvm::StructType* struct_type = this->get_struct_type(this->get_type(node.args[i]->expression).type_definition);
+            llvm::AllocaInst* allocation = this->create_allocation(node.function->args[i]->value, struct_type);
+
+            // Store fields
+            this->store_fields(node.args[i]->expression, allocation);
+
+            // Add to args
+            args.push_back(allocation);
+        }
+        else {
+            args.push_back(this->codegen(node.args[i]->expression));
+        }
     }
 
     if (node.args.size() == 2) {
@@ -1045,7 +1058,7 @@ llvm::Value* codegen::Context::codegen(ast::IntegerNode& node) {
 }
 
 llvm::Value* codegen::Context::codegen(ast::IdentifierNode& node) {
-    if (node.type.type_definition) {
+    if (this->has_struct_type((ast::Node*) &node)) {
         return this->get_binding(node.value);
     }
     return this->builder->CreateLoad(this->get_binding(node.value), node.value.c_str());
