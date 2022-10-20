@@ -63,7 +63,7 @@ namespace semantic {
         Result<Ok, Error> analyze(ast::Type& type);
         Result<Ok, Error> analyze(ast::TypeNode& node);
         Result<Ok, Error> analyze(ast::AssignmentNode& node);
-        Result<Ok, Error> analyze(ast::FieldAssignmentNode& node) {assert(false); return Ok {};}
+        Result<Ok, Error> analyze(ast::FieldAssignmentNode& node);
         Result<Ok, Error> analyze(ast::ReturnNode& node);
         Result<Ok, Error> analyze(ast::BreakNode& node) {return Ok {};}
         Result<Ok, Error> analyze(ast::ContinueNode& node) {return Ok {};}

@@ -547,6 +547,7 @@ Result<Ok, Error> semantic::Context::analyze(ast::BlockNode& node) {
         // Type checking
         switch (node.statements[i]->index()) {
             case ast::Assignment: break;
+            case ast::FieldAssignment: break;
             case ast::Call: {
                 if (result.is_ok() && ast::get_type(node.statements[i]) != ast::Type("void")) {
                     this->errors.push_back(errors::unhandled_return_value(std::get<ast::CallNode>(*node.statements[i]), this->current_module)); // tested in test/errors/unhandled_return_value.dm
@@ -709,6 +710,28 @@ Result<Ok, Error> semantic::Context::analyze(ast::AssignmentNode& node) {
             }
         }
         this->current_scope()[identifier] = &node;
+    }
+
+    return Ok {};
+}
+
+Result<Ok, Error> semantic::Context::analyze(ast::FieldAssignmentNode& node) {
+    // Analyze field access
+    auto identifier = this->analyze(*node.identifier);
+    if (identifier.is_error()) return Error {};
+
+    // Set expected type for expression if it does not have a type annotation
+    if (ast::get_type(node.expression) == ast::Type("")) {
+        ast::set_type(node.expression, node.identifier->type);
+    }
+
+     // Analyze expression
+    auto result = this->analyze(node.expression);
+    if (result.is_error()) return result;
+
+    if (node.identifier->type != ast::get_type(node.expression)) {
+        this->errors.push_back(std::string("Error: Incompatible type for variable"));
+        return Error {};
     }
 
     return Ok {};
