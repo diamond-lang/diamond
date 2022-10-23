@@ -1,0 +1,11 @@
+a be 10
+if a == 10
+    a be false
+    print(a)
+
+print(a)
+
+--- Output
+false
+10
+---

@@ -5,7 +5,7 @@
 #include "shared.hpp"
 
 namespace semantic {
-	Result<Ok, Errors> analyze(ast::Ast& ast);
+    Result<Ok, Errors> analyze(ast::Ast& ast);
 }
 
 #endif

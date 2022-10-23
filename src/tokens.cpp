@@ -130,6 +130,10 @@ void token::print(std::vector<Token> token) {
                 std::cout << "token::Function";
                 break;
             }
+            case Type: {
+                std::cout << "token::Type";
+                break;
+            }
             case NonLocal: {
                 std::cout << "token::NonLocal";
                 break;

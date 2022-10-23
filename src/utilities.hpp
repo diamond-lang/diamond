@@ -8,11 +8,11 @@
 #include "errors.hpp"
 
 namespace utilities {
-	std::string read_file(std::filesystem::path path);
-	bool file_exists(std::string path);
-	std::string get_program_name(std::filesystem::path path);
-	std::string get_executable_name(std::string program_name);
-	std::string get_run_command(std::string path);
+    std::string read_file(std::filesystem::path path);
+    bool file_exists(std::string path);
+    std::string get_program_name(std::filesystem::path path);
+    std::string get_executable_name(std::string program_name);
+    std::string get_run_command(std::string path);
 }
 
 #endif

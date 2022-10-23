@@ -1,0 +1,8 @@
+function add(a: float64, b: float64): float64
+    a + b
+
+print(add(10, 20))
+
+--- Output
+30
+---

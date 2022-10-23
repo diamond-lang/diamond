@@ -4,7 +4,7 @@
 #include "ast.hpp"
 
 namespace codegen {
-	void generate_executable(ast::Ast& ast, std::string program_name);
+    void generate_executable(ast::Ast& ast, std::string program_name);
     void print_llvm_ir(ast::Ast& ast, std::string program_name);
 }
 

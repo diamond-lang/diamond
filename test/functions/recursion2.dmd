@@ -1,6 +1,6 @@
 function fib2(n)
     if n == 0
-        0 + 0
+        0
     else
         if n == 1
             1

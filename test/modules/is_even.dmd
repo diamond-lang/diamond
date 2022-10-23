@@ -1,5 +1,0 @@
-use "is_odd"
-
-function is_even(n)
-	if n == 0 return true
-	else      return is_odd(n - 1)
