@@ -174,6 +174,10 @@ void token::print(std::vector<Token> token) {
                 std::cout << "token::Include";
                 break;
             }
+            case Extern: {
+                std::cout << "token::Extern";
+                break;
+            }
             case NewLine: {
                 std::cout << "token::NewLine";
                 break;

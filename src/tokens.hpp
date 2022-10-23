@@ -49,6 +49,7 @@ namespace token {
         Continue,
         Return,
         Include,
+        Extern,
         NewLine,
         EndOfFile
     };

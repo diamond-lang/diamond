@@ -260,6 +260,7 @@ Result<token::Token, Error> lexer::get_identifier(Source& source) {
     if (literal == "continue") return token::Token(token::Continue, "continue", line, column);
     if (literal == "return")   return token::Token(token::Return, "return", line, column);
     if (literal == "not")      return token::Token(token::Not, "not", line, column);
+    if (literal == "extern")   return token::Token(token::Extern, "extern", line, column);
 
     return token::Token(token::Identifier, literal, line, column);
 }
