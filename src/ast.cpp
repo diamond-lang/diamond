@@ -383,7 +383,12 @@ void ast::print(Node* node, PrintContext context) {
             }
 
             put_indent_level(context.indent_level, append(context.last, last && !where_clause));
-            std::cout << "function " << function.identifier->value << '(';
+            if (function.is_extern) {
+                std::cout << "extern " << function.identifier->value << '(';
+            }
+            else {
+                std::cout << "function " << function.identifier->value << '(';
+            }
             for (size_t i = 0; i < function.args.size(); i++) {
                 auto& arg_name = function.args[i]->value;
                 std::cout << arg_name;
@@ -400,8 +405,12 @@ void ast::print(Node* node, PrintContext context) {
             if (function.return_type != Type("")) {
                 std::cout << ": " << get_concrete_type(function.return_type, context).to_str();
             }
-
             std::cout << "\n";
+
+            if (function.is_extern) {
+                return;
+            }
+
             if (!is_expression(function.body)) {
                 context.last.push_back(last && !where_clause);
                 print(function.body, context);
