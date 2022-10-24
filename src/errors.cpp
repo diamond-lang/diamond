@@ -36,7 +36,8 @@ std::string errors::usage() {
                        "        --ast\n"
                        "        --ast-with-types\n"
                        "        --ast-with-concrete-types\n"
-                       "        --llvm-ir\n";
+                       "        --llvm-ir\n"
+                       "        --obj\n";
 }
 
 std::string errors::unexpected_character(Location location) {

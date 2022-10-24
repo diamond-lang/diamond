@@ -229,12 +229,12 @@ void codegen::print_llvm_ir(ast::Ast& ast, std::string program_name) {
     llvm_ir.module->print(llvm::errs(), nullptr);
 }
 
-// Generate executable
-// -------------------
+// Generate object code
+// --------------------
 static std::string get_object_file_name(std::string executable_name);
 static void link(std::string executable_name, std::string object_file_name);
 
-void codegen::generate_executable(ast::Ast& ast, std::string program_name) {
+void codegen::generate_object_code(ast::Ast& ast, std::string program_name) {
     codegen::Context llvm_ir(ast);
     llvm_ir.codegen(ast);
 
@@ -282,12 +282,18 @@ void codegen::generate_executable(ast::Ast& ast, std::string program_name) {
 
     pass.run(*(llvm_ir.module));
     dest.flush();
+}
+
+// Generate executable
+// -------------------
+void codegen::generate_executable(ast::Ast& ast, std::string program_name) {
+    codegen::generate_object_code(ast, program_name);
 
     // Link
-    link(utilities::get_executable_name(program_name), object_file_name);
+    link(utilities::get_executable_name(program_name), get_object_file_name(program_name));
 
     // Remove generated object file
-    remove(object_file_name.c_str());
+    remove(get_object_file_name(program_name).c_str());
 }
 
 #ifdef __linux__
