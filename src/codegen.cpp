@@ -72,7 +72,7 @@ namespace codegen {
         void codegen_types_bodies(std::vector<ast::TypeNode*> functions);
         llvm::Value* codegen(ast::FunctionNode& node) {return nullptr;}
         void codegen_function_prototypes(std::vector<ast::FunctionNode*> functions);
-        void codegen_function_prototypes(std::filesystem::path module_path, std::string identifier, std::vector<ast::FunctionArgumentNode*> args_names, std::vector<ast::Type> args_types, ast::Type return_type);
+        void codegen_function_prototypes(std::filesystem::path module_path, std::string identifier, std::vector<ast::FunctionArgumentNode*> args_names, std::vector<ast::Type> args_types, ast::Type return_type, bool is_extern);
         void codegen_function_bodies(std::vector<ast::FunctionNode*> functions);
         void codegen_function_bodies(std::filesystem::path module_path, std::string identifier, std::vector<ast::FunctionArgumentNode*> args_names, std::vector<ast::Type> args_types, ast::Type return_type, ast::Node* function_body);
         llvm::Value* codegen(ast::AssignmentNode& node);
@@ -96,7 +96,11 @@ namespace codegen {
             return module.string() + "::" + identifier;
         }
 
-       std::string get_mangled_function_name(std::filesystem::path module, std::string identifier, std::vector<ast::Type> args, ast::Type return_type) {
+        std::string get_mangled_function_name(std::filesystem::path module, std::string identifier, std::vector<ast::Type> args, ast::Type return_type, bool is_extern) {
+            if (is_extern) {
+                return identifier;
+            }
+
             std::string name = module.string() + "::" + identifier;
             for (size_t i = 0; i < args.size(); i++) {
                 name += "_" + args[i].to_str();
@@ -428,7 +432,8 @@ void codegen::Context::codegen_function_prototypes(std::vector<ast::FunctionNode
                     function->identifier->value,
                     function->args,
                     specialization.args,
-                    specialization.return_type
+                    specialization.return_type,
+                    function->is_extern
                 );
             }
         }
@@ -438,18 +443,19 @@ void codegen::Context::codegen_function_prototypes(std::vector<ast::FunctionNode
                 function->identifier->value,
                 function->args,
                 ast::get_types(function->args),
-                function->return_type
+                function->return_type,
+                function->is_extern
             );
         }
     }
 }
 
-void codegen::Context::codegen_function_prototypes(std::filesystem::path module_path, std::string identifier, std::vector<ast::FunctionArgumentNode*> args_names, std::vector<ast::Type> args_types, ast::Type return_type) {
+void codegen::Context::codegen_function_prototypes(std::filesystem::path module_path, std::string identifier, std::vector<ast::FunctionArgumentNode*> args_names, std::vector<ast::Type> args_types, ast::Type return_type, bool is_extern) {
     // Make function type
     llvm::FunctionType* function_type = this->get_function_type(args_types, return_type);
 
     // Create function
-    std::string name = this->get_mangled_function_name(module_path, identifier, args_types, return_type);
+    std::string name = this->get_mangled_function_name(module_path, identifier, args_types, return_type, is_extern);
     llvm::Function* f = llvm::Function::Create(function_type, llvm::Function::ExternalLinkage, name, this->module);
 
     // Set args for names
@@ -467,6 +473,8 @@ void codegen::Context::codegen_function_prototypes(std::filesystem::path module_
 
 void codegen::Context::codegen_function_bodies(std::vector<ast::FunctionNode*> functions) {
     for (auto& function: functions) {
+        if (function->is_extern) return;
+
         if (function->generic) {
             for (auto& specialization: function->specializations) {
                 this->type_bindings = specialization.type_bindings;
@@ -497,7 +505,7 @@ void codegen::Context::codegen_function_bodies(std::vector<ast::FunctionNode*> f
 }
 
 void codegen::Context::codegen_function_bodies(std::filesystem::path module_path, std::string identifier, std::vector<ast::FunctionArgumentNode*> args_names, std::vector<ast::Type> args_types, ast::Type return_type, ast::Node* function_body) {
-    std::string name = this->get_mangled_function_name(module_path, identifier, args_types, return_type);
+    std::string name = this->get_mangled_function_name(module_path, identifier, args_types, return_type, false);
     llvm::Function* f = this->module->getFunction(name);
 
     // Create the body of the function
@@ -594,7 +602,7 @@ void codegen::Context::store_fields(ast::Node* expression, llvm::Value* struct_a
         }
         else {
             assert(call.function);
-            std::string name = this->get_mangled_function_name(call.function->module_path, call.identifier->value, this->get_types(call.args), this->get_type((ast::Node*) &call));
+            std::string name = this->get_mangled_function_name(call.function->module_path, call.identifier->value, this->get_types(call.args), this->get_type((ast::Node*) &call), call.function->is_extern);
             llvm::Function* function = this->module->getFunction(name);
             assert(function);
             
@@ -1038,7 +1046,7 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
 
     // Get function
     assert(node.function);
-    std::string name = this->get_mangled_function_name(node.function->module_path, node.identifier->value, this->get_types(node.args), this->get_type((ast::Node*) &node));
+    std::string name = this->get_mangled_function_name(node.function->module_path, node.identifier->value, this->get_types(node.args), this->get_type((ast::Node*) &node), node.function->is_extern);
     llvm::Function* function = this->module->getFunction(name);
     assert(function);
 
