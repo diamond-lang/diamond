@@ -47,6 +47,7 @@ namespace codegen {
 
         std::vector<std::unordered_map<std::string, llvm::AllocaInst*>> scopes;
         std::unordered_map<std::string, ast::Type> type_bindings;
+        std::unordered_map<std::string, llvm::Constant*> globals;
 
         Context(ast::Ast& ast) : ast(ast) {
             // Create llvm context
@@ -89,7 +90,7 @@ namespace codegen {
         llvm::Value* codegen(ast::IntegerNode& node);
         llvm::Value* codegen(ast::IdentifierNode& node);
         llvm::Value* codegen(ast::BooleanNode& node);
-        llvm::Value* codegen(ast::StringNode& node) {return nullptr;}
+        llvm::Value* codegen(ast::StringNode& node);
         llvm::Value* codegen(ast::FieldAccessNode& node);
 
         std::string get_mangled_type_name(std::filesystem::path module, std::string identifier) {
@@ -112,6 +113,7 @@ namespace codegen {
             if      (type == ast::Type("float64")) return llvm::Type::getDoubleTy(*(this->context));
             else if (type == ast::Type("int64"))   return llvm::Type::getInt64Ty(*(this->context));
             else if (type == ast::Type("bool"))    return llvm::Type::getInt1Ty(*(this->context));
+            else if (type == ast::Type("string"))  return llvm::Type::getInt8PtrTy(*(this->context));
             else if (type == ast::Type("void"))    return llvm::Type::getVoidTy(*(this->context));
             else if (type.type_definition)         return this->get_struct_type(type.type_definition);
             else {
@@ -218,6 +220,17 @@ namespace codegen {
         }
 
         llvm::Value* get_field_pointer(ast::FieldAccessNode& node);
+
+        llvm::Constant* get_global_string(std::string str) {
+            for (auto it = this->globals.begin(); it != this->globals.end(); it++) {
+                if (it->first == str) {
+                    return it->second;
+                }
+            }
+
+            this->globals[str] = this->builder->CreateGlobalStringPtr(str);
+            return this->globals[str];
+        }
     };
 };
 
@@ -1006,14 +1019,14 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
     if (node.identifier->value == "print") {
         if (args[0]->getType()->isDoubleTy()) {
             std::vector<llvm::Value*> printArgs;
-            printArgs.push_back(this->builder->CreateGlobalStringPtr("%g\n"));
+            printArgs.push_back(this->get_global_string("%g\n"));
             printArgs.push_back(args[0]);
             this->builder->CreateCall(this->module->getFunction("printf"), printArgs);
             return nullptr;
         }
         if (args[0]->getType()->isIntegerTy(64)) {
             std::vector<llvm::Value*> printArgs;
-            printArgs.push_back(this->builder->CreateGlobalStringPtr("%d\n"));
+            printArgs.push_back(this->get_global_string("%d\n"));
             printArgs.push_back(args[0]);
             this->builder->CreateCall(this->module->getFunction("printf"), printArgs);
             return nullptr;
@@ -1028,7 +1041,7 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
 
             // Create then branch
             this->builder->SetInsertPoint(then_block);
-            printArgs.push_back(this->builder->CreateGlobalStringPtr("true\n"));
+            printArgs.push_back(this->get_global_string("true\n"));
             this->builder->CreateCall(this->module->getFunction("printf"), printArgs);
             this->builder->CreateBr(merge);
             then_block = this->builder->GetInsertBlock();
@@ -1038,7 +1051,7 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
             // Create else branch
             current_function->getBasicBlockList().push_back(else_block);
             this->builder->SetInsertPoint(else_block);
-            printArgs.push_back(this->builder->CreateGlobalStringPtr("false\n"));
+            printArgs.push_back(this->get_global_string("false\n"));
             this->builder->CreateCall(this->module->getFunction("printf"), printArgs);
             this->builder->CreateBr(merge);
             else_block = this->builder->GetInsertBlock();
@@ -1046,6 +1059,12 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
             // Merge  block
             current_function->getBasicBlockList().push_back(merge);
             this->builder->SetInsertPoint(merge);
+            return nullptr;
+        }
+        if (this->get_type(node.args[0]->expression) == ast::Type("string")) {
+            std::vector<llvm::Value*> printArgs;
+            printArgs.push_back(args[0]);
+            this->builder->CreateCall(this->module->getFunction("printf"), printArgs);
             return nullptr;
         }
     }
@@ -1080,6 +1099,10 @@ llvm::Value* codegen::Context::codegen(ast::IdentifierNode& node) {
 
 llvm::Value* codegen::Context::codegen(ast::BooleanNode& node) {
     return llvm::ConstantInt::getBool(*(this->context), node.value);
+}
+
+llvm::Value* codegen::Context::codegen(ast::StringNode& node) {
+    return this->get_global_string(node.value);
 }
 
 static size_t get_index_of_field(std::string field, ast::TypeNode* type_definition) {

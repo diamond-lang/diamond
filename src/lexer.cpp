@@ -219,7 +219,13 @@ Result<token::Token, Error> lexer::get_string(Source& source) {
 
     advance(source);
     while (!(at_end(source) || match(source, "\n") || match(source, "\""))) {
-        literal += current(source);
+        if (match(source, "\\n")) {
+            literal += "\n";
+            advance(source);
+        }
+        else {
+            literal += current(source);
+        }
         advance(source);
     }
 
