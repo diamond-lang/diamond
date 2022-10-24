@@ -356,6 +356,7 @@ Result<Ok, Error> semantic::Context::check_constraint(std::unordered_map<std::st
         }
         // Else compare with previous type founded for her
         else if (type_bindings[type_variable.to_str()] != ast::Type("int64")
+        &&       type_bindings[type_variable.to_str()] != ast::Type("int32")
         &&       type_bindings[type_variable.to_str()] != ast::Type("float64")) {
             assert(false);
             return Error {};
@@ -982,6 +983,7 @@ Result<Ok, Error> semantic::Context::analyze(ast::IntegerNode& node) {
         node.type = ast::Type("int64");
     }
     else if (node.type != ast::Type("int64")
+    &&       node.type != ast::Type("int32")
     &&       node.type != ast::Type("float64")) {
         this->errors.push_back(Error("Error: Type mismatch between type annotation and expression"));
         return Error {};
