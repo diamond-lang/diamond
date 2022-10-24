@@ -22,6 +22,7 @@ struct Parser {
     Result<ast::Node*, Error> parse_program();
     Result<ast::Node*, Error> parse_block();
     Result<ast::Node*, Error> parse_function();
+    Result<ast::Node*, Error> parse_extern();
     Result<ast::Node*, Error> parse_type();
     Result<ast::Node*, Error> parse_statement();
     Result<ast::Node*, Error> parse_block_or_statement();
@@ -217,6 +218,7 @@ Result<ast::Node*, Error> Parser::parse_block() {
 Result<ast::Node*, Error> Parser::parse_statement() {
     switch (this->current().variant) {
         case token::Function: return this->parse_function();
+        case token::Extern:   return this->parse_extern();
         case token::Type:     return this->parse_type();
         case token::Return:   return this->parse_return_stmt();
         case token::If:       return this->parse_if_else();
@@ -363,6 +365,62 @@ Result<ast::Node*, Error> Parser::parse_function() {
     if (function.return_type == ast::Type("")) {
         function.generic = true;
     }
+
+    this->ast.push_back(function);
+    return this->ast.last_element();
+}
+
+Result<ast::Node*, Error> Parser::parse_extern() {
+    // Create node
+    auto function = ast::FunctionNode {this->current().line, this->current().column};
+    function.module_path = this->file;
+    function.is_extern = true;
+
+    // Parse keyword
+    auto keyword = this->parse_token(token::Extern);
+    if (keyword.is_error()) return Error {};
+
+    // Parse indentifier
+    auto identifier = this->parse_identifier();
+    if (identifier.is_error()) return identifier;
+    function.identifier = (ast::IdentifierNode*) identifier.get_value();
+
+    // Parse left paren
+    auto left_paren = this->parse_token(token::LeftParen);
+    if (left_paren.is_error()) return Error {};
+
+    // Parse args
+    while (this->current() != token::RightParen && !this->at_end()) {
+        auto arg = this->parse_identifier();
+        if (arg.is_error()) return arg;
+
+        // Parse type annotation
+        auto colon = this->parse_token(token::Colon);
+        if (colon.is_error()) return Error {};
+
+        auto type_identifier = this->parse_token(token::Identifier);
+        if (type_identifier.is_error()) return Error {};
+
+        ast::set_type(arg.get_value(), ast::Type(type_identifier.get_value().get_literal()));
+        function.args.push_back((ast::FunctionArgumentNode*) arg.get_value());
+
+        // Parse comma
+        if (this->current() == token::Comma) this->advance();
+        else                                 break;
+    }
+
+    // Parse right paren
+    auto right_paren = this->parse_token(token::RightParen);
+    if (right_paren.is_error()) return Error {};
+
+    // Parse type annotation
+    auto colon = this->parse_token(token::Colon);
+    if (colon.is_error()) return Error {};
+
+    auto type_identifier = this->parse_token(token::Identifier);
+    if (type_identifier.is_error()) return Error {};
+
+    function.return_type = ast::Type(type_identifier.get_value().get_literal());
 
     this->ast.push_back(function);
     return this->ast.last_element();

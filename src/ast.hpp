@@ -143,6 +143,7 @@ namespace ast {
         Node* body;
 
         bool generic = false;
+        bool is_extern = false;
         Type return_type = Type("");
         std::vector<FunctionSpecialization> specializations;
         FunctionConstraints constraints;

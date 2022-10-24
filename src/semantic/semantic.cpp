@@ -603,6 +603,10 @@ Result<Ok, Error> semantic::Context::analyze(ast::BlockNode& node) {
 }
 
 Result<Ok, Error> semantic::Context::analyze(ast::FunctionNode& node) {
+    if (node.is_extern) {
+        return Ok {};
+    }
+    
     if (node.generic) {
         if (node.return_type == ast::Type("")) {
             if (this->current_module == node.module_path) {
