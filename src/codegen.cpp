@@ -112,6 +112,7 @@ namespace codegen {
         llvm::Type* as_llvm_type(ast::Type type) {
             if      (type == ast::Type("float64")) return llvm::Type::getDoubleTy(*(this->context));
             else if (type == ast::Type("int64"))   return llvm::Type::getInt64Ty(*(this->context));
+            else if (type == ast::Type("int32"))   return llvm::Type::getInt32Ty(*(this->context));
             else if (type == ast::Type("bool"))    return llvm::Type::getInt1Ty(*(this->context));
             else if (type == ast::Type("string"))  return llvm::Type::getInt8PtrTy(*(this->context));
             else if (type == ast::Type("void"))    return llvm::Type::getVoidTy(*(this->context));
@@ -925,12 +926,18 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
             if (args[0]->getType()->isIntegerTy(64) && args[1]->getType()->isIntegerTy(64)) {
                 return this->builder->CreateAdd(args[0], args[1], "addtmp");
             }
+            if (args[0]->getType()->isIntegerTy(32) && args[1]->getType()->isIntegerTy(32)) {
+                return this->builder->CreateAdd(args[0], args[1], "addtmp");
+            }
         }
         if (node.identifier->value == "-") {
             if (args[0]->getType()->isDoubleTy() && args[1]->getType()->isDoubleTy()) {
                 return this->builder->CreateFSub(args[0], args[1], "subtmp");
             }
             if (args[0]->getType()->isIntegerTy(64) && args[1]->getType()->isIntegerTy(64)) {
+                return this->builder->CreateSub(args[0], args[1], "addtmp");
+            }
+            if (args[0]->getType()->isIntegerTy(32) && args[1]->getType()->isIntegerTy(32)) {
                 return this->builder->CreateSub(args[0], args[1], "addtmp");
             }
         }
@@ -941,12 +948,18 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
             if (args[0]->getType()->isIntegerTy(64) && args[1]->getType()->isIntegerTy(64)) {
                 return this->builder->CreateMul(args[0], args[1], "addtmp");
             }
+            if (args[0]->getType()->isIntegerTy(32) && args[1]->getType()->isIntegerTy(32)) {
+                return this->builder->CreateMul(args[0], args[1], "addtmp");
+            }
         }
         if (node.identifier->value == "/") {
             if (args[0]->getType()->isDoubleTy() && args[1]->getType()->isDoubleTy()) {
                 return this->builder->CreateFDiv(args[0], args[1], "divtmp");
             }
             if (args[0]->getType()->isIntegerTy(64) && args[1]->getType()->isIntegerTy(64)) {
+                return this->builder->CreateSDiv(args[0], args[1], "divtmp");
+            }
+            if (args[0]->getType()->isIntegerTy(32) && args[1]->getType()->isIntegerTy(32)) {
                 return this->builder->CreateSDiv(args[0], args[1], "divtmp");
             }
         }
@@ -960,12 +973,18 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
             if (args[0]->getType()->isIntegerTy(64) && args[1]->getType()->isIntegerTy(64)) {
                 return this->builder->CreateICmpULT(args[0], args[1], "addtmp");
             }
+            if (args[0]->getType()->isIntegerTy(32) && args[1]->getType()->isIntegerTy(32)) {
+                return this->builder->CreateICmpULT(args[0], args[1], "addtmp");
+            }
         }
         if (node.identifier->value == "<=") {
             if (args[0]->getType()->isDoubleTy() && args[1]->getType()->isDoubleTy()) {
                 return this->builder->CreateFCmpULE(args[0], args[1], "cmptmp");
             }
             if (args[0]->getType()->isIntegerTy(64) && args[1]->getType()->isIntegerTy(64)) {
+                return this->builder->CreateICmpULE(args[0], args[1], "addtmp");
+            }
+            if (args[0]->getType()->isIntegerTy(32) && args[1]->getType()->isIntegerTy(32)) {
                 return this->builder->CreateICmpULE(args[0], args[1], "addtmp");
             }
         }
@@ -976,12 +995,18 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
             if (args[0]->getType()->isIntegerTy(64) && args[1]->getType()->isIntegerTy(64)) {
                 return this->builder->CreateICmpUGT(args[0], args[1], "addtmp");
             }
+            if (args[0]->getType()->isIntegerTy(32) && args[1]->getType()->isIntegerTy(32)) {
+                return this->builder->CreateICmpUGT(args[0], args[1], "addtmp");
+            }
         }
         if (node.identifier->value == ">=") {
             if (args[0]->getType()->isDoubleTy() && args[1]->getType()->isDoubleTy()) {
                 return this->builder->CreateFCmpUGE(args[0], args[1], "cmptmp");
             }
             if (args[0]->getType()->isIntegerTy(64) && args[1]->getType()->isIntegerTy(64)) {
+                return this->builder->CreateICmpUGE(args[0], args[1], "addtmp");
+            }
+            if (args[0]->getType()->isIntegerTy(32) && args[1]->getType()->isIntegerTy(32)) {
                 return this->builder->CreateICmpUGE(args[0], args[1], "addtmp");
             }
         }
@@ -993,6 +1018,9 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
                 return this->builder->CreateICmpEQ(args[0], args[1], "eqtmp");
             }
             if (args[0]->getType()->isIntegerTy(64) && args[1]->getType()->isIntegerTy(64)) {
+                return this->builder->CreateICmpEQ(args[0], args[1], "addtmp");
+            }
+            if (args[0]->getType()->isIntegerTy(32) && args[1]->getType()->isIntegerTy(32)) {
                 return this->builder->CreateICmpEQ(args[0], args[1], "addtmp");
             }
         }
@@ -1011,6 +1039,9 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
             if (args[0]->getType()->isIntegerTy(64)) {
                 return this->builder->CreateNeg(args[0], "negation");
             }
+            if (args[0]->getType()->isIntegerTy(32)) {
+                return this->builder->CreateNeg(args[0], "negation");
+            }
         }
         if (node.identifier->value == "not") {
             return this->builder->CreateNot(args[0], "not");
@@ -1025,6 +1056,13 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
             return nullptr;
         }
         if (args[0]->getType()->isIntegerTy(64)) {
+            std::vector<llvm::Value*> printArgs;
+            printArgs.push_back(this->get_global_string("%d\n"));
+            printArgs.push_back(args[0]);
+            this->builder->CreateCall(this->module->getFunction("printf"), printArgs);
+            return nullptr;
+        }
+        if (args[0]->getType()->isIntegerTy(32)) {
             std::vector<llvm::Value*> printArgs;
             printArgs.push_back(this->get_global_string("%d\n"));
             printArgs.push_back(args[0]);
@@ -1086,8 +1124,15 @@ llvm::Value* codegen::Context::codegen(ast::FloatNode& node) {
 llvm::Value* codegen::Context::codegen(ast::IntegerNode& node) {
     if (this->get_type((ast::Node*) &node) == ast::Type("float64"))
         return llvm::ConstantFP::get(*(this->context), llvm::APFloat((double)node.value));
-    else
+    else if (this->get_type((ast::Node*) &node) == ast::Type("int64")) {
         return llvm::ConstantInt::get(*(this->context), llvm::APInt(64, node.value, true));
+    }
+    else if (this->get_type((ast::Node*) &node) == ast::Type("int32")) {
+        return llvm::ConstantInt::get(*(this->context), llvm::APInt(32, node.value, true));
+    }
+    
+    assert(false);
+    return nullptr;
 }
 
 llvm::Value* codegen::Context::codegen(ast::IdentifierNode& node) {
