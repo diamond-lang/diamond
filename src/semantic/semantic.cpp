@@ -1018,6 +1018,17 @@ Result<Ok, Error> semantic::Context::analyze(ast::BooleanNode& node) {
     return Ok {};
 }
 
+Result<Ok, Error> semantic::Context::analyze(ast::StringNode& node) {
+    if (node.type == ast::Type("")) {
+        node.type = ast::Type("string");
+    }
+    else if (node.type != ast::Type("string")) {
+        this->errors.push_back(Error("Error: Type mismatch between type annotation and expression"));
+        return Error {};
+    }
+    return Ok {};
+}
+
 Result<Ok, Error> semantic::Context::analyze(ast::FieldAccessNode& node) {
     // There should be at least 2 identifiers in fields accessed. eg: circle.radius
     assert(node.fields_accessed.size() >= 2);

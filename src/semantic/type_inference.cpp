@@ -130,7 +130,7 @@ namespace type_inference {
         Result<Ok, Error> analyze(ast::IntegerNode& node);
         Result<Ok, Error> analyze(ast::IdentifierNode& node);
         Result<Ok, Error> analyze(ast::BooleanNode& node);
-        Result<Ok, Error> analyze(ast::StringNode& node) {return Ok {};}
+        Result<Ok, Error> analyze(ast::StringNode& node);
         Result<Ok, Error> analyze(ast::FieldAccessNode& node);
 
         void unify(ast::Node* node);
@@ -480,6 +480,11 @@ Result<Ok, Error> type_inference::Context::analyze(ast::FloatNode& node) {
 
 Result<Ok, Error> type_inference::Context::analyze(ast::BooleanNode& node) {
     node.type = ast::Type("bool");
+    return Ok {};
+}
+
+Result<Ok, Error> type_inference::Context::analyze(ast::StringNode& node) {
+    node.type = ast::Type("string");
     return Ok {};
 }
 

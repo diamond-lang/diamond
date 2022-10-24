@@ -76,7 +76,7 @@ namespace semantic {
         Result<Ok, Error> analyze(ast::IntegerNode& node);
         Result<Ok, Error> analyze(ast::IdentifierNode& node);
         Result<Ok, Error> analyze(ast::BooleanNode& node);
-        Result<Ok, Error> analyze(ast::StringNode& node) {return Ok {};}
+        Result<Ok, Error> analyze(ast::StringNode& node);
         Result<Ok, Error> analyze(ast::FieldAccessNode& node);
 
         void add_scope();
