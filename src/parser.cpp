@@ -934,6 +934,7 @@ Result<ast::Node*, Error> Parser::parse_primary() {
         case token::Integer:   return this->parse_integer();
         case token::True:      return this->parse_boolean();
         case token::False:     return this->parse_boolean();
+        case token::String:    return this->parse_string();
         case token::Identifier: {
             if (this->match({token::Identifier, token::LeftParen})) return this->parse_call();
             if (this->match({token::Identifier, token::Dot}))       return this->parse_field_access();
