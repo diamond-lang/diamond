@@ -605,6 +605,14 @@ Result<Ok, Error> semantic::Context::analyze(ast::BlockNode& node) {
 
 Result<Ok, Error> semantic::Context::analyze(ast::FunctionNode& node) {
     if (node.is_extern) {
+         for (auto arg: node.args) {
+            auto identifier = arg;
+            auto result = this->analyze(identifier->type);
+            if (result.is_error()) return Error {};
+            this->current_scope()[identifier->value] = semantic::Binding((ast::Node*) arg);
+        }
+        auto result = this->analyze(node.return_type);
+        if (result.is_error()) return Error {};
         return Ok {};
     }
     
@@ -637,13 +645,16 @@ Result<Ok, Error> semantic::Context::analyze(ast::FunctionNode& node) {
         context.add_scope();
         for (auto arg: node.args) {
             auto identifier = arg;
-            context.analyze(identifier->type);
+            auto result = context.analyze(identifier->type);
+            if (result.is_error()) return Error {};
             context.current_scope()[identifier->value] = semantic::Binding((ast::Node*) arg);
         }
 
+        auto result = context.analyze(node.return_type);
+        if (result.is_error()) return Error {};
         context.analyze(node.return_type);
 
-        auto result = context.analyze(node.body);
+        result = context.analyze(node.body);
         if (result.is_error()) {
             this->errors.insert(this->errors.end(), context.errors.begin(), context.errors.end());
             return Error {};
@@ -654,8 +665,11 @@ Result<Ok, Error> semantic::Context::analyze(ast::FunctionNode& node) {
 
 Result<Ok, Error> semantic::Context::analyze(ast::Type& type) {
     if (type == ast::Type("int64")) return Ok {};
+    else if (type == ast::Type("int32")) return Ok {};
     else if (type == ast::Type("float64")) return Ok {};
     else if (type == ast::Type("bool")) return Ok {};
+    else if (type == ast::Type("void")) return Ok {};
+    else if (type == ast::Type("string")) return Ok {};
     else {
         Binding* type_binding = this->get_binding(type.to_str());
         if (!type_binding) {
