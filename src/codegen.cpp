@@ -127,6 +127,17 @@ namespace codegen {
             return llvm::StructType::getTypeByName(*this->context, this->get_mangled_type_name(type_definition->module_path, type_definition->identifier->value));
         }
 
+        bool has_struct_type(ast::Node* expression) {
+            if (this->get_type(expression).type_definition) {
+                return true;
+            }
+            return false;
+        }
+
+        bool is_struct_type(ast::Type type) {
+            return type.type_definition != nullptr;
+        }
+
         llvm::FunctionType* get_function_type(std::vector<ast::Type> args_types, ast::Type return_type) {
             // Get args types
             std::vector<llvm::Type*> llvm_args_types;
@@ -136,8 +147,13 @@ namespace codegen {
             }
 
             for (auto arg: args_types) {
-                if (arg.type_definition) llvm_args_types.push_back(this->as_llvm_type(arg)->getPointerTo());
-                else llvm_args_types.push_back(this->as_llvm_type(arg));
+                llvm::Type* llvm_type = this->as_llvm_type(arg);
+                if (this->is_struct_type(arg)) {
+                    llvm_args_types.push_back(llvm_type->getPointerTo());
+                }
+                else {
+                    llvm_args_types.push_back(llvm_type);
+                }
             }
 
             // Get return type
@@ -189,7 +205,57 @@ namespace codegen {
             return block.CreateAlloca(type, 0, name.c_str());
         }
 
-        void store_fields(ast::Node* expression, llvm::Value* struct_allocation);
+        void store_fields(ast::Node* expression, llvm::Value* struct_allocation) {
+            // Get struct type
+            llvm::StructType* struct_type = this->get_struct_type(ast::get_type(expression).type_definition);
+
+            // If the struct expression is a call
+            if (expression->index() == ast::Call) {
+                // Get call
+                auto& call = std::get<ast::CallNode>(*expression);
+
+                // If call is a struct constructror
+                bool is_constructor = call.identifier->value == call.type.to_str();
+                if (is_constructor) {
+                    // For each field
+                    for (size_t i = 0; i < call.args.size(); i++) {
+                        // Get pointer to the field
+                        llvm::Value* ptr = this->builder->CreateStructGEP(struct_type, struct_allocation, i);
+
+                        // If the field type has a struct type
+                        if (this->has_struct_type(call.args[i]->expression)) {
+                            this->store_fields(call.args[i]->expression, ptr);
+                        }
+                        else {
+                            this->builder->CreateStore(this->codegen(call.args[i]->expression), ptr);
+                        }
+                    }
+                }
+                else {
+                    assert(call.function);
+                    std::string name = this->get_mangled_function_name(call.function->module_path, call.identifier->value, this->get_types(call.args), this->get_type((ast::Node*) &call), call.function->is_extern);
+                    llvm::Function* function = this->module->getFunction(name);
+                    assert(function);
+                    
+                    // Codegen args
+                    std::vector<llvm::Value*> args;
+                    args.push_back(struct_allocation);
+                    for (size_t i = 0; i < call.args.size(); i++) {
+                        args.push_back(this->codegen(call.args[i]->expression));
+                    }
+
+                    // Make call
+                    this->builder->CreateCall(function, args, "calltmp");
+                }
+            }
+            else if (expression->index() == ast::Identifier) {
+                auto& identifier = std::get<ast::IdentifierNode>(*expression);
+                this->builder->CreateMemCpy(struct_allocation, llvm::MaybeAlign(), this->get_binding(identifier.value), llvm::MaybeAlign(), this->get_type_size(struct_type));
+            }
+            else {
+                assert(false);
+            }
+        }
 
         void add_scope() {
             this->scopes.push_back(std::unordered_map<std::string, llvm::AllocaInst*>());
@@ -213,14 +279,45 @@ namespace codegen {
             return nullptr;
         }
 
-        bool has_struct_type(ast::Node* expression) {
-            if (this->get_type(expression).type_definition) {
-                return true;
+        size_t get_index_of_field(std::string field, ast::TypeNode* type_definition) {
+            for (size_t i = 0; i < type_definition->fields.size(); i++) {
+                if (field == type_definition->fields[i]->value) {
+                    return i;
+                }
             }
-            return false;
+            assert(false);
+            return 0;
         }
 
-        llvm::Value* get_field_pointer(ast::FieldAccessNode& node);
+        llvm::Value* get_field_pointer(ast::FieldAccessNode& node) {
+            // There should be at least 2 identifiers in fields accessed. eg: circle.radius
+            assert(node.fields_accessed.size() >= 2);
+
+            // Get struct allocation and type
+            llvm::Value* struct_ptr = this->get_binding(node.fields_accessed[0]->value);
+            if (((llvm::AllocaInst*)struct_ptr)->getAllocatedType()->isPointerTy()) {
+                struct_ptr = this->builder->CreateLoad(struct_ptr);
+            }
+            assert(this->get_type((ast::Node*) node.fields_accessed[0]).type_definition);
+            llvm::StructType* struct_type = this->get_struct_type(this->get_type((ast::Node*) node.fields_accessed[0]).type_definition);
+
+            // Get type definition
+            ast::TypeNode* type_definition = this->get_type((ast::Node*) node.fields_accessed[0]).type_definition;
+
+            for (size_t i = 1; i < node.fields_accessed.size() - 1; i++) {
+                // Get pointer to accessed fieldd
+                struct_ptr = this->builder->CreateStructGEP(struct_type, struct_ptr, get_index_of_field(node.fields_accessed[i]->value, type_definition));
+                
+                // Update current type definition
+                type_definition = this->get_type((ast::Node*) node.fields_accessed[i]).type_definition;
+                struct_type = this->get_struct_type(type_definition);
+            }
+            
+            // Get pointer to accessed fieldd
+            size_t last_element = node.fields_accessed.size() - 1;
+            llvm::Value* ptr = this->builder->CreateStructGEP(struct_type, struct_ptr, get_index_of_field(node.fields_accessed[last_element]->value, type_definition));
+            return ptr;
+        }
 
         llvm::Constant* get_global_string(std::string str) {
             for (auto it = this->globals.begin(); it != this->globals.end(); it++) {
@@ -231,6 +328,11 @@ namespace codegen {
 
             this->globals[str] = this->builder->CreateGlobalStringPtr(str);
             return this->globals[str];
+        }
+
+        llvm::TypeSize get_type_size(llvm::Type* type) {
+            llvm::DataLayout dl = llvm::DataLayout(this->module);
+            return dl.getTypeAllocSize(type);
         }
     };
 };
@@ -479,7 +581,7 @@ void codegen::Context::codegen_function_prototypes(std::filesystem::path module_
     llvm::Function* f = llvm::Function::Create(function_type, llvm::Function::ExternalLinkage, name, this->module);
 
     // Set args for names
-    if (return_type.type_definition) {
+    if (this->is_struct_type(return_type)) {
         for (unsigned int i = 0; i < args_names.size(); i++) {
             f->getArg(i + 1)->setName(args_names[i]->value);
         }
@@ -592,59 +694,6 @@ void codegen::Context::codegen_function_bodies(std::filesystem::path module_path
 
     // Remove scope
     this->remove_scope();
-}
-
-void codegen::Context::store_fields(ast::Node* expression, llvm::Value* struct_allocation) {
-    // Get struct type
-    llvm::StructType* struct_type = this->get_struct_type(ast::get_type(expression).type_definition);
-
-    // If the struct expression is a call
-    if (expression->index() == ast::Call) {
-        // Get call
-        auto& call = std::get<ast::CallNode>(*expression);
-
-        // If call is a struct constructror
-        bool is_constructor = call.identifier->value == call.type.to_str();
-        if (is_constructor) {
-            // For each field
-            for (size_t i = 0; i < call.args.size(); i++) {
-                // Get pointer to the field
-                llvm::Value* ptr = this->builder->CreateStructGEP(struct_type, struct_allocation, i);
-
-                // If the field type has a struct type
-                if (this->has_struct_type(call.args[i]->expression)) {
-                    this->store_fields(call.args[i]->expression, ptr);
-                }
-                else {
-                    this->builder->CreateStore(this->codegen(call.args[i]->expression), ptr);
-                }
-            }
-        }
-        else {
-            assert(call.function);
-            std::string name = this->get_mangled_function_name(call.function->module_path, call.identifier->value, this->get_types(call.args), this->get_type((ast::Node*) &call), call.function->is_extern);
-            llvm::Function* function = this->module->getFunction(name);
-            assert(function);
-            
-            // Codegen args
-            std::vector<llvm::Value*> args;
-            args.push_back(struct_allocation);
-            for (size_t i = 0; i < call.args.size(); i++) {
-                args.push_back(this->codegen(call.args[i]->expression));
-            }
-
-            // Make call
-            this->builder->CreateCall(function, args, "calltmp");
-        }
-    }
-    else if (expression->index() == ast::Identifier) {
-        llvm::DataLayout dl = llvm::DataLayout(this->module);
-        auto& identifier = std::get<ast::IdentifierNode>(*expression);
-        this->builder->CreateMemCpy(struct_allocation, llvm::MaybeAlign(), this->get_binding(identifier.value), llvm::MaybeAlign(), dl.getTypeAllocSize(struct_type));
-    }
-    else {
-        assert(false);
-    }
 }
 
 llvm::Value* codegen::Context::codegen(ast::AssignmentNode& node) {
@@ -1148,46 +1197,6 @@ llvm::Value* codegen::Context::codegen(ast::BooleanNode& node) {
 
 llvm::Value* codegen::Context::codegen(ast::StringNode& node) {
     return this->get_global_string(node.value);
-}
-
-static size_t get_index_of_field(std::string field, ast::TypeNode* type_definition) {
-    for (size_t i = 0; i < type_definition->fields.size(); i++) {
-        if (field == type_definition->fields[i]->value) {
-            return i;
-        }
-    }
-    assert(false);
-    return 0;
-}
-
-llvm::Value* codegen::Context::get_field_pointer(ast::FieldAccessNode& node) {
-    // There should be at least 2 identifiers in fields accessed. eg: circle.radius
-    assert(node.fields_accessed.size() >= 2);
-
-    // Get struct allocation and type
-    llvm::Value* struct_ptr = this->get_binding(node.fields_accessed[0]->value);
-    if (((llvm::AllocaInst*)struct_ptr)->getAllocatedType()->isPointerTy()) {
-        struct_ptr = this->builder->CreateLoad(struct_ptr);
-    }
-    assert(this->get_type((ast::Node*) node.fields_accessed[0]).type_definition);
-    llvm::StructType* struct_type = this->get_struct_type(this->get_type((ast::Node*) node.fields_accessed[0]).type_definition);
-
-    // Get type definition
-    ast::TypeNode* type_definition = this->get_type((ast::Node*) node.fields_accessed[0]).type_definition;
-
-    for (size_t i = 1; i < node.fields_accessed.size() - 1; i++) {
-        // Get pointer to accessed fieldd
-        struct_ptr = this->builder->CreateStructGEP(struct_type, struct_ptr, get_index_of_field(node.fields_accessed[i]->value, type_definition));
-        
-        // Update current type definition
-        type_definition = this->get_type((ast::Node*) node.fields_accessed[i]).type_definition;
-        struct_type = this->get_struct_type(type_definition);
-    }
-    
-    // Get pointer to accessed fieldd
-    size_t last_element = node.fields_accessed.size() - 1;
-    llvm::Value* ptr = this->builder->CreateStructGEP(struct_type, struct_ptr, get_index_of_field(node.fields_accessed[last_element]->value, type_definition));
-    return ptr;
 }
 
 llvm::Value* codegen::Context::codegen(ast::FieldAccessNode& node) {
