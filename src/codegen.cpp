@@ -34,6 +34,11 @@
 #include "utilities.hpp"
 
 namespace codegen {
+    struct StructType {
+        std::vector<llvm::Type*> types;
+        llvm::StructType* struct_type;
+    };
+
     struct Context {
         ast::Ast& ast;
 
@@ -94,7 +99,7 @@ namespace codegen {
         llvm::Value* codegen(ast::FieldAccessNode& node);
 
         std::string get_mangled_type_name(std::filesystem::path module, std::string identifier) {
-            return module.string() + "::" + identifier;
+            return /*module.string() + "::" + */ identifier;
         }
 
         std::string get_mangled_function_name(std::filesystem::path module, std::string identifier, std::vector<ast::Type> args, ast::Type return_type, bool is_extern) {
@@ -102,7 +107,7 @@ namespace codegen {
                 return identifier;
             }
 
-            std::string name = module.string() + "::" + identifier;
+            std::string name = /*module.string() + "::" +*/ identifier;
             for (size_t i = 0; i < args.size(); i++) {
                 name += "_" + args[i].to_str();
             }
@@ -138,6 +143,48 @@ namespace codegen {
             return type.type_definition != nullptr;
         }
 
+        StructType get_struct_type_as_argument(llvm::StructType* struct_type) {
+            std::vector<llvm::Type*> sub_types;
+            if (this->get_type_size(struct_type) <= 16) {
+                auto& fields = struct_type->elements();
+
+                size_t i = 0;
+                while (i < fields.size()) {
+                    ast::Type type = ast::Type("");
+                    size_t bytes = 0;
+                    while (bytes < 8) {
+                        if (fields[i]->isDoubleTy()) {
+                            type = ast::Type("float64");
+                            bytes += 8;
+                        }
+                        else if (fields[i]->isIntegerTy(64)) {
+                            type = ast::Type("int64");
+                            bytes += 8;
+                        }
+                        else if (fields[i]->isIntegerTy(32)) {
+                            type = ast::Type("int64");
+                            bytes += 4;
+                        }
+                        else if (fields[i]->isIntegerTy(1)) {
+                            type = ast::Type("int64");
+                            bytes += 1;
+                        }
+                        i += 1;
+                    }
+
+                    sub_types.push_back(this->as_llvm_type(type));
+                }
+            }
+            else {
+                sub_types.push_back(struct_type->getPointerTo());
+            }
+
+            StructType result;
+            result.types = sub_types;
+            result.struct_type = llvm::StructType::get((*this->context), sub_types);
+            return result;
+        }
+
         llvm::FunctionType* get_function_type(std::vector<ast::Type> args_types, ast::Type return_type) {
             // Get args types
             std::vector<llvm::Type*> llvm_args_types;
@@ -149,7 +196,8 @@ namespace codegen {
             for (auto arg: args_types) {
                 llvm::Type* llvm_type = this->as_llvm_type(arg);
                 if (this->is_struct_type(arg)) {
-                    llvm_args_types.push_back(llvm_type->getPointerTo());
+                    auto new_args = this->get_struct_type_as_argument((llvm::StructType*) llvm_type).types;
+                    llvm_args_types.insert(llvm_args_types.end(), new_args.begin(), new_args.end());
                 }
                 else {
                     llvm_args_types.push_back(llvm_type);
@@ -241,7 +289,36 @@ namespace codegen {
                     std::vector<llvm::Value*> args;
                     args.push_back(struct_allocation);
                     for (size_t i = 0; i < call.args.size(); i++) {
-                        args.push_back(this->codegen(call.args[i]->expression));
+                        if (this->has_struct_type(call.args[i]->expression)) {
+                            // Create allocation
+                            llvm::StructType* struct_type = this->get_struct_type(this->get_type(call.args[i]->expression).type_definition);
+                            llvm::AllocaInst* allocation = this->create_allocation(call.function->args[i]->value, struct_type);
+
+                            // Store fields
+                            this->store_fields(call.args[i]->expression, allocation);
+
+                            auto new_args = this->get_struct_type_as_argument(struct_type);
+                            if (new_args.types.size() > 1) {
+                                for (size_t j = 0; j < new_args.types.size(); j++) {
+                                    llvm::Value* field_ptr = this->builder->CreateStructGEP(
+                                        new_args.struct_type,
+                                        this->builder->CreateBitCast(
+                                            allocation,
+                                            new_args.struct_type->getPointerTo()
+                                        ),
+                                        j
+                                    );
+                                    args.push_back(this->builder->CreateLoad(field_ptr));
+                                }
+                            }
+                            else {
+                                // Add to args
+                                args.push_back(allocation);
+                            }
+                        }
+                        else {
+                            args.push_back(this->codegen(call.args[i]->expression));
+                        }
                     }
 
                     // Make call
@@ -578,19 +655,7 @@ void codegen::Context::codegen_function_prototypes(std::filesystem::path module_
 
     // Create function
     std::string name = this->get_mangled_function_name(module_path, identifier, args_types, return_type, is_extern);
-    llvm::Function* f = llvm::Function::Create(function_type, llvm::Function::ExternalLinkage, name, this->module);
-
-    // Set args for names
-    if (this->is_struct_type(return_type)) {
-        for (unsigned int i = 0; i < args_names.size(); i++) {
-            f->getArg(i + 1)->setName(args_names[i]->value);
-        }
-    }
-    else {
-        for (unsigned int i = 0; i < args_names.size(); i++) {
-            f->getArg(i)->setName(args_names[i]->value);
-        }
-    }
+    llvm::Function::Create(function_type, llvm::Function::ExternalLinkage, name, this->module);
 }
 
 void codegen::Context::codegen_function_bodies(std::vector<ast::FunctionNode*> functions) {
@@ -640,32 +705,63 @@ void codegen::Context::codegen_function_bodies(std::filesystem::path module_path
     // Add arguments to scope
     this->add_scope();
 
-    if (return_type.type_definition) {
-        for (unsigned int i = 0; i < args_names.size() + 1; i++) {
-            std::string name = "$result";
-            if (i != 0) {
-                name = args_names[i - 1]->value;
-            }
+    size_t offset = 0;
+    if (this->is_struct_type(return_type)) {
+        // Create allocation for argument
+        auto allocation = this->create_allocation("$result", f->getArg(0)->getType());
 
-            // Create allocation for argument
-            auto allocation = this->create_allocation(name, f->getArg(i)->getType());
+        // Store initial value
+        this->builder->CreateStore(f->getArg(0), allocation);
 
-            // Store initial value
-            this->builder->CreateStore(f->getArg(i), allocation);
+        // Add arguments to scope
+        this->current_scope()["$result"] = allocation;
 
-            // Add arguments to scope
-            this->current_scope()[name] = allocation;
-        }
+        offset += 1;
     }
-    else {
-         for (unsigned int i = 0; i < args_names.size(); i++) {
-            std::string name = args_names[i]->value;
 
+    for (size_t i = 0; i < args_names.size(); i++) {
+        std::string name = args_names[i]->value;
+        if (this->is_struct_type(args_types[i])) {
+            auto struct_type = (llvm::StructType*) this->as_llvm_type(args_types[i]);
+            auto new_args = this->get_struct_type_as_argument(struct_type);
+
+            auto struct_allocation = this->create_allocation(name, struct_type);
+
+            if (new_args.types.size() > 1) {
+                // Store values on struct
+                for (size_t j = 0; j < new_args.types.size(); j++) {
+                    llvm::Value* field_ptr = this->builder->CreateStructGEP(
+                        new_args.struct_type,
+                        this->builder->CreateBitCast(
+                            struct_allocation,
+                            new_args.struct_type->getPointerTo()
+                        ), 
+                        j
+                    );
+                    this->builder->CreateStore(f->getArg(i + offset + j), field_ptr);
+                }
+                offset += new_args.types.size() - 1;
+
+                // Add struct to scope
+                this->current_scope()[name] = struct_allocation;
+            }
+            else {
+                // Create allocation for argument
+                auto allocation = this->create_allocation(name, f->getArg(i + offset)->getType());
+
+                // Store initial value
+                this->builder->CreateStore(f->getArg(i + offset), allocation);
+
+                // Add arguments to scope
+                this->current_scope()[name] = allocation;
+            }
+        }
+        else {
             // Create allocation for argument
-            auto allocation = this->create_allocation(name, f->getArg(i)->getType());
+            auto allocation = this->create_allocation(name, f->getArg(i + offset)->getType());
 
             // Store initial value
-            this->builder->CreateStore(f->getArg(i), allocation);
+            this->builder->CreateStore(f->getArg(i + offset), allocation);
 
             // Add arguments to scope
             this->current_scope()[name] = allocation;
@@ -686,11 +782,11 @@ void codegen::Context::codegen_function_bodies(std::filesystem::path module_path
         }
     }
 
-    // Verify function
-    llvm::verifyFunction(*f);
+    // // Verify function
+    // llvm::verifyFunction(*f);
 
-    // Run optimizations
-    this->function_pass_manager->run(*f);
+    // // Run optimizations
+    // this->function_pass_manager->run(*f);
 
     // Remove scope
     this->remove_scope();
@@ -936,7 +1032,7 @@ llvm::Value* codegen::Context::codegen(ast::WhileNode& node) {
 
 llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
     // If type is struct
-    if (node.type.type_definition) {
+    if (this->is_struct_type(node.type)) {
         // Create allocation
         llvm::StructType* struct_type = this->get_struct_type(node.type.type_definition);
         llvm::AllocaInst* allocation = this->create_allocation(node.identifier->value, struct_type);
@@ -959,8 +1055,24 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
             // Store fields
             this->store_fields(node.args[i]->expression, allocation);
 
-            // Add to args
-            args.push_back(allocation);
+            auto new_args = this->get_struct_type_as_argument(struct_type);
+            if (new_args.types.size() > 1) {
+                for (size_t j = 0; j < new_args.types.size(); j++) {
+                    llvm::Value* field_ptr = this->builder->CreateStructGEP(
+                        new_args.struct_type,
+                        this->builder->CreateBitCast(
+                            allocation,
+                            new_args.struct_type->getPointerTo()
+                        ),
+                        j
+                    );
+                    args.push_back(this->builder->CreateLoad(field_ptr));
+                }
+            }
+            else {
+                // Add to args
+                args.push_back(allocation);
+            }
         }
         else {
             args.push_back(this->codegen(node.args[i]->expression));
