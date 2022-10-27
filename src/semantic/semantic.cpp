@@ -357,6 +357,7 @@ Result<Ok, Error> semantic::Context::check_constraint(std::unordered_map<std::st
         // Else compare with previous type founded for her
         else if (type_bindings[type_variable.to_str()] != ast::Type("int64")
         &&       type_bindings[type_variable.to_str()] != ast::Type("int32")
+        &&       type_bindings[type_variable.to_str()] != ast::Type("int8")
         &&       type_bindings[type_variable.to_str()] != ast::Type("float64")) {
             assert(false);
             return Error {};
@@ -666,6 +667,7 @@ Result<Ok, Error> semantic::Context::analyze(ast::FunctionNode& node) {
 Result<Ok, Error> semantic::Context::analyze(ast::Type& type) {
     if (type == ast::Type("int64")) return Ok {};
     else if (type == ast::Type("int32")) return Ok {};
+    else if (type == ast::Type("int8")) return Ok {};
     else if (type == ast::Type("float64")) return Ok {};
     else if (type == ast::Type("bool")) return Ok {};
     else if (type == ast::Type("void")) return Ok {};
@@ -998,6 +1000,7 @@ Result<Ok, Error> semantic::Context::analyze(ast::IntegerNode& node) {
     }
     else if (node.type != ast::Type("int64")
     &&       node.type != ast::Type("int32")
+    &&       node.type != ast::Type("int8")
     &&       node.type != ast::Type("float64")) {
         this->errors.push_back(Error("Error: Type mismatch between type annotation and expression"));
         return Error {};
