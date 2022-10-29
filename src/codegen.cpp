@@ -89,6 +89,7 @@ namespace codegen {
         llvm::Value* codegen(ast::IfElseNode& node);
         llvm::Value* codegen(ast::WhileNode& node);
         llvm::Value* codegen(ast::UseNode& node) {return nullptr;}
+        std::vector<llvm::Value*> codegen_args(ast::FunctionNode* function, std::vector<ast::CallArgumentNode*> args);
         llvm::Value* codegen(ast::CallArgumentNode& node) {return nullptr;}
         llvm::Value* codegen(ast::CallNode& node);
         llvm::Value* codegen(ast::FloatNode& node);
@@ -291,40 +292,10 @@ namespace codegen {
                     assert(function);
                     
                     // Codegen args
-                    std::vector<llvm::Value*> args;
-                    args.push_back(struct_allocation);
-                    for (size_t i = 0; i < call.args.size(); i++) {
-                        if (this->has_struct_type(call.args[i]->expression)) {
-                            // Create allocation
-                            llvm::StructType* struct_type = this->get_struct_type(this->get_type(call.args[i]->expression).type_definition);
-                            llvm::AllocaInst* allocation = this->create_allocation(call.function->args[i]->value, struct_type);
-
-                            // Store fields
-                            this->store_fields(call.args[i]->expression, allocation);
-
-                            auto new_args = this->get_struct_type_as_argument(struct_type);
-                            if (new_args.types.size() > 1) {
-                                for (size_t j = 0; j < new_args.types.size(); j++) {
-                                    llvm::Value* field_ptr = this->builder->CreateStructGEP(
-                                        new_args.struct_type,
-                                        this->builder->CreateBitCast(
-                                            allocation,
-                                            new_args.struct_type->getPointerTo()
-                                        ),
-                                        j
-                                    );
-                                    args.push_back(this->builder->CreateLoad(field_ptr));
-                                }
-                            }
-                            else {
-                                // Add to args
-                                args.push_back(allocation);
-                            }
-                        }
-                        else {
-                            args.push_back(this->codegen(call.args[i]->expression));
-                        }
-                    }
+                    std::vector<llvm::Value*> args = this->codegen_args(call.function, call.args);
+                    
+                    // Add return type as arg (because its a struct)
+                    args.insert(args.begin(), struct_allocation);
 
                     // Make call
                     this->builder->CreateCall(function, args, "calltmp");
@@ -660,7 +631,34 @@ void codegen::Context::codegen_function_prototypes(std::filesystem::path module_
 
     // Create function
     std::string name = this->get_mangled_function_name(module_path, identifier, args_types, return_type, is_extern);
-    llvm::Function::Create(function_type, llvm::Function::ExternalLinkage, name, this->module);
+    llvm::Function* f = llvm::Function::Create(function_type, llvm::Function::ExternalLinkage, name, this->module);
+
+     size_t offset = 0;
+    
+    if (this->is_struct_type(return_type)) {
+        f->getArg(0)->setName("$result");
+        offset += 1;
+    }
+
+    for (size_t i = 0; i < args_names.size(); i++) {
+        std::string name = args_names[i]->value;
+        if (this->is_struct_type(args_types[i])) {
+            auto struct_type = (llvm::StructType*) this->as_llvm_type(args_types[i]);
+            auto new_args = this->get_struct_type_as_argument(struct_type);
+
+            if (new_args.types.size() > 1) {
+                // Store values on struct
+                for (size_t j = 0; j < new_args.types.size(); j++) {
+                    f->getArg(i + offset + j)->setName(name);
+                }
+                offset += new_args.types.size() - 1;
+
+                continue;
+            }
+        }
+
+        f->getArg(i + offset)->setName(name);
+    }
 }
 
 void codegen::Context::codegen_function_bodies(std::vector<ast::FunctionNode*> functions) {
@@ -711,6 +709,7 @@ void codegen::Context::codegen_function_bodies(std::filesystem::path module_path
     this->add_scope();
 
     size_t offset = 0;
+    
     if (this->is_struct_type(return_type)) {
         // Create allocation for argument
         auto allocation = this->create_allocation("$result", f->getArg(0)->getType());
@@ -749,28 +748,19 @@ void codegen::Context::codegen_function_bodies(std::filesystem::path module_path
 
                 // Add struct to scope
                 this->current_scope()[name] = struct_allocation;
-            }
-            else {
-                // Create allocation for argument
-                auto allocation = this->create_allocation(name, f->getArg(i + offset)->getType());
 
-                // Store initial value
-                this->builder->CreateStore(f->getArg(i + offset), allocation);
-
-                // Add arguments to scope
-                this->current_scope()[name] = allocation;
+                continue;
             }
         }
-        else {
-            // Create allocation for argument
-            auto allocation = this->create_allocation(name, f->getArg(i + offset)->getType());
 
-            // Store initial value
-            this->builder->CreateStore(f->getArg(i + offset), allocation);
+        // Create allocation for argument
+        auto allocation = this->create_allocation(name, f->getArg(i + offset)->getType());
 
-            // Add arguments to scope
-            this->current_scope()[name] = allocation;
-        }
+        // Store initial value
+        this->builder->CreateStore(f->getArg(i + offset), allocation);
+
+        // Add arguments to scope
+        this->current_scope()[name] = allocation;
     }
 
     // Codegen body
@@ -787,11 +777,11 @@ void codegen::Context::codegen_function_bodies(std::filesystem::path module_path
         }
     }
 
-    // // Verify function
-    // llvm::verifyFunction(*f);
+    // Verify function
+    llvm::verifyFunction(*f);
 
-    // // Run optimizations
-    // this->function_pass_manager->run(*f);
+    // Run optimizations
+    this->function_pass_manager->run(*f);
 
     // Remove scope
     this->remove_scope();
@@ -1035,6 +1025,44 @@ llvm::Value* codegen::Context::codegen(ast::WhileNode& node) {
     return nullptr;
 }
 
+std::vector<llvm::Value*> codegen::Context::codegen_args(ast::FunctionNode* function, std::vector<ast::CallArgumentNode*> args) {
+    std::vector<llvm::Value*> result;
+    for (size_t i = 0; i < args.size(); i++) {
+        if (this->has_struct_type(args[i]->expression)) {
+            // Create allocation
+            llvm::StructType* struct_type = this->get_struct_type(this->get_type(args[i]->expression).type_definition);
+            llvm::AllocaInst* allocation = this->create_allocation(function->args[i]->value, struct_type);
+
+            // Store fields
+            this->store_fields(args[i]->expression, allocation);
+
+            auto new_args = this->get_struct_type_as_argument(struct_type);
+            if (new_args.types.size() > 1) {
+                for (size_t j = 0; j < new_args.types.size(); j++) {
+                    llvm::Value* field_ptr = this->builder->CreateStructGEP(
+                        new_args.struct_type,
+                        this->builder->CreateBitCast(
+                            allocation,
+                            new_args.struct_type->getPointerTo()
+                        ),
+                        j
+                    );
+                    result.push_back(this->builder->CreateLoad(field_ptr));
+                }
+            }
+            else {
+                // Add to args
+                result.push_back(allocation);
+            }
+        }
+        else {
+            result.push_back(this->codegen(args[i]->expression));
+        }
+    }
+
+    return result;
+}
+
 llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
     // If type is struct
     if (this->is_struct_type(node.type)) {
@@ -1050,40 +1078,9 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
     }
 
     // Codegen args
-    std::vector<llvm::Value*> args;
-    for (size_t i = 0; i < node.args.size(); i++) {
-        if (this->has_struct_type(node.args[i]->expression)) {
-            // Create allocation
-            llvm::StructType* struct_type = this->get_struct_type(this->get_type(node.args[i]->expression).type_definition);
-            llvm::AllocaInst* allocation = this->create_allocation(node.function->args[i]->value, struct_type);
-
-            // Store fields
-            this->store_fields(node.args[i]->expression, allocation);
-
-            auto new_args = this->get_struct_type_as_argument(struct_type);
-            if (new_args.types.size() > 1) {
-                for (size_t j = 0; j < new_args.types.size(); j++) {
-                    llvm::Value* field_ptr = this->builder->CreateStructGEP(
-                        new_args.struct_type,
-                        this->builder->CreateBitCast(
-                            allocation,
-                            new_args.struct_type->getPointerTo()
-                        ),
-                        j
-                    );
-                    args.push_back(this->builder->CreateLoad(field_ptr));
-                }
-            }
-            else {
-                // Add to args
-                args.push_back(allocation);
-            }
-        }
-        else {
-            args.push_back(this->codegen(node.args[i]->expression));
-        }
-    }
-
+    std::vector<llvm::Value*> args = this->codegen_args(node.function, node.args);
+  
+    // Intrinsics
     if (node.args.size() == 2) {
         if (node.identifier->value == "+") {
             if (args[0]->getType()->isDoubleTy() && args[1]->getType()->isDoubleTy()) {
