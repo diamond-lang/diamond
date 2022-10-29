@@ -99,7 +99,7 @@ namespace codegen {
         llvm::Value* codegen(ast::FieldAccessNode& node);
 
         std::string get_mangled_type_name(std::filesystem::path module, std::string identifier) {
-            return /*module.string() + "::" + */ identifier;
+            return module.string() + "::" + identifier;
         }
 
         std::string get_mangled_function_name(std::filesystem::path module, std::string identifier, std::vector<ast::Type> args, ast::Type return_type, bool is_extern) {
@@ -107,7 +107,7 @@ namespace codegen {
                 return identifier;
             }
 
-            std::string name = /*module.string() + "::" +*/ identifier;
+            std::string name = module.string() + "::" + identifier;
             for (size_t i = 0; i < args.size(); i++) {
                 name += "_" + args[i].to_str();
             }
