@@ -1089,13 +1089,7 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
             if (args[0]->getType()->isDoubleTy() && args[1]->getType()->isDoubleTy()) {
                 return this->builder->CreateFAdd(args[0], args[1], "addtmp");
             }
-            if (args[0]->getType()->isIntegerTy(64) && args[1]->getType()->isIntegerTy(64)) {
-                return this->builder->CreateAdd(args[0], args[1], "addtmp");
-            }
-            if (args[0]->getType()->isIntegerTy(32) && args[1]->getType()->isIntegerTy(32)) {
-                return this->builder->CreateAdd(args[0], args[1], "addtmp");
-            }
-            if (args[0]->getType()->isIntegerTy(8) && args[1]->getType()->isIntegerTy(8)) {
+            if (args[0]->getType()->isIntegerTy() && args[1]->getType()->isIntegerTy()) {
                 return this->builder->CreateAdd(args[0], args[1], "addtmp");
             }
         }
@@ -1103,13 +1097,7 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
             if (args[0]->getType()->isDoubleTy() && args[1]->getType()->isDoubleTy()) {
                 return this->builder->CreateFSub(args[0], args[1], "subtmp");
             }
-            if (args[0]->getType()->isIntegerTy(64) && args[1]->getType()->isIntegerTy(64)) {
-                return this->builder->CreateSub(args[0], args[1], "addtmp");
-            }
-            if (args[0]->getType()->isIntegerTy(32) && args[1]->getType()->isIntegerTy(32)) {
-                return this->builder->CreateSub(args[0], args[1], "addtmp");
-            }
-            if (args[0]->getType()->isIntegerTy(8) && args[1]->getType()->isIntegerTy(8)) {
+            if (args[0]->getType()->isIntegerTy() && args[1]->getType()->isIntegerTy()) {
                 return this->builder->CreateSub(args[0], args[1], "addtmp");
             }
         }
@@ -1117,13 +1105,7 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
             if (args[0]->getType()->isDoubleTy() && args[1]->getType()->isDoubleTy()) {
                 return this->builder->CreateFMul(args[0], args[1], "multmp");
             }
-            if (args[0]->getType()->isIntegerTy(64) && args[1]->getType()->isIntegerTy(64)) {
-                return this->builder->CreateMul(args[0], args[1], "addtmp");
-            }
-            if (args[0]->getType()->isIntegerTy(32) && args[1]->getType()->isIntegerTy(32)) {
-                return this->builder->CreateMul(args[0], args[1], "addtmp");
-            }
-            if (args[0]->getType()->isIntegerTy(8) && args[1]->getType()->isIntegerTy(8)) {
+            if (args[0]->getType()->isIntegerTy() && args[1]->getType()->isIntegerTy()) {
                 return this->builder->CreateMul(args[0], args[1], "addtmp");
             }
         }
@@ -1131,13 +1113,7 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
             if (args[0]->getType()->isDoubleTy() && args[1]->getType()->isDoubleTy()) {
                 return this->builder->CreateFDiv(args[0], args[1], "divtmp");
             }
-            if (args[0]->getType()->isIntegerTy(64) && args[1]->getType()->isIntegerTy(64)) {
-                return this->builder->CreateSDiv(args[0], args[1], "divtmp");
-            }
-            if (args[0]->getType()->isIntegerTy(32) && args[1]->getType()->isIntegerTy(32)) {
-                return this->builder->CreateSDiv(args[0], args[1], "divtmp");
-            }
-            if (args[0]->getType()->isIntegerTy(8) && args[1]->getType()->isIntegerTy(8)) {
+            if (args[0]->getType()->isIntegerTy() && args[1]->getType()->isIntegerTy()) {
                 return this->builder->CreateSDiv(args[0], args[1], "divtmp");
             }
         }
@@ -1148,13 +1124,7 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
             if (args[0]->getType()->isDoubleTy() && args[1]->getType()->isDoubleTy()) {
                 return this->builder->CreateFCmpULT(args[0], args[1], "cmptmp");
             }
-            if (args[0]->getType()->isIntegerTy(64) && args[1]->getType()->isIntegerTy(64)) {
-                return this->builder->CreateICmpULT(args[0], args[1], "addtmp");
-            }
-            if (args[0]->getType()->isIntegerTy(32) && args[1]->getType()->isIntegerTy(32)) {
-                return this->builder->CreateICmpULT(args[0], args[1], "addtmp");
-            }
-            if (args[0]->getType()->isIntegerTy(8) && args[1]->getType()->isIntegerTy(8)) {
+            if (args[0]->getType()->isIntegerTy() && args[1]->getType()->isIntegerTy()) {
                 return this->builder->CreateICmpULT(args[0], args[1], "addtmp");
             }
         }
@@ -1162,13 +1132,7 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
             if (args[0]->getType()->isDoubleTy() && args[1]->getType()->isDoubleTy()) {
                 return this->builder->CreateFCmpULE(args[0], args[1], "cmptmp");
             }
-            if (args[0]->getType()->isIntegerTy(64) && args[1]->getType()->isIntegerTy(64)) {
-                return this->builder->CreateICmpULE(args[0], args[1], "addtmp");
-            }
-            if (args[0]->getType()->isIntegerTy(32) && args[1]->getType()->isIntegerTy(32)) {
-                return this->builder->CreateICmpULE(args[0], args[1], "addtmp");
-            }
-            if (args[0]->getType()->isIntegerTy(8) && args[1]->getType()->isIntegerTy(8)) {
+            if (args[0]->getType()->isIntegerTy() && args[1]->getType()->isIntegerTy()) {
                 return this->builder->CreateICmpULE(args[0], args[1], "addtmp");
             }
         }
@@ -1176,13 +1140,7 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
             if (args[0]->getType()->isDoubleTy() && args[1]->getType()->isDoubleTy()) {
                 return this->builder->CreateFCmpUGT(args[0], args[1], "cmptmp");
             }
-            if (args[0]->getType()->isIntegerTy(64) && args[1]->getType()->isIntegerTy(64)) {
-                return this->builder->CreateICmpUGT(args[0], args[1], "addtmp");
-            }
-            if (args[0]->getType()->isIntegerTy(32) && args[1]->getType()->isIntegerTy(32)) {
-                return this->builder->CreateICmpUGT(args[0], args[1], "addtmp");
-            }
-            if (args[0]->getType()->isIntegerTy(8) && args[1]->getType()->isIntegerTy(8)) {
+            if (args[0]->getType()->isIntegerTy() && args[1]->getType()->isIntegerTy()) {
                 return this->builder->CreateICmpUGT(args[0], args[1], "addtmp");
             }
         }
@@ -1190,13 +1148,7 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
             if (args[0]->getType()->isDoubleTy() && args[1]->getType()->isDoubleTy()) {
                 return this->builder->CreateFCmpUGE(args[0], args[1], "cmptmp");
             }
-            if (args[0]->getType()->isIntegerTy(64) && args[1]->getType()->isIntegerTy(64)) {
-                return this->builder->CreateICmpUGE(args[0], args[1], "addtmp");
-            }
-            if (args[0]->getType()->isIntegerTy(32) && args[1]->getType()->isIntegerTy(32)) {
-                return this->builder->CreateICmpUGE(args[0], args[1], "addtmp");
-            }
-            if (args[0]->getType()->isIntegerTy(8) && args[1]->getType()->isIntegerTy(8)) {
+            if (args[0]->getType()->isIntegerTy() && args[1]->getType()->isIntegerTy()) {
                 return this->builder->CreateICmpUGE(args[0], args[1], "addtmp");
             }
         }
@@ -1204,16 +1156,7 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
             if (args[0]->getType()->isDoubleTy() && args[1]->getType()->isDoubleTy()) {
                 return this->builder->CreateFCmpUEQ(args[0], args[1], "eqtmp");
             }
-            if (args[0]->getType()->isIntegerTy(1) && args[1]->getType()->isIntegerTy(1)) {
-                return this->builder->CreateICmpEQ(args[0], args[1], "eqtmp");
-            }
-            if (args[0]->getType()->isIntegerTy(64) && args[1]->getType()->isIntegerTy(64)) {
-                return this->builder->CreateICmpEQ(args[0], args[1], "addtmp");
-            }
-            if (args[0]->getType()->isIntegerTy(32) && args[1]->getType()->isIntegerTy(32)) {
-                return this->builder->CreateICmpEQ(args[0], args[1], "addtmp");
-            }
-            if (args[0]->getType()->isIntegerTy(8) && args[1]->getType()->isIntegerTy(8)) {
+            if (args[0]->getType()->isIntegerTy() && args[1]->getType()->isIntegerTy()) {
                 return this->builder->CreateICmpEQ(args[0], args[1], "addtmp");
             }
         }
@@ -1229,13 +1172,7 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
             if (args[0]->getType()->isDoubleTy()) {
                 return this->builder->CreateFNeg(args[0], "negation");
             }
-            if (args[0]->getType()->isIntegerTy(64)) {
-                return this->builder->CreateNeg(args[0], "negation");
-            }
-            if (args[0]->getType()->isIntegerTy(32)) {
-                return this->builder->CreateNeg(args[0], "negation");
-            }
-            if (args[0]->getType()->isIntegerTy(8)) {
+            if (args[0]->getType()->isIntegerTy()) {
                 return this->builder->CreateNeg(args[0], "negation");
             }
         }
@@ -1244,34 +1181,6 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
         }
     }
     if (node.identifier->value == "print") {
-        if (args[0]->getType()->isDoubleTy()) {
-            std::vector<llvm::Value*> printArgs;
-            printArgs.push_back(this->get_global_string("%g\n"));
-            printArgs.push_back(args[0]);
-            this->builder->CreateCall(this->module->getFunction("printf"), printArgs);
-            return nullptr;
-        }
-        if (args[0]->getType()->isIntegerTy(64)) {
-            std::vector<llvm::Value*> printArgs;
-            printArgs.push_back(this->get_global_string("%d\n"));
-            printArgs.push_back(args[0]);
-            this->builder->CreateCall(this->module->getFunction("printf"), printArgs);
-            return nullptr;
-        }
-        if (args[0]->getType()->isIntegerTy(32)) {
-            std::vector<llvm::Value*> printArgs;
-            printArgs.push_back(this->get_global_string("%d\n"));
-            printArgs.push_back(args[0]);
-            this->builder->CreateCall(this->module->getFunction("printf"), printArgs);
-            return nullptr;
-        }
-        if (args[0]->getType()->isIntegerTy(8)) {
-            std::vector<llvm::Value*> printArgs;
-            printArgs.push_back(this->get_global_string("%d\n"));
-            printArgs.push_back(args[0]);
-            this->builder->CreateCall(this->module->getFunction("printf"), printArgs);
-            return nullptr;
-        }
         if (args[0]->getType()->isIntegerTy(1)) {
             std::vector<llvm::Value*> printArgs;
             llvm::Function *current_function = this->builder->GetInsertBlock()->getParent();
@@ -1300,6 +1209,20 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
             // Merge  block
             current_function->getBasicBlockList().push_back(merge);
             this->builder->SetInsertPoint(merge);
+            return nullptr;
+        }
+        if (args[0]->getType()->isDoubleTy()) {
+            std::vector<llvm::Value*> printArgs;
+            printArgs.push_back(this->get_global_string("%g\n"));
+            printArgs.push_back(args[0]);
+            this->builder->CreateCall(this->module->getFunction("printf"), printArgs);
+            return nullptr;
+        }
+        if (args[0]->getType()->isIntegerTy()) {
+            std::vector<llvm::Value*> printArgs;
+            printArgs.push_back(this->get_global_string("%d\n"));
+            printArgs.push_back(args[0]);
+            this->builder->CreateCall(this->module->getFunction("printf"), printArgs);
             return nullptr;
         }
         if (this->get_type(node.args[0]->expression) == ast::Type("string")) {
