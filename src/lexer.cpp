@@ -249,24 +249,25 @@ Result<token::Token, Error> lexer::get_identifier(Source& source) {
         advance(source);
     }
 
-    if (literal == "if")       return token::Token(token::If, "if", line, column);
-    if (literal == "else")     return token::Token(token::Else, "else", line, column);
-    if (literal == "while")    return token::Token(token::While, "while", line, column);
-    if (literal == "function") return token::Token(token::Function, "function", line, column);
-    if (literal == "type")     return token::Token(token::Type, "type", line, column);
-    if (literal == "be")       return token::Token(token::Be, "be", line, column);
-    if (literal == "nonlocal") return token::Token(token::NonLocal, "nonlocal", line, column);
-    if (literal == "true")     return token::Token(token::True, "true", line, column);
-    if (literal == "false")    return token::Token(token::False, "false", line, column);
-    if (literal == "and")      return token::Token(token::And, "and", line, column);
-    if (literal == "or")       return token::Token(token::Or, "or", line, column);
-    if (literal == "use")      return token::Token(token::Use, "use", line, column);
-    if (literal == "include")  return token::Token(token::Include, "include", line, column);
-    if (literal == "break")    return token::Token(token::Break, "break", line, column);
-    if (literal == "continue") return token::Token(token::Continue, "continue", line, column);
-    if (literal == "return")   return token::Token(token::Return, "return", line, column);
-    if (literal == "not")      return token::Token(token::Not, "not", line, column);
-    if (literal == "extern")   return token::Token(token::Extern, "extern", line, column);
+    if (literal == "if")        return token::Token(token::If, "if", line, column);
+    if (literal == "else")      return token::Token(token::Else, "else", line, column);
+    if (literal == "while")     return token::Token(token::While, "while", line, column);
+    if (literal == "function")  return token::Token(token::Function, "function", line, column);
+    if (literal == "type")      return token::Token(token::Type, "type", line, column);
+    if (literal == "be")        return token::Token(token::Be, "be", line, column);
+    if (literal == "nonlocal")  return token::Token(token::NonLocal, "nonlocal", line, column);
+    if (literal == "true")      return token::Token(token::True, "true", line, column);
+    if (literal == "false")     return token::Token(token::False, "false", line, column);
+    if (literal == "and")       return token::Token(token::And, "and", line, column);
+    if (literal == "or")        return token::Token(token::Or, "or", line, column);
+    if (literal == "use")       return token::Token(token::Use, "use", line, column);
+    if (literal == "include")   return token::Token(token::Include, "include", line, column);
+    if (literal == "break")     return token::Token(token::Break, "break", line, column);
+    if (literal == "continue")  return token::Token(token::Continue, "continue", line, column);
+    if (literal == "return")    return token::Token(token::Return, "return", line, column);
+    if (literal == "not")       return token::Token(token::Not, "not", line, column);
+    if (literal == "extern")    return token::Token(token::Extern, "extern", line, column);
+    if (literal == "link_with") return token::Token(token::LinkWith, "link_with", line, column);
 
     return token::Token(token::Identifier, literal, line, column);
 }

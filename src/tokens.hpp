@@ -50,6 +50,7 @@ namespace token {
         Return,
         Include,
         Extern,
+        LinkWith,
         NewLine,
         EndOfFile
     };

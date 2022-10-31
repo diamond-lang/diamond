@@ -178,6 +178,10 @@ void token::print(std::vector<Token> token) {
                 std::cout << "token::Extern";
                 break;
             }
+            case LinkWith: {
+                std::cout << "token::LinkWith";
+                break;
+            }
             case NewLine: {
                 std::cout << "token::NewLine";
                 break;
