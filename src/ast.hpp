@@ -315,6 +315,7 @@ namespace ast {
         BlockNode* program;
         std::filesystem::path module_path;
         std::unordered_map<std::string, BlockNode*> modules;
+        std::vector<std::string> link_with;
 
         // Storage
         std::vector<Node*> nodes;

@@ -188,6 +188,10 @@ Result<ast::Node*, Error> Parser::parse_block() {
                     block.use_statements.push_back((ast::UseNode*) result.get_value());
                     break;
 
+                case ast::LinkWith:
+                    this->ast.link_with.push_back(std::get<ast::LinkWithNode>(*result.get_value()).directives->value);
+                    break;
+
                 default:
                     block.statements.push_back(result.get_value());
             }

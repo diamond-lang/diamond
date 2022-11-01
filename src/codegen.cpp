@@ -402,7 +402,7 @@ void codegen::print_llvm_ir(ast::Ast& ast, std::string program_name) {
 // Generate object code
 // --------------------
 static std::string get_object_file_name(std::string executable_name);
-static void link(std::string executable_name, std::string object_file_name);
+static void link(std::string executable_name, std::string object_file_name, std::vector<std::string> link_directives);
 
 void codegen::generate_object_code(ast::Ast& ast, std::string program_name) {
     codegen::Context llvm_ir(ast);
@@ -460,7 +460,7 @@ void codegen::generate_executable(ast::Ast& ast, std::string program_name) {
     codegen::generate_object_code(ast, program_name);
 
     // Link
-    link(utilities::get_executable_name(program_name), get_object_file_name(program_name));
+    link(utilities::get_executable_name(program_name), get_object_file_name(program_name), ast.link_with);
 
     // Remove generated object file
     remove(get_object_file_name(program_name).c_str());
@@ -471,7 +471,7 @@ void codegen::generate_executable(ast::Ast& ast, std::string program_name) {
         return executable_name + ".o";
     }
 
-    static void link(std::string executable_name, std::string object_file_name) {
+    static void link(std::string executable_name, std::string object_file_name, std::vector<std::string> link_directives) {
         std::string name = "-o" + executable_name;
         std::vector<const char*> args = {
             "lld",
@@ -483,8 +483,34 @@ void codegen::generate_executable(ast::Ast& ast, std::string program_name) {
             "-lc",
             "/usr/lib/x86_64-linux-gnu/crt1.o",
             "/usr/lib/x86_64-linux-gnu/crti.o",
-            "/usr/lib/x86_64-linux-gnu/crtn.o"
+            "/usr/lib/x86_64-linux-gnu/crtn.o",
         };
+
+        // Add linker directives
+        std::vector<std::string> flatened_link_directives;
+        if (link_directives.size() > 0) {
+            args.push_back("-L/lib");
+            args.push_back("-L/usr/lib");
+            args.push_back("-L/usr/local/lib");
+
+            for (auto& str: link_directives) {
+                size_t pos = 0;
+                while (pos < str.size()) {
+                    std::string arg = "";
+                    while (pos < str.size() && str[pos] == ' ') pos += 1;
+                    while (pos < str.size() && str[pos] != ' ') {
+                        arg.push_back(str[pos]);
+                        pos += 1;
+                    }
+                    flatened_link_directives.push_back(arg);
+                    pos += 1;
+                }
+            }
+
+            for (auto& arg: flatened_link_directives) {
+                args.push_back(arg.c_str());
+            }
+        }
 
         std::string output = "";
         std::string errors = "";
@@ -498,7 +524,7 @@ void codegen::generate_executable(ast::Ast& ast, std::string program_name) {
         return executable_name + ".obj";
     }
 
-    static void link(std::string executable_name, std::string object_file_name) {
+    static void link(std::string executable_name, std::string object_file_name, std::vector<std::string> link_directives) {
         std::string name = "-out:" + executable_name;
         std::vector<const char*> args = {
             "lld",
@@ -508,6 +534,10 @@ void codegen::generate_executable(ast::Ast& ast, std::string program_name) {
             "-nologo",
             name.c_str()
         };
+        
+        if (link_directives.size() > 0) {
+            assert(false);
+        }
 
         std::string output = "";
         std::string errors = "";

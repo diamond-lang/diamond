@@ -579,9 +579,7 @@ void ast::print(Node* node, PrintContext context) {
         }
 
         case LinkWith: {
-            auto& link_with_node = std::get<LinkWithNode>(*node);
-            put_indent_level(context.indent_level, context.last);
-            std::cout << "link_with" << " \"" << link_with_node.directives->value << "\"\n";
+            assert(false);
             break;
         }
 
