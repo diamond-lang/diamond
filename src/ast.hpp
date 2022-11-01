@@ -21,6 +21,7 @@ namespace ast {
     struct IfElseNode;
     struct WhileNode;
     struct UseNode;
+    struct LinkWithNode;
     struct CallArgumentNode;
     struct CallNode;
     struct FloatNode;
@@ -43,6 +44,7 @@ namespace ast {
         IfElse,
         While,
         Use,
+        LinkWith,
         CallArgument,
         Call,
         Float,
@@ -65,6 +67,7 @@ namespace ast {
         IfElseNode,
         WhileNode,
         UseNode,
+        LinkWithNode,
         CallArgumentNode,
         CallNode,
         FloatNode,
@@ -230,6 +233,14 @@ namespace ast {
 
         StringNode* path;
         bool include = false;
+    };
+
+    struct LinkWithNode {
+        size_t line;
+        size_t column;
+        Type type = Type("");
+
+        StringNode* directives;
     };
 
     struct CallArgumentNode {

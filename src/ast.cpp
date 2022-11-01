@@ -578,6 +578,13 @@ void ast::print(Node* node, PrintContext context) {
             break;
         }
 
+        case LinkWith: {
+            auto& link_with_node = std::get<LinkWithNode>(*node);
+            put_indent_level(context.indent_level, context.last);
+            std::cout << "link_with" << " \"" << link_with_node.directives->value << "\"\n";
+            break;
+        }
+
         case CallArgument: {
             auto& call_argument = std::get<CallArgumentNode>(*node);
             if (call_argument.identifier.has_value()) {

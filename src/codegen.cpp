@@ -89,6 +89,7 @@ namespace codegen {
         llvm::Value* codegen(ast::IfElseNode& node);
         llvm::Value* codegen(ast::WhileNode& node);
         llvm::Value* codegen(ast::UseNode& node) {return nullptr;}
+        llvm::Value* codegen(ast::LinkWithNode& node) {return nullptr;}
         std::vector<llvm::Value*> codegen_args(ast::FunctionNode* function, std::vector<ast::CallArgumentNode*> args);
         llvm::Value* codegen(ast::CallArgumentNode& node) {return nullptr;}
         llvm::Value* codegen(ast::CallNode& node);
