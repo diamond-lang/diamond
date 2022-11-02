@@ -694,7 +694,7 @@ void codegen::Context::codegen_function_prototypes(std::filesystem::path module_
 
 void codegen::Context::codegen_function_bodies(std::vector<ast::FunctionNode*> functions) {
     for (auto& function: functions) {
-        if (function->is_extern) return;
+        if (function->is_extern) continue;
 
         if (function->generic) {
             for (auto& specialization: function->specializations) {
