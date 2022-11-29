@@ -23,6 +23,7 @@ struct Parser {
     Result<ast::Node*, Error> parse_block();
     Result<ast::Node*, Error> parse_function();
     Result<ast::Node*, Error> parse_extern();
+    Result<ast::Node*, Error> parse_link_with();
     Result<ast::Node*, Error> parse_type();
     Result<ast::Node*, Error> parse_statement();
     Result<ast::Node*, Error> parse_block_or_statement();
@@ -187,6 +188,10 @@ Result<ast::Node*, Error> Parser::parse_block() {
                     block.use_statements.push_back((ast::UseNode*) result.get_value());
                     break;
 
+                case ast::LinkWith:
+                    this->ast.link_with.push_back(std::get<ast::LinkWithNode>(*result.get_value()).directives->value);
+                    break;
+
                 default:
                     block.statements.push_back(result.get_value());
             }
@@ -219,6 +224,7 @@ Result<ast::Node*, Error> Parser::parse_statement() {
     switch (this->current().variant) {
         case token::Function: return this->parse_function();
         case token::Extern:   return this->parse_extern();
+        case token::LinkWith: return this->parse_link_with();
         case token::Type:     return this->parse_type();
         case token::Return:   return this->parse_return_stmt();
         case token::If:       return this->parse_if_else();
@@ -423,6 +429,24 @@ Result<ast::Node*, Error> Parser::parse_extern() {
     function.return_type = ast::Type(type_identifier.get_value().get_literal());
 
     this->ast.push_back(function);
+    return this->ast.last_element();
+}
+
+Result<ast::Node*, Error> Parser::parse_link_with() {
+    // Create node
+    auto link_with = ast::LinkWithNode {this->current().line, this->current().column};
+
+    // Parse keyword
+    auto keyword = this->parse_token(token::LinkWith);
+    if (keyword.is_error()) return Error {};
+
+    // Parse string
+    auto string = this->parse_string();
+    if (string.is_error()) return Error {};
+
+    link_with.directives = (ast::StringNode*) string.get_value();
+
+    this->ast.push_back(link_with);
     return this->ast.last_element();
 }
 

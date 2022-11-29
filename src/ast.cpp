@@ -578,6 +578,11 @@ void ast::print(Node* node, PrintContext context) {
             break;
         }
 
+        case LinkWith: {
+            assert(false);
+            break;
+        }
+
         case CallArgument: {
             auto& call_argument = std::get<CallArgumentNode>(*node);
             if (call_argument.identifier.has_value()) {

@@ -21,6 +21,7 @@ namespace ast {
     struct IfElseNode;
     struct WhileNode;
     struct UseNode;
+    struct LinkWithNode;
     struct CallArgumentNode;
     struct CallNode;
     struct FloatNode;
@@ -43,6 +44,7 @@ namespace ast {
         IfElse,
         While,
         Use,
+        LinkWith,
         CallArgument,
         Call,
         Float,
@@ -65,6 +67,7 @@ namespace ast {
         IfElseNode,
         WhileNode,
         UseNode,
+        LinkWithNode,
         CallArgumentNode,
         CallNode,
         FloatNode,
@@ -232,6 +235,14 @@ namespace ast {
         bool include = false;
     };
 
+    struct LinkWithNode {
+        size_t line;
+        size_t column;
+        Type type = Type("");
+
+        StringNode* directives;
+    };
+
     struct CallArgumentNode {
         size_t line;
         size_t column;
@@ -304,6 +315,7 @@ namespace ast {
         BlockNode* program;
         std::filesystem::path module_path;
         std::unordered_map<std::string, BlockNode*> modules;
+        std::vector<std::string> link_with;
 
         // Storage
         std::vector<Node*> nodes;
