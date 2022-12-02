@@ -467,27 +467,30 @@ void codegen::generate_executable(ast::Ast& ast, std::string program_name) {
 }
 
 #ifdef __linux__
+    #include <iostream>
+    #include <filesystem>
+
     static std::string get_object_file_name(std::string executable_name) {
         return executable_name + ".o";
     }
 
+    static std::string get_folder_of_executable() {
+        return std::filesystem::canonical("/proc/self/exe").parent_path().string();
+    }
+
     static void link(std::string executable_name, std::string object_file_name, std::vector<std::string> link_directives) {
         std::string name = "-o" + executable_name;
-        std::vector<const char*> args = {
+        std::vector<std::string> args = {
             "lld",
-            object_file_name.c_str(),
-            name.c_str(),
-            "-dynamic-linker",
-            "/lib64/ld-linux-x86-64.so.2",
-            "-L/usr/lib/x86_64-linux-gnu",
-            "-lc",
-            "/usr/lib/x86_64-linux-gnu/crt1.o",
-            "/usr/lib/x86_64-linux-gnu/crti.o",
-            "/usr/lib/x86_64-linux-gnu/crtn.o",
+            object_file_name,
+            name,
+            get_folder_of_executable() + "/deps/musl/libc.a",
+            get_folder_of_executable() + "/deps/musl/crt1.o",
+            get_folder_of_executable() + "/deps/musl/crti.o",
+            get_folder_of_executable() + "/deps/musl/crtn.o"
         };
 
         // Add linker directives
-        std::vector<std::string> flatened_link_directives;
         if (link_directives.size() > 0) {
             args.push_back("-L/lib");
             args.push_back("-L/usr/lib");
@@ -502,13 +505,9 @@ void codegen::generate_executable(ast::Ast& ast, std::string program_name) {
                         arg.push_back(str[pos]);
                         pos += 1;
                     }
-                    flatened_link_directives.push_back(arg);
+                    args.push_back(arg);
                     pos += 1;
                 }
-            }
-
-            for (auto& arg: flatened_link_directives) {
-                args.push_back(arg.c_str());
             }
         }
 
@@ -517,7 +516,12 @@ void codegen::generate_executable(ast::Ast& ast, std::string program_name) {
         llvm::raw_string_ostream output_stream(output);
         llvm::raw_string_ostream errors_stream(errors);
 
-        bool result = lld::elf::link(args, false, output_stream, errors_stream);
+
+        std::vector<const char*> args_as_c_strings;
+        for (auto& arg: args) {
+            args_as_c_strings.push_back(arg.c_str());
+        }
+        bool result = lld::elf::link(args_as_c_strings, false, output_stream, errors_stream);
     }
 #elif _WIN32
     static std::string get_object_file_name(std::string executable_name) {

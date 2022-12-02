@@ -20,6 +20,7 @@ diamond emit [options] [program file]
         --ast-with-types
         --ast-with-concrete-types
         --llvm-ir
+        --obj
 ```
 
 ## Dependencies
@@ -30,14 +31,11 @@ diamond uses the following dependencies:
 - Python 3 (for build.py and test.py)
 - clang (for compiling)
 
-The only dependency that must be installed on Ubuntu is clang. This can be achieved with the following command:
-```
-sudo apt-get install clang
-```
+The only dependencies that must be installed on Linux are Clang and Python. And generally Python is already installe. Also nomrally Clang can be installed from the package repositories from your distro of choice.
 
 On the other hand, on Windows, you have to download and install [Build Tools fo Visual Studio 2022](https://visualstudio.microsoft.com/downloads/). On the installation you should mark "C++ Clang tools for Windows" under "Desktop Development with C++". And also you should install [Python 3](https://www.python.org/).
 
-## Building on Ubuntu
+## Building on Linux
 
 To get LLVM you can run `get_llvm.py`. This script download LLVM prebuilt binaries, extract them and save them in `deps` inside `llvm`.
 

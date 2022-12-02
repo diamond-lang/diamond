@@ -2,5 +2,5 @@ cache
 diamond
 diamond.exe
 .vscode
-deps
+deps/llvm
 bindings

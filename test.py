@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import os
 import re
-import platform
 import subprocess
 
 def test(file, expected):
