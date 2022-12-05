@@ -100,6 +100,7 @@ namespace semantic {
     void remove_scope(Context& context);
     std::unordered_map<std::string, Binding>& current_scope(Context& context);
     Binding* get_binding(Context& context, std::string identifier);
+    bool in_function(Context& context);
     void add_definitions_to_current_scope(Context& context, ast::BlockNode& block);
     void add_module_functions(Context& context, std::filesystem::path module_path, std::set<std::filesystem::path>& already_included_modules);
     std::vector<std::unordered_map<std::string, Binding>> get_definitions(Context& context);
@@ -442,6 +443,10 @@ semantic::Binding* semantic::get_binding(Context& context, std::string identifie
     return nullptr;
 }
 
+bool semantic::in_function(Context& context) {
+    return context.current_function.has_value();
+}
+
 void semantic::add_definitions_to_current_scope(Context& context, ast::BlockNode& block) {
     // Add functions from block to current scope
     for (auto& function: block.functions) {
@@ -648,16 +653,21 @@ Result<Ok, Error> semantic::analyze(semantic::Context& context, ast::BlockNode& 
     context.type_inference.current_type_variable_number = 1;
     for (size_t i = 0; i < context.type_inference.type_constraints.size(); i++) {
         std::vector<ast::Type> representatives;
+        std::vector<ast::Type> possible_types;
+        
         for (auto& type: context.type_inference.type_constraints[i].elements) {
             if (!type.is_type_variable()) {
                 representatives.push_back(type);
             }
+            else if (type.possible_type != "") {
+                possible_types.push_back(ast::Type(type.possible_type));
+            }
         }
 
-        if (representatives.size() == 0) {
+        if (representatives.size() == 0 && possible_types.size() == 0) {
             context.type_inference.labeled_type_constraints[semantic::new_final_type_variable(context)] = context.type_inference.type_constraints[i];
         }
-        else {
+        else if (representatives.size() > 0) {
             ast::Type representative = representatives[0];
             for (size_t i = 1; i < representatives.size(); i++) {
                 if (representative != representatives[i]) {
@@ -676,6 +686,36 @@ Result<Ok, Error> semantic::analyze(semantic::Context& context, ast::BlockNode& 
                 } 
             }
             context.type_inference.labeled_type_constraints[representative] = context.type_inference.type_constraints[i];
+        }
+        else if (possible_types.size() > 0) {
+            ast::Type possible_type = possible_types[0];
+            for (size_t i = 1; i < possible_types.size(); i++) {
+                if (possible_type != possible_types[i]) {
+                    if (possible_type == possible_types[i]) {
+                        continue;
+                    }
+                    else if (possible_type.is_integer() && possible_types[i].is_float()) {
+                        possible_type = possible_types[i];
+                    }
+                    else if (possible_type.is_float() && possible_types[i].is_integer()) {
+                        continue;
+                    }
+                    else {
+                        assert(false);
+                    }
+                } 
+            }
+            if (context.type_inference.labeled_type_constraints.find(possible_type) == context.type_inference.labeled_type_constraints.end()) {
+                context.type_inference.labeled_type_constraints[possible_type] = context.type_inference.type_constraints[i];
+            }
+            else {
+                for (auto& elem: context.type_inference.type_constraints[i].elements) {
+                    semantic::insert(context.type_inference.labeled_type_constraints[possible_type], elem);
+                }
+            }
+        }
+        else {
+            assert(false);
         }
     }
 
@@ -799,11 +839,39 @@ Result<Ok, Error> semantic::type_infer_and_analyze(Context& context, ast::TypeNo
 }
 
 Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, ast::AssignmentNode& node) {
+    // Type infer and analyze expression
     auto result = semantic::type_infer_and_analyze(context, node.expression);
     if (result.is_error()) return Error {};
 
+    // Get identifier
     std::string identifier = node.identifier->value;
-    semantic::current_scope(context)[identifier] = semantic::make_Binding(&node);
+
+    // nonlocal assignment
+    if (node.nonlocal) {
+        semantic::Binding* binding = semantic::get_binding(context, identifier);
+        if (!binding) {
+            context.errors.push_back(errors::undefined_variable(*node.identifier, context.current_module));
+            return Error {};
+        }
+        // if (semantic::get_binding_type(*binding) != ast::get_type(node.expression)) {
+        //     context.errors.push_back(std::string("Error: Incompatible type for variable"));
+        //     return Error {};
+        // }
+        *binding = semantic::make_Binding(&node);
+    }
+
+    // normal assignment
+    else {
+        if (semantic::current_scope(context).find(identifier) != semantic::current_scope(context).end()
+        && semantic::current_scope(context)[identifier].type == AssignmentBinding) {
+            auto assignment = get_assignment(semantic::current_scope(context)[identifier]);
+            if (!assignment->is_mutable) {
+                context.errors.push_back(errors::reassigning_immutable_variable(*node.identifier, *assignment, context.current_module));
+                return Error {};
+            }
+        }
+        semantic::current_scope(context)[identifier] = semantic::make_Binding(&node);
+    }
 
     return Ok {};
 }
@@ -904,21 +972,33 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
     return Ok {};
 }
 
-Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, ast::IntegerNode& node) {
-    node.type = semantic::new_type_variable(context);
-    
-    if (!context.current_function.has_value()) {
-        semantic::add_constraint(context, semantic::make_Set<ast::Type>({node.type, ast::Type("int64")}));
+Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, ast::IntegerNode& node) {    
+    if (node.type == ast::Type("")) {
+        node.type = semantic::new_type_variable(context);
+
+        if (!semantic::in_function(context)) {
+            node.type.possible_type = "int64";
+        }
     }
-    
+    else if (!node.type.is_integer() && !node.type.is_float()) {
+        context.errors.push_back(Error("Error: Type mismatch between type annotation and expression"));
+        return Error {};
+    }
+
     return Ok {};
 }
 
 Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, ast::FloatNode& node) {
-    node.type = semantic::new_type_variable(context);
-    
-    if (!context.current_function.has_value()) {
-        semantic::add_constraint(context, semantic::make_Set<ast::Type>({node.type, ast::Type("float64")}));
+    if (node.type == ast::Type("")) {
+        node.type = semantic::new_type_variable(context);
+
+        if (!semantic::in_function(context)) {
+            node.type.possible_type = "float64";
+        }
+    }
+    else if (!node.type.is_float()) {
+        context.errors.push_back(Error("Error: Type mismatch between type annotation and expression"));
+        return Error {};
     }
     
     return Ok {};

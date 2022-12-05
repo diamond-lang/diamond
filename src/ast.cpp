@@ -58,13 +58,15 @@ bool ast::Type::is_type_variable() const {
 bool ast::Type::is_integer() const {
     if (*this == ast::Type("int64"))      return true;
     else if (*this == ast::Type("int32")) return true;
+    else if (*this == ast::Type("int16")) return true;
+    else if (*this == ast::Type("int8")) return true;
     else                                  return false;
 }
 
 bool ast::Type::is_float() const {
     if (*this == ast::Type("float64"))      return true;
     else if (*this == ast::Type("float32")) return true;
-    else                                  return false;
+    else                                    return false;
 }
 
 // Add hash struct for ast::Type to be able to use ast::Type as keys of std::unordered_map
