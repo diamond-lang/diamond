@@ -91,6 +91,8 @@ namespace ast {
         bool operator!=(const Type &t) const;
         std::string to_str(std::string output = "") const;
         bool is_type_variable() const;
+        bool is_integer() const;
+        bool is_float() const;
     };
 
     Type get_type(Node* node);
