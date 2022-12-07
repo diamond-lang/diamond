@@ -853,10 +853,7 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
             context.errors.push_back(errors::undefined_variable(*node.identifier, context.current_module));
             return Error {};
         }
-        // if (semantic::get_binding_type(*binding) != ast::get_type(node.expression)) {
-        //     context.errors.push_back(std::string("Error: Incompatible type for variable"));
-        //     return Error {};
-        // }
+        semantic::add_constraint(context, semantic::make_Set<ast::Type>({semantic::get_binding_type(*binding), ast::get_type(node.expression)}));
         *binding = semantic::make_Binding(&node);
     }
 
