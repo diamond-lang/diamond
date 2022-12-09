@@ -113,6 +113,7 @@ namespace semantic {
     ast::Type new_final_type_variable(Context& context);
 
     // Semantic analysis
+    Result<Ok, Error> analyze_block_or_expression(Context& context, ast::Node* node);
     Result<Ok, Error> analyze(Context& context, ast::BlockNode& node);
     Result<Ok, Error> analyze(Context& context, ast::FunctionNode& node);
     Result<Ok, Error> analyze(Context& context, ast::Type& type);
@@ -642,13 +643,16 @@ Result<Ok, Errors> semantic::analyze(ast::Ast& ast) {
     else                           return Ok {};
 }
 
-Result<Ok, Error> semantic::analyze(semantic::Context& context, ast::BlockNode& node) {
+Result<Ok, Error> semantic::analyze_block_or_expression(semantic::Context& context, ast::Node* node) {
+    assert(node->index() == ast::Block || ast::is_expression(node));
+
     // Do type inference and semantic analysis
-    semantic::type_infer_and_analyze(context, node);
+    auto result = semantic::type_infer_and_analyze(context, node);
+    if (result.is_error()) return Error {};
 
     // Merge type constraints that share elements
     context.type_inference.type_constraints = semantic::merge_sets_with_shared_elements<ast::Type>(context.type_inference.type_constraints);
-
+    
     // Label type constraints
     context.type_inference.current_type_variable_number = 1;
     for (size_t i = 0; i < context.type_inference.type_constraints.size(); i++) {
@@ -720,13 +724,49 @@ Result<Ok, Error> semantic::analyze(semantic::Context& context, ast::BlockNode& 
     }
 
     // Unify
-    semantic::unify_types_and_type_check(context, node);
+    return semantic::unify_types_and_type_check(context, node);
+}
 
-    return Ok {};
+Result<Ok, Error> semantic::analyze(semantic::Context& context, ast::BlockNode& node) {
+    return semantic::analyze_block_or_expression(context, (ast::Node*) &node);
 }
 
 Result<Ok, Error> semantic::analyze(semantic::Context& context, ast::FunctionNode& node) {
-    semantic::type_infer_and_analyze(context, node);
+    if (node.is_extern) {
+        assert(false);
+    }
+    if (node.generic) {
+        assert(false);
+    }
+    else {
+        Context new_context;
+        new_context.ast = context.ast;
+        new_context.current_function = &node;
+
+        if (context.current_module == node.module_path) {
+            new_context.scopes = semantic::get_definitions(context);
+        }
+        else {
+            assert(false);
+        }
+
+        semantic::add_scope(new_context);
+        for (auto arg: node.args) {
+            auto identifier = arg;
+            auto result = semantic::analyze(new_context, identifier->type);
+            if (result.is_error()) return Error {};
+            semantic::current_scope(new_context)[identifier->value] = semantic::make_Binding((ast::Node*) arg);
+        }
+
+        auto result = semantic::analyze(new_context, node.return_type);
+        if (result.is_error()) return Error {};
+        
+        result = semantic::analyze_block_or_expression(new_context, node.body);
+        if (result.is_error()) {
+            context.errors.insert(context.errors.end(), new_context.errors.begin(), new_context.errors.end());
+            return Error {};
+        }
+    }
     return Ok {};
 }
 
