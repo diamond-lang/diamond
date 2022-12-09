@@ -100,7 +100,7 @@ namespace semantic {
     void remove_scope(Context& context);
     std::unordered_map<std::string, Binding>& current_scope(Context& context);
     Binding* get_binding(Context& context, std::string identifier);
-    bool in_function(Context& context);
+    bool in_generic_function(Context& context);
     void add_definitions_to_current_scope(Context& context, ast::BlockNode& block);
     void add_module_functions(Context& context, std::filesystem::path module_path, std::set<std::filesystem::path>& already_included_modules);
     std::vector<std::unordered_map<std::string, Binding>> get_definitions(Context& context);
@@ -444,8 +444,8 @@ semantic::Binding* semantic::get_binding(Context& context, std::string identifie
     return nullptr;
 }
 
-bool semantic::in_function(Context& context) {
-    return context.current_function.has_value();
+bool semantic::in_generic_function(Context& context) {
+    return context.current_function.has_value() && context.current_function.value()->generic;
 }
 
 void semantic::add_definitions_to_current_scope(Context& context, ast::BlockNode& block) {
@@ -652,7 +652,7 @@ Result<Ok, Error> semantic::analyze_block_or_expression(semantic::Context& conte
 
     // Merge type constraints that share elements
     context.type_inference.type_constraints = semantic::merge_sets_with_shared_elements<ast::Type>(context.type_inference.type_constraints);
-    
+
     // Label type constraints
     context.type_inference.current_type_variable_number = 1;
     for (size_t i = 0; i < context.type_inference.type_constraints.size(); i++) {
@@ -1013,7 +1013,7 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
     if (node.type == ast::Type("")) {
         node.type = semantic::new_type_variable(context);
 
-        if (!semantic::in_function(context)) {
+        if (!semantic::in_generic_function(context)) {
             node.type.possible_type = "int64";
         }
     }
@@ -1029,7 +1029,7 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
     if (node.type == ast::Type("")) {
         node.type = semantic::new_type_variable(context);
 
-        if (!semantic::in_function(context)) {
+        if (!semantic::in_generic_function(context)) {
             node.type.possible_type = "float64";
         }
     }
@@ -1141,7 +1141,9 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
 
                 // Add constraints found
                 for (auto it = sets.begin(); it != sets.end(); it++) {
-                    semantic::add_constraint(context, it->second);
+                    if (semantic::size(it->second) > 1) {
+                        semantic::add_constraint(context, it->second);
+                    }
                 }
 
                 // Check binding exists
