@@ -59,7 +59,7 @@ bool ast::Type::is_integer() const {
     if (*this == ast::Type("int64"))      return true;
     else if (*this == ast::Type("int32")) return true;
     else if (*this == ast::Type("int16")) return true;
-    else if (*this == ast::Type("int8")) return true;
+    else if (*this == ast::Type("int8"))  return true;
     else                                  return false;
 }
 

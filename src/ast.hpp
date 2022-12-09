@@ -82,7 +82,7 @@ namespace ast {
         std::string name;
         std::vector<Type> parameters;
         TypeNode* type_definition = nullptr;
-        std::string possible_type = "";
+        std::string domain = "";
 
         Type() : name("") {}
         Type(std::string name) : name(name) {}

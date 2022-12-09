@@ -613,7 +613,12 @@ ast::Type semantic::get_unified_type(Context& context, ast::Type type_var) {
     if (type_var.is_type_variable()) {
         for (auto it = context.type_inference.labeled_type_constraints.begin(); it != context.type_inference.labeled_type_constraints.end(); it++) {
             if (semantic::contains(it->second, type_var)) {
-                return ast::Type(it->first);
+                auto type = it->first;
+                if (type.is_type_variable()) {
+                    if (type.domain == "number") return ast::Type("int64");
+                    else if (type.domain == "float") type = ast::Type("float64");
+                }
+                return type;
             }
         }
 
@@ -657,70 +662,67 @@ Result<Ok, Error> semantic::analyze_block_or_expression(semantic::Context& conte
     context.type_inference.current_type_variable_number = 1;
     for (size_t i = 0; i < context.type_inference.type_constraints.size(); i++) {
         std::vector<ast::Type> representatives;
-        std::vector<ast::Type> possible_types;
         
         for (auto& type: context.type_inference.type_constraints[i].elements) {
             if (!type.is_type_variable()) {
                 representatives.push_back(type);
             }
-            else if (type.possible_type != "") {
-                possible_types.push_back(ast::Type(type.possible_type));
-            }
         }
 
-        if (representatives.size() == 0 && possible_types.size() == 0) {
+        if (representatives.size() == 0) {
             context.type_inference.labeled_type_constraints[semantic::new_final_type_variable(context)] = context.type_inference.type_constraints[i];
         }
-        else if (representatives.size() > 0) {
+        else {
             ast::Type representative = representatives[0];
             for (size_t i = 1; i < representatives.size(); i++) {
                 if (representative != representatives[i]) {
-                    if (representative == representatives[i]) {
-                        continue;
-                    }
-                    else if (representative.is_integer() && representatives[i].is_float()) {
-                        representative = representatives[i];
-                    }
-                    else if (representative.is_float() && representatives[i].is_integer()) {
-                        continue;
-                    }
-                    else {
-                        assert(false);
-                    }
+                    assert(false);
                 } 
             }
             context.type_inference.labeled_type_constraints[representative] = context.type_inference.type_constraints[i];
         }
-        else if (possible_types.size() > 0) {
-            ast::Type possible_type = possible_types[0];
-            for (size_t i = 1; i < possible_types.size(); i++) {
-                if (possible_type != possible_types[i]) {
-                    if (possible_type == possible_types[i]) {
-                        continue;
-                    }
-                    else if (possible_type.is_integer() && possible_types[i].is_float()) {
-                        possible_type = possible_types[i];
-                    }
-                    else if (possible_type.is_float() && possible_types[i].is_integer()) {
-                        continue;
-                    }
-                    else {
-                        assert(false);
-                    }
-                } 
-            }
-            if (context.type_inference.labeled_type_constraints.find(possible_type) == context.type_inference.labeled_type_constraints.end()) {
-                context.type_inference.labeled_type_constraints[possible_type] = context.type_inference.type_constraints[i];
-            }
-            else {
-                for (auto& elem: context.type_inference.type_constraints[i].elements) {
-                    semantic::insert(context.type_inference.labeled_type_constraints[possible_type], elem);
+    }
+
+    // Unify of domains of type variables
+    auto labeled_type_constraints = context.type_inference.labeled_type_constraints;
+    for (auto it = labeled_type_constraints.begin(); it != labeled_type_constraints.end(); it++) {
+        if (it->first.is_type_variable()) {
+            std::string domain = it->second.elements[0].domain;
+            for (size_t i = 0; i < it->second.elements.size(); i++) {
+                std::string current = it->second.elements[i].domain;
+                if (domain == current) {
+                    continue;
+                }
+                else if (domain == "") {
+                    domain = current;
+                }
+                else if (current == "") {
+                    continue;
+                }
+                else if (domain == "number" && current == "float") {
+                    domain = current;
+                }
+                else if (domain == "float" && current == "number") {
+                    continue;
+                }
+                else {
+                    std::cout << it->second.elements[i].to_str() << "\n";
+                    std::cout << domain << " : " << current << "\n";
+                    assert(false);
                 }
             }
-        }
-        else {
-            assert(false);
-        }
+
+            // Update domain of type variables
+            for (size_t i = 0; i < it->second.elements.size(); i++) {
+                it->second.elements[i].domain = domain;
+            }
+
+            // Update key
+            auto key = it->first;
+            key.domain = domain;
+            context.type_inference.labeled_type_constraints.erase(it->first);
+            context.type_inference.labeled_type_constraints[key] = it->second;
+        } 
     }
 
     // Unify
@@ -1012,10 +1014,8 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
 Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, ast::IntegerNode& node) {    
     if (node.type == ast::Type("")) {
         node.type = semantic::new_type_variable(context);
-
-        if (!semantic::in_generic_function(context)) {
-            node.type.possible_type = "int64";
-        }
+        node.type.domain = "number";
+        semantic::add_constraint(context, semantic::make_Set<ast::Type>({node.type}));
     }
     else if (!node.type.is_integer() && !node.type.is_float()) {
         context.errors.push_back(Error("Error: Type mismatch between type annotation and expression"));
@@ -1028,10 +1028,8 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
 Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, ast::FloatNode& node) {
     if (node.type == ast::Type("")) {
         node.type = semantic::new_type_variable(context);
-
-        if (!semantic::in_generic_function(context)) {
-            node.type.possible_type = "float64";
-        }
+        node.type.domain = "float";
+        semantic::add_constraint(context, semantic::make_Set<ast::Type>({node.type}));
     }
     else if (!node.type.is_float()) {
         context.errors.push_back(Error("Error: Type mismatch between type annotation and expression"));
