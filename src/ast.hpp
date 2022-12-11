@@ -100,6 +100,7 @@ namespace ast {
     Type get_concrete_type(Node* node, std::unordered_map<std::string, Type>& type_bindings);
     Type get_concrete_type(Type type_variable, std::unordered_map<std::string, Type>& type_bindings);
     void set_type(Node* node, Type type);
+    void set_types(std::vector<CallArgumentNode*> nodes, std::vector<Type> types);
     std::vector<Type> get_types(std::vector<Node*> nodes);
     std::vector<Type> get_types(std::vector<CallArgumentNode*> nodes);
     std::vector<Type> get_types(std::vector<FunctionArgumentNode*> nodes);

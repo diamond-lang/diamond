@@ -118,6 +118,13 @@ void ast::set_type(Node* node, Type type) {
     std::visit([type](auto& variant) {variant.type = type;}, *node);
 }
 
+void ast::set_types(std::vector<CallArgumentNode*> nodes, std::vector<Type> types) {
+    assert(nodes.size() == types.size());
+    for (size_t i = 0; i < nodes.size(); i++) {
+        ast::set_type(nodes[i]->expression, types[i]);
+    }
+}
+
 std::vector<ast::Type> ast::get_types(std::vector<Node*> nodes) {
     std::vector<Type> types;
     for (size_t i = 0; i < nodes.size(); i++) {
