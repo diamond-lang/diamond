@@ -947,6 +947,13 @@ Result<Ok, Error> semantic::analyze_block_or_expression(semantic::Context& conte
     auto result = semantic::type_infer_and_analyze(context, node);
     if (result.is_error()) return Error {};
 
+    // If we are in a function and the return type is not clear and the body of the function is an expression
+    if (context.current_function.has_value()
+    && context.current_function.value()->return_type.is_type_variable()
+    && node->index() != ast::Block) {
+        semantic::add_constraint(context, semantic::make_Set<ast::Type>({ast::get_type(node), context.current_function.value()->return_type}));
+    }
+
     // Merge type constraints that share elements
     context.type_inference.type_constraints = semantic::merge_sets_with_shared_elements<ast::Type>(context.type_inference.type_constraints);
 
