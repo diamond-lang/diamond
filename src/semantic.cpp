@@ -867,7 +867,53 @@ Result<Ok, Error> semantic::analyze(semantic::Context& context, ast::FunctionNod
         assert(false);
     }
     if (node.generic) {
-        assert(false);
+        Context new_context;
+        new_context.ast = context.ast;
+        new_context.current_function = &node;
+
+        if (context.current_module == node.module_path) {
+            new_context.scopes = semantic::get_definitions(context);
+        }
+        else {
+            assert(false);
+        }
+
+        semantic::add_scope(new_context);
+
+        // Assign a type variable to every argument and return type
+        for (auto arg: node.args) {
+            auto identifier = arg->value;
+            if (arg->type == ast::Type("")) {
+                arg->type = semantic::new_type_variable(new_context);
+                semantic::add_constraint(new_context, semantic::make_Set<ast::Type>({arg->type}));
+            }
+            else {
+                auto result = semantic::analyze(new_context, arg->type);
+                if (result.is_error()) return Error {};
+            }
+            semantic::current_scope(new_context)[identifier] = semantic::make_Binding((ast::Node*) arg);
+        }
+
+        if (node.return_type == ast::Type("")) {
+            node.return_type = semantic::new_type_variable(new_context);
+            semantic::add_constraint(new_context, semantic::make_Set<ast::Type>({node.return_type}));
+        }
+        else {
+            auto result = semantic::analyze(new_context, node.return_type);
+            if (result.is_error()) return Error {};
+        }
+
+        auto result = semantic::analyze_block_or_expression(new_context, node.body);
+        if (result.is_error()) {
+            context.errors.insert(context.errors.end(), new_context.errors.begin(), new_context.errors.end());
+            return Error {};
+        }
+
+        // Unify args and return type
+        for (size_t i = 0; i < node.args.size(); i++) {
+            node.args[i]->type = semantic::get_unified_type(new_context, node.args[i]->type);
+        }
+        node.return_type = semantic::get_unified_type(new_context, node.return_type);
     }
     else {
         Context new_context;
@@ -883,10 +929,10 @@ Result<Ok, Error> semantic::analyze(semantic::Context& context, ast::FunctionNod
 
         semantic::add_scope(new_context);
         for (auto arg: node.args) {
-            auto identifier = arg;
-            auto result = semantic::analyze(new_context, identifier->type);
+            auto identifier = arg->value;
+            auto result = semantic::analyze(new_context, arg->type);
             if (result.is_error()) return Error {};
-            semantic::current_scope(new_context)[identifier->value] = semantic::make_Binding((ast::Node*) arg);
+            semantic::current_scope(new_context)[identifier] = semantic::make_Binding((ast::Node*) arg);
         }
 
         auto result = semantic::analyze(new_context, node.return_type);
@@ -1325,13 +1371,6 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
             }
 
             assert(false);
-            // // Add function constraint
-            // if (node.type.is_type_variable() || semantic::has_type_variables(ast::get_types(node.args))) {
-            //     auto constraint = ast::FunctionPrototype{node.identifier->value, ast::get_types(node.args), node.type};
-            //     if (std::find(context.type_inference.function_constraints.begin(), context.type_inference.function_constraints.end(), constraint) == context.type_inference.function_constraints.end()) {
-            //         context.type_inference.function_constraints.push_back(constraint);
-            //     }
-            // }
         }
         else {
             assert(false);
@@ -1472,13 +1511,16 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::St
 Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::IntegerNode& node) {
     node.type = semantic::get_unified_type(context, node.type);
 
-    // // Add constraint
-    // if (node.type.is_type_variable()) {
-    //     auto constraint = ast::FunctionPrototype{"Number", std::vector{node.type}, ast::Type("")};
-    //     if (std::find(this->function_node->constraints.begin(), this->function_node->constraints.end(), constraint) == this->function_node->constraints.end()) {
-    //         this->function_node->constraints.push_back(constraint);
-    //     }
-    // }
+    // Add constraint
+    if (semantic::in_generic_function(context)) {
+        if (node.type.is_type_variable()) {
+            auto function = context.current_function.value();
+            auto constraint = ast::FunctionPrototype{"Number", std::vector{node.type}, ast::Type("")};
+            if (std::find(function->constraints.begin(), function->constraints.end(), constraint) == function->constraints.end()) {
+                function->constraints.push_back(constraint);
+            }
+        }
+    }
 
     return Ok {};
 }
@@ -1486,13 +1528,16 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::In
 Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::FloatNode& node) {
     node.type = semantic::get_unified_type(context, node.type);
 
-    // // Add constraint
-    // if (node.type.is_type_variable()) {
-    //     auto constraint = ast::FunctionPrototype{"Float", std::vector{node.type}, ast::Type("")};
-    //     if (std::find(this->function_node->constraints.begin(), this->function_node->constraints.end(), constraint) == this->function_node->constraints.end()) {
-    //         this->function_node->constraints.push_back(constraint);
-    //     }
-    // }
+    // Add constraint
+    if (semantic::in_generic_function(context)) {
+        if (node.type.is_type_variable()) {
+            auto function = context.current_function.value();
+            auto constraint = ast::FunctionPrototype{"Float", std::vector{node.type}, ast::Type("")};
+            if (std::find(function->constraints.begin(), function->constraints.end(), constraint) == function->constraints.end()) {
+                function->constraints.push_back(constraint);
+            }
+        }
+    }
 
     return Ok {};
 }
@@ -1504,13 +1549,16 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::Ca
 
     node.type = semantic::get_unified_type(context, node.type);
 
-    // // Add constraint
-    // if (node.type.is_type_variable() || has_type_variables(ast::get_types(node.args))) {
-    //     auto constraint = ast::FunctionPrototype{node.identifier->value, ast::get_types(node.args), node.type};
-    //     if (std::find(this->function_node->constraints.begin(), this->function_node->constraints.end(), constraint) == this->function_node->constraints.end()) {
-    //         this->function_node->constraints.push_back(constraint);
-    //     }
-    // }
+    // Add constraint
+    if (semantic::in_generic_function(context)) {
+        if (node.type.is_type_variable() || has_type_variables(ast::get_types(node.args))) {
+            auto function = context.current_function.value();
+            auto constraint = ast::FunctionPrototype{node.identifier->value, ast::get_types(node.args), node.type};
+            if (std::find(function->constraints.begin(), function->constraints.end(), constraint) == function->constraints.end()) {
+                function->constraints.push_back(constraint);
+            }
+        }
+    }
 
     return Ok {};
 }
@@ -1531,13 +1579,16 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::Fi
         // Get unified type
         node.fields_accessed[i]->type = semantic::get_unified_type(context, struct_type->fields[field]);
         
-        // // Add constraint
-        // if (node.fields_accessed[0]->type.is_type_variable() || node.fields_accessed[i]->type.is_type_variable()) {
-        //     auto constraint = ast::FunctionPrototype{"." + node.fields_accessed[i]->value, {node.fields_accessed[i - 1]->type}, node.fields_accessed[i]->type};
-        //     if (std::find(this->function_node->constraints.begin(), this->function_node->constraints.end(), constraint) == this->function_node->constraints.end()) {
-        //         this->function_node->constraints.push_back(constraint);
-        //     }
-        // }
+        // Add constraint
+        if (semantic::in_generic_function(context)) {
+            if (node.fields_accessed[0]->type.is_type_variable() || node.fields_accessed[i]->type.is_type_variable()) {
+                auto function = context.current_function.value();
+                auto constraint = ast::FunctionPrototype{"." + node.fields_accessed[i]->value, {node.fields_accessed[i - 1]->type}, node.fields_accessed[i]->type};
+                if (std::find(function->constraints.begin(), function->constraints.end(), constraint) == function->constraints.end()) {
+                    function->constraints.push_back(constraint);
+                }
+            }
+        }
         
         // Iterate
         if (i != node.fields_accessed.size() - 1) {
