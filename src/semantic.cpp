@@ -784,9 +784,9 @@ ast::Type semantic::get_unified_type(Context& context, ast::Type type_var) {
         for (auto it = context.type_inference.labeled_type_constraints.begin(); it != context.type_inference.labeled_type_constraints.end(); it++) {
             if (semantic::contains(it->second, type_var)) {
                 auto type = it->first;
-                if (type.is_type_variable()) {
-                    if (type.domain == "number") return ast::Type("int64");
-                    else if (type.domain == "float") type = ast::Type("float64");
+                if (type.is_type_variable() && !semantic::in_generic_function(context)) {
+                    if (type.domain == "Number") return ast::Type("int64");
+                    else if (type.domain == "Float") type = ast::Type("float64");
                 }
                 return type;
             }
@@ -813,6 +813,8 @@ bool semantic::has_type_variables(std::vector<ast::Type> types) {
 }
 
 Result<Ok, Error> semantic::check_function_constraint(semantic::Context& context, semantic::FunctionConstraint constraint) {
+    assert(!semantic::in_generic_function(context));
+    
     // Get unified and default types
     std::vector<ast::Type> args_types;
     std::vector<ast::Type> default_types;
@@ -839,13 +841,13 @@ Result<Ok, Error> semantic::check_function_constraint(semantic::Context& context
                 bool error = false;
                 for (size_t i = 0; i < function->args.size(); i++) {
                     if (args_types[i].is_type_variable()) {
-                        if (args_types[i].domain == "number" 
+                        if (args_types[i].domain == "Number" 
                         && !(ast::get_type((ast::Node*) function->args[i]).is_integer()
                         ||  ast::get_type((ast::Node*) function->args[i]).is_float())) {
                             error = true;
                             break;
                         }
-                        else if (args_types[i].domain == "float" 
+                        else if (args_types[i].domain == "Float" 
                         && !ast::get_type((ast::Node*) function->args[i]).is_float()) {
                             error = true;
                             break;
@@ -998,10 +1000,10 @@ Result<Ok, Error> semantic::analyze_block_or_expression(semantic::Context& conte
                 else if (current == "") {
                     continue;
                 }
-                else if (domain == "number" && current == "float") {
+                else if (domain == "Number" && current == "Float") {
                     domain = current;
                 }
-                else if (domain == "float" && current == "number") {
+                else if (domain == "Float" && current == "Number") {
                     continue;
                 }
                 else {
@@ -1025,8 +1027,10 @@ Result<Ok, Error> semantic::analyze_block_or_expression(semantic::Context& conte
     }
 
     // Check function constraints
-    for (auto constraint: context.type_inference.function_constraints) {
-        semantic::check_function_constraint(context, constraint);
+    if (!semantic::in_generic_function(context)) {
+        for (auto constraint: context.type_inference.function_constraints) {
+            semantic::check_function_constraint(context, constraint);
+        }
     }
 
     // Unify
@@ -1364,7 +1368,7 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
 Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, ast::IntegerNode& node) {    
     if (node.type == ast::Type("")) {
         node.type = semantic::new_type_variable(context);
-        node.type.domain = "number";
+        node.type.domain = "Number";
         semantic::add_constraint(context, semantic::make_Set<ast::Type>({node.type}));
     }
     else if (!node.type.is_integer() && !node.type.is_float()) {
@@ -1378,7 +1382,7 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
 Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, ast::FloatNode& node) {
     if (node.type == ast::Type("")) {
         node.type = semantic::new_type_variable(context);
-        node.type.domain = "float";
+        node.type.domain = "Float";
         semantic::add_constraint(context, semantic::make_Set<ast::Type>({node.type}));
     }
     else if (!node.type.is_float()) {
@@ -1692,7 +1696,7 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::In
     if (semantic::in_generic_function(context)) {
         if (node.type.is_type_variable()) {
             auto function = context.current_function.value();
-            auto constraint = ast::FunctionPrototype{"Number", std::vector{node.type}, ast::Type("")};
+            auto constraint = ast::FunctionPrototype{node.type.domain, std::vector{node.type}, ast::Type("")};
             if (std::find(function->constraints.begin(), function->constraints.end(), constraint) == function->constraints.end()) {
                 function->constraints.push_back(constraint);
             }
@@ -1709,7 +1713,7 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::Fl
     if (semantic::in_generic_function(context)) {
         if (node.type.is_type_variable()) {
             auto function = context.current_function.value();
-            auto constraint = ast::FunctionPrototype{"Float", std::vector{node.type}, ast::Type("")};
+            auto constraint = ast::FunctionPrototype{node.type.domain, std::vector{node.type}, ast::Type("")};
             if (std::find(function->constraints.begin(), function->constraints.end(), constraint) == function->constraints.end()) {
                 function->constraints.push_back(constraint);
             }
