@@ -107,7 +107,6 @@ namespace semantic {
     std::vector<std::unordered_map<std::string, Binding>> get_definitions(Context& context);
     Result<ast::Type, Error> get_type_of_generic_function(Context& context, std::vector<ast::Type> args, ast::FunctionNode* function, std::vector<ast::FunctionPrototype> call_stack = {});
     Result<Ok, Error> check_constraint_of_generic_function(Context& context, std::unordered_map<std::string, ast::Type>& type_bindings, ast::FunctionConstraint constraint, std::vector<ast::FunctionPrototype> call_stack = {});
-    // bool depends_on_binding_with_concrete_type(ast::Node* node);
     void add_constraint(Context& context, Set<ast::Type> constraint);
     ast::Type new_type_variable(Context& context);
     ast::Type get_unified_type(Context& context, ast::Type type_var);
@@ -1057,10 +1056,38 @@ Result<Ok, Error> semantic::analyze(semantic::Context& context, ast::FunctionNod
 }
 
 Result<Ok, Error> semantic::analyze(semantic::Context& context, ast::Type& type) {
-    return Ok {};
+    if (type.is_type_variable()) return Ok {};
+    else if (type == ast::Type("int64")) return Ok {};
+    else if (type == ast::Type("int32")) return Ok {};
+    else if (type == ast::Type("int8")) return Ok {};
+    else if (type == ast::Type("float64")) return Ok {};
+    else if (type == ast::Type("bool")) return Ok {};
+    else if (type == ast::Type("void")) return Ok {};
+    else if (type == ast::Type("string")) return Ok {};
+    else {
+        Binding* type_binding = semantic::get_binding(context, type.to_str());
+        if (!type_binding) {
+            context.errors.push_back(Error{"Errors: Undefined type"});
+            return Error {};
+        }
+        if (type_binding->type != semantic::TypeBinding) {
+            context.errors.push_back(Error{"Error: Binding is not a type\n"});
+            return Error {};
+        }
+
+        type.type_definition = semantic::get_type_definition(*type_binding);
+        return Ok {};
+    }
+    assert(false);
+    return Error {};
 }
 
 Result<Ok, Error> semantic::analyze(semantic::Context& context, ast::TypeNode& node) {
+    for (auto field: node.fields) {
+        auto result = semantic::analyze(context, field->type);
+        if (result.is_error()) return Error {};
+    }
+
     return Ok {};
 }
 
@@ -1168,6 +1195,13 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
     // Type infer and analyze expression
     auto result = semantic::type_infer_and_analyze(context, node.expression);
     if (result.is_error()) return Error {};
+
+    // Analyze type of expression
+    if (!ast::get_type(node.expression).is_type_variable()) {
+        auto type = ast::get_type(node.expression);
+        auto result = semantic::analyze(context, type);
+        ast::set_type(node.expression, type);
+    }
 
     // Get identifier
     std::string identifier = node.identifier->value;
