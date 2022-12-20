@@ -968,12 +968,12 @@ Result<Ok, Error> semantic::analyze(semantic::Context& context, ast::BlockNode& 
 }
 
 Result<Ok, Error> semantic::analyze(semantic::Context& context, ast::FunctionNode& node) {
-    if (node.return_type != ast::Type("")) return Ok {}; 
-
     if (node.is_extern) {
         assert(false);
     }
     if (node.generic) {
+        if (node.return_type != ast::Type("")) return Ok {};
+
         Context new_context;
         new_context.ast = context.ast;
         new_context.current_module = context.current_module;
@@ -1026,6 +1026,7 @@ Result<Ok, Error> semantic::analyze(semantic::Context& context, ast::FunctionNod
     else {
         Context new_context;
         new_context.ast = context.ast;
+        new_context.current_module = context.current_module;
         new_context.current_function = &node;
 
         if (context.current_module == node.module_path) {
@@ -1435,6 +1436,9 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
                 return Ok {};
             }
         }
+        else if (binding->type == semantic::OverloadedFunctionsBinding) {
+            // do nothing
+        }
         else if (binding->type == semantic::GenericFunctionBinding) {
             node.function = semantic::get_generic_function(*binding);
             if (node.function->return_type == ast::Type("")) {
@@ -1635,6 +1639,7 @@ Result<Ok, Error> semantic::check_calls(Context& context, ast::CallNode& node) {
         for (auto function: semantic::get_overloaded_functions(*binding)) {
             if (ast::get_types(function->args) == default_types) {
                 node.type = function->return_type;
+                node.function = function;
                 return Ok {};
             }
         }
@@ -1683,12 +1688,14 @@ Result<Ok, Error> semantic::check_calls(Context& context, ast::CallNode& node) {
             return Error {};
         }
 
+        node.type = functions_that_can_be_called[0]->return_type;
         node.function = functions_that_can_be_called[0];
         auto function = functions_that_can_be_called[0];
         for (size_t i = 0; i < function->args.size(); i++) {
             semantic::relabel(context, args_types[i], ast::get_type((ast::Node*) function->args[i]));
         }
         semantic::relabel(context, node.type, function->return_type);
+        return Ok {};
     }
     else if (binding->type == semantic::GenericFunctionBinding) {
         // Get return type and analyze body
