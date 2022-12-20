@@ -1384,7 +1384,7 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
         return Ok {};
     }
     else if (is_function(*binding)) {
-        // Assign a type variable to every argument and return type
+        // Analyze arguments
         for (size_t i = 0; i < node.args.size(); i++) {
             auto result = semantic::type_infer_and_analyze(context, node.args[i]->expression);
             if (result.is_error()) return Error {};
@@ -1604,6 +1604,12 @@ Result<Ok, Error> semantic::check_calls(Context& context, ast::CallArgumentNode&
 Result<Ok, Error> semantic::check_calls(Context& context, ast::CallNode& node) {
     assert(!semantic::in_generic_function(context));
 
+    // Check calls in arguments
+    for (size_t i = 0; i < node.args.size(); i++) {
+        auto result = semantic::check_calls(context, node.args[i]->expression);
+        if (result.is_error()) return Error {};
+    }
+
     // Check binding exists
     semantic::Binding* binding = semantic::get_binding(context, node.identifier->value);
     if (!binding) {
@@ -1692,6 +1698,7 @@ Result<Ok, Error> semantic::check_calls(Context& context, ast::CallNode& node) {
         else {
             assert(false);
         }
+        semantic::relabel(context, node.type, result.get_value());
     }
     return Ok {};
 }
