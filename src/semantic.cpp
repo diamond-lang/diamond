@@ -968,6 +968,8 @@ Result<Ok, Error> semantic::analyze(semantic::Context& context, ast::BlockNode& 
 }
 
 Result<Ok, Error> semantic::analyze(semantic::Context& context, ast::FunctionNode& node) {
+    if (node.return_type != ast::Type("")) return Ok {}; 
+
     if (node.is_extern) {
         assert(false);
     }
@@ -1298,7 +1300,7 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
         node.type.domain = "Number";
         semantic::add_constraint(context, semantic::make_Set<ast::Type>({node.type}));
     }
-    else if (!node.type.is_integer() && !node.type.is_float()) {
+    else if (!node.type.is_type_variable() && !node.type.is_integer() && !node.type.is_float()) {
         context.errors.push_back(Error("Error: Type mismatch between type annotation and expression"));
         return Error {};
     }
@@ -1312,7 +1314,7 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
         node.type.domain = "Float";
         semantic::add_constraint(context, semantic::make_Set<ast::Type>({node.type}));
     }
-    else if (!node.type.is_float()) {
+    else if (!node.type.is_type_variable() && !node.type.is_float()) {
         context.errors.push_back(Error("Error: Type mismatch between type annotation and expression"));
         return Error {};
     }
