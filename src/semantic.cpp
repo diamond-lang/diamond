@@ -830,6 +830,7 @@ Result<Ok, Error> semantic::check_function_constraint(semantic::Context& context
         // Try default arguments types
         for (auto function: semantic::get_overloaded_functions(constraint.binding)) {
             if (ast::get_types(function->args) == default_types) {
+                constraint.call->type = function->return_type;
                 return Ok {};
             }
         }
