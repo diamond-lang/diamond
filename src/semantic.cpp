@@ -1401,7 +1401,7 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
                 if (arg->identifier.value()->value == field) {
                     founded = true;
 
-                    auto result = semantic::type_infer_and_analyze(context, node.args[i]->expression);
+                    auto result = semantic::type_infer_and_analyze(context, arg->expression);
                     if (result.is_error()) return Error {};
 
                     if (struct_type->fields.find(field) == struct_type->fields.end()) {
@@ -1409,6 +1409,7 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
                     }
                     
                     semantic::add_constraint(context, make_Set<ast::Type>({struct_type->fields[field], ast::get_type(arg->expression)}));
+                    semantic::add_constraint(context, make_Set<ast::Type>({struct_type->fields[field], type_definition->fields[i]->type}));
                 }
             }
 
@@ -1672,6 +1673,10 @@ Result<Ok, Error> semantic::check_calls(Context& context, ast::CallNode& node) {
         // Try default arguments types
         for (auto function: semantic::get_overloaded_functions(*binding)) {
             if (ast::get_types(function->args) == default_types) {
+                for (size_t i = 0; i < function->args.size(); i++) {
+                    semantic::relabel(context, args_types[i], ast::get_type((ast::Node*) function->args[i]));
+                }
+                semantic::relabel(context, node.type, function->return_type);
                 node.type = function->return_type;
                 node.function = function;
                 return Ok {};
@@ -1722,13 +1727,13 @@ Result<Ok, Error> semantic::check_calls(Context& context, ast::CallNode& node) {
             return Error {};
         }
 
-        node.type = functions_that_can_be_called[0]->return_type;
-        node.function = functions_that_can_be_called[0];
         auto function = functions_that_can_be_called[0];
         for (size_t i = 0; i < function->args.size(); i++) {
             semantic::relabel(context, args_types[i], ast::get_type((ast::Node*) function->args[i]));
         }
         semantic::relabel(context, node.type, function->return_type);
+        node.type = functions_that_can_be_called[0]->return_type;
+        node.function = functions_that_can_be_called[0];
         return Ok {};
     }
     else if (binding->type == semantic::GenericFunctionBinding) {
