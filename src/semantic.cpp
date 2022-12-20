@@ -74,18 +74,11 @@ namespace semantic {
         std::unordered_map<std::string, ast::Type> fields;
     };
 
-    struct FunctionConstraint {
-        Binding binding;
-        ast::FunctionConstraint constraint; 
-        ast::CallNode* call = nullptr;   
-    };
-
     struct TypeInference {
         size_t current_type_variable_number = 1;
         std::vector<Set<ast::Type>> type_constraints;
         std::unordered_map<ast::Type, Set<ast::Type>> labeled_type_constraints;
         std::unordered_map<ast::Type, StructType> struct_types;
-        std::vector<semantic::FunctionConstraint> function_constraints;
     };
 
     void print(std::unordered_map<ast::Type, StructType> struct_types);
@@ -120,7 +113,6 @@ namespace semantic {
     ast::Type get_unified_type(Context& context, ast::Type type_var);
     ast::Type new_final_type_variable(Context& context);
     bool has_type_variables(std::vector<ast::Type> types);
-    Result<Ok, Error> check_function_constraint(Context& context, semantic::FunctionConstraint constraint);
     void relabel(Context& context, ast::Type type_variable, ast::Type new_type);
 
     // Semantic analysis
@@ -152,6 +144,29 @@ namespace semantic {
     Result<Ok, Error> type_infer_and_analyze(Context& context, ast::BooleanNode& node);
     Result<Ok, Error> type_infer_and_analyze(Context& context, ast::StringNode& node);
     Result<Ok, Error> type_infer_and_analyze(Context& context, ast::FieldAccessNode& node);
+
+    Result<Ok, Error> check_calls(Context& context, ast::Node* node);
+    Result<Ok, Error> check_calls(Context& context, ast::BlockNode& node);
+    Result<Ok, Error> check_calls(Context& context, ast::FunctionNode& node);
+    Result<Ok, Error> check_calls(Context& context, ast::Type& type);
+    Result<Ok, Error> check_calls(Context& context, ast::TypeNode& node); 
+    Result<Ok, Error> check_calls(Context& context, ast::AssignmentNode& node);
+    Result<Ok, Error> check_calls(Context& context, ast::FieldAssignmentNode& node);
+    Result<Ok, Error> check_calls(Context& context, ast::ReturnNode& node);
+    Result<Ok, Error> check_calls(Context& context, ast::BreakNode& node);
+    Result<Ok, Error> check_calls(Context& context, ast::ContinueNode& node);
+    Result<Ok, Error> check_calls(Context& context, ast::IfElseNode& node);
+    Result<Ok, Error> check_calls(Context& context, ast::WhileNode& node);
+    Result<Ok, Error> check_calls(Context& context, ast::UseNode& node);
+    Result<Ok, Error> check_calls(Context& context, ast::LinkWithNode& node);
+    Result<Ok, Error> check_calls(Context& context, ast::CallArgumentNode& node);
+    Result<Ok, Error> check_calls(Context& context, ast::CallNode& node);
+    Result<Ok, Error> check_calls(Context& context, ast::FloatNode& node);
+    Result<Ok, Error> check_calls(Context& context, ast::IntegerNode& node);
+    Result<Ok, Error> check_calls(Context& context, ast::IdentifierNode& node);
+    Result<Ok, Error> check_calls(Context& context, ast::BooleanNode& node);
+    Result<Ok, Error> check_calls(Context& context, ast::StringNode& node);
+    Result<Ok, Error> check_calls(Context& context, ast::FieldAccessNode& node);
 
     Result<Ok, Error> unify_types_and_type_check(Context& context, ast::Node* node);
     Result<Ok, Error> unify_types_and_type_check(Context& context, ast::BlockNode& node);
@@ -610,7 +625,7 @@ std::vector<std::unordered_map<std::string, semantic::Binding>> semantic::get_de
     return scopes;
 }
 
-Result<ast::Type, Error> semantic::get_type_of_generic_function(Context& context, std::vector<ast::Type> args, ast::FunctionNode* function, std::vector<ast::FunctionPrototype> call_stack) {
+Result<ast::Type, Error> semantic::get_type_of_generic_function(Context& context, std::vector<ast::Type> args, ast::FunctionNode* function, std::vector<ast::FunctionPrototype> call_stack) {    
     // Check specializations
     for (auto& specialization: function->specializations) {
         if (specialization.args == args) {
@@ -812,95 +827,6 @@ bool semantic::has_type_variables(std::vector<ast::Type> types) {
     return false;
 }
 
-Result<Ok, Error> semantic::check_function_constraint(semantic::Context& context, semantic::FunctionConstraint constraint) {
-    assert(!semantic::in_generic_function(context));
-    
-    // Get unified and default types
-    std::vector<ast::Type> args_types;
-    std::vector<ast::Type> default_types;
-    for (auto arg: constraint.constraint.args) {
-        args_types.push_back(arg);
-        auto unified_type = semantic::get_unified_type(context, arg);
-        assert(!unified_type.is_type_variable());
-        default_types.push_back(ast::Type(unified_type));
-    }
-
-    // If the function is concrete
-    if (constraint.binding.type == semantic::OverloadedFunctionsBinding) {
-        // Try default arguments types
-        for (auto function: semantic::get_overloaded_functions(constraint.binding)) {
-            if (ast::get_types(function->args) == default_types) {
-                constraint.call->type = function->return_type;
-                return Ok {};
-            }
-        }
-
-        // Try everything else
-        std::vector<ast::FunctionNode*> functions_that_can_be_called; 
-        for (auto function: semantic::get_overloaded_functions(constraint.binding)) {
-            if (function->args.size() == args_types.size()) {
-                bool error = false;
-                for (size_t i = 0; i < function->args.size(); i++) {
-                    if (args_types[i].is_type_variable()) {
-                        if (args_types[i].domain == "Number" 
-                        && !(ast::get_type((ast::Node*) function->args[i]).is_integer()
-                        ||  ast::get_type((ast::Node*) function->args[i]).is_float())) {
-                            error = true;
-                            break;
-                        }
-                        else if (args_types[i].domain == "Float" 
-                        && !ast::get_type((ast::Node*) function->args[i]).is_float()) {
-                            error = true;
-                            break;
-                        }
-                        else {
-                            continue;
-                        }
-                    }
-                    else if (ast::get_type((ast::Node*) function->args[i]) != args_types[i]) {
-                        error = true;
-                        break;
-                    }
-                }
-
-                if (!error) {
-                    functions_that_can_be_called.push_back(function);
-                }
-            }
-        }
-
-        if (functions_that_can_be_called.size() == 0) {
-            assert(constraint.call);
-            ast::set_types(constraint.call->args, default_types);
-            context.errors.push_back(errors::undefined_function(*constraint.call, context.current_module));
-            return Error {};
-        }
-        else if (functions_that_can_be_called.size() > 1) {
-            context.errors.push_back(Error{"Error: Is ambiguous what function to call"});
-            return Error {};
-        }
-
-        constraint.call->function = functions_that_can_be_called[0];
-        auto function = functions_that_can_be_called[0];
-        for (size_t i = 0; i < function->args.size(); i++) {
-            semantic::relabel(context, args_types[i], ast::get_type((ast::Node*) function->args[i]));
-        }
-        semantic::relabel(context, constraint.constraint.return_type, function->return_type);
-    }
-    else if (constraint.binding.type == semantic::GenericFunctionBinding) {
-        // Get return type and analyze body
-        Result<ast::Type, Error> result;
-        auto function = semantic::get_generic_function(constraint.binding);
-        if (context.current_module == function->module_path) {
-            result = semantic::get_type_of_generic_function(context, default_types, function);
-        }
-        else {
-            assert(false);
-        }
-    }
-    return Ok {};
-}
-
 void semantic::relabel(Context& context, ast::Type type_variable, ast::Type new_type) {
     auto& labeled = context.type_inference.labeled_type_constraints;
     
@@ -1027,11 +953,10 @@ Result<Ok, Error> semantic::analyze_block_or_expression(semantic::Context& conte
         } 
     }
 
-    // Check function constraints
+    // Check function calls
     if (!semantic::in_generic_function(context)) {
-        for (auto constraint: context.type_inference.function_constraints) {
-            semantic::check_function_constraint(context, constraint);
-        }
+        result = semantic::check_calls(context, node);
+        if (result.is_error()) return Error {};
     }
 
     // Unify
@@ -1049,6 +974,7 @@ Result<Ok, Error> semantic::analyze(semantic::Context& context, ast::FunctionNod
     if (node.generic) {
         Context new_context;
         new_context.ast = context.ast;
+        new_context.current_module = context.current_module;
         new_context.current_function = &node;
 
         if (context.current_module == node.module_path) {
@@ -1507,20 +1433,10 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
                 return Ok {};
             }
         }
-        else if (binding->type == semantic::OverloadedFunctionsBinding) {
-            // Add function constraint
-            if (node.type.is_type_variable() || semantic::has_type_variables(ast::get_types(node.args))) {
-                semantic::FunctionConstraint constraint = semantic::FunctionConstraint{*binding, ast::FunctionPrototype{node.identifier->value, ast::get_types(node.args), node.type}, &node};
-                context.type_inference.function_constraints.push_back(constraint);
-            }
-        }
         else if (binding->type == semantic::GenericFunctionBinding) {
             node.function = semantic::get_generic_function(*binding);
             if (node.function->return_type == ast::Type("")) {
-                semantic::Context new_context;
-                semantic::init_Context(new_context, context.ast);
-                new_context.scopes = semantic::get_definitions(context);
-                semantic::analyze(new_context, *node.function);
+                semantic::analyze(context, *node.function);
             }
 
             // Create prototype type vector
@@ -1549,10 +1465,6 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
             for (auto it = sets.begin(); it != sets.end(); it++) {
                 semantic::add_constraint(context, it->second);
             }
-
-            // Add function constraint
-            semantic::FunctionConstraint constraint = semantic::FunctionConstraint{*binding, ast::FunctionPrototype{node.identifier->value, ast::get_types(node.args), node.type}, &node};
-            context.type_inference.function_constraints.push_back(constraint);
         }
         else {
             assert(false);
@@ -1597,6 +1509,217 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
 
     return Ok {};
 }
+
+// Check calls
+Result<Ok, Error> semantic::check_calls(Context& context, ast::Node* node) {
+    return std::visit([&context, node](auto& variant) {return semantic::check_calls(context, variant);}, *node);
+}
+
+Result<Ok, Error> semantic::check_calls(Context& context, ast::BlockNode& node) {
+    semantic::add_scope(context);
+
+    // Add functions to the current scope
+    semantic::add_definitions_to_current_scope(context, node);
+
+    for (auto statement: node.statements) {
+        semantic::check_calls(context, statement);
+    }
+
+    semantic::remove_scope(context);
+
+    return Ok {};
+}
+
+Result<Ok, Error> semantic::check_calls(Context& context, ast::FunctionNode& node) {
+    return Ok {};
+}
+
+Result<Ok, Error> semantic::check_calls(Context& context, ast::Type& type) {
+    return Ok {};
+}
+
+Result<Ok, Error> semantic::check_calls(Context& context, ast::TypeNode& node) {
+    return Ok {};
+} 
+
+Result<Ok, Error> semantic::check_calls(Context& context, ast::AssignmentNode& node) {
+    // Type infer and analyze expression
+    auto result = semantic::check_calls(context, node.expression);
+    if (result.is_error()) return Error {};
+
+    // Get identifier
+    std::string identifier = node.identifier->value;
+
+    // nonlocal assignment
+    if (node.nonlocal) {
+        semantic::Binding* binding = semantic::get_binding(context, identifier);
+        assert(binding);
+        *binding = semantic::make_Binding(&node);
+    }
+
+    // normal assignment
+    else {
+        semantic::current_scope(context)[identifier] = semantic::make_Binding(&node);
+    }
+
+    return Ok {};
+}
+
+Result<Ok, Error> semantic::check_calls(Context& context, ast::FieldAssignmentNode& node) {
+    return Ok {};
+}
+
+Result<Ok, Error> semantic::check_calls(Context& context, ast::ReturnNode& node) {
+    return Ok {};
+}
+
+Result<Ok, Error> semantic::check_calls(Context& context, ast::BreakNode& node) {
+    return Ok {};
+}
+
+Result<Ok, Error> semantic::check_calls(Context& context, ast::ContinueNode& node) {
+    return Ok {};
+}
+
+Result<Ok, Error> semantic::check_calls(Context& context, ast::IfElseNode& node) {
+    return Ok {};
+}
+
+Result<Ok, Error> semantic::check_calls(Context& context, ast::WhileNode& node) {
+    return Ok {};
+}
+
+Result<Ok, Error> semantic::check_calls(Context& context, ast::UseNode& node) {
+    return Ok {};
+}
+
+Result<Ok, Error> semantic::check_calls(Context& context, ast::LinkWithNode& node) {
+    return Ok {};
+}
+
+Result<Ok, Error> semantic::check_calls(Context& context, ast::CallArgumentNode& node) {
+    return Ok {};
+}
+
+Result<Ok, Error> semantic::check_calls(Context& context, ast::CallNode& node) {
+    assert(!semantic::in_generic_function(context));
+
+    // Check binding exists
+    semantic::Binding* binding = semantic::get_binding(context, node.identifier->value);
+    if (!binding) {
+        context.errors.push_back(errors::undefined_function(node, context.current_module));
+        return Error {};
+    }
+    
+    // Get unified and default types
+    std::vector<ast::Type> args_types;
+    std::vector<ast::Type> default_types;
+    for (auto arg: ast::get_types(node.args)) {
+        args_types.push_back(arg);
+        auto unified_type = semantic::get_unified_type(context, arg);
+        assert(!unified_type.is_type_variable());
+        default_types.push_back(ast::Type(unified_type));
+    }
+
+    // If the function is concrete
+    if (binding->type == semantic::OverloadedFunctionsBinding) {
+        // Try default arguments types
+        for (auto function: semantic::get_overloaded_functions(*binding)) {
+            if (ast::get_types(function->args) == default_types) {
+                node.type = function->return_type;
+                return Ok {};
+            }
+        }
+
+        // Try everything else
+        std::vector<ast::FunctionNode*> functions_that_can_be_called; 
+        for (auto function: semantic::get_overloaded_functions(*binding)) {
+            if (function->args.size() == args_types.size()) {
+                bool error = false;
+                for (size_t i = 0; i < function->args.size(); i++) {
+                    if (args_types[i].is_type_variable()) {
+                        if (args_types[i].domain == "Number" 
+                        && !(ast::get_type((ast::Node*) function->args[i]).is_integer()
+                        ||  ast::get_type((ast::Node*) function->args[i]).is_float())) {
+                            error = true;
+                            break;
+                        }
+                        else if (args_types[i].domain == "Float" 
+                        && !ast::get_type((ast::Node*) function->args[i]).is_float()) {
+                            error = true;
+                            break;
+                        }
+                        else {
+                            continue;
+                        }
+                    }
+                    else if (ast::get_type((ast::Node*) function->args[i]) != args_types[i]) {
+                        error = true;
+                        break;
+                    }
+                }
+
+                if (!error) {
+                    functions_that_can_be_called.push_back(function);
+                }
+            }
+        }
+
+        if (functions_that_can_be_called.size() == 0) {
+            ast::set_types(node.args, default_types);
+            context.errors.push_back(errors::undefined_function(node, context.current_module));
+            return Error {};
+        }
+        else if (functions_that_can_be_called.size() > 1) {
+            context.errors.push_back(Error{"Error: Is ambiguous what function to call"});
+            return Error {};
+        }
+
+        node.function = functions_that_can_be_called[0];
+        auto function = functions_that_can_be_called[0];
+        for (size_t i = 0; i < function->args.size(); i++) {
+            semantic::relabel(context, args_types[i], ast::get_type((ast::Node*) function->args[i]));
+        }
+        semantic::relabel(context, node.type, function->return_type);
+    }
+    else if (binding->type == semantic::GenericFunctionBinding) {
+        // Get return type and analyze body
+        Result<ast::Type, Error> result;
+        auto function = semantic::get_generic_function(*binding);
+        if (context.current_module == function->module_path) {
+            result = semantic::get_type_of_generic_function(context, default_types, function);
+        }
+        else {
+            assert(false);
+        }
+    }
+    return Ok {};
+}
+
+Result<Ok, Error> semantic::check_calls(Context& context, ast::FloatNode& node) {
+    return Ok {};
+}
+
+Result<Ok, Error> semantic::check_calls(Context& context, ast::IntegerNode& node) {
+    return Ok {};
+}
+
+Result<Ok, Error> semantic::check_calls(Context& context, ast::IdentifierNode& node) {
+    return Ok {};
+}
+
+Result<Ok, Error> semantic::check_calls(Context& context, ast::BooleanNode& node) {
+    return Ok {};
+}
+
+Result<Ok, Error> semantic::check_calls(Context& context, ast::StringNode& node) {
+    return Ok {};
+}
+
+Result<Ok, Error> semantic::check_calls(Context& context, ast::FieldAccessNode& node) {
+    return Ok {};
+}
+
 
 // Unify types and type check
 // --------------------------
