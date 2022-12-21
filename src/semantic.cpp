@@ -1772,6 +1772,35 @@ Result<Ok, Error> semantic::check_calls(Context& context, ast::StringNode& node)
 }
 
 Result<Ok, Error> semantic::check_calls(Context& context, ast::FieldAccessNode& node) {
+    assert(node.fields_accessed.size() > 1);
+    semantic::StructType struct_type = context.type_inference.struct_types[node.fields_accessed[0]->type];
+    node.fields_accessed[0]->type = semantic::get_unified_type(context, node.fields_accessed[0]->type);
+    ast::TypeNode* type_definition = node.fields_accessed[0]->type.type_definition;
+
+    for (size_t i = 1; i < node.fields_accessed.size(); i++) {
+        // Set type of field
+        std::string field = node.fields_accessed[i]->value;
+        bool founded = false;
+        for (auto it: type_definition->fields) {
+            if (it->value == field) {
+                founded = true;
+                semantic::relabel(context, struct_type.fields[field], it->type);
+            }
+        }
+        assert(founded);
+
+        node.fields_accessed[i]->type = semantic::get_unified_type(context, struct_type.fields[field]);
+
+        // Iterate on struct_type
+        if (i != node.fields_accessed.size() - 1) {
+            struct_type = context.type_inference.struct_types[node.fields_accessed[i]->type];
+            type_definition = node.fields_accessed[i]->type.type_definition;
+        }
+    }
+
+    // Set overall node type
+    node.type = node.fields_accessed[node.fields_accessed.size() - 1]->type;
+
     return Ok {};
 }
 
@@ -1925,6 +1954,8 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::Ca
 
 Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::FieldAccessNode& node) {
     assert(node.fields_accessed.size() >= 2);
+
+    if (!node.type.is_type_variable()) return Ok {};
 
     // Get struct type
     semantic::StructType* struct_type = &context.type_inference.struct_types[node.fields_accessed[0]->type];
