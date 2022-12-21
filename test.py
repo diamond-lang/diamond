@@ -12,9 +12,9 @@ def test(file, expected):
     result = result.stdout
     result =  re.sub("\\x1b\\[.+?m", "", result) # Remove escape sequences for colored text
     if result == expected:
-        print('OK')
+        print('\u001b[32mOK\u001b[0m')
     else:
-        print('Failed')
+        print('\u001b[31mFailed\u001b[0m')
         quit()
 
 def get_all_files(folder):
