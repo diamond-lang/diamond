@@ -885,6 +885,18 @@ Result<Ok, Error> semantic::analyze_block_or_expression(semantic::Context& conte
     // Merge type constraints that share elements
     context.type_inference.type_constraints = semantic::merge_sets_with_shared_elements<ast::Type>(context.type_inference.type_constraints);
 
+    // If we are in a function check if return type is alone, if is alone it means the function is void
+    if (context.current_function.has_value()
+    && context.current_function.value()->return_type.is_type_variable()) {
+        for (size_t i = 0; i < context.type_inference.type_constraints.size(); i++) {
+            if (semantic::contains<ast::Type>(context.type_inference.type_constraints[i], context.current_function.value()->return_type)) {
+                if (semantic::size(context.type_inference.type_constraints[i]) == 1) {
+                    semantic::insert<ast::Type>(context.type_inference.type_constraints[i], ast::Type("void"));
+                }
+            }
+        }
+    }
+
     // Label type constraints
     context.type_inference.current_type_variable_number = 1;
     for (size_t i = 0; i < context.type_inference.type_constraints.size(); i++) {
@@ -906,7 +918,13 @@ Result<Ok, Error> semantic::analyze_block_or_expression(semantic::Context& conte
                     assert(false);
                 } 
             }
-            context.type_inference.labeled_type_constraints[representative] = context.type_inference.type_constraints[i];
+
+            if (context.type_inference.labeled_type_constraints.find(representative) == context.type_inference.labeled_type_constraints.end()) {
+                context.type_inference.labeled_type_constraints[representative] = context.type_inference.type_constraints[i];
+            }
+            else {
+                semantic::merge(context.type_inference.labeled_type_constraints[representative], context.type_inference.type_constraints[i]);
+            }
         }
     }
 
@@ -1746,7 +1764,11 @@ Result<Ok, Error> semantic::check_calls(Context& context, ast::CallNode& node) {
         else {
             assert(false);
         }
+
+        if (result.is_error()) return Error {};
+        
         semantic::relabel(context, node.type, result.get_value());
+        node.type = result.get_value();
     }
     return Ok {};
 }

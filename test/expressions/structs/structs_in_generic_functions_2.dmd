@@ -29,7 +29,7 @@ generic1(Rectangle(
 ))
 generic2()
 
----
+--- Output
 10
 10
 110
