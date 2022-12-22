@@ -412,6 +412,9 @@ void semantic::print(std::unordered_map<ast::Type, Set<ast::Type>> labeled_type_
 // Context
 // -------
 void semantic::init_Context(semantic::Context& context, ast::Ast* ast) {
+    context.current_module = ast->module_path;
+    context.ast = ast;
+
     // Add intrinsic functions
     semantic::add_scope(context);
 
@@ -861,7 +864,6 @@ Result<Ok, Errors> semantic::analyze(ast::Ast& ast) {
     semantic::Context context;
     init_Context(context, &ast);
 
-    context.current_module = ast.module_path;
     semantic::analyze(context, *ast.program);
 
     if (context.errors.size() > 0) return context.errors;
@@ -988,23 +990,24 @@ Result<Ok, Error> semantic::analyze(semantic::Context& context, ast::FunctionNod
     if (node.is_extern) {
         assert(false);
     }
+
+    if (node.generic && node.return_type != ast::Type("")) return Ok {};
+
+    Context new_context;
+    semantic::init_Context(new_context, context.ast);
+    new_context.current_function = &node;
+
+    if (context.current_module == node.module_path) {
+        new_context.scopes = semantic::get_definitions(context);
+    }
+    else {
+        new_context.current_module = node.module_path;
+        semantic::add_definitions_to_current_scope(new_context, *(context.ast->modules[node.module_path.string()]));
+    }
+
+    semantic::add_scope(new_context);
+
     if (node.generic) {
-        if (node.return_type != ast::Type("")) return Ok {};
-
-        Context new_context;
-        new_context.ast = context.ast;
-        new_context.current_module = context.current_module;
-        new_context.current_function = &node;
-
-        if (context.current_module == node.module_path) {
-            new_context.scopes = semantic::get_definitions(context);
-        }
-        else {
-            assert(false);
-        }
-
-        semantic::add_scope(new_context);
-
         // Assign a type variable to every argument and return type
         for (auto arg: node.args) {
             auto identifier = arg->value;
@@ -1041,19 +1044,6 @@ Result<Ok, Error> semantic::analyze(semantic::Context& context, ast::FunctionNod
         node.return_type = semantic::get_unified_type(new_context, node.return_type);
     }
     else {
-        Context new_context;
-        new_context.ast = context.ast;
-        new_context.current_module = context.current_module;
-        new_context.current_function = &node;
-
-        if (context.current_module == node.module_path) {
-            new_context.scopes = semantic::get_definitions(context);
-        }
-        else {
-            assert(false);
-        }
-
-        semantic::add_scope(new_context);
         for (auto arg: node.args) {
             auto identifier = arg->value;
             auto result = semantic::analyze(new_context, arg->type);
@@ -1762,7 +1752,11 @@ Result<Ok, Error> semantic::check_calls(Context& context, ast::CallNode& node) {
             result = semantic::get_type_of_generic_function(context, default_types, function);
         }
         else {
-            assert(false);
+            semantic::Context new_context;
+            semantic::init_Context(new_context, context.ast);
+            new_context.current_module = function->module_path;
+            semantic::add_definitions_to_current_scope(new_context, *(context.ast->modules[new_context.current_module.string()]));
+            result = semantic::get_type_of_generic_function(new_context, default_types, function);
         }
 
         if (result.is_error()) return Error {};
