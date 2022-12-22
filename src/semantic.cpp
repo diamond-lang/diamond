@@ -1828,8 +1828,25 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::No
 }
 
 Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::BlockNode& block) {
-    for (size_t i = 0; i < block.statements.size(); i++) {
-       semantic::unify_types_and_type_check(context, block.statements[i]);
+    for (auto statement: block.statements) {
+       auto result = semantic::unify_types_and_type_check(context, statement);
+
+        if (statement->index() == ast::Call) {
+            if (!semantic::in_generic_function(context)) {
+                if (result.is_ok() && ast::get_type(statement) != ast::Type("void")) {
+                    context.errors.push_back(errors::unhandled_return_value(std::get<ast::CallNode>(*statement), context.current_module)); // tested in test/errors/unhandled_return_value.dm
+                }
+            }
+            else {
+                if (ast::get_type(statement).is_type_variable()) {
+                    auto function = context.current_function.value();
+                    auto constraint = ast::FunctionPrototype{"void", std::vector{ast::get_type(statement)}, ast::Type("")};
+                    if (std::find(function->constraints.begin(), function->constraints.end(), constraint) == function->constraints.end()) {
+                        function->constraints.push_back(constraint);
+                    }
+                }
+            }
+        }
     }
 
     return Ok {};
