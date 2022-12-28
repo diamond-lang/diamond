@@ -756,13 +756,14 @@ Result<Ok, Error> semantic::check_constraint_of_generic_function(Context& contex
                     // If return type was not already included
                     if (type_bindings.find(type_variable.to_str()) == type_bindings.end()) {
                         type_bindings[type_variable.to_str()] = function->return_type;
-                        return Ok {};
                     }
                     // Else compare with previous type founded for her
                     else if (type_bindings[type_variable.to_str()] != function->return_type) {
                         context.errors.push_back(Error{"Error: Incompatible types in function constraints"});
                         return Error {};
                     }
+
+                    return Ok {};
                 }
             }
             assert(false);
