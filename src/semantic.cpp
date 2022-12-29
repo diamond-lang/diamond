@@ -680,10 +680,20 @@ Result<ast::Type, Error> semantic::get_type_of_generic_function(Context& context
         specialization.args.push_back(type);
     }
 
+    // Change context the function is in a different module
+    Context* current_context = &context;
+    Context new_context;
+    if (context.current_module != function->module_path) {
+        init_Context(new_context, context.ast);
+        new_context.current_module = function->module_path;
+        semantic::add_definitions_to_current_scope(new_context, *(context.ast->modules[function->module_path.string()]));
+        current_context = &new_context;
+    }
+
     // Check constraints
     call_stack.push_back(ast::FunctionPrototype{function->identifier->value, args, ast::Type("")});
     for (auto& constraint: function->constraints) {
-        semantic::check_constraint_of_generic_function(context, specialization.type_bindings, constraint, call_stack);
+        semantic::check_constraint_of_generic_function(*current_context, specialization.type_bindings, constraint, call_stack);
     }
 
     // Add return type to specialization
@@ -760,8 +770,8 @@ Result<Ok, Error> semantic::check_constraint_of_generic_function(Context& contex
     }
     else {
         semantic::Binding* binding = semantic::get_binding(context, constraint.identifier);
-        if (!binding || !is_function(*binding)) {
-            context.errors.push_back(Error{"Error: Undefined constraint. The function doesnt exists."});
+        if (!binding || !is_function(*binding)) {;
+            context.errors.push_back(Error{"Error: Undefined constraint. The function doesn't exists."});
             return Error {};
         }
         else if (binding->type == semantic::OverloadedFunctionsBinding) {
