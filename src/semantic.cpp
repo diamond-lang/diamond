@@ -1859,6 +1859,9 @@ void semantic::make_concrete(Context& context, ast::IfElseNode& node) {
     if (node.else_branch.has_value()) {
         semantic::make_concrete(context, node.else_branch.value());
     }
+    if (node.type.is_type_variable()) {
+        node.type = context.type_inference.type_bindings[node.type.to_str()];
+    }
 }
 
 void semantic::make_concrete(Context& context, ast::WhileNode& node) {
