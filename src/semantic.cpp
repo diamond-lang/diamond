@@ -1479,7 +1479,9 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
             auto result = semantic::type_infer_and_analyze(context, node.args[i]->expression);
             if (result.is_error()) return Error {};
         }
-        node.type = semantic::new_type_variable(context);
+        if (node.type == ast::Type("")) {
+            node.type = semantic::new_type_variable(context);
+        }
 
         // Infer things based on interface if exists
         if (interfaces.find(identifier) != interfaces.end()) {
@@ -1610,6 +1612,11 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::No
 }
 
 Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::BlockNode& block) {
+    semantic::add_scope(context);
+
+    // Add functions and types to the current scope
+    semantic::add_definitions_to_current_scope(context, block);
+
     for (auto statement: block.statements) {
        auto result = semantic::unify_types_and_type_check(context, statement);
 
@@ -1623,6 +1630,8 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::Bl
         }
     }
 
+    semantic::remove_scope(context);
+
     return Ok {};
 }
 
@@ -1635,7 +1644,11 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::Ty
 }
 
 Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::AssignmentNode& node) {
-    semantic::unify_types_and_type_check(context, node.expression);
+    auto result = semantic::unify_types_and_type_check(context, node.expression);
+    if (result.is_error()) return Error {};
+
+    semantic::current_scope(context)[node.identifier->value] = semantic::make_Binding(&node);
+    
     return Ok {};
 }
 
@@ -1744,6 +1757,14 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::Ca
         auto constraint = ast::FunctionPrototype{node.identifier->value, ast::get_types(node.args), node.type};
         if (std::find(context.type_inference.function_constraints.begin(), context.type_inference.function_constraints.end(), constraint) == context.type_inference.function_constraints.end()) {
             context.type_inference.function_constraints.push_back(constraint);
+        }
+    }
+    else {
+        semantic::Binding* binding = semantic::get_binding(context, node.identifier->value);
+        assert(binding);
+        if (binding->type == semantic::GenericFunctionBinding) {
+            auto function = semantic::get_generic_function(*binding);
+            (void) semantic::get_type_of_generic_function(context, ast::get_types(node.args), function);
         }
     }
 

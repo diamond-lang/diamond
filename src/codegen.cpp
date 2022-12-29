@@ -668,7 +668,7 @@ void codegen::Context::codegen_function_prototypes(std::filesystem::path module_
     std::string name = this->get_mangled_function_name(module_path, identifier, args_types, return_type, is_extern);
     llvm::Function* f = llvm::Function::Create(function_type, llvm::Function::ExternalLinkage, name, this->module);
 
-     size_t offset = 0;
+    size_t offset = 0;
     
     if (this->is_struct_type(return_type)) {
         f->getArg(0)->setName("$result");
