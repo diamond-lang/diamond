@@ -120,7 +120,7 @@ namespace codegen {
             if      (type == ast::Type("float64")) return llvm::Type::getDoubleTy(*(this->context));
             else if (type == ast::Type("int64"))   return llvm::Type::getInt64Ty(*(this->context));
             else if (type == ast::Type("int32"))   return llvm::Type::getInt32Ty(*(this->context));
-            else if (type == ast::Type("int8"))   return llvm::Type::getInt8Ty(*(this->context));
+            else if (type == ast::Type("int8"))    return llvm::Type::getInt8Ty(*(this->context));
             else if (type == ast::Type("bool"))    return llvm::Type::getInt1Ty(*(this->context));
             else if (type == ast::Type("string"))  return llvm::Type::getInt8PtrTy(*(this->context));
             else if (type == ast::Type("void"))    return llvm::Type::getVoidTy(*(this->context));
@@ -1112,6 +1112,20 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
         return allocation;
     }
 
+    // Get function
+    ast::FunctionNode* function = nullptr;
+    if (node.function) {
+        function = node.function;
+    }
+    else if (node.functions.size() > 0) {
+        for (auto it: node.functions) {
+            if (this->get_types(node.args) == ast::get_types(it->args)) {
+                function = it;
+                break;
+            }
+        }
+    }
+
     // Codegen args
     std::vector<llvm::Value*> args = this->codegen_args(node.function, node.args);
   
@@ -1266,13 +1280,13 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
     }
 
     // Get function
-    assert(node.function);
-    std::string name = this->get_mangled_function_name(node.function->module_path, node.identifier->value, this->get_types(node.args), this->get_type((ast::Node*) &node), node.function->is_extern);
-    llvm::Function* function = this->module->getFunction(name);
     assert(function);
+    std::string name = this->get_mangled_function_name(function->module_path, node.identifier->value, this->get_types(node.args), this->get_type((ast::Node*) &node), function->is_extern);
+    llvm::Function* llvm_function = this->module->getFunction(name);
+    assert(llvm_function);
 
     // Make call
-    return this->builder->CreateCall(function, args, "calltmp");
+    return this->builder->CreateCall(llvm_function, args, "calltmp");
 }
 
 llvm::Value* codegen::Context::codegen(ast::FloatNode& node) {

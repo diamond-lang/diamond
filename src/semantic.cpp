@@ -87,6 +87,7 @@ namespace semantic {
     void print(Set<ast::Type> set);
     void print(std::vector<Set<ast::Type>> sets);
     void print(std::unordered_map<ast::Type, Set<ast::Type>> labeled_sets);
+    void print(ast::FunctionConstraints function_constraints);
 
     struct Context {
         ast::Ast* ast;
@@ -410,6 +411,22 @@ void semantic::print(std::unordered_map<ast::Type, Set<ast::Type>> labeled_type_
     }
 }
 
+void semantic::print(ast::FunctionConstraints function_constraints) {
+    std::cout << "constraints\n";
+    for (auto& constraint: function_constraints) {
+        std::cout << "    " << constraint.identifier << "(";
+        for (size_t i = 0; i < constraint.args.size(); i++) {
+            std::cout << constraint.args[i].to_str();
+            if (i != constraint.args.size() - 1) std::cout << ", ";
+        }
+        std::cout << ")";
+        if (constraint.return_type != ast::Type("")) {
+            std::cout << ": " << constraint.return_type.to_str();
+        }
+        std::cout << "\n";
+    }
+}
+
 // Context
 // -------
 void semantic::init_Context(semantic::Context& context, ast::Ast* ast) {
@@ -628,7 +645,7 @@ std::vector<std::unordered_map<std::string, semantic::Binding>> semantic::get_de
     return scopes;
 }
 
-Result<ast::Type, Error> semantic::get_type_of_generic_function(Context& context, std::vector<ast::Type> args, ast::FunctionNode* function, std::vector<ast::FunctionPrototype> call_stack) {    
+Result<ast::Type, Error> semantic::get_type_of_generic_function(Context& context, std::vector<ast::Type> args, ast::FunctionNode* function, std::vector<ast::FunctionPrototype> call_stack) {
     // Check specializations
     for (auto& specialization: function->specializations) {
         if (specialization.args == args) {
@@ -665,7 +682,7 @@ Result<ast::Type, Error> semantic::get_type_of_generic_function(Context& context
 
     // Check constraints
     call_stack.push_back(ast::FunctionPrototype{function->identifier->value, args, ast::Type("")});
-    for (auto& constraint: context.type_inference.function_constraints) {
+    for (auto& constraint: function->constraints) {
         semantic::check_constraint_of_generic_function(context, specialization.type_bindings, constraint, call_stack);
     }
 
@@ -684,7 +701,7 @@ Result<ast::Type, Error> semantic::get_type_of_generic_function(Context& context
 }
 
 Result<Ok, Error> semantic::check_constraint_of_generic_function(Context& context, std::unordered_map<std::string, ast::Type>& type_bindings, ast::FunctionConstraint constraint, std::vector<ast::FunctionPrototype> call_stack) {
-     if (constraint.identifier == "Number") {
+    if (constraint.identifier == "Number") {
         ast::Type type_variable = constraint.args[0];
 
         // If type variable was not already included
@@ -780,6 +797,18 @@ Result<Ok, Error> semantic::check_constraint_of_generic_function(Context& contex
             // Check constraints otherwise
             auto result = semantic::get_type_of_generic_function(context, ast::get_concrete_types(constraint.args, type_bindings), semantic::get_generic_function(*binding), call_stack);
             if (result.is_error()) return Error {};
+
+            ast::Type type_variable = constraint.return_type;
+
+            // If return type was not already included
+            if (type_bindings.find(type_variable.to_str()) == type_bindings.end()) {
+                type_bindings[type_variable.to_str()] = result.get_value();
+            }
+            // Else compare with previous type founded for her
+            else if (type_bindings[type_variable.to_str()] != result.get_value()) {
+                context.errors.push_back(Error{"Error: Incompatible types in function constraints"});
+                return Error {};
+            }
         }
         else {
             context.errors.push_back(Error{"Error: Undefined constraint. The function doesnt exists."});
@@ -1495,7 +1524,7 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
             }
         }
         else if (binding->type == semantic::OverloadedFunctionsBinding) {
-            // do nothing
+            node.functions = semantic::get_overloaded_functions(*binding);
         }
         else if (binding->type == semantic::GenericFunctionBinding) {
             node.function = semantic::get_generic_function(*binding);
