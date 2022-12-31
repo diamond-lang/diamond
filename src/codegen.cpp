@@ -1140,7 +1140,7 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
     }
 
     // Codegen args
-    std::vector<llvm::Value*> args = this->codegen_args(node.function, node.args);
+    std::vector<llvm::Value*> args = this->codegen_args(function, node.args);
   
     // Intrinsics
     if (node.args.size() == 2) {

@@ -753,8 +753,12 @@ Result<Ok, Error> semantic::check_constraint_of_generic_function(Context& contex
         return Ok {};
     }
     else if (constraint.identifier[0] == '.') {
-        std::string type_name = type_bindings[constraint.args[0].to_str()].to_str();
-        Binding* type_binding = semantic::get_binding(context, type_name);
+        ast::Type type = constraint.args[0];
+        if (type.is_type_variable()) {
+            assert(type_bindings.find(type.to_str()) != type_bindings.end());
+            type = type_bindings[type.to_str()];
+        }
+        Binding* type_binding = semantic::get_binding(context, type.to_str());
         if (!type_binding) {
             context.errors.push_back(Error{"Errors: Undefined type"});
             return Error {};
@@ -778,7 +782,8 @@ Result<Ok, Error> semantic::check_constraint_of_generic_function(Context& contex
     }
     else {
         semantic::Binding* binding = semantic::get_binding(context, constraint.identifier);
-        if (!binding || !is_function(*binding)) {;
+        if (!binding || !is_function(*binding)) {
+            std::cout << constraint.identifier << "\n";
             context.errors.push_back(Error{"Error: Undefined constraint. The function doesn't exists."});
             return Error {};
         }
@@ -1106,7 +1111,7 @@ Result<Ok, Error> semantic::analyze_block_or_expression(semantic::Context& conte
     // Unify
     result = semantic::unify_types_and_type_check(context, node);
     if(result.is_error()) return Error {};
-
+    
     // Handle function constraints
     if (semantic::in_generic_function(context)) {
         context.current_function.value()->constraints = context.type_inference.function_constraints;
@@ -1721,16 +1726,7 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::Bl
     semantic::add_definitions_to_current_scope(context, block);
 
     for (auto statement: block.statements) {
-       auto result = semantic::unify_types_and_type_check(context, statement);
-
-        if (statement->index() == ast::Call) {
-            if (ast::get_type(statement).is_type_variable()) {
-                auto constraint = ast::FunctionPrototype{"void", std::vector{ast::get_type(statement)}, ast::Type("")};
-                if (std::find(context.type_inference.function_constraints.begin(), context.type_inference.function_constraints.end(), constraint) == context.type_inference.function_constraints.end()) {
-                    context.type_inference.function_constraints.push_back(constraint);
-                }
-            }
-        }
+       (void) semantic::unify_types_and_type_check(context, statement);
     }
 
     semantic::remove_scope(context);
@@ -2022,7 +2018,7 @@ void semantic::make_concrete(Context& context, ast::StringNode& node) {
 
 void semantic::make_concrete(Context& context, ast::FieldAccessNode& node) {
     for (auto field: node.fields_accessed) {
-        if (node.type.is_type_variable()) {
+        if (field->type.is_type_variable()) {
             field->type = context.type_inference.type_bindings[field->type.to_str()];
         }
     }
