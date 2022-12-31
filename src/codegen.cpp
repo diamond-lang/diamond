@@ -287,19 +287,32 @@ namespace codegen {
                     }
                 }
                 else {
-                    assert(call.function);
-                    std::string name = this->get_mangled_function_name(call.function->module_path, call.identifier->value, this->get_types(call.args), this->get_type((ast::Node*) &call), call.function->is_extern);
-                    llvm::Function* function = this->module->getFunction(name);
+                    // Get function
+                    ast::FunctionNode* function = nullptr;
+                    if (call.function) {
+                        function = call.function;
+                    }
+                    else if (call.functions.size() > 0) {
+                        for (auto it: call.functions) {
+                            if (this->get_types(call.args) == ast::get_types(it->args)) {
+                                function = it;
+                                break;
+                            }
+                        }
+                    }
                     assert(function);
+                    std::string name = this->get_mangled_function_name(function->module_path, call.identifier->value, this->get_types(call.args), this->get_type((ast::Node*) &call), function->is_extern);
+                    llvm::Function* llvm_function = this->module->getFunction(name);
+                    assert(llvm_function);
                     
                     // Codegen args
-                    std::vector<llvm::Value*> args = this->codegen_args(call.function, call.args);
+                    std::vector<llvm::Value*> args = this->codegen_args(function, call.args);
                     
                     // Add return type as arg (because its a struct)
                     args.insert(args.begin(), struct_allocation);
 
                     // Make call
-                    this->builder->CreateCall(function, args, "calltmp");
+                    this->builder->CreateCall(llvm_function, args, "calltmp");
                 }
             }
             else if (expression->index() == ast::Identifier) {

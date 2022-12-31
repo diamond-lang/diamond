@@ -88,6 +88,7 @@ namespace semantic {
     void print(std::vector<Set<ast::Type>> sets);
     void print(std::unordered_map<ast::Type, Set<ast::Type>> labeled_sets);
     void print(ast::FunctionConstraints function_constraints);
+    void print(std::unordered_map<std::string, ast::Type> type_bindings);
 
     struct Context {
         ast::Ast* ast;
@@ -424,6 +425,13 @@ void semantic::print(ast::FunctionConstraints function_constraints) {
             std::cout << ": " << constraint.return_type.to_str();
         }
         std::cout << "\n";
+    }
+}
+
+void semantic::print(std::unordered_map<std::string, ast::Type> type_bindings) {
+    std::cout << "type bindings\n";
+    for (auto& type_binding: type_bindings) {
+        std::cout << "    " << type_binding.first << ": " << type_binding.second.to_str() << "\n";
     }
 }
 
@@ -774,13 +782,40 @@ Result<Ok, Error> semantic::check_constraint_of_generic_function(Context& contex
             context.errors.push_back(Error{"Error: Undefined constraint. The function doesn't exists."});
             return Error {};
         }
-        else if (binding->type == semantic::OverloadedFunctionsBinding) {
+
+        // Get unified and default types
+        std::vector<ast::Type> args_types;
+        std::vector<ast::Type> default_types;
+        for (auto arg: constraint.args) {
+            args_types.push_back(arg);
+            if (!arg.is_type_variable()) {
+                default_types.push_back(arg);
+            }
+            else if (type_bindings.find(arg.to_str()) != type_bindings.end()) {
+                default_types.push_back(type_bindings[arg.to_str()]);
+            }
+            else if (arg.domain == "Number") {
+                default_types.push_back(ast::Type("int64"));
+            }
+            else if (arg.domain == "Float") {
+                default_types.push_back(ast::Type("float64"));
+            }
+            else {
+                std::cout << arg.to_str() << "\n";
+                assert(false);
+            }
+        }
+        
+        if (binding->type == semantic::OverloadedFunctionsBinding) {
+            // Try default arguments types
             for (auto function: semantic::get_overloaded_functions(*binding)) {
-                // Check arguments types match
-                if (ast::get_types(function->args) == ast::get_concrete_types(constraint.args, type_bindings)) {
-                    ast::Type type_variable = constraint.return_type;
+                if (ast::get_types(function->args) == default_types) {
+                    for (size_t i = 0; i < function->args.size(); i++) {
+                        type_bindings[constraint.args[i].to_str()] = default_types[i];
+                    }
 
                     // If return type was not already included
+                    ast::Type type_variable = constraint.return_type;
                     if (type_bindings.find(type_variable.to_str()) == type_bindings.end()) {
                         type_bindings[type_variable.to_str()] = function->return_type;
                     }
@@ -789,12 +824,71 @@ Result<Ok, Error> semantic::check_constraint_of_generic_function(Context& contex
                         context.errors.push_back(Error{"Error: Incompatible types in function constraints"});
                         return Error {};
                     }
-
+                   
                     return Ok {};
                 }
             }
-            assert(false);
-            return Error {};
+
+            // Try everything else
+            std::vector<ast::FunctionNode*> functions_that_can_be_called; 
+            for (auto function: semantic::get_overloaded_functions(*binding)) {
+                if (function->args.size() == args_types.size()) {
+                    bool error = false;
+                    for (size_t i = 0; i < function->args.size(); i++) {
+                        if (args_types[i].is_type_variable()) {
+                            if (args_types[i].domain == "Number" 
+                            && !(ast::get_type((ast::Node*) function->args[i]).is_integer()
+                            ||  ast::get_type((ast::Node*) function->args[i]).is_float())) {
+                                error = true;
+                                break;
+                            }
+                            else if (args_types[i].domain == "Float" 
+                            && !ast::get_type((ast::Node*) function->args[i]).is_float()) {
+                                error = true;
+                                break;
+                            }
+                            else {
+                                continue;
+                            }
+                        }
+                        else if (ast::get_type((ast::Node*) function->args[i]) != args_types[i]) {
+                            error = true;
+                            break;
+                        }
+                    }
+
+                    if (!error) {
+                        functions_that_can_be_called.push_back(function);
+                    }
+                }
+            }
+
+            if (functions_that_can_be_called.size() == 0) {
+                assert(false);
+                return Error {};
+            }
+            else if (functions_that_can_be_called.size() > 1) {
+                context.errors.push_back(Error{"Error: Is ambiguous what function to call"});
+                return Error {};
+            }
+
+            auto function = functions_that_can_be_called[0];
+            for (size_t i = 0; i < function->args.size(); i++) {
+                type_bindings[constraint.args[i].to_str()] = function->args[i]->type;
+            }
+
+            // If return type was not already included
+            ast::Type type_variable = constraint.return_type;
+            if (type_bindings.find(type_variable.to_str()) == type_bindings.end()) {
+                type_bindings[type_variable.to_str()] = function->return_type;
+            }
+            // Else compare with previous type founded for her
+            else if (type_bindings[type_variable.to_str()] != function->return_type) {
+                context.errors.push_back(Error{"Error: Incompatible types in function constraints"});
+                return Error {};
+            }
+            
+            return Ok {};
         }
         else if (binding->type == semantic::GenericFunctionBinding) {
             // Check if constraints are already being checked
@@ -808,9 +902,8 @@ Result<Ok, Error> semantic::check_constraint_of_generic_function(Context& contex
             auto result = semantic::get_type_of_generic_function(context, ast::get_concrete_types(constraint.args, type_bindings), semantic::get_generic_function(*binding), call_stack);
             if (result.is_error()) return Error {};
 
-            ast::Type type_variable = constraint.return_type;
-
             // If return type was not already included
+            ast::Type type_variable = constraint.return_type;
             if (type_bindings.find(type_variable.to_str()) == type_bindings.end()) {
                 type_bindings[type_variable.to_str()] = result.get_value();
             }
@@ -1029,7 +1122,7 @@ Result<Ok, Error> semantic::analyze_block_or_expression(semantic::Context& conte
         for (auto& constraint: context.type_inference.function_constraints) {
             semantic::check_constraint_of_generic_function(context, context.type_inference.type_bindings, constraint);
         }
-        
+
         semantic::remove_scope(context);
         semantic::make_concrete(context, node);
         return Ok {};
@@ -1930,7 +2023,7 @@ void semantic::make_concrete(Context& context, ast::StringNode& node) {
 void semantic::make_concrete(Context& context, ast::FieldAccessNode& node) {
     for (auto field: node.fields_accessed) {
         if (node.type.is_type_variable()) {
-            field->type = context.type_inference.type_bindings[node.type.to_str()];
+            field->type = context.type_inference.type_bindings[field->type.to_str()];
         }
     }
 
