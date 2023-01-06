@@ -1935,7 +1935,7 @@ void semantic::make_concrete(Context& context, ast::AssignmentNode& node) {
 }
 
 void semantic::make_concrete(Context& context, ast::FieldAssignmentNode& node) {
-
+    semantic::make_concrete(context, node.expression);
 }
 
 void semantic::make_concrete(Context& context, ast::ReturnNode& node) {
