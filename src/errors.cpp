@@ -79,19 +79,10 @@ std::string errors::reassigning_immutable_variable(ast::IdentifierNode& identifi
            std::to_string(assignment.line) + "| " + current_line(assignment.line, file);
 }
 
-static std::string format_args(std::vector<ast::CallArgumentNode*> args) {
-    std::string result = "";
-    if (args.size() >= 1) result += ast::get_type(args[0]->expression).to_str();
-    for (size_t i = 1; i < args.size(); i++) {
-        result += ", " + ast::get_type(args[i]->expression).to_str();
-    }
-    return result;
-}
-
 std::string errors::undefined_function(ast::CallNode& call, std::filesystem::path file) {
     auto& identifier = call.identifier->value;
     return make_header("Undefined function\n\n") +
-           identifier + "(" + format_args(call.args) + ") is not defined.\n\n" +
+           identifier + " is not defined.\n\n" +
            std::to_string(call.line) + "| " + current_line(call.line, file) + "\n" +
            underline_identifier(*call.identifier, file);
 }
