@@ -116,7 +116,6 @@ namespace semantic {
     ast::Type get_unified_type(Context& context, ast::Type type_var);
     ast::Type new_final_type_variable(Context& context);
     bool has_type_variables(std::vector<ast::Type> types);
-    void relabel(Context& context, ast::Type type_variable, ast::Type new_type);
 
     // Semantic analysis
     Result<Ok, Error> analyze_block_or_expression(Context& context, ast::Node* node);
@@ -963,35 +962,6 @@ bool semantic::has_type_variables(std::vector<ast::Type> types) {
         if (type.is_type_variable()) return true;
     }
     return false;
-}
-
-void semantic::relabel(Context& context, ast::Type type_variable, ast::Type new_type) {
-    auto& labeled = context.type_inference.labeled_type_constraints;
-    
-    // Remove type variable from labeled type constraints
-    for (auto it = labeled.begin(); it != labeled.end();) {
-        if (semantic::contains(it->second, type_variable)) {
-            if (semantic::size(it->second) == 1) {
-                it = labeled.erase(it);
-            }
-            else {
-                auto& set = it->second.elements;
-                set.erase(std::find(set.begin(), set.end(), type_variable));
-                it++;
-            }
-        }
-        else {
-            it++;
-        }
-    }
-
-    // Re add type variable
-    if (labeled.find(new_type) == labeled.end()) {
-        labeled[new_type] = semantic::make_Set<ast::Type>({type_variable});
-    }
-    else {
-        semantic::insert(labeled[new_type], type_variable);
-    }
 }
 
 // Semantic analysis
