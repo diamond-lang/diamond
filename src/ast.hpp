@@ -137,7 +137,17 @@ namespace ast {
         bool operator!=(const FunctionPrototype &t) const;
     };
 
-    using FunctionConstraint = FunctionPrototype;
+    struct FunctionConstraint {
+        std::string identifier;
+        std::vector<Type> args;
+        Type return_type;
+        ast::CallNode* call = nullptr;
+
+        FunctionConstraint(std::string identifier, std::vector<Type> args, Type return_type, ast::CallNode* call) : identifier(identifier), args(args), return_type(return_type), call(call) {}
+        bool operator==(const FunctionConstraint &t) const;
+        bool operator!=(const FunctionConstraint &t) const;
+    };
+
     using FunctionConstraints = std::vector<FunctionConstraint>;
 
     struct FunctionNode {

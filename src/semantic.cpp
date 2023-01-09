@@ -751,6 +751,22 @@ Result<Ok, Error> semantic::check_constraint_of_generic_function(Context& contex
 
         return Ok {};
     }
+    else if (constraint.identifier == "void") {
+        ast::Type type_variable = constraint.args[0];
+
+        // If return type was not already included
+        if (type_bindings.find(type_variable.to_str()) == type_bindings.end()) {
+            type_bindings[type_variable.to_str()] = ast::Type("void");
+        }
+        // Else compare with previous type founded for her
+        else if (type_bindings[type_variable.to_str()] != ast::Type("void")) {
+            assert(constraint.call);
+            context.errors.push_back(errors::unhandled_return_value(*constraint.call, context.current_module));
+            return Error {};
+        }
+
+        return Ok {};
+    }
     else if (constraint.identifier[0] == '.') {
         ast::Type type = constraint.args[0];
         if (type.is_type_variable()) {
@@ -1690,17 +1706,37 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::No
 }
 
 Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::BlockNode& block) {
+    size_t errors = context.errors.size();
+
+    // Add scope
     semantic::add_scope(context);
 
     // Add functions and types to the current scope
     semantic::add_definitions_to_current_scope(context, block);
 
     for (auto statement: block.statements) {
-       (void) semantic::unify_types_and_type_check(context, statement);
+        auto result = semantic::unify_types_and_type_check(context, statement);
+        if (result.is_ok()) {
+            if (statement->index() == ast::Call) {
+                if (ast::get_type(statement).is_type_variable()) {
+                    auto constraint = ast::FunctionConstraint{"void", std::vector{ast::get_type(statement)}, ast::Type(""), &std::get<ast::CallNode>(*statement)};
+                    if (std::find(context.type_inference.function_constraints.begin(), context.type_inference.function_constraints.end(), constraint) == context.type_inference.function_constraints.end()) {
+                        context.type_inference.function_constraints.push_back(constraint);
+                    }
+                }
+                else if (ast::get_type(statement) != ast::Type("void")) {
+                    context.errors.push_back(errors::unhandled_return_value(std::get<ast::CallNode>(*statement), context.current_module));
+                }
+            }
+        }
     }
 
+    // Remove scope
     semantic::remove_scope(context);
 
+    if (errors != context.errors.size()) {
+        return Error {};
+    }
     return Ok {};
 }
 
@@ -1791,7 +1827,7 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::In
 
     // Add constraint
     if (node.type.is_type_variable()) {
-        auto constraint = ast::FunctionPrototype{node.type.domain, std::vector{node.type}, ast::Type("")};
+        auto constraint = ast::FunctionConstraint{node.type.domain, std::vector{node.type}, ast::Type(""), nullptr};
         if (std::find(context.type_inference.function_constraints.begin(), context.type_inference.function_constraints.end(), constraint) == context.type_inference.function_constraints.end()) {
             context.type_inference.function_constraints.push_back(constraint);
         }
@@ -1805,7 +1841,7 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::Fl
 
     // Add constraint
     if (node.type.is_type_variable()) {
-        auto constraint = ast::FunctionPrototype{node.type.domain, std::vector{node.type}, ast::Type("")};
+        auto constraint = ast::FunctionConstraint{node.type.domain, std::vector{node.type}, ast::Type(""), nullptr};
         if (std::find(context.type_inference.function_constraints.begin(), context.type_inference.function_constraints.end(), constraint) == context.type_inference.function_constraints.end()) {
             context.type_inference.function_constraints.push_back(constraint);
         }
@@ -1823,7 +1859,7 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::Ca
 
     // Add constraint
     if (node.type.is_type_variable() || has_type_variables(ast::get_types(node.args))) {
-        auto constraint = ast::FunctionPrototype{node.identifier->value, ast::get_types(node.args), node.type};
+        auto constraint = ast::FunctionConstraint{node.identifier->value, ast::get_types(node.args), node.type, &node};
         if (std::find(context.type_inference.function_constraints.begin(), context.type_inference.function_constraints.end(), constraint) == context.type_inference.function_constraints.end()) {
             context.type_inference.function_constraints.push_back(constraint);
         }
@@ -1860,7 +1896,7 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::Fi
         
         // Add constraint
         if (node.fields_accessed[0]->type.is_type_variable() || node.fields_accessed[i]->type.is_type_variable()) {
-            auto constraint = ast::FunctionPrototype{"." + node.fields_accessed[i]->value, {node.fields_accessed[i - 1]->type}, node.fields_accessed[i]->type};
+            auto constraint = ast::FunctionConstraint{"." + node.fields_accessed[i]->value, {node.fields_accessed[i - 1]->type}, node.fields_accessed[i]->type, nullptr};
             if (std::find(context.type_inference.function_constraints.begin(), context.type_inference.function_constraints.end(), constraint) == context.type_inference.function_constraints.end()) {
                 context.type_inference.function_constraints.push_back(constraint);
             }
