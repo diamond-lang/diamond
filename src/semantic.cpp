@@ -1126,7 +1126,11 @@ Result<Ok, Error> semantic::analyze(semantic::Context& context, ast::BlockNode& 
 
 Result<Ok, Error> semantic::analyze(semantic::Context& context, ast::FunctionNode& node) {
     if (node.is_extern) {
-        assert(false);
+        for (auto arg: node.args) {
+            auto result = semantic::analyze(context, arg->type);
+            if (result.is_error()) return Error {};
+        }
+        return semantic::analyze(context, node.return_type);
     }
 
     if (node.generic && node.return_type != ast::Type("")) return Ok {};
