@@ -4,7 +4,7 @@
 #include <set>
 #include <iostream>
 #include <cassert>
-#include <bits/stdc++.h>
+#include <algorithm>
 
 #include "ast.hpp"
 #include "errors.hpp"
