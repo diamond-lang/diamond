@@ -20,7 +20,7 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Host.h"
 #include "llvm/Support/raw_ostream.h"
-#include "llvm/Support/TargetRegistry.h"
+#include "llvm/MC/TargetRegistry.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Target/TargetOptions.h"
@@ -149,7 +149,7 @@ namespace codegen {
         StructType get_struct_type_as_argument(llvm::StructType* struct_type) {
             std::vector<llvm::Type*> sub_types;
             if (this->get_type_size(struct_type) <= 16) {
-                auto& fields = struct_type->elements();
+                auto fields = struct_type->elements();
 
                 size_t i = 0;
                 while (i < fields.size()) {
@@ -361,12 +361,12 @@ namespace codegen {
             assert(node.fields_accessed.size() >= 2);
 
             // Get struct allocation and type
-            llvm::Value* struct_ptr = this->get_binding(node.fields_accessed[0]->value);
-            if (((llvm::AllocaInst*)struct_ptr)->getAllocatedType()->isPointerTy()) {
-                struct_ptr = this->builder->CreateLoad(struct_ptr);
-            }
             assert(this->get_type((ast::Node*) node.fields_accessed[0]).type_definition);
+            llvm::Value* struct_ptr = this->get_binding(node.fields_accessed[0]->value);
             llvm::StructType* struct_type = this->get_struct_type(this->get_type((ast::Node*) node.fields_accessed[0]).type_definition);
+            if (((llvm::AllocaInst*)struct_ptr)->getAllocatedType()->isPointerTy()) {
+                struct_ptr = this->builder->CreateLoad(struct_type->getPointerTo(), struct_ptr);
+            }
 
             // Get type definition
             ast::TypeNode* type_definition = this->get_type((ast::Node*) node.fields_accessed[0]).type_definition;
@@ -401,6 +401,7 @@ namespace codegen {
             llvm::DataLayout dl = llvm::DataLayout(this->module);
             return dl.getTypeAllocSize(type);
         }
+        
     };
 };
 
@@ -534,7 +535,7 @@ void codegen::generate_executable(ast::Ast& ast, std::string program_name) {
         for (auto& arg: args) {
             args_as_c_strings.push_back(arg.c_str());
         }
-        bool result = lld::elf::link(args_as_c_strings, false, output_stream, errors_stream);
+        bool result = lld::elf::link(args_as_c_strings, output_stream, errors_stream, false, false);
     }
 #elif _WIN32
     static std::string get_object_file_name(std::string executable_name) {
@@ -903,9 +904,15 @@ llvm::Value* codegen::Context::codegen(ast::ReturnNode& node) {
             // Create return value
             this->builder->CreateRet(expr);
         }
-        else {            
+        else {
             // Store fields
-            this->store_fields(node.expression.value(), this->builder->CreateLoad(this->get_binding("$result")));
+            this->store_fields(
+                node.expression.value(),
+                this->builder->CreateLoad(
+                    this->as_llvm_type(this->get_type(node.expression.value()))->getPointerTo(),
+                    this->get_binding("$result")
+                )
+            );
             
             // Return
             this->builder->CreateRetVoid();
@@ -1095,7 +1102,10 @@ std::vector<llvm::Value*> codegen::Context::codegen_args(ast::FunctionNode* func
                         ),
                         j
                     );
-                    result.push_back(this->builder->CreateLoad(field_ptr));
+                    result.push_back(this->builder->CreateLoad(
+                        new_args.types[j],
+                        field_ptr
+                    ));
                 }
             }
             else {
@@ -1327,7 +1337,11 @@ llvm::Value* codegen::Context::codegen(ast::IdentifierNode& node) {
     if (this->has_struct_type((ast::Node*) &node)) {
         return this->get_binding(node.value);
     }
-    return this->builder->CreateLoad(this->get_binding(node.value), node.value.c_str());
+    return this->builder->CreateLoad(
+        this->as_llvm_type(this->get_type((ast::Node*) &node)),
+        this->get_binding(node.value),
+        node.value.c_str()
+    );
 }
 
 llvm::Value* codegen::Context::codegen(ast::BooleanNode& node) {
@@ -1339,5 +1353,9 @@ llvm::Value* codegen::Context::codegen(ast::StringNode& node) {
 }
 
 llvm::Value* codegen::Context::codegen(ast::FieldAccessNode& node) {
-    return this->builder->CreateLoad(this->get_field_pointer(node));
+    return this->builder->CreateLoad(
+        this->as_llvm_type(this->get_type((ast::Node*) &node)),
+        this->get_field_pointer(node),
+        node.fields_accessed[node.fields_accessed.size() - 1]->value
+    );
 }

@@ -12,18 +12,18 @@ if not os.path.exists('deps'):
     os.mkdir('deps')
 
 def get_url_llvm():
-    if   platform.system() == 'Linux': return 'https://github.com/llvm/llvm-project/releases/download/llvmorg-12.0.1/clang+llvm-12.0.1-x86_64-linux-gnu-ubuntu-16.04.tar.xz'
-    elif platform.system() == 'Windows': return 'https://ziglang.org/deps/llvm%2bclang%2blld-12.0.1-rc1-x86_64-windows-msvc-release-mt.tar.xz'
+    if   platform.system() == 'Linux': return 'https://github.com/llvm/llvm-project/releases/download/llvmorg-15.0.6/clang+llvm-15.0.6-x86_64-linux-gnu-ubuntu-18.04.tar.xz'
+    elif platform.system() == 'Windows': assert False
     else: assert False
 
 def get_local_file_name_llvm():
-    if   platform.system() == 'Linux': return 'clang+llvm-12.0.1-x86_64-linux-gnu-ubuntu-16.04.tar.xz'
-    elif platform.system() == 'Windows': return 'llvm+clang+lld-12.0.1-rc1-x86_64-windows-msvc-release-mt.tar'
+    if   platform.system() == 'Linux': return 'clang+llvm-15.0.6-x86_64-linux-gnu-ubuntu-18.04.tar.xz'
+    elif platform.system() == 'Windows': assert False
     else: assert False
 
 def get_extracted_llvm_name():
-    if   platform.system() == 'Linux': return 'clang+llvm-12.0.1-x86_64-linux-gnu-ubuntu-'
-    elif platform.system() == 'Windows': return 'llvm+clang+lld-12.0.1-rc1-x86_64-windows-msvc-release-mt'
+    if   platform.system() == 'Linux': return 'clang+llvm-15.0.6-x86_64-linux-gnu-ubuntu-18.04'
+    elif platform.system() == 'Windows': assert False
     else: assert False
 
 # Retrieve llvm

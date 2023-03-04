@@ -25,22 +25,22 @@ source_files = [
 # ---------------------------
 def get_name():
     if   platform.system() == 'Linux': return name
-    elif platform.system() == 'Windows': return name + ".exe"
+    elif platform.system() == 'Windows': assert False
     else: assert False
 
 def get_object_file_extension():
     if   platform.system() == 'Linux': return '.o'
-    elif platform.system() == 'Windows': return '.obj'
+    elif platform.system() == 'Windows': assert False
     else: assert False
 
 def get_default_llvm_config_path():
     if   platform.system() == 'Linux': return 'deps/llvm/bin/llvm-config'
-    elif platform.system() == 'Windows': return 'deps\\llvm\\bin\\llvm-config.exe'
+    elif platform.system() == 'Windows': assert False
     else: assert False
 
 def get_lld_libraries():
-    if   platform.system() == 'Linux': return '-llldDriver -llldCore -llldELF -llldCommon'
-    elif platform.system() == 'Windows': return '-llldDriver -llldCore -llldCOFF -llldCommon'
+    if   platform.system() == 'Linux': return '-llldELF -llldCommon'
+    elif platform.system() == 'Windows': assert False
     else: assert False
 
 # Helper functions
@@ -109,12 +109,6 @@ def build():
     llvm_libs = os.popen(command).read()
     llvm_libs = llvm_libs.strip()
 
-    if platform.system() == 'Windows':
-        llvm_libs = llvm_libs.split(" ")
-        llvm_libs = [lib.split("\\")[-1] for lib in llvm_libs]
-        llvm_libs = ["-l" + lib.split(".")[0] for lib in llvm_libs]
-        llvm_libs = " ".join(llvm_libs)
-
     # Get libs path
     command = f'{llvm_config} --link-static --ldflags'
     libpath = os.popen(command).read().strip()
@@ -122,17 +116,9 @@ def build():
     if platform.system() == "Linux":
         libpath = libpath.split("-L")[1]
 
-    elif platform.system() == 'Windows':
-        libpath = libpath.split("-LIBPATH:")[1]
-
     # Get system libs
     command = f'{llvm_config} --link-static --system-libs'
     system_libs = os.popen(command).read().strip()
-
-    if platform.system() == 'Windows':
-        system_libs = system_libs.split(" ")
-        system_libs = ["-l" + lib.split(".")[0] for lib in system_libs]
-        system_libs = " ".join(system_libs)
 
     # Build diamond
     command = f'clang++ -std=c++17 {objects_files} -o {get_name()} -L {libpath} {get_lld_libraries()} {llvm_libs} {system_libs}'
