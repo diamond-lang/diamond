@@ -1,6 +1,7 @@
 #include <iostream>
 #include <cstdio>
 #include <unordered_map>
+#include <filesystem>
 #include <assert.h>
 
 #include "llvm/ADT/APFloat.h"
@@ -480,21 +481,37 @@ void codegen::generate_executable(ast::Ast& ast, std::string program_name) {
     remove(get_object_file_name(program_name).c_str());
 }
 
-#ifdef __linux__
-    #include <iostream>
-    #include <filesystem>
+static std::string get_object_file_name(std::string executable_name) {
+    return executable_name + ".o";
+}
 
-    static std::string get_object_file_name(std::string executable_name) {
-        return executable_name + ".o";
+static std::string get_folder_of_executable() {
+    return std::filesystem::canonical("/proc/self/exe").parent_path().string();
+}
+
+static void link(std::string executable_name, std::string object_file_name, std::vector<std::string> link_directives) {
+    std::string name = "-o" + executable_name;
+
+    // Link using a native C compiler
+    if (link_directives.size() > 0) {
+        std::string build_command = "cc";
+        build_command += " " + object_file_name;
+        build_command += " " + name;
+
+        // Add linker directives
+        for (auto& directive: link_directives) {
+            build_command += " " + directive;
+        }
+
+        // Add -no-pie (it doesn't work without it for some reason)
+        build_command += " -no-pie";
+
+        // Execute command
+        system(build_command.c_str());
     }
-
-    static std::string get_folder_of_executable() {
-        return std::filesystem::canonical("/proc/self/exe").parent_path().string();
-    }
-
-    static void link(std::string executable_name, std::string object_file_name, std::vector<std::string> link_directives) {
-        std::string name = "-o" + executable_name;
-        std::vector<std::string> args = {
+    // Link using lld
+    else {
+         std::vector<std::string> args = {
             "lld",
             object_file_name,
             name,
@@ -504,67 +521,21 @@ void codegen::generate_executable(ast::Ast& ast, std::string program_name) {
             get_folder_of_executable() + "/deps/musl/crtn.o"
         };
 
-        // Add linker directives
-        if (link_directives.size() > 0) {
-            args.push_back("-L/lib");
-            args.push_back("-L/usr/lib");
-            args.push_back("-L/usr/local/lib");
-
-            for (auto& str: link_directives) {
-                size_t pos = 0;
-                while (pos < str.size()) {
-                    std::string arg = "";
-                    while (pos < str.size() && str[pos] == ' ') pos += 1;
-                    while (pos < str.size() && str[pos] != ' ') {
-                        arg.push_back(str[pos]);
-                        pos += 1;
-                    }
-                    args.push_back(arg);
-                    pos += 1;
-                }
-            }
-        }
-
         std::string output = "";
         std::string errors = "";
         llvm::raw_string_ostream output_stream(output);
         llvm::raw_string_ostream errors_stream(errors);
-
 
         std::vector<const char*> args_as_c_strings;
         for (auto& arg: args) {
             args_as_c_strings.push_back(arg.c_str());
         }
         bool result = lld::elf::link(args_as_c_strings, output_stream, errors_stream, false, false);
+        if (result == false) {
+            std::cout << errors;
+        } 
     }
-#elif _WIN32
-    static std::string get_object_file_name(std::string executable_name) {
-        return executable_name + ".obj";
-    }
-
-    static void link(std::string executable_name, std::string object_file_name, std::vector<std::string> link_directives) {
-        std::string name = "-out:" + executable_name;
-        std::vector<const char*> args = {
-            "lld",
-            object_file_name.c_str(),
-            "-defaultlib:libcmt",
-            "-defaultlib:oldnames",
-            "-nologo",
-            name.c_str()
-        };
-        
-        if (link_directives.size() > 0) {
-            assert(false);
-        }
-
-        std::string output = "";
-        std::string errors = "";
-        llvm::raw_string_ostream output_stream(output);
-        llvm::raw_string_ostream errors_stream(errors);
-
-        bool result = lld::coff::link(args, false, output_stream, errors_stream);
-    }
-#endif
+}
 
 // Codegeneration
 // --------------
