@@ -184,6 +184,7 @@ namespace ast {
 
         bool is_mutable = false;
         bool nonlocal = false;
+        unsigned int dereference = 0;
 
         IdentifierNode* identifier;
         Node* expression;

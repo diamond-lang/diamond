@@ -21,6 +21,7 @@ namespace token {
         Minus,
         Colon,
         Dot,
+        AtSign,
         Not,
         NotEqual,
         Greater,

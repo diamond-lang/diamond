@@ -157,6 +157,7 @@ Result<token::Token, Error> lexer::get_token(Source& source) {
     if (match(source, ">"))  return advance(token::Token(token::Greater, ">", source.line, source.column), source, 1);
     if (match(source, "<=")) return advance(token::Token(token::LessEqual, "<=", source.line, source.column), source, 2);
     if (match(source, "<"))  return advance(token::Token(token::Less, "<", source.line, source.column), source, 1);
+    if (match(source, "@"))  return advance(token::Token(token::AtSign, "@", source.line, source.column), source, 1);
     if (match(source, ".") && isdigit(peek(source))) {
         return get_number(source);
     }
