@@ -538,6 +538,10 @@ static void link(std::string executable_name, std::string object_file_name, std:
     }
 }
 #elif __APPLE__
+
+#include <stdio.h>
+#include <sys/sysctl.h>
+
 static void link(std::string executable_name, std::string object_file_name, std::vector<std::string> link_directives) {
     // Link using a native C compiler
     if (link_directives.size() > 0) {
@@ -556,9 +560,34 @@ static void link(std::string executable_name, std::string object_file_name, std:
         // Execute command
         system(build_command.c_str());
     }
+    
     // Link using lld
     else {
-         std::vector<std::string> args = {
+        // Get macos version, modified from https://stackoverflow.com/a/69176800 with https://creativecommons.org/licenses/by-sa/4.0/ license.
+        char osversion[32];
+        size_t osversion_len = sizeof(osversion) - 1;
+        int osversion_name[] = { CTL_KERN, KERN_OSRELEASE };
+
+        if (sysctl(osversion_name, 2, osversion, &osversion_len, NULL, 0) == -1) {
+            printf("sysctl() failed\n");
+            exit(EXIT_FAILURE);
+        }
+
+        uint32_t major, minor;
+        if (sscanf(osversion, "%u.%u", &major, &minor) != 2) {
+            printf("sscanf() failed\n");
+            exit(EXIT_FAILURE);
+        }
+
+        if (major >= 20) {
+            major -= 9;
+        } 
+        else {
+            major -= 4;
+        }
+
+        // Create link args
+        std::vector<std::string> args = {
             "lld",
             object_file_name,
             "-o",
@@ -567,8 +596,8 @@ static void link(std::string executable_name, std::string object_file_name, std:
             "arm64",
             "-platform_version",
             "macos",
-            "13.0.0",
-            "13.3",
+            std::to_string(major) + ".0.0",
+            std::to_string(major) + ".0",
             "-syslibroot",
             "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk",
             "-L/usr/local/lib",
