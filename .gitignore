@@ -4,3 +4,4 @@ diamond.exe
 .vscode
 deps/llvm
 bindings
+.DS_Store

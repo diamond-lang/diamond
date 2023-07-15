@@ -44,7 +44,14 @@ std::string utilities::get_program_name(std::filesystem::path path) {
     std::string utilities::get_run_command(std::string program_name) {
         return "./" + utilities::get_executable_name(program_name);
     }
+#elif __APPLE__
+    std::string utilities::get_executable_name(std::string program_name) {
+        return program_name;
+    }
 
+    std::string utilities::get_run_command(std::string program_name) {
+        return "./" + utilities::get_executable_name(program_name);
+    }
 #elif _WIN32
     std::string utilities::get_executable_name(std::string program_name) {
         return program_name + ".exe";

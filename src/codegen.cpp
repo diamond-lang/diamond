@@ -375,7 +375,7 @@ namespace codegen {
             for (size_t i = 1; i < node.fields_accessed.size() - 1; i++) {
                 // Get pointer to accessed fieldd
                 struct_ptr = this->builder->CreateStructGEP(struct_type, struct_ptr, get_index_of_field(node.fields_accessed[i]->value, type_definition));
-                
+
                 // Update current type definition
                 type_definition = this->get_type((ast::Node*) node.fields_accessed[i]).type_definition;
                 struct_type = this->get_struct_type(type_definition);
@@ -489,6 +489,7 @@ static std::string get_folder_of_executable() {
     return std::filesystem::canonical("/proc/self/exe").parent_path().string();
 }
 
+#ifdef __linux__
 static void link(std::string executable_name, std::string object_file_name, std::vector<std::string> link_directives) {
     std::string name = "-o" + executable_name;
 
@@ -536,6 +537,61 @@ static void link(std::string executable_name, std::string object_file_name, std:
         } 
     }
 }
+#elif __APPLE__
+static void link(std::string executable_name, std::string object_file_name, std::vector<std::string> link_directives) {
+    // Link using a native C compiler
+    if (link_directives.size() > 0) {
+        std::string build_command = "cc";
+        build_command += " " + object_file_name;
+        build_command += " -o " + executable_name;
+
+        // Add linker directives
+        for (auto& directive: link_directives) {
+            build_command += " " + directive;
+        }
+
+        // Add -no-pie (it doesn't work without it for some reason)
+        build_command += " -no-pie";
+
+        // Execute command
+        system(build_command.c_str());
+    }
+    // Link using lld
+    else {
+         std::vector<std::string> args = {
+            "lld",
+            object_file_name,
+            "-o",
+            executable_name,
+            "-arch",
+            "arm64",
+            "-platform_version",
+            "macos",
+            "13.0.0",
+            "13.3",
+            "-syslibroot",
+            "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk",
+            "-L/usr/local/lib",
+            "-lSystem",
+            "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/14.0.3/lib/darwin/libclang_rt.osx.a"
+        };
+
+        std::string output = "";
+        std::string errors = "";
+        llvm::raw_string_ostream output_stream(output);
+        llvm::raw_string_ostream errors_stream(errors);
+
+        std::vector<const char*> args_as_c_strings;
+        for (auto& arg: args) {
+            args_as_c_strings.push_back(arg.c_str());
+        }
+        bool result = lld::macho::link(args_as_c_strings, output_stream, errors_stream, false, false);
+        if (result == false) {
+            std::cout << errors;
+        } 
+    }
+}
+#endif
 
 // Codegeneration
 // --------------

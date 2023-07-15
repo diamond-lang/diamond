@@ -13,16 +13,19 @@ if not os.path.exists('deps'):
 
 def get_url_llvm():
     if   platform.system() == 'Linux': return 'https://github.com/llvm/llvm-project/releases/download/llvmorg-15.0.6/clang+llvm-15.0.6-x86_64-linux-gnu-ubuntu-18.04.tar.xz'
+    elif platform.system() == 'Darwin': return 'https://github.com/llvm/llvm-project/releases/download/llvmorg-15.0.6/clang+llvm-15.0.6-arm64-apple-darwin21.0.tar.xz'
     elif platform.system() == 'Windows': assert False
     else: assert False
 
 def get_local_file_name_llvm():
     if   platform.system() == 'Linux': return 'clang+llvm-15.0.6-x86_64-linux-gnu-ubuntu-18.04.tar.xz'
+    elif platform.system() == 'Darwin': return 'clang+llvm-15.0.6-arm64-apple-darwin21.0.tar.xz'
     elif platform.system() == 'Windows': assert False
     else: assert False
 
 def get_extracted_llvm_name():
     if   platform.system() == 'Linux': return 'clang+llvm-15.0.6-x86_64-linux-gnu-ubuntu-18.04'
+    elif platform.system() == 'Darwin': return 'clang+llvm-15.0.6-arm64-apple-darwin21.0'
     elif platform.system() == 'Windows': assert False
     else: assert False
 

@@ -90,7 +90,7 @@ void build(Command command) {
     if (parsing_result.is_error()) print_errors_and_exit(parsing_result.get_error());
     auto ast = parsing_result.get_value();
 
-    // // Analyze
+    // Analyze
     auto analyze_result = semantic::analyze(ast);
     if (analyze_result.is_error()) print_errors_and_exit(analyze_result.get_error());
 
@@ -118,7 +118,7 @@ void run(Command command) {
     if (parsing_result.is_error()) print_errors_and_exit(parsing_result.get_error());
     auto ast = parsing_result.get_value();
 
-    // // Analyze
+    // Analyze
     auto analyze_result = semantic::analyze(ast);
     if (analyze_result.is_error()) print_errors_and_exit(analyze_result.get_error());
 

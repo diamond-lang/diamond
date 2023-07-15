@@ -31,6 +31,7 @@ def get_all_files(folder):
 def main():
     for file in get_all_files('test'):
         content = open(file).read()
+        
         try:
             expected = re.search("(?<=--- Output\n)(.|\n)*(?=---)", content).group(0)
             test(file, expected)
