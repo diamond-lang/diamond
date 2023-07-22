@@ -1262,6 +1262,13 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
     auto scope = semantic::current_scope(context);
     for (auto& it: scope) {
         auto& binding = it.second;
+        if (binding.type == semantic::TypeBinding) {
+            auto result = semantic::analyze(context, *semantic::get_type_definition(binding));
+            if (result.is_error()) return result;
+        }
+    }
+    for (auto& it: scope) {
+        auto& binding = it.second;
         if (binding.type == semantic::GenericFunctionBinding) {
             auto result = semantic::analyze(context, *semantic::get_generic_function(binding));
             if (result.is_error()) return result;
@@ -1272,10 +1279,6 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
                 auto result = semantic::analyze(context, *functions[i]);
                 if (result.is_error()) return result;
             }
-        }
-        else if (binding.type == semantic::TypeBinding) {
-            auto result = semantic::analyze(context, *semantic::get_type_definition(binding));
-            if (result.is_error()) return result;
         }
     }
 
