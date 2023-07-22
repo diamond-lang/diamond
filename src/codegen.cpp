@@ -554,9 +554,6 @@ static void link(std::string executable_name, std::string object_file_name, std:
             build_command += " " + directive;
         }
 
-        // Add -no-pie (it doesn't work without it for some reason)
-        build_command += " -no-pie";
-
         // Execute command
         system(build_command.c_str());
     }
