@@ -27,19 +27,16 @@ std::string ast::Type::to_str(std::string output) const {
     if (this->parameters.size() == 0) {
         output += this->name;
     }
-    else if (this->name == "@") {
-        output += this->name;
-        output += this->parameters[0].to_str();
-    }
     else {
+        output += "(";
         output += this->name;
-        output += "[";
-        output += this->parameters[0].to_str();
+        output += " of ";
+        output += this->parameters[0].to_str(output);
         for (size_t i = 1; i < this->parameters.size(); i++) {
             output += ", ";
-            output += this->parameters[i].to_str();
+            output += this->parameters[0].to_str(output);
         }
-        output += "]";
+        output += ")";
     }
     return output;
 }
@@ -505,11 +502,7 @@ void ast::print(Node* node, PrintContext context) {
         case Assignment: {
             auto& assignment = std::get<AssignmentNode>(*node);
 
-            put_indent_level(context.indent_level, context.last);
-            for (int i = 0; i < assignment.dereference; i++) {
-                std::cout << "@";   
-            }
-            std::cout << assignment.identifier->value << "\n";
+            print((ast::Node*) assignment.identifier, context);
             if (assignment.nonlocal) {
                 put_indent_level(context.indent_level + 1, append(context.last, false));
                 std::cout << "nonlocal\n";
