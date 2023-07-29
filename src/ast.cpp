@@ -27,16 +27,19 @@ std::string ast::Type::to_str(std::string output) const {
     if (this->parameters.size() == 0) {
         output += this->name;
     }
-    else {
-        output += "(";
+    else if (this->name == "@") {
         output += this->name;
-        output += " of ";
-        output += this->parameters[0].to_str(output);
+        output += this->parameters[0].to_str();
+    }
+    else {
+        output += this->name;
+        output += "[";
+        output += this->parameters[0].to_str();
         for (size_t i = 1; i < this->parameters.size(); i++) {
             output += ", ";
-            output += this->parameters[0].to_str(output);
+            output += this->parameters[i].to_str();
         }
-        output += ")";
+        output += "]";
     }
     return output;
 }
@@ -502,7 +505,11 @@ void ast::print(Node* node, PrintContext context) {
         case Assignment: {
             auto& assignment = std::get<AssignmentNode>(*node);
 
-            print((ast::Node*) assignment.identifier, context);
+            put_indent_level(context.indent_level, context.last);
+            for (unsigned int i = 0; i < assignment.dereference; i++) {
+                std::cout << "*";
+            }
+            std::cout << assignment.identifier->value << "\n";
             if (assignment.nonlocal) {
                 put_indent_level(context.indent_level + 1, append(context.last, false));
                 std::cout << "nonlocal\n";
@@ -712,6 +719,21 @@ void ast::print(Node* node, PrintContext context) {
                 std::cout << "\n";
                 last.push_back(true);
             }
+
+            break;
+        }
+
+        case AddressOf: {
+            auto& address_of = std::get<AddressOfNode>(*node);
+
+            put_indent_level(context.indent_level, context.last);
+            std::cout << "&";
+            if (address_of.type != Type("")) std::cout << ": " << get_concrete_type(address_of.type, context).to_str();
+            std::cout << "\n";
+
+            context.indent_level += 1;
+            context.last.push_back(true);
+            ast::print((address_of.expression), context);
 
             break;
         }

@@ -146,6 +146,7 @@ namespace semantic {
     Result<Ok, Error> type_infer_and_analyze(Context& context, ast::BooleanNode& node);
     Result<Ok, Error> type_infer_and_analyze(Context& context, ast::StringNode& node);
     Result<Ok, Error> type_infer_and_analyze(Context& context, ast::FieldAccessNode& node);
+    Result<Ok, Error> type_infer_and_analyze(Context& context, ast::AddressOfNode& node);
 
     Result<Ok, Error> unify_types_and_type_check(Context& context, ast::Node* node);
     Result<Ok, Error> unify_types_and_type_check(Context& context, ast::BlockNode& node);
@@ -168,6 +169,7 @@ namespace semantic {
     Result<Ok, Error> unify_types_and_type_check(Context& context, ast::BooleanNode& node);
     Result<Ok, Error> unify_types_and_type_check(Context& context, ast::StringNode& node);
     Result<Ok, Error> unify_types_and_type_check(Context& context, ast::FieldAccessNode& node);
+    Result<Ok, Error> unify_types_and_type_check(Context& context, ast::AddressOfNode& node);
 
     void make_concrete(Context& context, ast::Node* node);
     void make_concrete(Context& context, ast::BlockNode& node);
@@ -190,6 +192,7 @@ namespace semantic {
     void make_concrete(Context& context, ast::BooleanNode& node);
     void make_concrete(Context& context, ast::StringNode& node);
     void make_concrete(Context& context, ast::FieldAccessNode& node);
+    void make_concrete(Context& context, ast::AddressOfNode& node);
 }
 
 // Set
@@ -1706,6 +1709,11 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
     return Ok {};
 }
 
+Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, ast::AddressOfNode& node) {
+    assert(false);
+    return Ok {};
+}
+
 // Unify types and type check
 // --------------------------
 Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::Node* node) {
@@ -1921,6 +1929,12 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::Fi
     return Ok {};
 }
 
+
+Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::AddressOfNode& node) {
+    assert(false);
+    return Ok {};
+}
+
 // Make concrete
 // -------------
 void semantic::make_concrete(Context& context, ast::Node* node) {
@@ -2039,4 +2053,8 @@ void semantic::make_concrete(Context& context, ast::FieldAccessNode& node) {
     if (node.type.is_type_variable()) {
         node.type = context.type_inference.type_bindings[node.type.to_str()];
     }
+}
+
+void semantic::make_concrete(Context& context, ast::AddressOfNode& node) {
+    assert(false);
 }

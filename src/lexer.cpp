@@ -125,6 +125,7 @@ Result<std::vector<token::Token>, Errors> lexer::lex(std::filesystem::path path)
         }
         else if (result.is_error()) {
             errors.push_back(result.get_error());
+            advance(source);
         }
     }
     tokens.push_back(token::Token(token::EndOfFile, source.line, source.column));
@@ -157,6 +158,7 @@ Result<token::Token, Error> lexer::get_token(Source& source) {
     if (match(source, ">"))  return advance(token::Token(token::Greater, ">", source.line, source.column), source, 1);
     if (match(source, "<=")) return advance(token::Token(token::LessEqual, "<=", source.line, source.column), source, 2);
     if (match(source, "<"))  return advance(token::Token(token::Less, "<", source.line, source.column), source, 1);
+    if (match(source, "&"))  return advance(token::Token(token::Ampersand, "&", source.line, source.column), source, 1);
     if (match(source, ".") && isdigit(peek(source))) {
         return get_number(source);
     }
@@ -196,8 +198,7 @@ Result<token::Token, Error> lexer::get_token(Source& source) {
     if (isdigit(current(source))) return get_number(source);
     if (isalpha(current(source))) return get_identifier(source);
 
-    std::cout << current(source) << "\n";
-    return Result<token::Token, Error>(std::string("Error: Unrecognized symbol\n"));
+    return Result<token::Token, Error>(std::string("Error: Unrecognized character \"") + std::string(1, current(source)) + std::string("\".\n"));
 }
 
 Result<token::Token, Error> lexer::advance(token::Token token, Source& source, unsigned int offset) {

@@ -58,6 +58,10 @@ void token::print(std::vector<Token> token) {
                 std::cout << "token::Colon";
                 break;
             }
+            case Ampersand: {
+                std::cout << "token::Ampersand";
+                break;
+            }
             case Dot: {
                 std::cout << "token::Dot";
                 break;

@@ -20,6 +20,7 @@ namespace token {
         Star,
         Minus,
         Colon,
+        Ampersand,
         Dot,
         Not,
         NotEqual,

@@ -30,6 +30,7 @@ namespace ast {
     struct BooleanNode;
     struct StringNode;
     struct FieldAccessNode;
+    struct AddressOfNode;
     using FunctionArgumentNode = IdentifierNode;
 
     enum NodeVariant {
@@ -52,7 +53,8 @@ namespace ast {
         Identifier,
         Boolean,
         String,
-        FieldAccess
+        FieldAccess,
+        AddressOf
     };
 
     using Node = std::variant<
@@ -75,7 +77,8 @@ namespace ast {
         IdentifierNode,
         BooleanNode,
         StringNode,
-        FieldAccessNode
+        FieldAccessNode,
+        AddressOfNode
     >;
 
     struct Type {
@@ -184,6 +187,7 @@ namespace ast {
 
         bool is_mutable = false;
         bool nonlocal = false;
+        unsigned int dereference = 0;
 
         IdentifierNode* identifier;
         Node* expression;
@@ -323,6 +327,14 @@ namespace ast {
         Type type = Type("");
 
         std::vector<ast::IdentifierNode*> fields_accessed;
+    };
+
+    struct AddressOfNode {
+        size_t line;
+        size_t column;
+        Type type = Type("");
+
+        ast::Node* expression;
     };
 
     struct Ast {

@@ -100,6 +100,7 @@ namespace codegen {
         llvm::Value* codegen(ast::BooleanNode& node);
         llvm::Value* codegen(ast::StringNode& node);
         llvm::Value* codegen(ast::FieldAccessNode& node);
+        llvm::Value* codegen(ast::AddressOfNode& node);
 
         std::string get_mangled_type_name(std::filesystem::path module, std::string identifier) {
             return module.string() + "::" + identifier;
@@ -1411,4 +1412,9 @@ llvm::Value* codegen::Context::codegen(ast::FieldAccessNode& node) {
         this->get_field_pointer(node),
         node.fields_accessed[node.fields_accessed.size() - 1]->value
     );
+}
+
+llvm::Value* codegen::Context::codegen(ast::AddressOfNode& node) {
+    assert(false);
+    return nullptr;
 }
