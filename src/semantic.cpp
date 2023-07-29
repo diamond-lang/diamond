@@ -1217,6 +1217,7 @@ Result<Ok, Error> semantic::analyze(semantic::Context& context, ast::Type& type)
     else if (type == ast::Type("bool")) return Ok {};
     else if (type == ast::Type("void")) return Ok {};
     else if (type == ast::Type("string")) return Ok {};
+    else if (type.is_pointer()) return semantic::analyze(context, type.parameters[0]);
     else {
         Binding* type_binding = semantic::get_binding(context, type.to_str());
         if (!type_binding) {
@@ -1710,7 +1711,25 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
 }
 
 Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, ast::AddressOfNode& node) {
-    assert(false);
+    // Type infer and analyze expression
+    auto result = semantic::type_infer_and_analyze(context, node.expression);
+    if (result.is_error()) return Error {};
+
+    // Analyze type of expression
+    if (!ast::get_type(node.expression).is_type_variable()) {
+        auto type = ast::get_type(node.expression);
+        auto result = semantic::analyze(context, type);
+        ast::set_type(node.expression, type);
+    }
+
+    if (node.type == ast::Type("")) {
+        node.type = ast::Type("pointer");
+        node.type.parameters.push_back(ast::get_type(node.expression));
+    }
+    else if (!node.type.is_type_variable() && !node.type.is_pointer()) {
+        context.errors.push_back(Error("Error: Type mismatch between type annotation and expression"));
+        return Error {};
+    }
     return Ok {};
 }
 
@@ -1931,7 +1950,7 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::Fi
 
 
 Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::AddressOfNode& node) {
-    assert(false);
+    ast::set_type(node.expression, semantic::get_unified_type(context, ast::get_type(node.expression)));
     return Ok {};
 }
 
@@ -2056,5 +2075,8 @@ void semantic::make_concrete(Context& context, ast::FieldAccessNode& node) {
 }
 
 void semantic::make_concrete(Context& context, ast::AddressOfNode& node) {
-    assert(false);
+    if (ast::get_type(node.expression).is_type_variable()) {
+        ast::set_type(node.expression, context.type_inference.type_bindings[ast::get_type(node.expression).to_str()]);
+        node.type.parameters[0] = ast::get_type(node.expression);
+    }
 }

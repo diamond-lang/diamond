@@ -97,6 +97,7 @@ namespace ast {
         bool is_type_variable() const;
         bool is_integer() const;
         bool is_float() const;
+        bool is_pointer() const;
     };
 
     Type get_type(Node* node);

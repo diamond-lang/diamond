@@ -72,6 +72,11 @@ bool ast::Type::is_float() const {
     else                                    return false;
 }
 
+bool ast::Type::is_pointer() const {
+    if (this->name == "pointer") return true;
+    else                         return false;
+}
+
 // Add hash struct for ast::Type to be able to use ast::Type as keys of std::unordered_map
 std::size_t std::hash<ast::Type>::operator()(const ast::Type& type) const {
     return std::hash<std::string>()(type.to_str());
