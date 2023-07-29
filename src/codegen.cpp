@@ -899,6 +899,14 @@ llvm::Value* codegen::Context::codegen(ast::AssignmentNode& node) {
             // Store value
             this->builder->CreateStore(expr, this->get_binding(node.identifier->value));
         }
+        else if (node.dereference > 0) {
+            auto pointer = this->get_binding(node.identifier->value);
+            for (unsigned int i = 0; i < node.dereference; i++) {
+                auto pointer_type = pointer->getType();
+                pointer = this->builder->CreateLoad(pointer_type, pointer);
+            }
+            this->builder->CreateStore(expr, pointer);
+        }
         else {
             // Create allocation if doesn't exists or if already exists, but it has a different type
             if (this->current_scope().find(node.identifier->value) == this->current_scope().end()
@@ -1415,6 +1423,5 @@ llvm::Value* codegen::Context::codegen(ast::FieldAccessNode& node) {
 }
 
 llvm::Value* codegen::Context::codegen(ast::AddressOfNode& node) {
-    assert(false);
-    return nullptr;
+    return this->get_binding(((ast::IdentifierNode*) node.expression)->value);
 }
