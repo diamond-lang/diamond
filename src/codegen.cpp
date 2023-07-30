@@ -101,6 +101,7 @@ namespace codegen {
         llvm::Value* codegen(ast::StringNode& node);
         llvm::Value* codegen(ast::FieldAccessNode& node);
         llvm::Value* codegen(ast::AddressOfNode& node);
+        llvm::Value* codegen(ast::DereferenceNode& node);
 
         std::string get_mangled_type_name(std::filesystem::path module, std::string identifier) {
             return module.string() + "::" + identifier;
@@ -126,6 +127,7 @@ namespace codegen {
             else if (type == ast::Type("bool"))    return llvm::Type::getInt1Ty(*(this->context));
             else if (type == ast::Type("string"))  return llvm::Type::getInt8PtrTy(*(this->context));
             else if (type == ast::Type("void"))    return llvm::Type::getVoidTy(*(this->context));
+            else if (type.is_pointer())            return this->as_llvm_type(type.parameters[0])->getPointerTo();
             else if (type.type_definition)         return this->get_struct_type(type.type_definition);
             else {
                 std::cout <<"type: " << type.to_str() << "\n";
@@ -1424,4 +1426,10 @@ llvm::Value* codegen::Context::codegen(ast::FieldAccessNode& node) {
 
 llvm::Value* codegen::Context::codegen(ast::AddressOfNode& node) {
     return this->get_binding(((ast::IdentifierNode*) node.expression)->value);
+}
+
+
+llvm::Value* codegen::Context::codegen(ast::DereferenceNode& node) {
+    auto pointer = this->codegen(node.expression);
+    return this->builder->CreateLoad(this->as_llvm_type(node.type), pointer);;
 }

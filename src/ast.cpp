@@ -119,7 +119,9 @@ bool ast::FunctionConstraint::operator!=(const FunctionConstraint &t) const {
 // Node
 // ----
 ast::Type ast::get_type(Node* node) {
-    return std::visit([](const auto& variant) {return variant.type;}, *node);
+    return std::visit([](const auto& variant) {
+        return variant.type;
+    }, *node);
 }
 
 ast::Type ast::get_concrete_type(Node* node, std::unordered_map<std::string, Type>& type_bindings) {
@@ -738,11 +740,28 @@ void ast::print(Node* node, PrintContext context) {
 
             context.indent_level += 1;
             context.last.push_back(true);
-            ast::print((address_of.expression), context);
+            ast::print(address_of.expression, context);
 
             break;
         }
 
-        default: assert(false);
+        case Dereference: {
+            auto& dereference = std::get<DereferenceNode>(*node);
+
+            put_indent_level(context.indent_level, context.last);
+            std::cout << "*";
+            if (dereference.type != Type("")) std::cout << ": " << get_concrete_type(dereference.type, context).to_str();
+            std::cout << "\n";
+
+            context.indent_level += 1;
+            context.last.push_back(true);
+            ast::print(dereference.expression, context);
+
+            break;
+        }
+
+        default: {
+            assert(false);
+        }
     }
 }

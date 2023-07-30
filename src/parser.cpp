@@ -45,6 +45,7 @@ struct Parser {
     Result<ast::Node*, Error> parse_binary(int precedence = 1);
     Result<ast::Node*, Error> parse_negation();
     Result<ast::Node*, Error> parse_address_of();
+    Result<ast::Node*, Error> parse_dereference();
     Result<ast::Node*, Error> parse_primary();
     Result<ast::Node*, Error> parse_grouping();
     Result<ast::Node*, Error> parse_float();
@@ -1007,9 +1008,31 @@ Result<ast::Node*, Error> Parser::parse_address_of() {
     return this->ast.last_element();
 }
 
+Result<ast::Node*, Error> Parser::parse_dereference() {
+    // Create node
+    auto dereference = ast::DereferenceNode {this->current().line, this->current().column};
+    this->advance();
+
+    // Parse expression
+    Result<ast::Node*, Error> expression;
+    if (this->match({token::Identifier, token::Dot})) {
+        expression = this->parse_field_access();
+    }
+    else {
+        expression = this->parse_identifier();
+    }
+    if (expression.is_error()) return Error {};
+    dereference.expression = expression.get_value();
+
+    // Add node to ast
+    this->ast.push_back(dereference);
+    return this->ast.last_element();
+}
+
 Result<ast::Node*, Error> Parser::parse_primary() {
     switch (this->current().variant) {
         case token::Minus:     return this->parse_negation();
+        case token::Star:      return this->parse_dereference();
         case token::Ampersand: return this->parse_address_of();
         case token::LeftParen: return this->parse_grouping();
         case token::Float:     return this->parse_float();
