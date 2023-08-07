@@ -571,7 +571,7 @@ Result<ast::Node*, Error> Parser::parse_assignment() {
             break;
 
         default:
-            this->errors.push_back(Error("Error: Expecting token Equal or Be"));
+            assert(false);
             return Error {};
     }
     this->advance();
@@ -908,7 +908,8 @@ Result<ast::Node*, Error> Parser::parse_if_else_expr() {
         return this->ast.last_element();
     }
     else {
-        this->errors.push_back(Error("Error: Expecting else branch"));
+        this->position = position_backup;
+        this->errors.push_back(errors::generic_error(this->location(), "Expecting else branch"));
         return Error {};
     }
 }

@@ -9,6 +9,7 @@
 
 namespace errors {
     std::string usage();
+    std::string generic_error(Location location, std::string message);
     std::string unexpected_character(Location location);
     std::string unexpected_indent(Location location);
     std::string expecting_statement(Location location);

@@ -1,0 +1,10 @@
+a = if true
+    3.5
+
+--- Output
+Expecting else branch
+
+1| a = if true
+2|     3.5
+          ^
+---

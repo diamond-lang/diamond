@@ -40,10 +40,17 @@ std::string errors::usage() {
                        "        --obj\n";
 }
 
+std::string errors::generic_error(Location location, std::string message) {
+    return make_header(message + "\n\n") +
+            (location.line > 1 ? std::to_string(location.line - 1) + "| " + current_line(Location{location.line - 1, location.column, location.file}) + "\n" : "") +
+            std::to_string(location.line) + "| " + current_line(location) + "\n" +
+            underline_current_char(location);
+}
+
 std::string errors::unexpected_character(Location location) {
     return make_header("Unexpected character\n\n") +
-           std::to_string(location.line) + "| " + current_line(location) + "\n" +
-           underline_current_char(location);
+            std::to_string(location.line) + "| " + current_line(location) + "\n" +
+            underline_current_char(location);
 }
 
 std::string errors::unexpected_indent(Location location) {
