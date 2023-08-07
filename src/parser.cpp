@@ -502,10 +502,10 @@ Result<ast::Node*, Error> Parser::parse_type_definition() {
         auto colon = this->parse_token(token::Colon);
         if (colon.is_error()) return Error {};
 
-        auto type_identifier = this->parse_token(token::Identifier);
-        if (type_identifier.is_error()) return Error {};
+        auto type_annotation = this->parse_type();
+        if (type_annotation.is_error()) return Error {};
 
-        ast::set_type(field.get_value(), ast::Type(type_identifier.get_value().get_literal()));
+        ast::set_type(field.get_value(), type_annotation.get_value());
 
         this->ast.push_back(*field.get_value());
         type.fields.push_back((ast::IdentifierNode*) this->ast.last_element());
