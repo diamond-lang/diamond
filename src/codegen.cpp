@@ -84,6 +84,7 @@ namespace codegen {
         void codegen_function_bodies(std::filesystem::path module_path, std::string identifier, std::vector<ast::FunctionArgumentNode*> args_names, std::vector<ast::Type> args_types, ast::Type return_type, ast::Node* function_body);
         llvm::Value* codegen(ast::AssignmentNode& node);
         llvm::Value* codegen(ast::FieldAssignmentNode& node);
+        llvm::Value* codegen(ast::DereferenceAssignmentNode& node);
         llvm::Value* codegen(ast::ReturnNode& node);
         llvm::Value* codegen(ast::BreakNode& node);
         llvm::Value* codegen(ast::ContinueNode& node);
@@ -233,13 +234,7 @@ namespace codegen {
         }
 
         ast::Type get_type(ast::Node* node) {
-            if (ast::get_type(node).is_type_variable()) {
-                assert(this->type_bindings.find(ast::get_type(node).to_str()) != this->type_bindings.end());
-                return this->type_bindings[ast::get_type(node).to_str()];
-            }
-            else {
-                return ast::get_type(node);
-            }
+            return ast::get_concrete_type(ast::get_type(node), this->type_bindings);
         }
 
         std::vector<ast::Type> get_types(std::vector<ast::Node*> nodes) {
@@ -901,14 +896,6 @@ llvm::Value* codegen::Context::codegen(ast::AssignmentNode& node) {
             // Store value
             this->builder->CreateStore(expr, this->get_binding(node.identifier->value));
         }
-        else if (node.dereference > 0) {
-            auto pointer = this->get_binding(node.identifier->value);
-            for (unsigned int i = 0; i < node.dereference; i++) {
-                auto pointer_type = pointer->getType();
-                pointer = this->builder->CreateLoad(pointer_type, pointer);
-            }
-            this->builder->CreateStore(expr, pointer);
-        }
         else {
             // Create allocation if doesn't exists or if already exists, but it has a different type
             if (this->current_scope().find(node.identifier->value) == this->current_scope().end()
@@ -954,6 +941,28 @@ llvm::Value* codegen::Context::codegen(ast::FieldAssignmentNode& node) {
   
         // Return
         return nullptr;
+    }
+
+    return nullptr;
+}
+
+llvm::Value* codegen::Context::codegen(ast::DereferenceAssignmentNode& node) {
+    // Codegen expression
+    llvm::Value* expression = this->codegen(node.expression);
+
+    // Codegen pointer
+    auto pointer = this->codegen(node.identifier->expression);
+    for (unsigned int i = 1; i < node.identifier->dereferences; i++) {
+        auto pointer_type = pointer->getType();
+        pointer = this->builder->CreateLoad(pointer_type, pointer);
+    }
+
+    if (!this->has_struct_type(node.expression)) {
+        this->builder->CreateStore(expression, pointer);
+    }
+    else {
+        // Store fields
+        this->store_fields(node.expression, pointer);
     }
 
     return nullptr;
@@ -1431,5 +1440,5 @@ llvm::Value* codegen::Context::codegen(ast::AddressOfNode& node) {
 
 llvm::Value* codegen::Context::codegen(ast::DereferenceNode& node) {
     auto pointer = this->codegen(node.expression);
-    return this->builder->CreateLoad(this->as_llvm_type(node.type), pointer);;
+    return this->builder->CreateLoad(this->as_llvm_type(this->get_type((ast::Node*) &node)), pointer);;
 }

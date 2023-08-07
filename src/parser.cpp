@@ -31,6 +31,7 @@ struct Parser {
     Result<ast::Node*, Error> parse_block_statement_or_expression();
     Result<ast::Node*, Error> parse_assignment();
     Result<ast::Node*, Error> parse_field_assignment();
+    Result<ast::Node*, Error> parse_dereference_assignment();
     Result<ast::Node*, Error> parse_return_stmt();
     Result<ast::Node*, Error> parse_break_stmt();
     Result<ast::Node*, Error> parse_continue_stmt();
@@ -237,7 +238,7 @@ Result<ast::Node*, Error> Parser::parse_statement() {
         case token::Use:      return this->parse_use_stmt();
         case token::Include:  return this->parse_use_stmt();
         case token::NonLocal: return this->parse_assignment();
-        case token::Star:     return this->parse_assignment();
+        case token::Star:     return this->parse_dereference_assignment();
         case token::Identifier:
             if (this->match({token::Identifier, token::Equal}))     return this->parse_assignment();
             if (this->match({token::Identifier, token::Be}))        return this->parse_assignment();
@@ -554,12 +555,6 @@ Result<ast::Node*, Error> Parser::parse_assignment() {
         this->advance();
     }
 
-    // Parse dereference
-    while (this->current() == token::Star) {
-        assignment.dereference++;
-        this->advance();
-    }
-
     // Parse identifier
     auto identifier = this->parse_identifier();
     if (identifier.is_error()) return Error {};
@@ -614,6 +609,44 @@ Result<ast::Node*, Error> Parser::parse_field_assignment() {
     auto identifier = this->parse_field_access();
     if (identifier.is_error()) return Error {};
     assignment.identifier = (ast::FieldAccessNode*) identifier.get_value();
+
+    // Parse equal
+    auto equal = this->parse_token(token::Equal);
+    if (equal.is_error()) return Error {};
+    
+    // Parse expression
+    auto expression = this->parse_expression();
+    if (expression.is_error()) return expression;
+    assignment.expression = expression.get_value();
+
+    // Parse type annotation
+    if (this->current() == token::Colon) {
+        this->advance();
+
+        auto type = this->parse_type();
+        if (type.is_error()) return Error {};
+
+        ast::set_type(assignment.expression, type.get_value());
+
+        if (assignment.expression->index() == ast::IfElse) {
+            auto& if_else = std::get<ast::IfElseNode>(*assignment.expression);
+            ast::set_type(if_else.if_branch, ast::get_type(assignment.expression));
+            ast::set_type(if_else.else_branch.value(), ast::get_type(assignment.expression));
+        }
+    }
+
+    this->ast.push_back(assignment);
+    return this->ast.last_element();
+}
+
+Result<ast::Node*, Error> Parser::parse_dereference_assignment() {
+    // Create node
+    auto assignment = ast::DereferenceAssignmentNode {this->current().line, this->current().column};
+
+    // Parse dereference
+    auto identifier = this->parse_dereference();
+    if (identifier.is_error()) return Error {};
+    assignment.identifier = (ast::DereferenceNode*) identifier.get_value();
 
     // Parse equal
     auto equal = this->parse_token(token::Equal);
@@ -1011,7 +1044,12 @@ Result<ast::Node*, Error> Parser::parse_address_of() {
 Result<ast::Node*, Error> Parser::parse_dereference() {
     // Create node
     auto dereference = ast::DereferenceNode {this->current().line, this->current().column};
-    this->advance();
+
+    // Parse dereference operator
+    while (this->current() == token::Star) {
+        this->advance();
+        dereference.dereferences++;
+    }
 
     // Parse expression
     Result<ast::Node*, Error> expression;

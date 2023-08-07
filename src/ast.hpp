@@ -15,6 +15,7 @@ namespace ast {
     struct TypeNode;
     struct AssignmentNode;
     struct FieldAssignmentNode;
+    struct DereferenceAssignmentNode;
     struct ReturnNode;
     struct BreakNode;
     struct ContinueNode;
@@ -40,6 +41,7 @@ namespace ast {
         TypeDef,
         Assignment,
         FieldAssignment,
+        DereferenceAssignment,
         Return,
         Break,
         Continue,
@@ -65,6 +67,7 @@ namespace ast {
         TypeNode,
         AssignmentNode,
         FieldAssignmentNode,
+        DereferenceAssignmentNode,
         ReturnNode,
         BreakNode,
         ContinueNode,
@@ -116,6 +119,7 @@ namespace ast {
     bool is_expression(Node* node);
     bool could_be_expression(Node* node);
     void transform_to_expression(Node*& node);
+    bool has_type_variables(std::vector<Type> types);
 
     struct BlockNode {
         size_t line;
@@ -191,7 +195,6 @@ namespace ast {
 
         bool is_mutable = false;
         bool nonlocal = false;
-        unsigned int dereference = 0;
 
         IdentifierNode* identifier;
         Node* expression;
@@ -206,6 +209,15 @@ namespace ast {
         bool nonlocal = false;
 
         FieldAccessNode* identifier;
+        Node* expression;
+    };
+
+    struct DereferenceAssignmentNode {
+        size_t line;
+        size_t column;
+        Type type = Type("");
+
+        DereferenceNode* identifier;
         Node* expression;
     };
 
@@ -346,6 +358,7 @@ namespace ast {
         size_t column;
         Type type = Type("");
 
+        unsigned int dereferences = 0;
         ast::Node* expression;
     };
 

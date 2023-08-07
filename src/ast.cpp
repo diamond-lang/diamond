@@ -125,18 +125,18 @@ ast::Type ast::get_type(Node* node) {
 }
 
 ast::Type ast::get_concrete_type(Node* node, std::unordered_map<std::string, Type>& type_bindings) {
-    Type type_variable = get_type(node);
-    if (type_variable.is_type_variable()) {
-        assert(type_bindings.find(type_variable.to_str()) != type_bindings.end());
-        return type_bindings[type_variable.to_str()];
-    }
-    return type_variable;
+    return ast::get_concrete_type(ast::get_type(node), type_bindings);
 }
 
 ast::Type ast::get_concrete_type(Type type_variable, std::unordered_map<std::string, Type>& type_bindings) {
     if (type_variable.is_type_variable()) {
         assert(type_bindings.find(type_variable.to_str()) != type_bindings.end());
-        return type_bindings[type_variable.to_str()];
+        type_variable = type_bindings[type_variable.to_str()];
+    }
+    if (ast::has_type_variables(type_variable.parameters)) {
+        for (size_t i = 0; i < type_variable.parameters.size(); i++) {
+            type_variable.parameters[i] = ast::get_concrete_type(type_variable.parameters[i], type_bindings);
+        }
     }
     return type_variable;
 }
@@ -254,6 +254,13 @@ void ast::transform_to_expression(ast::Node*& node) {
     }
 }
 
+bool ast::has_type_variables(std::vector<ast::Type> types) {
+    for (auto& type: types) {
+        if (type.is_type_variable()) return true;
+    }
+    return false;
+}
+
 bool ast::is_expression(Node* node) {
     switch (node->index()) {
         case Block: return false;
@@ -350,8 +357,8 @@ void put_indent_level(size_t indent_level, std::vector<bool> last) {
 }
 
 ast::Type ast::get_concrete_type(ast::Type type, ast::PrintContext context) {
-    if (context.concrete && type.is_type_variable()) {
-        return context.type_bindings[type.to_str()];
+    if (context.concrete) {
+        return ast::get_concrete_type(type, context.type_bindings);
     }
     else {
         return type;
@@ -513,9 +520,6 @@ void ast::print(Node* node, PrintContext context) {
             auto& assignment = std::get<AssignmentNode>(*node);
 
             put_indent_level(context.indent_level, context.last);
-            for (unsigned int i = 0; i < assignment.dereference; i++) {
-                std::cout << "*";
-            }
             std::cout << assignment.identifier->value << "\n";
             if (assignment.nonlocal) {
                 put_indent_level(context.indent_level + 1, append(context.last, false));
@@ -539,6 +543,40 @@ void ast::print(Node* node, PrintContext context) {
                 std::cout << "." << assignment.identifier->fields_accessed[i]->value;
             }
             std::cout << " =" << "\n";
+            context.indent_level += 1;
+            context.last.push_back(true);
+            print(assignment.expression, context);
+            break;
+        }
+
+        case DereferenceAssignment: {
+            auto& assignment = std::get<DereferenceAssignmentNode>(*node);
+
+            put_indent_level(context.indent_level, context.last);
+            for (unsigned int i = 0; i < assignment.identifier->dereferences; i++) {
+                std::cout << "*";
+            }
+
+            if (assignment.identifier->expression->index() == ast::Identifier) {
+                std::cout << ((ast::IdentifierNode*)assignment.identifier->expression)->value;
+            }
+            else if (assignment.identifier->expression->index() == ast::FieldAccess) {
+                auto field_access = (ast::FieldAccessNode*)assignment.identifier->expression;
+                std::cout << field_access->fields_accessed[0]->value;
+                for (size_t i = 1; i < field_access->fields_accessed.size(); i++) {
+                    std::cout << "." << field_access->fields_accessed[i]->value;
+                }
+            }
+            else {
+                assert(false);
+            }
+            if (ast::get_type(assignment.identifier->expression) != ast::Type("")) {
+                std::cout << ": " << ast::get_type(assignment.identifier->expression).to_str();
+            }
+            std::cout << "\n";
+            put_indent_level(context.indent_level + 1, append(context.last, false));
+            std::cout << "=" << '\n';
+
             context.indent_level += 1;
             context.last.push_back(true);
             print(assignment.expression, context);

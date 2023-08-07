@@ -1,0 +1,14 @@
+function awesome(pointer, value)
+    *pointer = value
+    print(*pointer)
+
+a = 10
+print(a)
+awesome(&a, 20)
+print(a)
+
+--- Output
+10
+20
+20
+---
