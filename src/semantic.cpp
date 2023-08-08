@@ -108,7 +108,7 @@ namespace semantic {
     std::unordered_map<std::string, Binding>& current_scope(Context& context);
     Binding* get_binding(Context& context, std::string identifier);
     bool in_generic_function(Context& context);
-    void add_definitions_to_current_scope(Context& context, ast::BlockNode& block);
+    Result<Ok, Error> add_definitions_to_current_scope(Context& context, ast::BlockNode& block);
     void add_module_functions(Context& context, std::filesystem::path module_path, std::set<std::filesystem::path>& already_included_modules);
     std::vector<std::unordered_map<std::string, Binding>> get_definitions(Context& context);
     Result<ast::Type, Error> get_type_of_generic_function(Context& context, std::vector<ast::Type> args, ast::FunctionNode* function, std::vector<ast::FunctionPrototype> call_stack = {});
@@ -518,7 +518,7 @@ bool semantic::in_generic_function(Context& context) {
     return context.current_function.has_value() && context.current_function.value()->generic;
 }
 
-void semantic::add_definitions_to_current_scope(Context& context, ast::BlockNode& block) {
+Result<Ok, Error> semantic::add_definitions_to_current_scope(Context& context, ast::BlockNode& block) {
     // Add functions from block to current scope
     for (auto& function: block.functions) {
         auto& identifier = function->identifier->value;
@@ -535,7 +535,8 @@ void semantic::add_definitions_to_current_scope(Context& context, ast::BlockNode
         }
         else if (is_function(scope[identifier])) {
             if (scope[identifier].type == GenericFunctionBinding) {
-                context.errors.push_back(Error{"Error: Trying to overload generic function!"});
+                context.errors.push_back(errors::generic_error(Location{function->line, function->column, function->module_path}, "This function is already defined. Generic functions can't be overloaded"));
+                return Error {};
             }
             else {
                 scope[identifier].value.push_back((ast::Node*) function);
@@ -555,7 +556,8 @@ void semantic::add_definitions_to_current_scope(Context& context, ast::BlockNode
             scope[identifier] = make_Binding(type);
         }
         else {
-            context.errors.push_back(Error{"Error: Type defined multiple times"});
+            context.errors.push_back(errors::generic_error(Location{type->line, type->column, type->module_path}, "This type is already defined."));
+            return Error {};
         }
     }
 
@@ -568,6 +570,8 @@ void semantic::add_definitions_to_current_scope(Context& context, ast::BlockNode
         assert(std::filesystem::exists(module_path));
         semantic::add_module_functions(context, module_path, already_included_modules);
     }
+
+    return Ok {};
 }
 
 void semantic::add_module_functions(Context& context, std::filesystem::path module_path, std::set<std::filesystem::path>& already_included_modules) {
@@ -710,7 +714,8 @@ Result<ast::Type, Error> semantic::get_type_of_generic_function(Context& context
     if (context.current_module != function->module_path) {
         init_Context(new_context, context.ast);
         new_context.current_module = function->module_path;
-        semantic::add_definitions_to_current_scope(new_context, *(context.ast->modules[function->module_path.string()]));
+        auto result = semantic::add_definitions_to_current_scope(new_context, *(context.ast->modules[function->module_path.string()]));
+        assert(result.is_ok());
         current_context = &new_context;
     }
 
@@ -1172,7 +1177,8 @@ Result<Ok, Error> semantic::analyze_block_or_expression(semantic::Context& conte
         semantic::add_scope(context);
         if (node->index() == ast::Block) {
             ast::BlockNode block = *((ast::BlockNode*)node);
-            semantic::add_definitions_to_current_scope(context, block);
+            auto result = semantic::add_definitions_to_current_scope(context, block);
+            assert(result.is_ok());
         }
 
         for (auto& constraint: context.type_inference.function_constraints) {
@@ -1213,7 +1219,8 @@ Result<Ok, Error> semantic::analyze(semantic::Context& context, ast::FunctionNod
     }
     else {
         new_context.current_module = node.module_path;
-        semantic::add_definitions_to_current_scope(new_context, *(context.ast->modules[node.module_path.string()]));
+        auto result = semantic::add_definitions_to_current_scope(new_context, *(context.ast->modules[node.module_path.string()]));
+        assert(result.is_ok());
     }
 
     semantic::add_scope(new_context);
@@ -1326,7 +1333,8 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
     semantic::add_scope(context);
 
     // Add functions to the current scope
-    semantic::add_definitions_to_current_scope(context, node);
+    auto result = semantic::add_definitions_to_current_scope(context, node);
+    if (result.is_error()) return result;
 
     // Analyze functions and types in current scope
     auto scope = semantic::current_scope(context);
@@ -1870,7 +1878,8 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::Bl
     semantic::add_scope(context);
 
     // Add functions and types to the current scope
-    semantic::add_definitions_to_current_scope(context, block);
+    auto result = semantic::add_definitions_to_current_scope(context, block);
+    assert(result.is_ok());
 
     for (auto statement: block.statements) {
         auto result = semantic::unify_types_and_type_check(context, statement);

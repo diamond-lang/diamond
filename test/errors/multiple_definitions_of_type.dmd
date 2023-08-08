@@ -1,0 +1,16 @@
+type Point
+    x: float64
+    y: float64
+
+type Point
+    x: float64
+    y: float64
+    z: float64
+
+--- Output
+This type is already defined.
+
+4| 
+5| type Point
+   ^
+---
