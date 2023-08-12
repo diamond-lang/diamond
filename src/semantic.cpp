@@ -109,7 +109,7 @@ namespace semantic {
     Binding* get_binding(Context& context, std::string identifier);
     bool in_generic_function(Context& context);
     Result<Ok, Error> add_definitions_to_current_scope(Context& context, ast::BlockNode& block);
-    void add_module_functions(Context& context, std::filesystem::path module_path, std::set<std::filesystem::path>& already_included_modules);
+    Result<Ok, Error> add_module_functions(Context& context, std::filesystem::path module_path, std::set<std::filesystem::path>& already_included_modules);
     std::vector<std::unordered_map<std::string, Binding>> get_definitions(Context& context);
     Result<ast::Type, Error> get_type_of_generic_function(Context& context, std::vector<ast::Type> args, ast::FunctionNode* function, std::vector<ast::FunctionPrototype> call_stack = {});
     Result<Ok, Error> check_constraint_of_generic_function(Context& context, std::unordered_map<std::string, ast::Type>& type_bindings, ast::FunctionConstraint constraint, std::vector<ast::FunctionPrototype> call_stack = {});
@@ -568,13 +568,14 @@ Result<Ok, Error> semantic::add_definitions_to_current_scope(Context& context, a
     for (auto& use_stmt: block.use_statements) {
         auto module_path = std::filesystem::canonical(current_directory / (use_stmt->path->value + ".dmd"));
         assert(std::filesystem::exists(module_path));
-        semantic::add_module_functions(context, module_path, already_included_modules);
+        auto result = semantic::add_module_functions(context, module_path, already_included_modules);
+        if (result.is_error()) return result;
     }
 
     return Ok {};
 }
 
-void semantic::add_module_functions(Context& context, std::filesystem::path module_path, std::set<std::filesystem::path>& already_included_modules) {
+Result<Ok, Error> semantic::add_module_functions(Context& context, std::filesystem::path module_path, std::set<std::filesystem::path>& already_included_modules) {
     if (context.ast->modules.find(module_path.string()) == context.ast->modules.end()) {
         // Read file
         Result<std::string, Error> result = utilities::read_file(module_path.string());
@@ -621,7 +622,8 @@ void semantic::add_module_functions(Context& context, std::filesystem::path modu
             }
             else if (is_function(scope[identifier])) {
                 if (scope[identifier].type == GenericFunctionBinding) {
-                    context.errors.push_back(Error{"Error: Trying to overload generic function!"});
+                    context.errors.push_back(errors::generic_error(Location{function->line, function->column, function->module_path}, "This function is already defined in current module. Generic functions can't be overloaded"));
+                    return Error {};
                 }
                 else {
                     scope[identifier].value.push_back((ast::Node*) function);
@@ -641,7 +643,8 @@ void semantic::add_module_functions(Context& context, std::filesystem::path modu
                 scope[identifier] = semantic::make_Binding(type);
             }
             else {
-                context.errors.push_back(Error{"Error: Type defined multiple times"});
+                context.errors.push_back(errors::generic_error(Location{type->line, type->column, type->module_path}, "This type is already defined in current module."));
+                return Error {};
             }
         }
 
@@ -651,10 +654,13 @@ void semantic::add_module_functions(Context& context, std::filesystem::path modu
         for (auto& use_stmt: context.ast->modules[module_path.string()]->use_statements) {
             if (use_stmt->include) {
                 auto include_path = std::filesystem::canonical(module_path.parent_path() / (use_stmt->path->value + ".dmd"));
-                semantic::add_module_functions(context, include_path, already_included_modules);
+                auto result = semantic::add_module_functions(context, include_path, already_included_modules);
+                if (result.is_error()) return result;
             }
         }
     }
+
+    return Ok {};
 }
 
 std::vector<std::unordered_map<std::string, semantic::Binding>> semantic::get_definitions(Context& context) {
