@@ -700,15 +700,13 @@ Result<ast::Type, Error> semantic::get_type_of_generic_function(Context& context
             if (specialization.type_bindings.find(type_variable.to_str()) == specialization.type_bindings.end()) {
                 specialization.type_bindings[type_variable.to_str()] = type;
             }
-            // Else compare with previous type founded for her
+            // Else compare with previous type founded for it
             else if (specialization.type_bindings[type_variable.to_str()] != type) {
-                context.errors.push_back(Error{"Error: Incompatible types in function arguments"});
-                return Error {};
+                assert(false);
             }
         }
         else if (type != type_variable) {
-            context.errors.push_back(Error{"Error: Incompatible types in function arguments"});
-            return Error {};
+            assert(false);
         }
 
         specialization.args.push_back(type);
