@@ -87,11 +87,23 @@ namespace ast {
         DereferenceNode
     >;
 
+    struct Type;
+
+    struct Interface {
+        std::string name;
+        
+        Interface(std::string name) : name(name) {}
+        bool operator==(const Interface &interface) const;
+        bool operator!=(const Interface &interface) const;
+
+        ast::Type get_default_type();
+    };
+
     struct Type {
         std::string name;
         std::vector<Type> parameters;
         TypeNode* type_definition = nullptr;
-        std::string domain = "";
+        std::optional<Interface> interface; 
 
         Type() : name("") {}
         Type(std::string name) : name(name) {}

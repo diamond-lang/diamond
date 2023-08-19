@@ -3,6 +3,29 @@
 #include <cassert>
 #include <iostream>
 
+// Interface
+// ---------
+bool ast::Interface::operator==(const Interface &interface) const {
+    return interface.name == this->name;
+}
+
+bool ast::Interface::operator!=(const Interface &interface) const {
+    return !(interface == *this);
+}
+
+ast::Type ast::Interface::get_default_type() {
+    if (this->name== "Number") {
+        return ast::Type("int64");
+    }
+    else if (this->name == "Float") {
+        return ast::Type("float64");
+    }
+    else {
+        assert(false);
+        return ast::Type("");
+    }
+}
+
 // Type
 // ----
 bool ast::Type::operator==(const Type &t) const {
@@ -130,8 +153,15 @@ ast::Type ast::get_concrete_type(Node* node, std::unordered_map<std::string, Typ
 
 ast::Type ast::get_concrete_type(Type type_variable, std::unordered_map<std::string, Type>& type_bindings) {
     if (type_variable.is_type_variable()) {
-        assert(type_bindings.find(type_variable.to_str()) != type_bindings.end());
-        type_variable = type_bindings[type_variable.to_str()];
+        if (type_bindings.find(type_variable.to_str()) != type_bindings.end()) {
+            type_variable = type_bindings[type_variable.to_str()];
+        }
+        else if (type_variable.interface.has_value()) {
+            type_variable = type_variable.interface.value().get_default_type();
+        }
+        else {
+            assert(false);
+        }
     }
     if (ast::has_type_variables(type_variable.parameters)) {
         for (size_t i = 0; i < type_variable.parameters.size(); i++) {

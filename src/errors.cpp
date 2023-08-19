@@ -94,6 +94,23 @@ std::string errors::undefined_function(ast::CallNode& call, std::filesystem::pat
            underline_identifier(*call.identifier, file);
 }
 
+std::string format_args(std::vector<ast::Type> args) {
+    std::string result = "";
+    if (args.size() >= 1) result += args[0].to_str();
+    for (size_t i = 1; i < args.size(); i++) {
+        result += ", " + args[i].to_str();
+    }
+    return result;
+}
+
+std::string errors::undefined_function(ast::CallNode& call, std::vector<ast::Type> args, std::filesystem::path file) {
+    auto& identifier = call.identifier->value;
+    return make_header("Undefined function\n\n") +
+           identifier + "(" + format_args(args) + ") is not defined.\n\n" +
+           std::to_string(call.line) + "| " + current_line(call.line, file) + "\n" +
+           underline_identifier(*call.identifier, file);
+}
+
 std::string errors::unhandled_return_value(ast::CallNode& call, std::filesystem::path file) {
     return make_header("Unhandled return value\n\n") +
            std::to_string(call.line) + "| " + current_line(call.line, file) + "\n" +
