@@ -141,7 +141,7 @@ namespace codegen {
         }
 
         bool has_struct_type(ast::Node* expression) {
-            if (this->get_type(expression).type_definition) {
+            if (ast::get_concrete_type(expression, this->type_bindings).type_definition) {
                 return true;
             }
             return false;
@@ -233,14 +233,10 @@ namespace codegen {
             return llvm_types;
         }
 
-        ast::Type get_type(ast::Node* node) {
-            return ast::get_concrete_type(ast::get_type(node), this->type_bindings);
-        }
-
         std::vector<ast::Type> get_types(std::vector<ast::Node*> nodes) {
             std::vector<ast::Type> types;
             for (auto& node: nodes) {
-                types.push_back(this->get_type(node));
+                types.push_back(ast::get_concrete_type(node, this->type_bindings));
             }
             return types;
         }
@@ -248,7 +244,7 @@ namespace codegen {
         std::vector<ast::Type> get_types(std::vector<ast::CallArgumentNode*> nodes) {
             std::vector<ast::Type> types;
             for (auto& node: nodes) {
-                types.push_back(this->get_type(node->expression));
+                types.push_back(ast::get_concrete_type(node->expression, this->type_bindings));
             }
             return types;
         }
@@ -300,7 +296,7 @@ namespace codegen {
                         }
                     }
                     assert(function);
-                    std::string name = this->get_mangled_function_name(function->module_path, call.identifier->value, this->get_types(call.args), this->get_type((ast::Node*) &call), function->is_extern);
+                    std::string name = this->get_mangled_function_name(function->module_path, call.identifier->value, this->get_types(call.args), ast::get_concrete_type((ast::Node*) &call, this->type_bindings), function->is_extern);
                     llvm::Function* llvm_function = this->module->getFunction(name);
                     assert(llvm_function);
                     
@@ -360,22 +356,22 @@ namespace codegen {
             assert(node.fields_accessed.size() >= 2);
 
             // Get struct allocation and type
-            assert(this->get_type((ast::Node*) node.fields_accessed[0]).type_definition);
+            assert(ast::get_concrete_type((ast::Node*) node.fields_accessed[0], this->type_bindings).type_definition);
             llvm::Value* struct_ptr = this->get_binding(node.fields_accessed[0]->value);
-            llvm::StructType* struct_type = this->get_struct_type(this->get_type((ast::Node*) node.fields_accessed[0]).type_definition);
+            llvm::StructType* struct_type = this->get_struct_type(ast::get_concrete_type((ast::Node*) node.fields_accessed[0], this->type_bindings).type_definition);
             if (((llvm::AllocaInst*)struct_ptr)->getAllocatedType()->isPointerTy()) {
                 struct_ptr = this->builder->CreateLoad(struct_type->getPointerTo(), struct_ptr);
             }
 
             // Get type definition
-            ast::TypeNode* type_definition = this->get_type((ast::Node*) node.fields_accessed[0]).type_definition;
+            ast::TypeNode* type_definition = ast::get_concrete_type((ast::Node*) node.fields_accessed[0], this->type_bindings).type_definition;
 
             for (size_t i = 1; i < node.fields_accessed.size() - 1; i++) {
                 // Get pointer to accessed fieldd
                 struct_ptr = this->builder->CreateStructGEP(struct_type, struct_ptr, get_index_of_field(node.fields_accessed[i]->value, type_definition));
 
                 // Update current type definition
-                type_definition = this->get_type((ast::Node*) node.fields_accessed[i]).type_definition;
+                type_definition = ast::get_concrete_type((ast::Node*) node.fields_accessed[i], this->type_bindings).type_definition;
                 struct_type = this->get_struct_type(type_definition);
             }
             
@@ -982,7 +978,7 @@ llvm::Value* codegen::Context::codegen(ast::ReturnNode& node) {
             this->store_fields(
                 node.expression.value(),
                 this->builder->CreateLoad(
-                    this->as_llvm_type(this->get_type(node.expression.value()))->getPointerTo(),
+                    this->as_llvm_type(ast::get_concrete_type(node.expression.value(), this->type_bindings))->getPointerTo(),
                     this->get_binding("$result")
                 )
             );
@@ -1158,7 +1154,7 @@ std::vector<llvm::Value*> codegen::Context::codegen_args(ast::FunctionNode* func
     for (size_t i = 0; i < args.size(); i++) {
         if (this->has_struct_type(args[i]->expression)) {
             // Create allocation
-            llvm::StructType* struct_type = this->get_struct_type(this->get_type(args[i]->expression).type_definition);
+            llvm::StructType* struct_type = this->get_struct_type(ast::get_concrete_type(args[i]->expression, this->type_bindings).type_definition);
             llvm::AllocaInst* allocation = this->create_allocation(function->args[i]->value, struct_type);
 
             // Store fields
@@ -1367,7 +1363,7 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
             this->builder->CreateCall(this->module->getFunction("printf"), printArgs);
             return nullptr;
         }
-        if (this->get_type(node.args[0]->expression) == ast::Type("string")) {
+        if (ast::get_concrete_type(node.args[0]->expression, this->type_bindings) == ast::Type("string")) {
             std::vector<llvm::Value*> printArgs;
             printArgs.push_back(args[0]);
             this->builder->CreateCall(this->module->getFunction("printf"), printArgs);
@@ -1377,7 +1373,7 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
 
     // Get function
     assert(function);
-    std::string name = this->get_mangled_function_name(function->module_path, node.identifier->value, this->get_types(node.args), this->get_type((ast::Node*) &node), function->is_extern);
+    std::string name = this->get_mangled_function_name(function->module_path, node.identifier->value, this->get_types(node.args), ast::get_concrete_type((ast::Node*) &node, this->type_bindings), function->is_extern);
     llvm::Function* llvm_function = this->module->getFunction(name);
     assert(llvm_function);
 
@@ -1390,15 +1386,15 @@ llvm::Value* codegen::Context::codegen(ast::FloatNode& node) {
 }
 
 llvm::Value* codegen::Context::codegen(ast::IntegerNode& node) {
-    if (this->get_type((ast::Node*) &node) == ast::Type("float64"))
+    if (ast::get_concrete_type((ast::Node*) &node, this->type_bindings) == ast::Type("float64"))
         return llvm::ConstantFP::get(*(this->context), llvm::APFloat((double)node.value));
-    else if (this->get_type((ast::Node*) &node) == ast::Type("int64")) {
+    else if (ast::get_concrete_type((ast::Node*) &node, this->type_bindings) == ast::Type("int64")) {
         return llvm::ConstantInt::get(*(this->context), llvm::APInt(64, node.value, true));
     }
-    else if (this->get_type((ast::Node*) &node) == ast::Type("int32")) {
+    else if (ast::get_concrete_type((ast::Node*) &node, this->type_bindings) == ast::Type("int32")) {
         return llvm::ConstantInt::get(*(this->context), llvm::APInt(32, node.value, true));
     }
-    else if (this->get_type((ast::Node*) &node) == ast::Type("int8")) {
+    else if (ast::get_concrete_type((ast::Node*) &node, this->type_bindings) == ast::Type("int8")) {
         return llvm::ConstantInt::get(*(this->context), llvm::APInt(8, node.value, true));
     }
     
@@ -1411,7 +1407,7 @@ llvm::Value* codegen::Context::codegen(ast::IdentifierNode& node) {
         return this->get_binding(node.value);
     }
     return this->builder->CreateLoad(
-        this->as_llvm_type(this->get_type((ast::Node*) &node)),
+        this->as_llvm_type(ast::get_concrete_type((ast::Node*) &node, this->type_bindings)),
         this->get_binding(node.value),
         node.value.c_str()
     );
@@ -1427,7 +1423,7 @@ llvm::Value* codegen::Context::codegen(ast::StringNode& node) {
 
 llvm::Value* codegen::Context::codegen(ast::FieldAccessNode& node) {
     return this->builder->CreateLoad(
-        this->as_llvm_type(this->get_type((ast::Node*) &node)),
+        this->as_llvm_type(ast::get_concrete_type((ast::Node*) &node, this->type_bindings)),
         this->get_field_pointer(node),
         node.fields_accessed[node.fields_accessed.size() - 1]->value
     );
@@ -1440,5 +1436,5 @@ llvm::Value* codegen::Context::codegen(ast::AddressOfNode& node) {
 
 llvm::Value* codegen::Context::codegen(ast::DereferenceNode& node) {
     auto pointer = this->codegen(node.expression);
-    return this->builder->CreateLoad(this->as_llvm_type(this->get_type((ast::Node*) &node)), pointer);;
+    return this->builder->CreateLoad(this->as_llvm_type(ast::get_concrete_type((ast::Node*) &node, this->type_bindings)), pointer);;
 }

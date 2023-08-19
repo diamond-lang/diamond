@@ -116,7 +116,6 @@ namespace semantic {
     void add_constraint(Context& context, Set<ast::Type> constraint);
     ast::Type new_type_variable(Context& context);
     ast::Type get_unified_type(Context& context, ast::Type type_var);
-    ast::Type get_concrete_type(Context& context, ast::Type type_var);
     ast::Type new_final_type_variable(Context& context);
 
     // Semantic analysis
@@ -978,22 +977,6 @@ ast::Type semantic::get_unified_type(Context& context, ast::Type type_var) {
         for (size_t i = 0; i < type_var.parameters.size(); i++) {
             type_var.parameters[i] = semantic::get_unified_type(context, type_var.parameters[i]);
         }
-    }
-    return type_var;
-}
-
-ast::Type semantic::get_concrete_type(Context& context, ast::Type type_var) {
-    if (type_var.is_type_variable()) {
-        if (context.type_inference.compound_types.find(type_var) != context.type_inference.compound_types.end()) {
-            return context.type_inference.compound_types[type_var];
-        }
-        return context.type_inference.type_bindings[type_var.to_str()];
-    }
-    else if (ast::has_type_variables(type_var.parameters)) {
-        for (size_t i = 0; i < type_var.parameters.size(); i++) {
-            type_var.parameters[i] = semantic::get_concrete_type(context, type_var.parameters[i]);
-        }
-        return type_var;
     }
     return type_var;
 }
@@ -2123,7 +2106,9 @@ void semantic::make_concrete(Context& context, ast::IfElseNode& node) {
         semantic::make_concrete(context, node.else_branch.value());
     }
 
-    node.type = semantic::get_concrete_type(context, node.type);
+    if (ast::is_expression((ast::Node*) &node)) {
+        node.type = ast::get_concrete_type(node.type, context.type_inference.type_bindings);
+    }
 }
 
 void semantic::make_concrete(Context& context, ast::WhileNode& node) {
@@ -2148,19 +2133,19 @@ void semantic::make_concrete(Context& context, ast::CallNode& node) {
         semantic::make_concrete(context, *arg);
     }
     
-    node.type = semantic::get_concrete_type(context, node.type);
+    node.type = ast::get_concrete_type(node.type, context.type_inference.type_bindings);
 }
 
 void semantic::make_concrete(Context& context, ast::FloatNode& node) {
-    node.type = semantic::get_concrete_type(context, node.type);
+    node.type = ast::get_concrete_type(node.type, context.type_inference.type_bindings);
 }
 
 void semantic::make_concrete(Context& context, ast::IntegerNode& node) {
-    node.type = semantic::get_concrete_type(context, node.type);
+    node.type = ast::get_concrete_type(node.type, context.type_inference.type_bindings);
 }
 
 void semantic::make_concrete(Context& context, ast::IdentifierNode& node) {
-    node.type = semantic::get_concrete_type(context, node.type);
+    node.type = ast::get_concrete_type(node.type, context.type_inference.type_bindings);
 }
 
 void semantic::make_concrete(Context& context, ast::BooleanNode& node) {
@@ -2173,10 +2158,10 @@ void semantic::make_concrete(Context& context, ast::StringNode& node) {
 
 void semantic::make_concrete(Context& context, ast::FieldAccessNode& node) {
     for (auto field: node.fields_accessed) {
-        field->type = semantic::get_concrete_type(context, field->type);
+        field->type = ast::get_concrete_type(field->type, context.type_inference.type_bindings);
     }
 
-    node.type = semantic::get_concrete_type(context, node.type);
+    node.type = ast::get_concrete_type(node.type, context.type_inference.type_bindings);
 }
 
 void semantic::make_concrete(Context& context, ast::AddressOfNode& node) {
@@ -2191,7 +2176,7 @@ void semantic::make_concrete(Context& context, ast::AddressOfNode& node) {
 void semantic::make_concrete(Context& context, ast::DereferenceNode& node) {
     assert(ast::get_type(node.expression).is_pointer());
 
-    node.type = semantic::get_concrete_type(context, node.type);
+    node.type = ast::get_concrete_type(node.type, context.type_inference.type_bindings);
 
     make_concrete(context, node.expression);
 }
