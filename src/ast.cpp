@@ -397,7 +397,7 @@ void put_indent_level(size_t indent_level, std::vector<bool> last) {
     }
 }
 
-ast::Type ast::get_concrete_type(ast::Type type, ast::PrintContext context) {
+ast::Type ast::get_concrete_type_or_type_variable(ast::Type type, ast::PrintContext context) {
     if (context.concrete) {
         return ast::get_concrete_type(type, context.type_bindings);
     }
@@ -492,14 +492,14 @@ void ast::print(Node* node, PrintContext context) {
                 auto& arg_type = function.args[i]->type;
 
                 if (arg_type != Type("")) {
-                    std::cout << ": " << get_concrete_type(arg_type, context).to_str();
+                    std::cout << ": " << get_concrete_type_or_type_variable(arg_type, context).to_str();
                 }
 
                 if (i != function.args.size() - 1) std::cout << ", ";
             }
             std::cout << ")";
             if (function.return_type != Type("")) {
-                std::cout << ": " << get_concrete_type(function.return_type, context).to_str();
+                std::cout << ": " << get_concrete_type_or_type_variable(function.return_type, context).to_str();
             }
             std::cout << "\n";
 
@@ -612,7 +612,7 @@ void ast::print(Node* node, PrintContext context) {
                 assert(false);
             }
             if (ast::get_type(assignment.identifier->expression) != ast::Type("")) {
-                std::cout << ": " << ast::get_concrete_type(assignment.identifier->expression, context.type_bindings).to_str();
+                std::cout << ": " << ast::get_concrete_type_or_type_variable(ast::get_type(assignment.identifier->expression), context).to_str();
             }
             std::cout << "\n";
             put_indent_level(context.indent_level + 1, append(context.last, false));
@@ -677,7 +677,7 @@ void ast::print(Node* node, PrintContext context) {
 
                 put_indent_level(context.indent_level, append(context.last, false));
                 std::cout << "if";
-                if (get_concrete_type(if_else.type, context) != Type("")) std::cout << ": " << get_concrete_type(if_else.type, context).to_str();
+                if (get_concrete_type_or_type_variable(if_else.type, context) != Type("")) std::cout << ": " << get_concrete_type_or_type_variable(if_else.type, context).to_str();
                 std::cout << "\n";
                 print(if_else.condition, PrintContext{context.indent_level + 1, append(append(context.last, false), false), context.concrete, context.type_bindings});
                 print(if_else.if_branch, PrintContext{context.indent_level + 1, append(append(context.last, false), true), context.concrete, context.type_bindings});
@@ -733,7 +733,7 @@ void ast::print(Node* node, PrintContext context) {
 
             put_indent_level(context.indent_level, context.last);
             std::cout << call.identifier->value;
-            if (call.type != Type("")) std::cout << ": " << get_concrete_type(call.type, context).to_str();
+            if (call.type != Type("")) std::cout << ": " << get_concrete_type_or_type_variable(call.type, context).to_str();
             std::cout << "\n";
             for (size_t i = 0; i < call.args.size(); i++) {
                 print((ast::Node*) call.args[i], PrintContext{context.indent_level + 1, append(context.last, i == call.args.size() - 1), context.concrete, context.type_bindings});
@@ -746,7 +746,7 @@ void ast::print(Node* node, PrintContext context) {
 
             put_indent_level(context.indent_level, context.last);
             std::cout << float_node.value;
-            if (float_node.type != Type("")) std::cout << ": " << get_concrete_type(float_node.type, context).to_str();
+            if (float_node.type != Type("")) std::cout << ": " << get_concrete_type_or_type_variable(float_node.type, context).to_str();
             std::cout << "\n";
             break;
         }
@@ -756,7 +756,7 @@ void ast::print(Node* node, PrintContext context) {
 
             put_indent_level(context.indent_level, context.last);
             std::cout << integer.value;
-            if (integer.type != Type("")) std::cout << ": " << get_concrete_type(integer.type, context).to_str();
+            if (integer.type != Type("")) std::cout << ": " << get_concrete_type_or_type_variable(integer.type, context).to_str();
             std::cout << "\n";
             break;
         }
@@ -766,7 +766,7 @@ void ast::print(Node* node, PrintContext context) {
 
             put_indent_level(context.indent_level, context.last);
             std::cout << identifier.value;
-            if (identifier.type != Type("")) std::cout << ": " << get_concrete_type(identifier.type, context).to_str();
+            if (identifier.type != Type("")) std::cout << ": " << get_concrete_type_or_type_variable(identifier.type, context).to_str();
             std::cout << "\n";
             break;
         }
@@ -776,7 +776,7 @@ void ast::print(Node* node, PrintContext context) {
 
             put_indent_level(context.indent_level, context.last);
             std::cout << (boolean.value ? "true" : "false");
-            if (boolean.type != Type("")) std::cout << ": " << get_concrete_type(boolean.type, context).to_str();
+            if (boolean.type != Type("")) std::cout << ": " << get_concrete_type_or_type_variable(boolean.type, context).to_str();
             std::cout << "\n";
             break;
         }
@@ -786,7 +786,7 @@ void ast::print(Node* node, PrintContext context) {
 
             put_indent_level(context.indent_level, context.last);
             std::cout << "\"" << string.value << "\"";
-            if (string.type != Type("")) std::cout << ": " << get_concrete_type(string.type, context).to_str();
+            if (string.type != Type("")) std::cout << ": " << get_concrete_type_or_type_variable(string.type, context).to_str();
             std::cout << "\n";
             break;
         }
@@ -801,7 +801,7 @@ void ast::print(Node* node, PrintContext context) {
             for (size_t i = 0; i < field_access.fields_accessed.size(); i++) {
                 put_indent_level(context.indent_level + i, last);
                 std::cout << field_access.fields_accessed[i]->value;
-                if (field_access.fields_accessed[i]->type != Type("")) std::cout << ": " << get_concrete_type(field_access.fields_accessed[i]->type, context).to_str();
+                if (field_access.fields_accessed[i]->type != Type("")) std::cout << ": " << get_concrete_type_or_type_variable(field_access.fields_accessed[i]->type, context).to_str();
                 std::cout << "\n";
                 last.push_back(true);
             }
@@ -814,7 +814,7 @@ void ast::print(Node* node, PrintContext context) {
 
             put_indent_level(context.indent_level, context.last);
             std::cout << "&";
-            if (address_of.type != Type("")) std::cout << ": " << get_concrete_type(address_of.type, context).to_str();
+            if (address_of.type != Type("")) std::cout << ": " << get_concrete_type_or_type_variable(address_of.type, context).to_str();
             std::cout << "\n";
 
             context.indent_level += 1;
@@ -829,7 +829,7 @@ void ast::print(Node* node, PrintContext context) {
 
             put_indent_level(context.indent_level, context.last);
             std::cout << "*";
-            if (dereference.type != Type("")) std::cout << ": " << get_concrete_type(dereference.type, context).to_str();
+            if (dereference.type != Type("")) std::cout << ": " << get_concrete_type_or_type_variable(dereference.type, context).to_str();
             std::cout << "\n";
 
             context.indent_level += 1;

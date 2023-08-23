@@ -404,7 +404,7 @@ namespace ast {
         std::unordered_map<std::string, ast::Type> type_bindings;
     };
 
-    Type get_concrete_type(Type type, PrintContext context);
+    Type get_concrete_type_or_type_variable(Type type, PrintContext context);
     void print(const Ast& ast, PrintContext context = PrintContext{});
     void print(Node* node, PrintContext context = PrintContext{});
     void print_with_concrete_types(const Ast& ast, PrintContext context = PrintContext{});
