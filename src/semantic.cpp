@@ -809,7 +809,7 @@ Result<Ok, Error> semantic::check_function_constraint(Context& context, std::uno
         std::vector<ast::Type> default_types;
         for (auto arg: constraint.args) {
             args_types.push_back(arg);
-            if (!arg.is_type_variable()) {
+            if (arg.is_concrete()) {
                 default_types.push_back(arg);
             }
             else if (type_bindings.find(arg.to_str()) != type_bindings.end()) {
@@ -817,6 +817,9 @@ Result<Ok, Error> semantic::check_function_constraint(Context& context, std::uno
             }
             else if (arg.interface.has_value()) {
                 default_types.push_back(arg.interface.value().get_default_type());
+            }
+            else if (!arg.is_type_variable() && ast::has_type_variables(arg.parameters)) {
+                default_types.push_back(ast::get_concrete_type(arg, type_bindings));
             }
             else {
                 std::cout << arg.to_str() << "\n";
@@ -1981,7 +1984,7 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::Ca
     node.type = semantic::get_unified_type(context, node.type);
 
     // Add constraint
-    if (node.type.is_type_variable() || ast::has_type_variables(ast::get_types(node.args))) {
+    if (!node.type.is_concrete() || !ast::types_are_concrete(ast::get_types(node.args))) {
         auto constraint = ast::FunctionConstraint{node.identifier->value, ast::get_types(node.args), node.type, &node};
         if (std::find(context.type_inference.function_constraints.begin(), context.type_inference.function_constraints.end(), constraint) == context.type_inference.function_constraints.end()) {
             context.type_inference.function_constraints.push_back(constraint);

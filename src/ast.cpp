@@ -81,6 +81,10 @@ bool ast::Type::is_type_variable() const {
     else                                 return false;
 }
 
+bool ast::Type::is_concrete() const {
+    return !this->is_type_variable() && ast::types_are_concrete(this->parameters);
+}
+
 bool ast::Type::is_integer() const {
     if (*this == ast::Type("int64"))      return true;
     else if (*this == ast::Type("int32")) return true;
@@ -289,6 +293,13 @@ bool ast::has_type_variables(std::vector<ast::Type> types) {
         if (type.is_type_variable()) return true;
     }
     return false;
+}
+
+bool ast::types_are_concrete(std::vector<ast::Type> types) {
+    for (auto& type: types) {
+        if (!type.is_concrete()) return false;
+    }
+    return true;
 }
 
 bool ast::is_expression(Node* node) {
@@ -601,7 +612,7 @@ void ast::print(Node* node, PrintContext context) {
                 assert(false);
             }
             if (ast::get_type(assignment.identifier->expression) != ast::Type("")) {
-                std::cout << ": " << ast::get_type(assignment.identifier->expression).to_str();
+                std::cout << ": " << ast::get_concrete_type(assignment.identifier->expression, context.type_bindings).to_str();
             }
             std::cout << "\n";
             put_indent_level(context.indent_level + 1, append(context.last, false));

@@ -113,6 +113,7 @@ namespace ast {
         bool operator!=(const Type &t) const;
         std::string to_str(std::string output = "") const;
         bool is_type_variable() const;
+        bool is_concrete() const;
         bool is_integer() const;
         bool is_float() const;
         bool is_pointer() const;
@@ -132,6 +133,7 @@ namespace ast {
     bool could_be_expression(Node* node);
     void transform_to_expression(Node*& node);
     bool has_type_variables(std::vector<Type> types);
+    bool types_are_concrete(std::vector<Type> types);
 
     struct BlockNode {
         size_t line;
