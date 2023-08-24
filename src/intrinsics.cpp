@@ -41,61 +41,73 @@ std::unordered_map<std::string, std::vector<std::pair<std::vector<ast::Type>, as
     {"+", {
         {{ast::Type("float64"), ast::Type("float64")}, ast::Type("float64")},
         {{ast::Type("int64"), ast::Type("int64")}, ast::Type("int64")},
-        {{ast::Type("int32"), ast::Type("int32")}, ast::Type("int32")}
+        {{ast::Type("int32"), ast::Type("int32")}, ast::Type("int32")},
+        {{ast::Type("int8"), ast::Type("int8")}, ast::Type("int8")}
     }},
     {"*", {
         {{ast::Type("float64"), ast::Type("float64")}, ast::Type("float64")},
         {{ast::Type("int64"), ast::Type("int64")}, ast::Type("int64")},
-        {{ast::Type("int32"), ast::Type("int32")}, ast::Type("int32")}
+        {{ast::Type("int32"), ast::Type("int32")}, ast::Type("int32")},
+        {{ast::Type("int8"), ast::Type("int8")}, ast::Type("int8")}
     }},
     {"/", {
         {{ast::Type("float64"), ast::Type("float64")}, ast::Type("float64")},
         {{ast::Type("int64"), ast::Type("int64")}, ast::Type("int64")},
-        {{ast::Type("int32"), ast::Type("int32")}, ast::Type("int32")}
+        {{ast::Type("int32"), ast::Type("int32")}, ast::Type("int32")},
+        {{ast::Type("int8"), ast::Type("int8")}, ast::Type("int8")}
     }},
     {"%", {
         {{ast::Type("int64"), ast::Type("int64")}, ast::Type("int64")},
-        {{ast::Type("int32"), ast::Type("int32")}, ast::Type("int32")}
+        {{ast::Type("int32"), ast::Type("int32")}, ast::Type("int32")},
+        {{ast::Type("int8"), ast::Type("int8")}, ast::Type("int8")}
     }},
     {"-", {
         {{ast::Type("float64")}, ast::Type("float64")},
         {{ast::Type("int64")}, ast::Type("int64")},
         {{ast::Type("int32")}, ast::Type("int32")},
+        {{ast::Type("int8")}, ast::Type("int8")},
         {{ast::Type("float64"), ast::Type("float64")}, ast::Type("float64")},
         {{ast::Type("int64"), ast::Type("int64")}, ast::Type("int64")},
-        {{ast::Type("int32"), ast::Type("int32")}, ast::Type("int32")}
+        {{ast::Type("int32"), ast::Type("int32")}, ast::Type("int32")},
+        {{ast::Type("int8"), ast::Type("int8")}, ast::Type("int8")}
     }},
     {"<", {
         {{ast::Type("float64"), ast::Type("float64")}, ast::Type("bool")},
         {{ast::Type("int64"), ast::Type("int64")}, ast::Type("bool")},
-        {{ast::Type("int32"), ast::Type("int32")}, ast::Type("int32")}
+        {{ast::Type("int32"), ast::Type("int32")}, ast::Type("int32")},
+        {{ast::Type("int8"), ast::Type("int8")}, ast::Type("int8")}
     }},
     {"<=", {
         {{ast::Type("float64"), ast::Type("float64")}, ast::Type("bool")},
         {{ast::Type("int64"), ast::Type("int64")}, ast::Type("bool")},
-        {{ast::Type("int32"), ast::Type("int32")}, ast::Type("int32")}
+        {{ast::Type("int32"), ast::Type("int32")}, ast::Type("int32")},
+        {{ast::Type("int8"), ast::Type("int8")}, ast::Type("int8")}
     }},
     {">", {
         {{ast::Type("float64"), ast::Type("float64")}, ast::Type("bool")},
         {{ast::Type("int64"), ast::Type("int64")}, ast::Type("bool")},
-        {{ast::Type("int32"), ast::Type("int32")}, ast::Type("int32")}
+        {{ast::Type("int32"), ast::Type("int32")}, ast::Type("int32")},
+        {{ast::Type("int8"), ast::Type("int8")}, ast::Type("int8")}
     }},
     {">=", {
         {{ast::Type("float64"), ast::Type("float64")}, ast::Type("bool")},
         {{ast::Type("int64"), ast::Type("int64")}, ast::Type("bool")},
-        {{ast::Type("int32"), ast::Type("int32")}, ast::Type("int32")}
+        {{ast::Type("int32"), ast::Type("int32")}, ast::Type("int32")},
+        {{ast::Type("int8"), ast::Type("int8")}, ast::Type("int8")}
     }},
     {"==", {
         {{ast::Type("bool"), ast::Type("bool")}, ast::Type("bool")},
         {{ast::Type("float64"), ast::Type("float64")}, ast::Type("bool")},
         {{ast::Type("int64"), ast::Type("int64")}, ast::Type("bool")},
-        {{ast::Type("int32"), ast::Type("int32")}, ast::Type("int32")}
+        {{ast::Type("int32"), ast::Type("int32")}, ast::Type("int32")},
+        {{ast::Type("int8"), ast::Type("int8")}, ast::Type("int8")}
     }},
     {"!=", {
         {{ast::Type("bool"), ast::Type("bool")}, ast::Type("bool")},
         {{ast::Type("float64"), ast::Type("float64")}, ast::Type("bool")},
         {{ast::Type("int64"), ast::Type("int64")}, ast::Type("bool")},
-        {{ast::Type("int32"), ast::Type("int32")}, ast::Type("int32")}
+        {{ast::Type("int32"), ast::Type("int32")}, ast::Type("int32")},
+        {{ast::Type("int8"), ast::Type("int8")}, ast::Type("int8")}
     }},
     {"not", {
         {{ast::Type("bool")}, ast::Type("bool")}
@@ -110,6 +122,7 @@ std::unordered_map<std::string, std::vector<std::pair<std::vector<ast::Type>, as
         {{ast::Type("float64")}, ast::Type("void")},
         {{ast::Type("int64")}, ast::Type("void")},
         {{ast::Type("int32")}, ast::Type("void")},
+        {{ast::Type("int8")}, ast::Type("void")},
         {{ast::Type("bool")}, ast::Type("void")},
         {{ast::Type("string")}, ast::Type("void")}
     }}
