@@ -807,19 +807,23 @@ Result<Ok, Error> semantic::check_function_constraint(Context& context, std::uno
         // Get unified and default types
         std::vector<ast::Type> args_types;
         std::vector<ast::Type> default_types;
+        std::vector<ast::Type> unified_types;
         for (auto arg: constraint.args) {
             args_types.push_back(arg);
             if (arg.is_concrete()) {
                 default_types.push_back(arg);
+                unified_types.push_back(arg);
             }
             else if (type_bindings.find(arg.to_str()) != type_bindings.end()) {
                 default_types.push_back(type_bindings[arg.to_str()]);
-            }
-            else if (arg.interface.has_value()) {
-                default_types.push_back(arg.interface.value().get_default_type());
+                unified_types.push_back(type_bindings[arg.to_str()]);
             }
             else if (!arg.is_type_variable() && ast::has_type_variables(arg.parameters)) {
                 default_types.push_back(ast::get_concrete_type(arg, type_bindings));
+                unified_types.push_back(ast::get_concrete_type(arg, type_bindings));
+            }
+            else if (arg.interface.has_value()) {
+                default_types.push_back(arg.interface.value().get_default_type());
             }
             else {
                 std::cout << arg.to_str() << "\n";
@@ -828,6 +832,33 @@ Result<Ok, Error> semantic::check_function_constraint(Context& context, std::uno
         }
         
         if (binding->type == semantic::OverloadedFunctionsBinding) {
+            // If types are concrete
+            if (unified_types.size() == constraint.args.size()) {
+                for (auto function: semantic::get_overloaded_functions(*binding)) {
+                    if (ast::get_types(function->args) == unified_types) {
+                        for (size_t i = 0; i < function->args.size(); i++) {
+                            type_bindings[constraint.args[i].to_str()] = default_types[i];
+                        }
+
+                        // If return type was not already included
+                        ast::Type type_variable = constraint.return_type;
+                        if (type_bindings.find(type_variable.to_str()) == type_bindings.end()) {
+                            type_bindings[type_variable.to_str()] = function->return_type;
+                        }
+                        // Else compare with previous type founded for it
+                        else if (type_bindings[type_variable.to_str()] != function->return_type) {
+                            context.errors.push_back(Error{"Error: Incompatible types in function constraints"});
+                            return Error {};
+                        }
+
+                        return Ok {};
+                    }
+                }
+
+                context.errors.push_back(errors::undefined_function(*constraint.call, unified_types, context.current_module));
+                return Error {};
+            }
+
             // Try default arguments types
             for (auto function: semantic::get_overloaded_functions(*binding)) {
                 if (ast::get_types(function->args) == default_types) {
@@ -840,7 +871,7 @@ Result<Ok, Error> semantic::check_function_constraint(Context& context, std::uno
                     if (type_bindings.find(type_variable.to_str()) == type_bindings.end()) {
                         type_bindings[type_variable.to_str()] = function->return_type;
                     }
-                    // Else compare with previous type founded for her
+                    // Else compare with previous type founded for it
                     else if (type_bindings[type_variable.to_str()] != function->return_type) {
                         context.errors.push_back(Error{"Error: Incompatible types in function constraints"});
                         return Error {};
@@ -1150,7 +1181,8 @@ Result<Ok, Error> semantic::analyze_block_or_expression(semantic::Context& conte
         }
 
         for (auto& constraint: context.type_inference.function_constraints) {
-            semantic::check_function_constraint(context, context.type_inference.type_bindings, constraint);
+            auto result = semantic::check_function_constraint(context, context.type_inference.type_bindings, constraint);
+            if (result.is_error()) return result;
         }
 
         semantic::remove_scope(context);

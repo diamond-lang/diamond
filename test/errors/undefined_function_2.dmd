@@ -1,0 +1,18 @@
+function add(a: int32, b: int32): int32
+    a + b
+
+function add(a: int8, b: int8): int8
+    a + b
+
+a = 2 : int64
+b = 4 : int64
+print(add(a, b))
+
+--- Output
+Undefined function
+
+add(int64, int64) is not defined.
+
+9| print(add(a, b))
+         ^^^
+---
