@@ -1627,11 +1627,17 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
 
 Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, ast::CallNode& node) {
     auto& identifier = node.identifier->value;
+
+    // Analyze arguments
+    for (auto arg: node.args) {
+        auto result = semantic::type_infer_and_analyze(context, arg->expression);
+        if (result.is_error()) return Error {};
+    }
       
     // Check binding exists
     semantic::Binding* binding = semantic::get_binding(context, identifier);
     if (!binding) {
-        context.errors.push_back(errors::undefined_function(node, context.current_module));
+        context.errors.push_back(errors::undefined_function(node, ast::get_default_types(ast::get_types(node.args)), context.current_module));
         return Error {};
     }
 
@@ -1659,9 +1665,6 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
                 if (arg->identifier.value()->value == field) {
                     founded = true;
 
-                    auto result = semantic::type_infer_and_analyze(context, arg->expression);
-                    if (result.is_error()) return Error {};
-
                     if (struct_type->fields.find(field) == struct_type->fields.end()) {
                         struct_type->fields[field] = type_definition->fields[i]->type;
                     }
@@ -1681,10 +1684,6 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
     }
     else if (is_function(*binding)) {
         // Analyze arguments
-        for (size_t i = 0; i < node.args.size(); i++) {
-            auto result = semantic::type_infer_and_analyze(context, node.args[i]->expression);
-            if (result.is_error()) return Error {};
-        }
         if (node.type == ast::Type("")) {
             node.type = semantic::new_type_variable(context);
         }
@@ -1719,13 +1718,6 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
                 // Add constraints found
                 for (auto it = sets.begin(); it != sets.end(); it++) {
                     semantic::add_constraint(context, it->second);
-                }
-
-                // Check binding exists
-                semantic::Binding* binding = semantic::get_binding(context, identifier);
-                if (!binding || !is_function(*binding)) {
-                    context.errors.push_back(errors::undefined_function(node, context.current_module));
-                    return Error {};
                 }
 
                 return Ok {};

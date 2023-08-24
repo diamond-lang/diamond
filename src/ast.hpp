@@ -127,6 +127,7 @@ namespace ast {
     std::vector<Type> get_types(std::vector<Node*> nodes);
     std::vector<Type> get_types(std::vector<CallArgumentNode*> nodes);
     std::vector<Type> get_types(std::vector<FunctionArgumentNode*> nodes);
+    std::vector<Type> get_default_types(std::vector<ast::Type> types);
     std::vector<Type> get_concrete_types(std::vector<Node*> nodes, std::unordered_map<std::string, Type>& type_bindings);
     std::vector<Type> get_concrete_types(std::vector<Type> type_variables, std::unordered_map<std::string, Type>& type_bindings);
     bool is_expression(Node* node);

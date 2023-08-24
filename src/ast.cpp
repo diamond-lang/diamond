@@ -210,6 +210,15 @@ std::vector<ast::Type> ast::get_types(std::vector<FunctionArgumentNode*> nodes) 
     return types;
 }
 
+std::vector<ast::Type> ast::get_default_types(std::vector<ast::Type> types) {
+    std::vector<Type> result;
+    for (size_t i = 0; i < types.size(); i++) {
+        assert(types[i].interface.has_value());
+        result.push_back(types[i].interface.value().get_default_type());
+    }
+    return result;
+}
+
 std::vector<ast::Type> ast::get_concrete_types(std::vector<Node*> nodes, std::unordered_map<std::string, Type>& type_bindings) {
     std::vector<Type> types;
     for (size_t i = 0; i < nodes.size(); i++) {
