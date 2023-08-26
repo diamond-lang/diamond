@@ -111,6 +111,13 @@ std::string errors::undefined_function(ast::CallNode& call, std::vector<ast::Typ
            underline_identifier(*call.identifier, file);
 }
 
+std::string errors::ambiguous_what_function_to_call(ast::CallNode& call, std::filesystem::path file) {
+    auto& identifier = call.identifier->value;
+    return make_header("Ambiguous what function to call\n\n") +
+           std::to_string(call.line) + "| " + current_line(call.line, file) + "\n" +
+           underline_identifier(*call.identifier, file);
+}
+
 std::string errors::unhandled_return_value(ast::CallNode& call, std::filesystem::path file) {
     return make_header("Unhandled return value\n\n") +
            std::to_string(call.line) + "| " + current_line(call.line, file) + "\n" +

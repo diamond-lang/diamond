@@ -920,7 +920,7 @@ Result<Ok, Error> semantic::check_function_constraint(Context& context, std::uno
                 return Error {};
             }
             else if (functions_that_can_be_called.size() > 1) {
-                context.errors.push_back(Error{"Error: Is ambiguous what function to call"});
+                context.errors.push_back(errors::ambiguous_what_function_to_call(*constraint.call, context.current_module));
                 return Error {};
             }
 

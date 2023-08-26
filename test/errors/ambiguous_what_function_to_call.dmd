@@ -1,0 +1,16 @@
+function add(a: int32, b: int32): int32
+    a + b
+
+function add(a: int8, b: int8): int8
+    a + b
+
+a = 2
+b = 4
+print(add(2, 5))
+
+--- Output
+Ambiguous what function to call
+
+9| print(add(2, 5))
+         ^^^
+---
