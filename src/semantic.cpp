@@ -1231,7 +1231,6 @@ Result<Ok, Error> semantic::analyze(semantic::Context& context, ast::FunctionNod
             auto identifier = arg->value;
             if (arg->type == ast::Type("")) {
                 arg->type = semantic::new_type_variable(new_context);
-                semantic::add_constraint(new_context, semantic::make_Set<ast::Type>({arg->type}));
             }
             else {
                 auto result = semantic::analyze(new_context, arg->type);
@@ -1716,8 +1715,9 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
                 }
 
                 // Add constraints found
-                for (auto it = sets.begin(); it != sets.end(); it++) {
-                    semantic::add_constraint(context, it->second);
+                for (auto set: sets) {
+                    if (semantic::size(set.second) == 1) continue;
+                    semantic::add_constraint(context, set.second);
                 }
 
                 return Ok {};
@@ -1755,8 +1755,9 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
             }
 
             // Save sets found
-            for (auto it = sets.begin(); it != sets.end(); it++) {
-                semantic::add_constraint(context, it->second);
+            for (auto set: sets) {
+                if (semantic::size(set.second) == 1) continue;
+                semantic::add_constraint(context, set.second);
             }
         }
         else {

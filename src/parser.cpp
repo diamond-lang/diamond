@@ -1045,16 +1045,17 @@ Result<ast::Node*, Error> Parser::parse_address_of() {
 Result<ast::Node*, Error> Parser::parse_dereference() {
     // Create node
     auto dereference = ast::DereferenceNode {this->current().line, this->current().column};
-
+    
     // Parse dereference operator
-    while (this->current() == token::Star) {
-        this->advance();
-        dereference.dereferences++;
-    }
+    assert(this->current() == token::Star);
+    this->advance();
 
     // Parse expression
     Result<ast::Node*, Error> expression;
-    if (this->match({token::Identifier, token::Dot})) {
+    if (this->current() == token::Star) {
+        expression = this->parse_dereference();
+    }
+    else if (this->match({token::Identifier, token::Dot})) {
         expression = this->parse_field_access();
     }
     else {

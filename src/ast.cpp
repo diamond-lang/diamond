@@ -603,27 +603,18 @@ void ast::print(Node* node, PrintContext context) {
             auto& assignment = std::get<DereferenceAssignmentNode>(*node);
 
             put_indent_level(context.indent_level, context.last);
-            for (unsigned int i = 0; i < assignment.identifier->dereferences; i++) {
-                std::cout << "*";
-            }
-
-            if (assignment.identifier->expression->index() == ast::Identifier) {
-                std::cout << ((ast::IdentifierNode*)assignment.identifier->expression)->value;
-            }
-            else if (assignment.identifier->expression->index() == ast::FieldAccess) {
-                auto field_access = (ast::FieldAccessNode*)assignment.identifier->expression;
-                std::cout << field_access->fields_accessed[0]->value;
-                for (size_t i = 1; i < field_access->fields_accessed.size(); i++) {
-                    std::cout << "." << field_access->fields_accessed[i]->value;
-                }
-            }
-            else {
-                assert(false);
-            }
+            std::cout << "*";
             if (ast::get_type(assignment.identifier->expression) != ast::Type("")) {
-                std::cout << ": " << ast::get_concrete_type_or_type_variable(ast::get_type(assignment.identifier->expression), context).to_str();
+                std::cout << ": " << ast::get_concrete_type_or_type_variable(assignment.identifier->type, context).to_str();
             }
             std::cout << "\n";
+
+            context.indent_level += 1;
+            context.last.push_back(false);
+            print(assignment.identifier->expression, context);
+            context.indent_level -= 1;
+            context.last.pop_back();
+
             put_indent_level(context.indent_level + 1, append(context.last, false));
             std::cout << "=" << '\n';
 

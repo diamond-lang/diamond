@@ -372,8 +372,7 @@ namespace ast {
         size_t line;
         size_t column;
         Type type = Type("");
-
-        unsigned int dereferences = 0;
+    
         ast::Node* expression;
     };
 

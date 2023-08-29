@@ -948,10 +948,6 @@ llvm::Value* codegen::Context::codegen(ast::DereferenceAssignmentNode& node) {
 
     // Codegen pointer
     auto pointer = this->codegen(node.identifier->expression);
-    for (unsigned int i = 1; i < node.identifier->dereferences; i++) {
-        auto pointer_type = pointer->getType();
-        pointer = this->builder->CreateLoad(pointer_type, pointer);
-    }
 
     if (!this->has_struct_type(node.expression)) {
         this->builder->CreateStore(expression, pointer);
