@@ -1,8 +1,10 @@
-a = 10 : int64
-p = &a : pointer[int64]
+a = 10
+p = &a
 *p = 20
+print(*p)
 print(a)
 
 --- Output
+20
 20
 ---

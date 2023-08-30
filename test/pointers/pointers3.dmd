@@ -1,8 +1,9 @@
-a = 0
-p = &a
-*p = 10
-print(*p)
+a = 10
+p = &a 
+o = &p
+**o = 30
+print(a)
 
 --- Output
-10
+30
 ---

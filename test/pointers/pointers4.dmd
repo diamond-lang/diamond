@@ -1,14 +1,9 @@
-function awesome(pointer, value)
-    *pointer = value
-    print(*pointer)
-
-a = 10
-print(a)
-awesome(&a, 20)
+a = 10 : int64
+p = &a : pointer[int64]
+o = &p : pointer[pointer[int64]]
+**o = 30
 print(a)
 
 --- Output
-10
-20
-20
+30
 ---

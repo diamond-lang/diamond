@@ -167,7 +167,7 @@ ast::Type ast::get_concrete_type(Type type_variable, std::unordered_map<std::str
             assert(false);
         }
     }
-    if (ast::has_type_variables(type_variable.parameters)) {
+    if (!type_variable.is_concrete()) {
         for (size_t i = 0; i < type_variable.parameters.size(); i++) {
             type_variable.parameters[i] = ast::get_concrete_type(type_variable.parameters[i], type_bindings);
         }
@@ -247,6 +247,7 @@ bool ast::could_be_expression(Node* node) {
         case Function: return false;
         case Assignment: return false;
         case FieldAssignment: return false;
+        case DereferenceAssignment: return false;
         case Return: return false;
         case Break: return false;
         case Continue: return false;
