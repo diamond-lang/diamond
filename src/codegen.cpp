@@ -181,6 +181,13 @@ namespace codegen {
                             type = ast::Type("int64");
                             bytes += 1;
                         }
+                        else if (fields[i]->isPointerTy()) {
+                            type = ast::Type("int64");
+                            bytes += 8;
+                        }
+                        else {
+                            assert(false);
+                        }
                         i += 1;
                     }
 

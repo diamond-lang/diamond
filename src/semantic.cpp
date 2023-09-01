@@ -111,6 +111,7 @@ namespace semantic {
     std::vector<std::unordered_map<std::string, Binding>> get_definitions(Context& context);
     Result<ast::Type, Error> get_type_of_generic_function(Context& context, std::vector<ast::Type> args, ast::FunctionNode* function, std::vector<ast::FunctionPrototype> call_stack = {});
     Result<Ok, Error> check_function_constraint(Context& context, std::unordered_map<std::string, ast::Type>& type_bindings, ast::FunctionConstraint constraint, std::vector<ast::FunctionPrototype> call_stack = {});
+    Result<Ok, Error> add_type_binding(Context& context, std::unordered_map<std::string, ast::Type>& type_bindings, ast::Type binding, ast::Type type);
     void add_constraint(Context& context, Set<ast::Type> constraint);
     ast::Type new_type_variable(Context& context);
     ast::Type get_unified_type(Context& context, ast::Type type_var);
@@ -744,6 +745,19 @@ Result<ast::Type, Error> semantic::get_type_of_generic_function(Context& context
     return specialization.return_type;
 }
 
+Result<Ok, Error> semantic::add_type_binding(Context& context, std::unordered_map<std::string, ast::Type>& type_bindings, ast::Type binding, ast::Type type) {
+    if (!binding.is_concrete()) {
+        type_bindings[binding.to_str()] = type;
+    }
+    if (binding.parameters.size() == type.parameters.size()) {
+        for (size_t i = 0; i < binding.parameters.size(); i++) {
+            auto result = add_type_binding(context, type_bindings, binding.parameters[i], type.parameters[i]);
+            if (result.is_error()) return result;
+        }
+    }
+    return Ok {};
+}
+
 Result<Ok, Error> semantic::check_function_constraint(Context& context, std::unordered_map<std::string, ast::Type>& type_bindings, ast::FunctionConstraint constraint, std::vector<ast::FunctionPrototype> call_stack) {
     if (constraint.identifier == "void") {
         ast::Type type_variable = constraint.args[0];
@@ -781,8 +795,7 @@ Result<Ok, Error> semantic::check_function_constraint(Context& context, std::uno
         // Search for field
         for (auto field: type_definition->fields) {
             if ("." + field->value == constraint.identifier) {
-                type_bindings[constraint.return_type.to_str()] = field->type;
-                return Ok {};
+                return add_type_binding(context, type_bindings, constraint.return_type, field->type);
             }
         }
 
@@ -1225,6 +1238,7 @@ Result<Ok, Error> semantic::analyze(semantic::Context& context, ast::FunctionNod
             auto identifier = arg->value;
             if (arg->type == ast::Type("")) {
                 arg->type = semantic::new_type_variable(new_context);
+                semantic::add_constraint(new_context, semantic::make_Set<ast::Type>({arg->type}));
             }
             else {
                 auto result = semantic::analyze(new_context, arg->type);
