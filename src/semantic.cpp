@@ -78,14 +78,12 @@ namespace semantic {
         size_t current_type_variable_number = 1;
         std::vector<Set<ast::Type>> type_constraints;
         std::unordered_map<ast::Type, Set<ast::Type>> labeled_type_constraints;
-        std::unordered_map<ast::Type, ast::Type> compound_types;
         std::unordered_map<ast::Type, StructType> struct_types;
         ast::FunctionConstraints function_constraints;
         std::unordered_map<std::string, ast::Type> type_bindings;
     };
 
     void print(std::unordered_map<ast::Type, StructType> struct_types);
-    void print(std::unordered_map<ast::Type, ast::Type> compound_types);
     void print(Set<ast::Type> set);
     void print(std::vector<Set<ast::Type>> sets);
     void print(std::unordered_map<ast::Type, Set<ast::Type>> labeled_sets);
@@ -396,13 +394,6 @@ void semantic::print(std::unordered_map<ast::Type, semantic::StructType> struct_
             std::cout << ",";
         }
         std::cout << "\n";
-    }
-}
-
-void semantic::print(std::unordered_map<ast::Type, ast::Type> compound_types) {
-    std::cout << "compound types\n";
-    for (auto it = compound_types.begin(); it != compound_types.end(); it++) {
-        std::cout << "    " << it->first.to_str() << ": " << it->second.to_str() << "\n";
     }
 }
 
@@ -992,31 +983,28 @@ ast::Type semantic::new_type_variable(Context& context) {
 }
 
 ast::Type semantic::get_unified_type(Context& context, ast::Type type_var) {
-    if (type_var.is_type_variable() && type_var.to_str()[0] != '$') {
-        for (auto it = context.type_inference.compound_types.begin(); it != context.type_inference.compound_types.end(); it++) {
-            if (type_var == it->first) {
-                type_var = it->second;
-                for (size_t i = 0; i < type_var.parameters.size(); i++) {
-                    type_var.parameters[i] = semantic::get_unified_type(context, type_var.parameters[i]);
-                }
-                return type_var;
+    for (auto it = context.type_inference.labeled_type_constraints.begin(); it != context.type_inference.labeled_type_constraints.end(); it++) {
+        if (semantic::contains(it->second, type_var)) {
+            type_var = it->first;
+            for (size_t i = 0; i < type_var.parameters.size(); i++) {
+                type_var.parameters[i] = semantic::get_unified_type(context, type_var.parameters[i]);
             }
+            return type_var;
         }
+    }
 
-        for (auto it = context.type_inference.labeled_type_constraints.begin(); it != context.type_inference.labeled_type_constraints.end(); it++) {
-            if (semantic::contains(it->second, type_var)) {
-                type_var = it->first;
-                for (size_t i = 0; i < type_var.parameters.size(); i++) {
-                    type_var.parameters[i] = semantic::get_unified_type(context, type_var.parameters[i]);
-                }
-                return type_var;
-            }
-        }
-
+    if (type_var.is_type_variable() && type_var.name[0] != '$') {
         ast::Type new_type_var = semantic::new_final_type_variable(context);
         context.type_inference.labeled_type_constraints[new_type_var] = semantic::make_Set<ast::Type>({type_var});
         return new_type_var;
     }
+    else if (!type_var.is_type_variable()) {
+        for (size_t i = 0; i < type_var.parameters.size(); i++) {
+            type_var.parameters[i] = semantic::get_unified_type(context, type_var.parameters[i]);
+        }
+        return type_var;
+    }
+    
     return type_var;
 }
 
@@ -1056,6 +1044,30 @@ Result<Ok, Error> semantic::analyze_block_or_expression(semantic::Context& conte
     // Merge type constraints that share elements
     context.type_inference.type_constraints = semantic::merge_sets_with_shared_elements<ast::Type>(context.type_inference.type_constraints);
 
+    // Flatten type constrains
+    auto& type_constraints = context.type_inference.type_constraints;
+    for (size_t i = 0; i < type_constraints.size(); i++) {
+        size_t j = 0;
+        while (j < semantic::size(type_constraints[i])) {
+            if (type_constraints[i].elements[j].parameters.size() < 0) {
+                j++;
+                continue;
+            }
+
+            for (size_t k = j + 1; k < semantic::size(type_constraints[i]); k++) {
+                if (type_constraints[i].elements[j].name == type_constraints[i].elements[k].name) {
+                    assert(type_constraints[i].elements[k].parameters.size() > 0);
+                    semantic::add_constraint(context, semantic::make_Set<ast::Type>({type_constraints[i].elements[j].parameters[0], type_constraints[i].elements[k].parameters[0]}));
+                }
+            }
+
+            j++;
+        }
+    }
+
+    // Merge type constraints that share elements
+    context.type_inference.type_constraints = semantic::merge_sets_with_shared_elements<ast::Type>(context.type_inference.type_constraints);
+
     // If we are in a function check if return type is alone, if is alone it means the function is void
     if (context.current_function.has_value()
     && context.current_function.value()->return_type.is_type_variable()) {
@@ -1077,9 +1089,6 @@ Result<Ok, Error> semantic::analyze_block_or_expression(semantic::Context& conte
             if (!type.is_type_variable()) {
                 representatives.push_back(type);
             }
-            if (context.type_inference.compound_types.find(type) != context.type_inference.compound_types.end()) {
-                representatives.push_back(context.type_inference.compound_types[type]);
-            }
         }
 
         if (representatives.size() == 0) {
@@ -1088,7 +1097,7 @@ Result<Ok, Error> semantic::analyze_block_or_expression(semantic::Context& conte
         else {
             ast::Type representative = representatives[0];
             for (size_t i = 1; i < representatives.size(); i++) {
-                if (representative != representatives[i]) {
+                if (representative.name != representatives[i].name) {
                     std::cout << representative.to_str() << " <> " << representatives[i].to_str() << "\n";
                     assert(false);
                 } 
@@ -1147,13 +1156,6 @@ Result<Ok, Error> semantic::analyze_block_or_expression(semantic::Context& conte
 
     // Unify
     // -----
-
-    // Unify type variables in compound types
-    for (auto it = context.type_inference.compound_types.begin(); it != context.type_inference.compound_types.end(); it++) {
-        for (size_t i = 0; i < it->second.parameters.size(); i++) {
-            it->second.parameters[i] = semantic::get_unified_type(context, it->second.parameters[i]);
-        }
-    }
 
     // Unify current block
     result = semantic::unify_types_and_type_check(context, node);
@@ -1484,11 +1486,7 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
     if (identifier.is_error()) return Error {};
 
     // Add constraint
-    auto pointer_type = context.type_inference.compound_types[ast::get_type(node.identifier->expression)];
-    while (pointer_type.parameters[0].is_pointer()) {
-        pointer_type = pointer_type.parameters[0];
-    }
-    semantic::add_constraint(context, semantic::make_Set<ast::Type>({pointer_type.parameters[0], ast::get_type(node.expression)}));
+    semantic::add_constraint(context, semantic::make_Set<ast::Type>({node.identifier->type, ast::get_type(node.expression)}));
 
     return Ok {};
 }
@@ -1809,13 +1807,8 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
     }
 
     if (node.type == ast::Type("")) {
-        node.type = node.type = semantic::new_type_variable(context);
-        
-        // Add to compound type if it doesnt exists
-        if (context.type_inference.compound_types.find(node.type) == context.type_inference.compound_types.end()) {
-            context.type_inference.compound_types[node.type] = ast::Type("pointer");
-            context.type_inference.compound_types[node.type].parameters.push_back(ast::get_type(node.expression));
-        }
+        node.type = ast::Type("pointer");
+        node.type.parameters.push_back(ast::get_type(node.expression));
     }
     else if (!node.type.is_type_variable() && !node.type.is_pointer()) {
         context.errors.push_back(Error("Error: Type mismatch between type annotation and expression"));
@@ -1837,14 +1830,16 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
     }
 
     if (node.type == ast::Type("")) {
-        if (context.type_inference.compound_types.find(ast::get_type(node.expression)) != context.type_inference.compound_types.end()) {
-            assert(context.type_inference.compound_types[ast::get_type(node.expression)].is_pointer());
+        if (ast::get_type(node.expression).is_pointer()) {
+            node.type = ast::get_type(node.expression).parameters[0];
         }
         else {
-            context.type_inference.compound_types[ast::get_type(node.expression)] = ast::Type("pointer");
-            context.type_inference.compound_types[ast::get_type(node.expression)].parameters.push_back(semantic::new_type_variable(context));
+            node.type = semantic::new_type_variable(context);
+            
+            auto pointer_type = ast::Type("pointer");
+            pointer_type.parameters.push_back(node.type);
+            semantic::add_constraint(context, semantic::make_Set<ast::Type>({ast::get_type(node.expression), pointer_type}));
         }
-        node.type = context.type_inference.compound_types[ast::get_type(node.expression)].parameters[0];
     }
 
     return Ok {};
