@@ -146,6 +146,7 @@ namespace semantic {
     Result<Ok, Error> type_infer_and_analyze(Context& context, ast::IdentifierNode& node);
     Result<Ok, Error> type_infer_and_analyze(Context& context, ast::BooleanNode& node);
     Result<Ok, Error> type_infer_and_analyze(Context& context, ast::StringNode& node);
+    Result<Ok, Error> type_infer_and_analyze(Context& context, ast::ArrayNode& node);
     Result<Ok, Error> type_infer_and_analyze(Context& context, ast::FieldAccessNode& node);
     Result<Ok, Error> type_infer_and_analyze(Context& context, ast::AddressOfNode& node);
     Result<Ok, Error> type_infer_and_analyze(Context& context, ast::DereferenceNode& node);
@@ -171,6 +172,7 @@ namespace semantic {
     Result<Ok, Error> unify_types_and_type_check(Context& context, ast::IdentifierNode& node);
     Result<Ok, Error> unify_types_and_type_check(Context& context, ast::BooleanNode& node);
     Result<Ok, Error> unify_types_and_type_check(Context& context, ast::StringNode& node);
+    Result<Ok, Error> unify_types_and_type_check(Context& context, ast::ArrayNode& node);
     Result<Ok, Error> unify_types_and_type_check(Context& context, ast::FieldAccessNode& node);
     Result<Ok, Error> unify_types_and_type_check(Context& context, ast::AddressOfNode& node);
     Result<Ok, Error> unify_types_and_type_check(Context& context, ast::DereferenceNode& node);
@@ -196,6 +198,7 @@ namespace semantic {
     void make_concrete(Context& context, ast::IdentifierNode& node);
     void make_concrete(Context& context, ast::BooleanNode& node);
     void make_concrete(Context& context, ast::StringNode& node);
+    void make_concrete(Context& context, ast::ArrayNode& node);
     void make_concrete(Context& context, ast::FieldAccessNode& node);
     void make_concrete(Context& context, ast::AddressOfNode& node);
     void make_concrete(Context& context, ast::DereferenceNode& node);
@@ -473,16 +476,31 @@ void semantic::init_Context(semantic::Context& context, ast::Ast* ast) {
             for (auto& arg: prototype.first) {
                 auto arg_node = ast::IdentifierNode {};
                 arg_node.type = arg;
+
+                if (!arg.is_concrete()) {
+                    function_node.generic = true;
+                }
+
                 ast->push_back(arg_node);
                 function_node.args.push_back((ast::FunctionArgumentNode*) ast->last_element());
             }
 
             function_node.return_type = prototype.second;
+            if (!function_node.return_type.is_concrete()) {
+                function_node.generic = true;
+            }
 
             ast->push_back(function_node);
             overloaded_functions.push_back((ast::FunctionNode*) ast->last_element());
         }
-        scope[identifier] = semantic::make_Binding(overloaded_functions);
+        if (overloaded_functions.size() == 1
+        && (!ast::types_are_concrete(ast::get_types(overloaded_functions[0]->args)) || !overloaded_functions[0]->return_type.is_concrete())) {
+            assert(overloaded_functions[0]->generic);
+            scope[identifier] = semantic::make_Binding(overloaded_functions[0]);
+        }
+        else {
+            scope[identifier] = semantic::make_Binding(overloaded_functions);
+        }
     }
 }
 
@@ -1297,7 +1315,8 @@ Result<Ok, Error> semantic::analyze(semantic::Context& context, ast::Type& type)
     else if (type == ast::Type("bool")) return Ok {};
     else if (type == ast::Type("void")) return Ok {};
     else if (type == ast::Type("string")) return Ok {};
-    else if (type.is_pointer()) return semantic::analyze(context, type.parameters[0]);
+    else if (type.name == "pointer") return semantic::analyze(context, type.parameters[0]);
+    else if (type.name == "array") return semantic::analyze(context, type.parameters[0]);
     else {
         Binding* type_binding = semantic::get_binding(context, type.to_str());
         if (!type_binding) {
@@ -1628,6 +1647,39 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
     return Ok {};
 }
 
+Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, ast::ArrayNode& node) {
+    // Type infer and analyze elements
+    for (size_t i = 0; i < node.elements.size(); i++) {
+        auto result = semantic::type_infer_and_analyze(context, node.elements[i]);
+        if (result.is_error()) return Error {};
+    }
+
+    if (node.type == ast::Type("")) {
+        node.type = ast::Type("array");
+        if (node.elements.size() > 0) {
+            node.type.parameters.push_back(ast::get_type(node.elements[0]));
+        }
+        else {
+            node.type.parameters.push_back(semantic::new_type_variable(context));
+        }
+    }
+    else {
+        assert(node.type.name == "array");
+    }
+
+    // Add constraint
+    if (node.elements.size() > 0) {
+        semantic::Set<ast::Type> constraint;
+        for (auto element: node.elements) {
+            semantic::insert(constraint, ast::get_type(element));
+        }
+        semantic::add_constraint(context, constraint);
+
+    }
+
+    return Ok {};
+}
+
 Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, ast::CallNode& node) {
     auto& identifier = node.identifier->value;
 
@@ -1744,7 +1796,7 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
             std::vector<ast::Type> function_prototype = ast::get_types(node.function->args);
             function_prototype.push_back(node.function->return_type);
 
-            // Infer stuff, basically is loop trough the interface prototype that groups type variables
+            // Infer stuff
             std::unordered_map<ast::Type, Set<ast::Type>> sets;
             for (size_t i = 0; i < function_prototype.size(); i++) {
                 if (sets.find(function_prototype[i]) == sets.end()) {
@@ -1990,6 +2042,15 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::St
     return Ok {};
 }
 
+Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::ArrayNode& node) {
+    for (auto element: node.elements) {
+        semantic::unify_types_and_type_check(context, element);
+    }
+    
+    node.type = semantic::get_unified_type(context, node.type);
+    return Ok {};
+}
+
 Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::IntegerNode& node) {
     node.type = semantic::get_unified_type(context, node.type);
 
@@ -2183,6 +2244,10 @@ void semantic::make_concrete(Context& context, ast::BooleanNode& node) {
 
 void semantic::make_concrete(Context& context, ast::StringNode& node) {
 
+}
+
+void semantic::make_concrete(Context& context, ast::ArrayNode& node) {
+    assert(false);
 }
 
 void semantic::make_concrete(Context& context, ast::FieldAccessNode& node) {

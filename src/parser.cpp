@@ -55,7 +55,9 @@ struct Parser {
     Result<ast::Node*, Error> parse_identifier();
     Result<ast::Node*, Error> parse_identifier(token::TokenVariant token);
     Result<ast::Node*, Error> parse_string();
+    Result<ast::Node*, Error> parse_array();
     Result<ast::Node*, Error> parse_field_access();
+    Result<ast::Node*, Error> parse_index_access(ast::Node* expression);
     Result<token::Token, Error> parse_token(token::TokenVariant token);
 
     token::Token current();
@@ -1071,19 +1073,31 @@ Result<ast::Node*, Error> Parser::parse_dereference() {
 
 Result<ast::Node*, Error> Parser::parse_primary() {
     switch (this->current().variant) {
-        case token::Minus:     return this->parse_negation();
-        case token::Star:      return this->parse_dereference();
-        case token::Ampersand: return this->parse_address_of();
-        case token::LeftParen: return this->parse_grouping();
-        case token::Float:     return this->parse_float();
-        case token::Integer:   return this->parse_integer();
-        case token::True:      return this->parse_boolean();
-        case token::False:     return this->parse_boolean();
-        case token::String:    return this->parse_string();
+        case token::Minus:       return this->parse_negation();
+        case token::Star:        return this->parse_dereference();
+        case token::Ampersand:   return this->parse_address_of();
+        case token::LeftParen:   return this->parse_grouping();
+        case token::LeftBracket: return this->parse_array();
+        case token::Float:       return this->parse_float();
+        case token::Integer:     return this->parse_integer();
+        case token::True:        return this->parse_boolean();
+        case token::False:       return this->parse_boolean();
+        case token::String:      return this->parse_string();
         case token::Identifier: {
-            if (this->match({token::Identifier, token::LeftParen})) return this->parse_call();
-            if (this->match({token::Identifier, token::Dot}))       return this->parse_field_access();
-            else                                                    return this->parse_identifier();
+            Result<ast::Node*, Error> result;             
+            if (this->match({token::Identifier, token::LeftParen})) {
+                result = this->parse_call();
+            }
+            else if (this->match({token::Identifier, token::Dot})) {
+                result = this->parse_field_access();
+            }
+            else {
+                result = this->parse_identifier();
+            }
+
+            if (result.is_error()) return result;
+            else if (this->current() != token::LeftBracket) return result;
+            else return this->parse_index_access(result.get_value());
         }
         default: break;
     }
@@ -1177,6 +1191,33 @@ Result<ast::Node*, Error> Parser::parse_string() {
     return this->ast.last_element();
 }
 
+Result<ast::Node*, Error> Parser::parse_array() {
+    // Create node
+    auto array = ast::ArrayNode{this->current().line, this->current().column};
+
+    // Parse left bracket
+    assert(this->current() == token::LeftBracket);
+    this->advance();
+
+    // Parse elements
+    while (this->current() != token::RightBracket && !this->at_end()) {
+        auto expression = this->parse_expression();
+        if (expression.is_error()) return Error {};
+        array.elements.push_back(expression.get_value());
+
+        if (this->current() == token::Comma) this->advance();
+        else if (this->current() == token::NewLine) this->advance_until_next_statement();
+        else break;
+    }
+
+    // Parse right bracket
+    auto right_bracket = this->parse_token(token::RightBracket);
+    if (right_bracket.is_error()) return Error {};
+
+    this->ast.push_back(array);
+    return this->ast.last_element();
+}
+
 Result<ast::Node*, Error> Parser::parse_field_access() {
     // Create node
     auto field_access = ast::FieldAccessNode {this->current().line, this->current().column};
@@ -1200,6 +1241,42 @@ Result<ast::Node*, Error> Parser::parse_field_access() {
     }
 
     this->ast.push_back(field_access);
+    return this->ast.last_element();
+}
+
+Result<ast::Node*, Error> Parser::parse_index_access(ast::Node* expression) {
+    // Create node
+    auto index_access = ast::CallNode {this->current().line, this->current().column};
+
+    // Create identifier node
+    auto identifier = ast::IdentifierNode {this->current().line, this->current().column};
+    identifier.value = "[]";
+    this->ast.push_back(identifier);
+    index_access.identifier = (ast::IdentifierNode*) this->ast.last_element();
+
+    // Parse expression being indexed
+    auto arg1 = ast::CallArgumentNode {this->current().line, this->current().column};
+    arg1.expression = expression;
+    this->ast.push_back(arg1);
+    index_access.args.push_back((ast::CallArgumentNode*) this->ast.last_element());
+
+    // Parse left bracket
+    assert(this->current() == token::LeftBracket);
+    this->advance();
+
+    // Parse index expression
+    auto arg2 = ast::CallArgumentNode {this->current().line, this->current().column};
+    auto index = this->parse_expression();
+    if (index.is_error()) return Error {};
+    arg2.expression = index.get_value();
+    this->ast.push_back(arg2);
+    index_access.args.push_back((ast::CallArgumentNode*) this->ast.last_element());
+
+    // Parse right bracket
+    auto right_bracket = this->parse_token(token::RightBracket);
+    if (right_bracket.is_error()) return Error {};
+
+    this->ast.push_back(index_access);
     return this->ast.last_element();
 }
 

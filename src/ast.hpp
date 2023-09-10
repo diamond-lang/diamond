@@ -30,6 +30,7 @@ namespace ast {
     struct IdentifierNode;
     struct BooleanNode;
     struct StringNode;
+    struct ArrayNode;
     struct FieldAccessNode;
     struct AddressOfNode;
     struct DereferenceNode;
@@ -56,6 +57,7 @@ namespace ast {
         Identifier,
         Boolean,
         String,
+        Array,
         FieldAccess,
         AddressOf,
         Dereference
@@ -82,6 +84,7 @@ namespace ast {
         IdentifierNode,
         BooleanNode,
         StringNode,
+        ArrayNode,
         FieldAccessNode,
         AddressOfNode,
         DereferenceNode
@@ -350,6 +353,14 @@ namespace ast {
         Type type = Type("");
 
         std::string value;
+    };
+
+    struct ArrayNode {
+        size_t line;
+        size_t column;
+        Type type = Type("");
+
+        std::vector<Node*> elements;
     };
 
     struct FieldAccessNode {

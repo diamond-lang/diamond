@@ -792,6 +792,20 @@ void ast::print(Node* node, PrintContext context) {
             break;
         }
 
+        case Array: {
+            auto& array = std::get<ArrayNode>(*node);
+            bool is_last = context.last[context.last.size()];
+
+            put_indent_level(context.indent_level, context.last);
+            std::cout << "array";
+            if (array.type != Type("")) std::cout << ": " << get_concrete_type_or_type_variable(array.type, context).to_str();
+            std::cout << "\n";
+            for (size_t i = 0; i < array.elements.size(); i++) {
+                print(array.elements[i], PrintContext{context.indent_level + 1, append(context.last, i + 1 == array.elements.size()), context.concrete, context.type_bindings});
+            }
+            break;
+        }
+
         case FieldAccess: {
             auto& field_access = std::get<FieldAccessNode>(*node);
 
