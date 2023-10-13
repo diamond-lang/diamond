@@ -2,6 +2,7 @@
 import os
 import re
 import subprocess
+import sys
 
 def test(file, expected):
     print(f"testing {file}...  ", end='')
@@ -29,7 +30,16 @@ def get_all_files(folder):
     return files
 
 def main():
-    for file in get_all_files('test'):
+    folder = 'test'
+
+    if len(sys.argv) > 2:
+        print("Too many arguments :/")
+        return
+
+    if len(sys.argv) > 1:
+        folder = sys.argv[1]
+
+    for file in get_all_files(folder):
         content = open(file).read()
         
         try:
