@@ -6,7 +6,6 @@
 
 #include "ast.hpp"
 
-extern std::unordered_map<std::string, std::vector<std::pair<std::vector<ast::Type>, ast::Type>>> interfaces;
-extern std::unordered_map<std::string, std::vector<std::pair<std::vector<ast::Type>, ast::Type>>> intrinsics;
+extern std::unordered_map<std::string, std::vector<std::pair<std::vector<ast::Type>, ast::Type>>> intrinsic_functions;
 
 #endif

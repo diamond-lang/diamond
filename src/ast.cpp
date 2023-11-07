@@ -46,7 +46,40 @@ bool ast::Type::operator!=(const Type &t) const {
     return !(t == *this);
 }
 
-std::string ast::Type::to_str(std::string output) const {
+std::string ast::Type::to_str() const {
+    std::string output = "";
+    if (this->is_type_variable()) {
+        output += this->name;
+
+        if (this->interface.has_value()
+        ||  overload_constraints.size() > 0) {
+            output += " :: ";
+        }
+
+
+        if (this->interface.has_value()) {
+            output += this->interface.value().name;
+        }
+
+        if (this->interface.has_value()
+        && this->overload_constraints.size() > 0) {
+            output += " & ";
+        }
+
+        if (this->overload_constraints.size() > 0) {
+            output += "{";
+
+            for (size_t i = 0; i < this->overload_constraints.size(); i++) {
+                output += this->overload_constraints.elements[i].to_str();
+                if (i + 1 != this->overload_constraints.size()) output += ", ";
+            }
+
+            output += "}";
+        }
+
+        return output;
+    }
+
     if (this->parameters.size() == 0) {
         output += this->name;
     }
@@ -75,7 +108,7 @@ static bool is_number(std::string str) {
 }
 
 bool ast::Type::is_type_variable() const {
-    std::string str = this->to_str();
+    std::string str = this->name;
     if (str.size() > 0 && str[0] == '$') return true;
     else if (is_number(str))             return true;
     else                                 return false;
@@ -164,6 +197,7 @@ ast::Type ast::get_concrete_type(Type type_variable, std::unordered_map<std::str
             type_variable = type_variable.interface.value().get_default_type();
         }
         else {
+            std::cout << "unknown type: " << type_variable.to_str() << "\n";
             assert(false);
         }
     }
@@ -459,21 +493,7 @@ void ast::print(Node* node, PrintContext context) {
                     print(nodes[i], PrintContext{context.indent_level + 1, append(context.last, is_last), context.concrete, context.type_bindings});
                 }
                 else {
-                    auto function = (ast::FunctionNode*) nodes[i];
-                    for (size_t j = 0; j < function->specializations.size(); j++) {
-
-                        // Check if is last specialization
-                        bool is_last = j == function->specializations.size() - 1;
-                        for (size_t k = i + 1; k < nodes.size(); k++) {
-                            if (((FunctionNode*)nodes[k])->specializations.size() != 0) {
-                                is_last = false;
-                                break;
-                            }
-                        }
-
-                        context.type_bindings = function->specializations[j].type_bindings;
-                        print((ast::Node*) nodes[i], PrintContext{context.indent_level + 1, append(context.last, is_last), context.concrete, context.type_bindings});
-                    }
+                    assert(false);
                 }
             }
             break;
@@ -481,14 +501,13 @@ void ast::print(Node* node, PrintContext context) {
 
         case Function: {
             auto& function = std::get<FunctionNode>(*node);
-            bool where_clause = !context.concrete && function.constraints.size() != 0;
             bool last = true;
             if (context.last.size() != 0) {
                 last = context.last[context.last.size() - 1];
                 context.last.pop_back();
             }
 
-            put_indent_level(context.indent_level, append(context.last, last && !where_clause));
+            put_indent_level(context.indent_level, append(context.last, last));
             if (function.is_extern) {
                 std::cout << "extern " << function.identifier->value << '(';
             }
@@ -518,36 +537,18 @@ void ast::print(Node* node, PrintContext context) {
             }
 
             if (!is_expression(function.body)) {
-                context.last.push_back(last && !where_clause);
+                context.last.push_back(last);
                 print(function.body, context);
                 context.last.pop_back();
             }
             else {
                 context.indent_level += 1;
-                context.last.push_back(last && !where_clause);
+                context.last.push_back(last);
                 context.last.push_back(true);
                 print(function.body, context);
                 context.indent_level -= 1;
                 context.last.pop_back();
                 context.last.pop_back();
-            }
-
-            if (function.constraints.size() != 0 && !context.concrete) {
-                put_indent_level(context.indent_level, append(context.last, last));
-                std::cout << "where\n";
-                for (size_t i = 0; i < function.constraints.size(); i++) {
-                    put_indent_level(context.indent_level + 1, i == (function.constraints.size() - 1) ? append(append(context.last, last), true) : append(append(context.last, last), false));
-                    std::cout << function.constraints[i].identifier << "(";
-                    for  (size_t j = 0; j < function.constraints[i].args.size(); j++) {
-                        std::cout << function.constraints[i].args[j].to_str();
-                        if (j != function.constraints[i].args.size() - 1) std::cout << ", ";
-                    }
-                    std::cout << ")";
-                    if (function.constraints[i].return_type != ast::Type("")) {
-                        std::cout << ": " << function.constraints[i].return_type.to_str();
-                    }
-                    std::cout << "\n";
-                }
             }
 
             break;

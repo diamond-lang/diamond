@@ -8,6 +8,7 @@
 #include <filesystem>
 #include <optional>
 #include <cmath>
+#include "data_structures.hpp"
 
 namespace ast {
     struct BlockNode;
@@ -106,7 +107,8 @@ namespace ast {
         std::string name;
         std::vector<Type> parameters;
         TypeNode* type_definition = nullptr;
-        std::optional<Interface> interface; 
+        std::optional<Interface> interface;
+        Set<ast::Type> overload_constraints;
 
         Type() : name("") {}
         Type(std::string name) : name(name) {}
@@ -114,7 +116,7 @@ namespace ast {
         Type(std::string name, TypeNode* type_definition) : name(name), type_definition(type_definition) {}
         bool operator==(const Type &t) const;
         bool operator!=(const Type &t) const;
-        std::string to_str(std::string output = "") const;
+        std::string to_str() const;
         bool is_type_variable() const;
         bool is_concrete() const;
         bool is_integer() const;
@@ -150,12 +152,6 @@ namespace ast {
         std::vector<TypeNode*> types;
     };
 
-    struct FunctionSpecialization {
-        std::vector<Type> args;
-        Type return_type;
-        std::unordered_map<std::string, Type> type_bindings;
-    };
-
     struct FunctionPrototype {
         std::string identifier;
         std::vector<Type> args;
@@ -188,11 +184,9 @@ namespace ast {
         std::vector<FunctionArgumentNode*> args;
         Node* body;
 
-        bool generic = false;
+        bool completely_typed = true;
         bool is_extern = false;
         Type return_type = Type("");
-        std::vector<FunctionSpecialization> specializations;
-        FunctionConstraints constraints;
         std::filesystem::path module_path; // Used in to tell from which module the function comes from
     };
 

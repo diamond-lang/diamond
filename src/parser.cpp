@@ -368,15 +368,15 @@ Result<ast::Node*, Error> Parser::parse_function() {
         ast::transform_to_expression(function.body);
     }
 
-    // Check if function is generic or not
+    // Check if function is completly typed or not
     for (auto arg: function.args) {
         if (arg->type == ast::Type("")) {
-            function.generic = true;
+            function.completely_typed = false;
             break;
         }
     }
     if (function.return_type == ast::Type("")) {
-        function.generic = true;
+        function.completely_typed = false;
     }
 
     this->ast.push_back(function);
@@ -591,12 +591,6 @@ Result<ast::Node*, Error> Parser::parse_assignment() {
         if (type.is_error()) return Error {};
 
         ast::set_type(assignment.expression, type.get_value());
-
-        if (assignment.expression->index() == ast::IfElse) {
-            auto& if_else = std::get<ast::IfElseNode>(*assignment.expression);
-            ast::set_type(if_else.if_branch, ast::get_type(assignment.expression));
-            ast::set_type(if_else.else_branch.value(), ast::get_type(assignment.expression));
-        }
     }
 
     this->ast.push_back(assignment);

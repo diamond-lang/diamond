@@ -704,17 +704,8 @@ void codegen::Context::codegen_types_bodies(std::vector<ast::TypeNode*> types) {
 
 void codegen::Context::codegen_function_prototypes(std::vector<ast::FunctionNode*> functions) {
     for (auto& function: functions) {
-        if (function->generic) {
-            for (auto& specialization: function->specializations) {
-                this->codegen_function_prototypes(
-                    function->module_path,
-                    function->identifier->value,
-                    function->args,
-                    specialization.args,
-                    specialization.return_type,
-                    function->is_extern
-                );
-            }
+        if (!function->completely_typed) {
+            assert(false);
         }
         else {
             this->codegen_function_prototypes(
@@ -769,21 +760,8 @@ void codegen::Context::codegen_function_bodies(std::vector<ast::FunctionNode*> f
     for (auto& function: functions) {
         if (function->is_extern) continue;
 
-        if (function->generic) {
-            for (auto& specialization: function->specializations) {
-                this->type_bindings = specialization.type_bindings;
-
-                this->codegen_function_bodies(
-                    function->module_path,
-                    function->identifier->value,
-                    function->args,
-                    specialization.args,
-                    specialization.return_type,
-                    function->body
-                );
-
-                this->type_bindings = {};
-            }
+        if (!function->completely_typed) {
+            assert(false);
         }
         else {
             this->codegen_function_bodies(
