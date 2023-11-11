@@ -159,23 +159,6 @@ bool ast::FunctionPrototype::operator!=(const FunctionPrototype &t) const {
     return !(t == *this);
 }
 
-// FunctionConstraint
-bool ast::FunctionConstraint::operator==(const FunctionConstraint &t) const {
-    if (this->identifier == t.identifier && this->args.size() == t.args.size()) {
-        for (size_t i = 0; i < this->args.size(); i++) {
-            if (this->args[i] != t.args[i]) return false;
-        }
-        return this->return_type == t.return_type;
-    }
-    else {
-        return false;
-    }
-}
-
-bool ast::FunctionConstraint::operator!=(const FunctionConstraint &t) const {
-    return !(t == *this);
-}
-
 // Node
 // ----
 ast::Type ast::get_type(Node* node) {

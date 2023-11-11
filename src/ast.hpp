@@ -162,18 +162,11 @@ namespace ast {
         bool operator!=(const FunctionPrototype &t) const;
     };
 
-    struct FunctionConstraint {
-        std::string identifier;
+    struct FunctionSpecialization {
         std::vector<Type> args;
         Type return_type;
-        ast::CallNode* call = nullptr;
-
-        FunctionConstraint(std::string identifier, std::vector<Type> args, Type return_type, ast::CallNode* call) : identifier(identifier), args(args), return_type(return_type), call(call) {}
-        bool operator==(const FunctionConstraint &t) const;
-        bool operator!=(const FunctionConstraint &t) const;
+        std::unordered_map<std::string, Type> type_bindings;
     };
-
-    using FunctionConstraints = std::vector<FunctionConstraint>;
 
     struct FunctionNode {
         size_t line;
@@ -186,6 +179,7 @@ namespace ast {
 
         bool completely_typed = true;
         bool is_extern = false;
+        std::vector<FunctionSpecialization> specializations;
         Type return_type = Type("");
         std::filesystem::path module_path; // Used in to tell from which module the function comes from
     };

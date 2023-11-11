@@ -31,7 +31,6 @@ namespace semantic {
 
     Binding make_Binding(ast::AssignmentNode* assignment);
     Binding make_Binding(ast::Node* function_argument);
-    Binding make_Binding(ast::FunctionNode* function);
     Binding make_Binding(std::vector<ast::FunctionNode*> functions);
     Binding make_Binding(ast::TypeNode* type);
 
@@ -64,6 +63,7 @@ namespace semantic {
     void print(Set<ast::Type> set);
     void print(std::vector<Set<ast::Type>> type_constraints);
     void print(std::unordered_map<ast::Type, Set<ast::Type>> labeled_type_constraints);
+    void print_type_bindings(std::unordered_map<std::string, ast::Type> type_bindings);
     void print_overload_constraints(std::unordered_map<ast::Type, Set<ast::Type>> overload_constraints);
 
     // Context
@@ -150,31 +150,35 @@ namespace semantic {
     Result<Ok, Error> unify_types_and_type_check(Context& context, ast::AddressOfNode& node);
     Result<Ok, Error> unify_types_and_type_check(Context& context, ast::DereferenceNode& node);
 
-    Result<Ok, Error> make_concrete(Context& context, ast::Node* node);
-    Result<Ok, Error> make_concrete(Context& context, ast::BlockNode& node);
-    Result<Ok, Error> make_concrete(Context& context, ast::FunctionNode& node);
-    Result<Ok, Error> make_concrete(Context& context, ast::TypeNode& node);
-    Result<Ok, Error> make_concrete(Context& context, ast::AssignmentNode& node);
-    Result<Ok, Error> make_concrete(Context& context, ast::FieldAssignmentNode& node);
-    Result<Ok, Error> make_concrete(Context& context, ast::DereferenceAssignmentNode& node);
-    Result<Ok, Error> make_concrete(Context& context, ast::ReturnNode& node);
-    Result<Ok, Error> make_concrete(Context& context, ast::BreakNode& node);
-    Result<Ok, Error> make_concrete(Context& context, ast::ContinueNode& node);
-    Result<Ok, Error> make_concrete(Context& context, ast::IfElseNode& node);
-    Result<Ok, Error> make_concrete(Context& context, ast::WhileNode& node);
-    Result<Ok, Error> make_concrete(Context& context, ast::UseNode& node);
-    Result<Ok, Error> make_concrete(Context& context, ast::LinkWithNode& node);
-    Result<Ok, Error> make_concrete(Context& context, ast::CallArgumentNode& node);
-    Result<Ok, Error> make_concrete(Context& context, ast::CallNode& node);
-    Result<Ok, Error> make_concrete(Context& context, ast::FloatNode& node);
-    Result<Ok, Error> make_concrete(Context& context, ast::IntegerNode& node);
-    Result<Ok, Error> make_concrete(Context& context, ast::IdentifierNode& node);
-    Result<Ok, Error> make_concrete(Context& context, ast::BooleanNode& node);
-    Result<Ok, Error> make_concrete(Context& context, ast::StringNode& node);
-    Result<Ok, Error> make_concrete(Context& context, ast::ArrayNode& node);
-    Result<Ok, Error> make_concrete(Context& context, ast::FieldAccessNode& node);
-    Result<Ok, Error> make_concrete(Context& context, ast::AddressOfNode& node);
-    Result<Ok, Error> make_concrete(Context& context, ast::DereferenceNode& node);
+    Result<Ok, Error> get_concrete_as_type_bindings(Context& context, ast::Node* node);
+    Result<Ok, Error> get_concrete_as_type_bindings(Context& context, ast::BlockNode& node);
+    Result<Ok, Error> get_concrete_as_type_bindings(Context& context, ast::FunctionNode& node);
+    Result<Ok, Error> get_concrete_as_type_bindings(Context& context, ast::TypeNode& node);
+    Result<Ok, Error> get_concrete_as_type_bindings(Context& context, ast::AssignmentNode& node);
+    Result<Ok, Error> get_concrete_as_type_bindings(Context& context, ast::FieldAssignmentNode& node);
+    Result<Ok, Error> get_concrete_as_type_bindings(Context& context, ast::DereferenceAssignmentNode& node);
+    Result<Ok, Error> get_concrete_as_type_bindings(Context& context, ast::ReturnNode& node);
+    Result<Ok, Error> get_concrete_as_type_bindings(Context& context, ast::BreakNode& node);
+    Result<Ok, Error> get_concrete_as_type_bindings(Context& context, ast::ContinueNode& node);
+    Result<Ok, Error> get_concrete_as_type_bindings(Context& context, ast::IfElseNode& node);
+    Result<Ok, Error> get_concrete_as_type_bindings(Context& context, ast::WhileNode& node);
+    Result<Ok, Error> get_concrete_as_type_bindings(Context& context, ast::UseNode& node);
+    Result<Ok, Error> get_concrete_as_type_bindings(Context& context, ast::LinkWithNode& node);
+    Result<Ok, Error> get_concrete_as_type_bindings(Context& context, ast::CallArgumentNode& node);
+    Result<Ok, Error> get_concrete_as_type_bindings(Context& context, ast::CallNode& node);
+    Result<Ok, Error> get_concrete_as_type_bindings(Context& context, ast::FloatNode& node);
+    Result<Ok, Error> get_concrete_as_type_bindings(Context& context, ast::IntegerNode& node);
+    Result<Ok, Error> get_concrete_as_type_bindings(Context& context, ast::IdentifierNode& node);
+    Result<Ok, Error> get_concrete_as_type_bindings(Context& context, ast::BooleanNode& node);
+    Result<Ok, Error> get_concrete_as_type_bindings(Context& context, ast::StringNode& node);
+    Result<Ok, Error> get_concrete_as_type_bindings(Context& context, ast::ArrayNode& node);
+    Result<Ok, Error> get_concrete_as_type_bindings(Context& context, ast::FieldAccessNode& node);
+    Result<Ok, Error> get_concrete_as_type_bindings(Context& context, ast::AddressOfNode& node);
+    Result<Ok, Error> get_concrete_as_type_bindings(Context& context, ast::DereferenceNode& node);
+    
+    Result<ast::Type, Error> get_function_type(Context& context, ast::FunctionNode* function, std::vector<ast::Type> args, std::vector<ast::FunctionPrototype> call_stack);
+    
+    void make_concrete(Context& context, ast::Node* node);
 }
 
 // Binding
@@ -289,6 +293,13 @@ void semantic::print(std::unordered_map<ast::Type, Set<ast::Type>> labeled_type_
     for (auto it: labeled_type_constraints) {
         std::cout << "    " << it.first.to_str() << ": ";
         semantic::print(it.second);
+    }
+}
+
+void semantic::print_type_bindings(std::unordered_map<std::string, ast::Type> type_bindings) {
+    std::cout << "type bindings\n";
+    for (auto it: type_bindings) {
+        std::cout << "    " << it.first << ": " << it.second.to_str() << "\n";
     }
 }
 
@@ -685,8 +696,9 @@ Result<Ok, Error> semantic::analyze_block_or_expression(semantic::Context& conte
     // -------------
     if (!context.current_function.has_value()
     ||   context.current_function.value()->completely_typed) {
-        result = semantic::make_concrete(context, node);
+        result = semantic::get_concrete_as_type_bindings(context, node);
         if (result.is_error()) return result;
+        make_concrete(context, node);
     }
 
     return Ok {};
@@ -1605,15 +1617,15 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::De
     return Ok {};
 }
 
-// Make concrete
-// -------------
-Result<Ok, Error> semantic::make_concrete(Context& context, ast::Node* node) {
+// Get concrete types as type bindings
+// -----------------------------------
+Result<Ok, Error> semantic::get_concrete_as_type_bindings(Context& context, ast::Node* node) {
     return std::visit([&context, node](auto& variant) {
-        return semantic::make_concrete(context, variant);
+        return semantic::get_concrete_as_type_bindings(context, variant);
     }, *node);
 }
 
-Result<Ok, Error> semantic::make_concrete(Context& context, ast::BlockNode& node) {
+Result<Ok, Error> semantic::get_concrete_as_type_bindings(Context& context, ast::BlockNode& node) {
     // Add scope
      semantic::add_scope(context);
 
@@ -1624,7 +1636,7 @@ Result<Ok, Error> semantic::make_concrete(Context& context, ast::BlockNode& node
     // Make statements concrete
     size_t number_of_errors = context.errors.size();
     for (auto statement: node.statements) {
-        auto result = semantic::make_concrete(context, statement);
+        auto result = semantic::get_concrete_as_type_bindings(context, statement);
         if (result.is_error()) return result;
     }
 
@@ -1635,57 +1647,58 @@ Result<Ok, Error> semantic::make_concrete(Context& context, ast::BlockNode& node
     else                                          return Ok {};
 }
 
-Result<Ok, Error> semantic::make_concrete(Context& context, ast::FunctionNode& node) {
+Result<Ok, Error> semantic::get_concrete_as_type_bindings(Context& context, ast::FunctionNode& node) {
+    assert(false);
     return Ok {};
 }
 
-Result<Ok, Error> semantic::make_concrete(Context& context, ast::TypeNode& node) {
+Result<Ok, Error> semantic::get_concrete_as_type_bindings(Context& context, ast::TypeNode& node) {
     return Ok {};
 }
 
-Result<Ok, Error> semantic::make_concrete(Context& context, ast::AssignmentNode& node) {
-    return semantic::make_concrete(context, node.expression);
+Result<Ok, Error> semantic::get_concrete_as_type_bindings(Context& context, ast::AssignmentNode& node) {
+    return semantic::get_concrete_as_type_bindings(context, node.expression);
 }
 
-Result<Ok, Error> semantic::make_concrete(Context& context, ast::FieldAssignmentNode& node) {
-    return semantic::make_concrete(context, node.expression);
+Result<Ok, Error> semantic::get_concrete_as_type_bindings(Context& context, ast::FieldAssignmentNode& node) {
+    return semantic::get_concrete_as_type_bindings(context, node.expression);
 }
 
-Result<Ok, Error> semantic::make_concrete(Context& context, ast::DereferenceAssignmentNode& node) {
-    auto result = semantic::make_concrete(context, *node.identifier);
+Result<Ok, Error> semantic::get_concrete_as_type_bindings(Context& context, ast::DereferenceAssignmentNode& node) {
+    auto result = semantic::get_concrete_as_type_bindings(context, *node.identifier);
     if (result.is_error()) return result;
     
-    result = semantic::make_concrete(context, node.expression);
+    result = semantic::get_concrete_as_type_bindings(context, node.expression);
     if (result.is_error()) return result;
 
     return Ok {};
 }
 
-Result<Ok, Error> semantic::make_concrete(Context& context, ast::ReturnNode& node) {
+Result<Ok, Error> semantic::get_concrete_as_type_bindings(Context& context, ast::ReturnNode& node) {
     if (node.expression.has_value()) {
-        return semantic::make_concrete(context, node.expression.value());
+        return semantic::get_concrete_as_type_bindings(context, node.expression.value());
     }
 
     return Ok {};
 }
 
-Result<Ok, Error> semantic::make_concrete(Context& context, ast::BreakNode& node) {
+Result<Ok, Error> semantic::get_concrete_as_type_bindings(Context& context, ast::BreakNode& node) {
     return Ok {};
 }
 
-Result<Ok, Error> semantic::make_concrete(Context& context, ast::ContinueNode& node) {
+Result<Ok, Error> semantic::get_concrete_as_type_bindings(Context& context, ast::ContinueNode& node) {
     return Ok {};
 }
 
-Result<Ok, Error> semantic::make_concrete(Context& context, ast::IfElseNode& node) {
-    auto result = semantic::make_concrete(context, node.condition);
+Result<Ok, Error> semantic::get_concrete_as_type_bindings(Context& context, ast::IfElseNode& node) {
+    auto result = semantic::get_concrete_as_type_bindings(context, node.condition);
     if (result.is_error()) return result;
 
-    result = semantic::make_concrete(context, node.if_branch);
+    result = semantic::get_concrete_as_type_bindings(context, node.if_branch);
     if (result.is_error()) return result;
     
     if (node.else_branch.has_value()) {
-        result = semantic::make_concrete(context, node.else_branch.value());
+        result = semantic::get_concrete_as_type_bindings(context, node.else_branch.value());
         if (result.is_error()) return result;
     }
 
@@ -1696,33 +1709,33 @@ Result<Ok, Error> semantic::make_concrete(Context& context, ast::IfElseNode& nod
     return Ok {};
 }
 
-Result<Ok, Error> semantic::make_concrete(Context& context, ast::WhileNode& node) {
-    auto result = semantic::make_concrete(context, node.condition);
+Result<Ok, Error> semantic::get_concrete_as_type_bindings(Context& context, ast::WhileNode& node) {
+    auto result = semantic::get_concrete_as_type_bindings(context, node.condition);
     if (result.is_error()) return result;
 
-    result = semantic::make_concrete(context, node.block);
+    result = semantic::get_concrete_as_type_bindings(context, node.block);
     if (result.is_error()) return result;
 
     return Ok {};
 }
 
-Result<Ok, Error> semantic::make_concrete(Context& context, ast::UseNode& node) {
+Result<Ok, Error> semantic::get_concrete_as_type_bindings(Context& context, ast::UseNode& node) {
     return Ok {};
 }
 
-Result<Ok, Error> semantic::make_concrete(Context& context, ast::LinkWithNode& node) {
+Result<Ok, Error> semantic::get_concrete_as_type_bindings(Context& context, ast::LinkWithNode& node) {
     return Ok {};
 }
 
-Result<Ok, Error> semantic::make_concrete(Context& context, ast::CallArgumentNode& node) {
-    auto result = semantic::make_concrete(context, node.expression);
+Result<Ok, Error> semantic::get_concrete_as_type_bindings(Context& context, ast::CallArgumentNode& node) {
+    auto result = semantic::get_concrete_as_type_bindings(context, node.expression);
     if (result.is_error()) return result;
 
     node.type = ast::get_type(node.expression);
     return Ok {};
 }
 
-Result<Ok, Error> semantic::make_concrete(Context& context, ast::CallNode& node) {
+Result<Ok, Error> semantic::get_concrete_as_type_bindings(Context& context, ast::CallNode& node) {
     // Get return type if it were founded
     if (context.type_inference.type_bindings.find(node.type.to_str()) != context.type_inference.type_bindings.end()) {
         node.type = context.type_inference.type_bindings[node.type.to_str()];
@@ -1767,7 +1780,7 @@ Result<Ok, Error> semantic::make_concrete(Context& context, ast::CallNode& node)
                         }
                         else {
                             // Check if everything typechecks
-                            auto result = make_concrete(context, *node.args[i]);
+                            auto result = get_concrete_as_type_bindings(context, *node.args[i]);
                             if (result.is_error()) return result;
                         }
                     }
@@ -1776,7 +1789,7 @@ Result<Ok, Error> semantic::make_concrete(Context& context, ast::CallNode& node)
                         context.type_inference.type_bindings[node.args[i]->type.to_str()] = called_function->args[i]->type;
 
                         // Check if it works
-                        auto result = make_concrete(context, *node.args[i]);
+                        auto result = get_concrete_as_type_bindings(context, *node.args[i]);
                         if (result.is_error()) return result;
                     }
                 }
@@ -1786,7 +1799,7 @@ Result<Ok, Error> semantic::make_concrete(Context& context, ast::CallNode& node)
                 size_t i = 0;
                 while (i < node.args.size()) {
                     // Get concrete type for current argument
-                    auto result = make_concrete(context, *node.args[i]);
+                    auto result = get_concrete_as_type_bindings(context, *node.args[i]);
                     if (result.is_error()) return result;
 
                     // Remove functions that don't match with the type founded for the argument
@@ -1822,7 +1835,7 @@ Result<Ok, Error> semantic::make_concrete(Context& context, ast::CallNode& node)
                                 }
                                 else {
                                     // Check if everything typechecks
-                                    auto result = make_concrete(context, *node.args[j]);
+                                    auto result = get_concrete_as_type_bindings(context, *node.args[j]);
                                     if (result.is_error()) return result;
                                 }
                             }
@@ -1831,7 +1844,7 @@ Result<Ok, Error> semantic::make_concrete(Context& context, ast::CallNode& node)
                                 context.type_inference.type_bindings[node.args[j]->type.to_str()] = called_function->args[j]->type;
 
                                 // Check if it works
-                                auto result = make_concrete(context, *node.args[j]);
+                                auto result = get_concrete_as_type_bindings(context, *node.args[j]);
                                 if (result.is_error()) return result;
                             }
                         }
@@ -1872,35 +1885,35 @@ Result<Ok, Error> semantic::make_concrete(Context& context, ast::CallNode& node)
     return Ok {};
 }
 
-Result<Ok, Error> semantic::make_concrete(Context& context, ast::FloatNode& node) {
+Result<Ok, Error> semantic::get_concrete_as_type_bindings(Context& context, ast::FloatNode& node) {
     node.type = ast::get_concrete_type(node.type, context.type_inference.type_bindings);
     return Ok {};
 }
 
-Result<Ok, Error> semantic::make_concrete(Context& context, ast::IntegerNode& node) {
+Result<Ok, Error> semantic::get_concrete_as_type_bindings(Context& context, ast::IntegerNode& node) {
     node.type = ast::get_concrete_type(node.type, context.type_inference.type_bindings);
     return Ok {};
 }
 
-Result<Ok, Error> semantic::make_concrete(Context& context, ast::IdentifierNode& node) {
+Result<Ok, Error> semantic::get_concrete_as_type_bindings(Context& context, ast::IdentifierNode& node) {
     node.type = ast::get_concrete_type(node.type, context.type_inference.type_bindings);
     return Ok {};
 }
 
-Result<Ok, Error> semantic::make_concrete(Context& context, ast::BooleanNode& node) {
+Result<Ok, Error> semantic::get_concrete_as_type_bindings(Context& context, ast::BooleanNode& node) {
     return Ok {};
 }
 
-Result<Ok, Error> semantic::make_concrete(Context& context, ast::StringNode& node) {
+Result<Ok, Error> semantic::get_concrete_as_type_bindings(Context& context, ast::StringNode& node) {
     return Ok {};
 }
 
-Result<Ok, Error> semantic::make_concrete(Context& context, ast::ArrayNode& node) {
+Result<Ok, Error> semantic::get_concrete_as_type_bindings(Context& context, ast::ArrayNode& node) {
     assert(false);
     return Ok {};
 }
 
-Result<Ok, Error> semantic::make_concrete(Context& context, ast::FieldAccessNode& node) {
+Result<Ok, Error> semantic::get_concrete_as_type_bindings(Context& context, ast::FieldAccessNode& node) {
     for (auto field: node.fields_accessed) {
         field->type = ast::get_concrete_type(field->type, context.type_inference.type_bindings);
     }
@@ -1909,8 +1922,8 @@ Result<Ok, Error> semantic::make_concrete(Context& context, ast::FieldAccessNode
     return Ok {};
 }
 
-Result<Ok, Error> semantic::make_concrete(Context& context, ast::AddressOfNode& node) {
-    auto result = semantic::make_concrete(context, node.expression);
+Result<Ok, Error> semantic::get_concrete_as_type_bindings(Context& context, ast::AddressOfNode& node) {
+    auto result = semantic::get_concrete_as_type_bindings(context, node.expression);
     if (result.is_error()) return result;
     
     assert(node.type.is_pointer());
@@ -1921,13 +1934,279 @@ Result<Ok, Error> semantic::make_concrete(Context& context, ast::AddressOfNode& 
     return Ok {};
 }
 
-Result<Ok, Error> semantic::make_concrete(Context& context, ast::DereferenceNode& node) {
+Result<Ok, Error> semantic::get_concrete_as_type_bindings(Context& context, ast::DereferenceNode& node) {
     assert(ast::get_concrete_type(node.expression, context.type_inference.type_bindings).is_pointer());
 
     node.type = ast::get_concrete_type(node.type, context.type_inference.type_bindings);
 
-    auto result = make_concrete(context, node.expression);
+    auto result = get_concrete_as_type_bindings(context, node.expression);
     if (result.is_error()) return result;
 
     return Ok {};
+}
+
+// Get function type
+// -----------------
+Result<ast::Type, Error> semantic::get_function_type(Context& context, ast::FunctionNode* function, std::vector<ast::Type> args, std::vector<ast::FunctionPrototype> call_stack) {
+    // Check if specialization already exists
+    for (auto& specialization: function->specializations) {
+        if (specialization.args == args) {
+            return specialization.return_type;
+        }
+    }
+
+    // Else type check and create specialization type
+    ast::FunctionSpecialization specialization;
+
+    // Create new context
+    Context new_context;
+    semantic::init_Context(new_context, context.ast);
+    new_context.current_function = function;
+
+    if (context.current_module == function->module_path) {
+        new_context.scopes = semantic::get_definitions(context);
+    }
+    else {
+        new_context.current_module = function->module_path;
+        auto result = semantic::add_definitions_to_current_scope(new_context, *(context.ast->modules[function->module_path.string()]));
+        assert(result.is_ok());
+    }
+
+    semantic::add_scope(new_context);
+
+    // Add arguments as type bindings
+    for (size_t i = 0; i < args.size(); i++) {
+        ast::Type call_type = args[i];
+        ast::Type function_type = function->args[i]->type;
+
+        if (function_type.is_type_variable() || ast::has_type_variables(function_type.parameters)) {
+            // If it was no already included
+            if (new_context.type_inference.type_bindings.find(function_type.to_str()) == new_context.type_inference.type_bindings.end()) {
+                new_context.type_inference.type_bindings[function_type.to_str()] = call_type;
+            }
+            // Else compare with previous type founded for it
+            else if (new_context.type_inference.type_bindings[function_type.to_str()] != call_type) {
+                assert(false);
+            }
+        }
+        else if (call_type != function_type) {
+            assert(false);
+        }
+    }
+
+    ast::print((ast::Node*) function);
+    for (auto arg: args) {
+        std::cout << arg.to_str() << ", ";
+    }
+    std::cout << "\n";
+    semantic::print_type_bindings(new_context.type_inference.type_bindings);
+
+    // Analyze function with call argument types
+    auto result = semantic::get_concrete_as_type_bindings(new_context, function->body);
+    if (result.is_error()) {
+        context.errors.insert(context.errors.end(), new_context.errors.begin(), new_context.errors.end());
+        return Error {};
+    }
+
+    // Add specialization
+    specialization.type_bindings = new_context.type_inference.type_bindings;
+    for (size_t i = 0; i < args.size(); i++) {
+        specialization.args.push_back(args[i]);
+    }
+
+    if (function->return_type.is_type_variable() || ast::has_type_variables(function->return_type.parameters)) {
+        assert(specialization.type_bindings.find(function->return_type.to_str()) != specialization.type_bindings.end());
+        specialization.return_type = specialization.type_bindings[function->return_type.to_str()];
+    }
+    else {
+        specialization.return_type = function->return_type;
+    }
+
+    function->specializations.push_back(specialization);
+
+    return specialization.return_type;
+}
+
+// Make concrete
+// -------------
+void semantic::make_concrete(Context& context, ast::Node* node) {
+    switch (node->index()) {
+        case ast::Block: {
+            auto& block = std::get<ast::BlockNode>(*node);
+
+            // Add scope
+            semantic::add_scope(context);
+
+            // Add functions to the current scope
+            auto result = semantic::add_definitions_to_current_scope(context, block);
+            assert(result.is_ok());
+
+            // Make statements concrete
+            size_t number_of_errors = context.errors.size();
+            for (auto statement: block.statements) {
+                semantic::make_concrete(context, statement);
+            }
+
+            // Remove scope
+            semantic::remove_scope(context);
+            break;
+        }
+
+        case ast::Function: {
+            break;
+        }
+
+        case ast::TypeDef: {
+            break;
+        }
+
+        case ast::Assignment: {
+            auto& assignment = std::get<ast::AssignmentNode>(*node);
+            semantic::make_concrete(context, assignment.expression);
+            break;
+        }
+
+        case ast::FieldAssignment: {
+            auto& assignment = std::get<ast::FieldAssignmentNode>(*node);
+            semantic::make_concrete(context, (ast::Node*) assignment.identifier);
+            semantic::make_concrete(context, (ast::Node*) assignment.expression);
+            break;
+        }
+
+        case ast::DereferenceAssignment: {
+            auto& assignment = std::get<ast::DereferenceAssignmentNode>(*node);
+            semantic::make_concrete(context, (ast::Node*) assignment.identifier);
+            semantic::make_concrete(context, (ast::Node*) assignment.expression);
+            break;
+        }
+
+        case ast::Return: {
+            auto& return_node = std::get<ast::ReturnNode>(*node);
+            if (return_node.expression.has_value()) {
+                semantic::make_concrete(context, return_node.expression.value());
+            }
+            break;
+        }
+
+        case ast::Break: {
+            break;
+        }
+
+        case ast::Continue: {
+            break;
+        }
+
+        case ast::IfElse: {
+            auto& if_else = std::get<ast::IfElseNode>(*node);
+            semantic::make_concrete(context, if_else.condition);
+            semantic::make_concrete(context, if_else.if_branch);
+            if (if_else.else_branch.has_value()) {
+                semantic::make_concrete(context, if_else.else_branch.value());
+            }
+
+            if (ast::is_expression(node)) {
+                if_else.type = ast::get_concrete_type(if_else.type, context.type_inference.type_bindings);
+            }
+            break;
+        }
+
+        case ast::While: {
+            auto& while_node = std::get<ast::WhileNode>(*node);
+            semantic::make_concrete(context, while_node.condition);
+            semantic::make_concrete(context, while_node.block);
+            break;
+        }
+
+        case ast::Use: {
+            assert(false);
+            break;
+        }
+
+        case ast::LinkWith: {
+            assert(false);
+            break;
+        }
+
+        case ast::CallArgument: {
+            auto& call_argument = std::get<ast::CallArgumentNode>(*node);
+            semantic::make_concrete(context, call_argument.expression);
+            call_argument.type = ast::get_type(call_argument.expression);
+            break;
+        }
+
+        case ast::Call: {
+            auto& call = std::get<ast::CallNode>(*node);
+            for (auto arg: call.args) {
+                semantic::make_concrete(context, (ast::Node*) arg);
+            }
+            
+            call.type = ast::get_concrete_type(call.type, context.type_inference.type_bindings);
+            break;
+        }
+
+        case ast::Float: {
+            auto& float_node = std::get<ast::FloatNode>(*node);
+            float_node.type = ast::get_concrete_type(float_node.type, context.type_inference.type_bindings);
+            break;
+        }
+
+        case ast::Integer: {
+            auto& integer = std::get<ast::IntegerNode>(*node);
+            integer.type = ast::get_concrete_type(integer.type, context.type_inference.type_bindings);
+            break;
+        }
+
+        case ast::Identifier: {
+            auto& identifier = std::get<ast::IdentifierNode>(*node);
+            identifier.type = ast::get_concrete_type(identifier.type, context.type_inference.type_bindings);
+            break;
+        }
+
+        case ast::Boolean: {
+            break;
+        }
+
+        case ast::String: {
+            break;
+        }
+
+        case ast::Array: {
+            auto& array = std::get<ast::ArrayNode>(*node);
+            assert(false);
+            break;
+        }
+
+        case ast::FieldAccess: {
+            auto& field_access = std::get<ast::FieldAccessNode>(*node);
+            for (auto field: field_access.fields_accessed) {
+                field->type = ast::get_concrete_type(field->type, context.type_inference.type_bindings);
+            }
+
+            field_access.type = ast::get_concrete_type(field_access.type, context.type_inference.type_bindings);
+            break;
+        }
+
+        case ast::AddressOf: {
+            auto& address_of = std::get<ast::AddressOfNode>(*node);
+            semantic::make_concrete(context, address_of.expression);
+    
+            assert(address_of.type.is_pointer());
+            if (!address_of.type.is_concrete()) {
+                address_of.type.parameters[0] = ast::get_concrete_type(address_of.expression, context.type_inference.type_bindings);
+            }
+            break;
+        }
+
+        case ast::Dereference: {
+            auto& dereference = std::get<ast::DereferenceNode>(*node);
+            assert(ast::get_concrete_type(dereference.expression, context.type_inference.type_bindings).is_pointer());
+            dereference.type = ast::get_concrete_type(dereference.type, context.type_inference.type_bindings);
+            make_concrete(context, dereference.expression);
+            break;
+        }
+
+        default: {
+            assert(false);
+        }
+    }
 }
