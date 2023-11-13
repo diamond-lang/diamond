@@ -89,6 +89,8 @@ namespace semantic {
     ast::Type new_final_type_variable(Context& context);
     void add_constraint(Context& context, Set<ast::Type> constraint);
     ast::Type get_unified_type(Context& context, ast::Type type_var);
+    bool is_type_concrete(Context& context, ast::Type type);
+    ast::Type get_type(Context& context, ast::Type type);
 
     // Semantic analysis
     Result<Ok, Error> analyze_block_or_expression(Context& context, ast::Node* node);
@@ -576,6 +578,36 @@ ast::Type semantic::get_unified_type(Context& context, ast::Type type_var) {
     }
     
     return type_var;
+}
+
+bool semantic::is_type_concrete(Context& context, ast::Type type) {
+    if (type.is_concrete()) {
+        return true;
+    }
+    if (context.type_inference.type_bindings.find(type.to_str()) != context.type_inference.type_bindings.end()) {
+        return true;
+    }
+    return false;
+}
+
+ast::Type semantic::get_type(Context& context, ast::Type type) {
+    if (type.is_type_variable()) {
+        if (context.type_inference.type_bindings.find(type.to_str()) != context.type_inference.type_bindings.end()) {
+            type = context.type_inference.type_bindings[type.to_str()];
+        }
+        else if (type.interface.has_value()) {
+            return type.interface.value().get_default_type();
+        }
+        else {
+            return type;
+        }
+    }
+    if (!type.is_concrete()) {
+        for (size_t i = 0; i < type.parameters.size(); i++) {
+            type.parameters[i] = ast::get_concrete_type(type.parameters[i], context.type_inference.type_bindings);
+        }
+    }
+    return type;
 }
 
 // Semantic analysis
@@ -1702,10 +1734,6 @@ Result<Ok, Error> semantic::get_concrete_as_type_bindings(Context& context, ast:
         if (result.is_error()) return result;
     }
 
-    if (ast::is_expression((ast::Node*) &node)) {
-        node.type = ast::get_concrete_type(node.type, context.type_inference.type_bindings);
-    }
-
     return Ok {};
 }
 
@@ -1731,16 +1759,10 @@ Result<Ok, Error> semantic::get_concrete_as_type_bindings(Context& context, ast:
     auto result = semantic::get_concrete_as_type_bindings(context, node.expression);
     if (result.is_error()) return result;
 
-    node.type = ast::get_type(node.expression);
     return Ok {};
 }
 
 Result<Ok, Error> semantic::get_concrete_as_type_bindings(Context& context, ast::CallNode& node) {
-    // Get return type if it were founded
-    if (context.type_inference.type_bindings.find(node.type.to_str()) != context.type_inference.type_bindings.end()) {
-        node.type = context.type_inference.type_bindings[node.type.to_str()];
-    }
-      
     // Get binding
     semantic::Binding* binding = semantic::get_binding(context, node.identifier->value);
     assert(binding);
@@ -1753,10 +1775,10 @@ Result<Ok, Error> semantic::get_concrete_as_type_bindings(Context& context, ast:
             assert(node.functions.size() != 0);
             auto functions_that_can_be_called = node.functions;
 
-            if (node.type.is_concrete()) {
+            if (semantic::is_type_concrete(context, node.type)) {
                 // Remove functions that aren't expected
-                functions_that_can_be_called.erase(std::remove_if(functions_that_can_be_called.begin(), functions_that_can_be_called.end(), [&node](ast::FunctionNode* function) {
-                    return node.type != function->return_type;
+                functions_that_can_be_called.erase(std::remove_if(functions_that_can_be_called.begin(), functions_that_can_be_called.end(), [&node, &context](ast::FunctionNode* function) {
+                    return ast::get_concrete_type(node.type, context.type_inference.type_bindings) != function->return_type;
                 }), functions_that_can_be_called.end());
 
                 // Check what function to call is not ambiguos
@@ -1772,9 +1794,10 @@ Result<Ok, Error> semantic::get_concrete_as_type_bindings(Context& context, ast:
                 // Set and check expected types
                 for (size_t i = 0; i < node.args.size(); i++) {
                     // If type is concrete
-                    if (node.args[i]->type.is_concrete()) {
+                    auto arg_type = semantic::get_type(context, node.args[i]->type);
+                    if (arg_type.is_concrete()) {
                         // If type dont match with expected type
-                        if (node.args[i]->type != called_function->args[i]->type) {
+                        if (arg_type != called_function->args[i]->type) {
                             context.errors.push_back(Error{"Error: Other expected type"});
                             return Error {};
                         }
@@ -1803,12 +1826,13 @@ Result<Ok, Error> semantic::get_concrete_as_type_bindings(Context& context, ast:
                     if (result.is_error()) return result;
 
                     // Remove functions that don't match with the type founded for the argument
-                    functions_that_can_be_called.erase(std::remove_if(functions_that_can_be_called.begin(), functions_that_can_be_called.end(), [&node, &i](ast::FunctionNode* function) {
+                    functions_that_can_be_called.erase(std::remove_if(functions_that_can_be_called.begin(), functions_that_can_be_called.end(), [&node, &i, &context](ast::FunctionNode* function) {
+                        auto arg_type = semantic::get_type(context, node.args[i]->type);
                         if (!function->args[i]->type.is_type_variable()) {
-                            return node.args[i]->type != function->args[i]->type;
+                            return arg_type != function->args[i]->type;
                         }
                         else if (function->args[i]->type.overload_constraints.size() > 0) {
-                            return function->args[i]->type.overload_constraints.contains(node.args[i]->type);
+                            return function->args[i]->type.overload_constraints.contains(arg_type);
                         }
                         assert(false);
                         return false;
@@ -1821,15 +1845,16 @@ Result<Ok, Error> semantic::get_concrete_as_type_bindings(Context& context, ast:
                         // Check types of remaining arguments
                         for (size_t j = i + 1; j < node.args.size(); j++) {
                             // If type is concrete
-                            if (node.args[j]->type.is_concrete()) {
+                            auto arg_type = semantic::get_type(context, node.args[j]->type);
+                            if (arg_type.is_concrete()) {
                                 // If type dont match with expected type
                                 if (!called_function->args[j]->type.is_type_variable()
-                                &&   node.args[j]->type != called_function->args[j]->type) {
+                                &&   arg_type != called_function->args[j]->type) {
                                     context.errors.push_back(Error{"Error: Other expected type"});
                                     return Error {};
                                 }
                                 else if (called_function->args[j]->type.is_type_variable()
-                                && !called_function->args[j]->type.overload_constraints.contains(node.args[j]->type)) {
+                                && !called_function->args[j]->type.overload_constraints.contains(arg_type)) {
                                     context.errors.push_back(Error{"Error: Other expected type"});
                                     return Error {};
                                 }
@@ -1869,7 +1894,6 @@ Result<Ok, Error> semantic::get_concrete_as_type_bindings(Context& context, ast:
                 if (context.type_inference.type_bindings.find(node.type.to_str()) == context.type_inference.type_bindings.end()) {
                     if (!called_function->return_type.is_type_variable()) {
                         context.type_inference.type_bindings[node.type.to_str()] = called_function->return_type;
-                        node.type = called_function->return_type;
                     }
                     else {
                         assert(false);
@@ -1886,17 +1910,14 @@ Result<Ok, Error> semantic::get_concrete_as_type_bindings(Context& context, ast:
 }
 
 Result<Ok, Error> semantic::get_concrete_as_type_bindings(Context& context, ast::FloatNode& node) {
-    node.type = ast::get_concrete_type(node.type, context.type_inference.type_bindings);
     return Ok {};
 }
 
 Result<Ok, Error> semantic::get_concrete_as_type_bindings(Context& context, ast::IntegerNode& node) {
-    node.type = ast::get_concrete_type(node.type, context.type_inference.type_bindings);
     return Ok {};
 }
 
 Result<Ok, Error> semantic::get_concrete_as_type_bindings(Context& context, ast::IdentifierNode& node) {
-    node.type = ast::get_concrete_type(node.type, context.type_inference.type_bindings);
     return Ok {};
 }
 
@@ -1914,30 +1935,18 @@ Result<Ok, Error> semantic::get_concrete_as_type_bindings(Context& context, ast:
 }
 
 Result<Ok, Error> semantic::get_concrete_as_type_bindings(Context& context, ast::FieldAccessNode& node) {
-    for (auto field: node.fields_accessed) {
-        field->type = ast::get_concrete_type(field->type, context.type_inference.type_bindings);
-    }
-
-    node.type = ast::get_concrete_type(node.type, context.type_inference.type_bindings);
     return Ok {};
 }
 
 Result<Ok, Error> semantic::get_concrete_as_type_bindings(Context& context, ast::AddressOfNode& node) {
     auto result = semantic::get_concrete_as_type_bindings(context, node.expression);
     if (result.is_error()) return result;
-    
-    assert(node.type.is_pointer());
-    if (!node.type.is_concrete()) {
-        node.type.parameters[0] = ast::get_concrete_type(node.expression, context.type_inference.type_bindings);
-    }
 
     return Ok {};
 }
 
 Result<Ok, Error> semantic::get_concrete_as_type_bindings(Context& context, ast::DereferenceNode& node) {
     assert(ast::get_concrete_type(node.expression, context.type_inference.type_bindings).is_pointer());
-
-    node.type = ast::get_concrete_type(node.type, context.type_inference.type_bindings);
 
     auto result = get_concrete_as_type_bindings(context, node.expression);
     if (result.is_error()) return result;
