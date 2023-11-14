@@ -263,6 +263,40 @@ namespace codegen {
             return block.CreateAlloca(type, 0, name.c_str());
         }
 
+        ast::FunctionNode* get_function(ast::CallNode* call) {
+            ast::FunctionNode* function = nullptr;
+            for (auto it: call->functions) {
+                if (it->completely_typed) {
+                    if (this->get_types(call->args) == ast::get_types(it->args)) {
+                        function = it;
+                        break;
+                    }
+                }
+                else {
+                    bool match = true;
+                    for (size_t i = 0; i < it->args.size(); i++) {
+                        auto arg_type = ast::get_concrete_type(call->args[i]->type, this->type_bindings);
+                        if (it->args[i]->type.is_concrete()
+                        &&  arg_type != it->args[i]->type) {
+                            match = false;
+                            break;
+                        }
+                        else if (!it->args[i]->type.overload_constraints.contains(arg_type)) {
+                            match = false;
+                            break;
+                        }
+                    }
+
+                    if (match) {
+                        function = it;
+                        break;
+                    }
+                }
+            }
+            assert(function);
+            return function;
+        }
+
         void store_fields(ast::Node* expression, llvm::Value* struct_allocation) {
             // Get struct type
             llvm::StructType* struct_type = this->get_struct_type(ast::get_type(expression).type_definition);
@@ -291,19 +325,7 @@ namespace codegen {
                 }
                 else {
                     // Get function
-                    ast::FunctionNode* function = nullptr;
-                    if (call.function) {
-                        function = call.function;
-                    }
-                    else if (call.functions.size() > 0) {
-                        for (auto it: call.functions) {
-                            if (this->get_types(call.args) == ast::get_types(it->args)) {
-                                function = it;
-                                break;
-                            }
-                        }
-                    }
-                    assert(function);
+                    ast::FunctionNode* function = this->get_function(&call);
                     std::string name = this->get_mangled_function_name(function->module_path, call.identifier->value, this->get_types(call.args), ast::get_concrete_type((ast::Node*) &call, this->type_bindings), function->is_extern);
                     llvm::Function* llvm_function = this->module->getFunction(name);
                     assert(llvm_function);
@@ -705,7 +727,16 @@ void codegen::Context::codegen_types_bodies(std::vector<ast::TypeNode*> types) {
 void codegen::Context::codegen_function_prototypes(std::vector<ast::FunctionNode*> functions) {
     for (auto& function: functions) {
         if (!function->completely_typed) {
-            assert(false);
+            for (auto& specialization: function->specializations) {
+                this->codegen_function_prototypes(
+                    function->module_path,
+                    function->identifier->value,
+                    function->args,
+                    specialization.args,
+                    specialization.return_type,
+                    function->is_extern
+                );
+            }
         }
         else {
             this->codegen_function_prototypes(
@@ -761,7 +792,20 @@ void codegen::Context::codegen_function_bodies(std::vector<ast::FunctionNode*> f
         if (function->is_extern) continue;
 
         if (!function->completely_typed) {
-            assert(false);
+            for (auto& specialization: function->specializations) {
+                this->type_bindings = specialization.type_bindings;
+
+                this->codegen_function_bodies(
+                    function->module_path,
+                    function->identifier->value,
+                    function->args,
+                    specialization.args,
+                    specialization.return_type,
+                    function->body
+                );
+
+                this->type_bindings = {};
+            }
         }
         else {
             this->codegen_function_bodies(
@@ -1187,18 +1231,7 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
     }
 
     // Get function
-    ast::FunctionNode* function = nullptr;
-    if (node.function) {
-        function = node.function;
-    }
-    else if (node.functions.size() > 0) {
-        for (auto it: node.functions) {
-            if (this->get_types(node.args) == ast::get_types(it->args)) {
-                function = it;
-                break;
-            }
-        }
-    }
+    ast::FunctionNode* function = this->get_function(&node);
 
     // Codegen args
     std::vector<llvm::Value*> args = this->codegen_args(function, node.args);
@@ -1354,7 +1387,6 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
     }
 
     // Get function
-    assert(function);
     std::string name = this->get_mangled_function_name(function->module_path, node.identifier->value, this->get_types(node.args), ast::get_concrete_type((ast::Node*) &node, this->type_bindings), function->is_extern);
     llvm::Function* llvm_function = this->module->getFunction(name);
     assert(llvm_function);

@@ -299,7 +299,6 @@ namespace ast {
 
         IdentifierNode* identifier;
         std::vector<CallArgumentNode*> args;
-        FunctionNode* function = nullptr;
         std::vector<FunctionNode*> functions;
     };
 
