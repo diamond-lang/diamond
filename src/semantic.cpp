@@ -1798,7 +1798,7 @@ Result<Ok, Error> semantic::get_concrete_as_type_bindings(Context& context, ast:
                     if (arg_type.is_concrete()) {
                         // If type dont match with expected type
                         if (arg_type != called_function->args[i]->type) {
-                            context.errors.push_back(Error{"Error: Other expected type"});
+                            context.errors.push_back(Error{"Error 1: Other expected type"});
                             return Error {};
                         }
                         else {
@@ -1832,7 +1832,7 @@ Result<Ok, Error> semantic::get_concrete_as_type_bindings(Context& context, ast:
                             return arg_type != function->args[i]->type;
                         }
                         else if (function->args[i]->type.overload_constraints.size() > 0) {
-                            return function->args[i]->type.overload_constraints.contains(arg_type);
+                            return !function->args[i]->type.overload_constraints.contains(arg_type);
                         }
                         assert(false);
                         return false;
@@ -1896,7 +1896,9 @@ Result<Ok, Error> semantic::get_concrete_as_type_bindings(Context& context, ast:
                         context.type_inference.type_bindings[node.type.to_str()] = called_function->return_type;
                     }
                     else {
-                        assert(false);
+                        auto result = semantic::get_function_type(context, called_function, ast::get_concrete_types(ast::get_types(node.args), context.type_inference.type_bindings), {});
+                        if (result.is_error()) return Error {};
+                        context.type_inference.type_bindings[node.type.to_str()] = result.get_value();
                     }
                 }
             }
@@ -1990,11 +1992,11 @@ Result<ast::Type, Error> semantic::get_function_type(Context& context, ast::Func
 
         if (function_type.is_type_variable() || ast::has_type_variables(function_type.parameters)) {
             // If it was no already included
-            if (new_context.type_inference.type_bindings.find(function_type.to_str()) == new_context.type_inference.type_bindings.end()) {
-                new_context.type_inference.type_bindings[function_type.to_str()] = call_type;
+            if (new_context.type_inference.type_bindings.find(function_type.name) == new_context.type_inference.type_bindings.end()) {
+                new_context.type_inference.type_bindings[function_type.name] = call_type;
             }
             // Else compare with previous type founded for it
-            else if (new_context.type_inference.type_bindings[function_type.to_str()] != call_type) {
+            else if (new_context.type_inference.type_bindings[function_type.name] != call_type) {
                 assert(false);
             }
         }
@@ -2002,13 +2004,6 @@ Result<ast::Type, Error> semantic::get_function_type(Context& context, ast::Func
             assert(false);
         }
     }
-
-    ast::print((ast::Node*) function);
-    for (auto arg: args) {
-        std::cout << arg.to_str() << ", ";
-    }
-    std::cout << "\n";
-    semantic::print_type_bindings(new_context.type_inference.type_bindings);
 
     // Analyze function with call argument types
     auto result = semantic::get_concrete_as_type_bindings(new_context, function->body);
@@ -2024,8 +2019,8 @@ Result<ast::Type, Error> semantic::get_function_type(Context& context, ast::Func
     }
 
     if (function->return_type.is_type_variable() || ast::has_type_variables(function->return_type.parameters)) {
-        assert(specialization.type_bindings.find(function->return_type.to_str()) != specialization.type_bindings.end());
-        specialization.return_type = specialization.type_bindings[function->return_type.to_str()];
+        assert(specialization.type_bindings.find(function->return_type.name) != specialization.type_bindings.end());
+        specialization.return_type = specialization.type_bindings[function->return_type.name];
     }
     else {
         specialization.return_type = function->return_type;
