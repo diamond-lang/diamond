@@ -111,11 +111,30 @@ std::string errors::undefined_function(ast::CallNode& call, std::vector<ast::Typ
            underline_identifier(*call.identifier, file);
 }
 
-std::string errors::ambiguous_what_function_to_call(ast::CallNode& call, std::filesystem::path file) {
+static std::string list_functions(std::vector<ast::FunctionNode*> functions) {
+    std::string result = "";
+    for (auto function: functions) {
+        result += "    " + std::to_string(function->line) + "| " + current_line(function->line, function->module_path) + "\n";
+    }
+    return result;
+}
+
+std::string errors::ambiguous_what_function_to_call(ast::CallNode& call, std::filesystem::path file, std::vector<ast::FunctionNode*> functions) {
     auto& identifier = call.identifier->value;
-    return make_header("Ambiguous what function to call\n\n") +
+    return make_header("Ambiguous call\n\n") +
            std::to_string(call.line) + "| " + current_line(call.line, file) + "\n" +
-           underline_identifier(*call.identifier, file);
+           underline_identifier(*call.identifier, file) + "\n" +
+           "Here '" + call.identifier->value + "'  can refer to:\n" +
+           list_functions(functions);
+}
+
+std::string errors::unexpected_type(ast::CallNode& call, std::filesystem::path file, std::vector<ast::FunctionNode*> functions) {
+    auto& identifier = call.identifier->value;
+    return make_header("Type mismatch\n\n") +
+           std::to_string(call.line) + "| " + current_line(call.line, file) + "\n" +
+           underline_identifier(*call.identifier, file) + "\n" +
+           "Here '" + call.identifier->value + "'  can refer to:\n" +
+           list_functions(functions);
 }
 
 std::string errors::unhandled_return_value(ast::CallNode& call, std::filesystem::path file) {

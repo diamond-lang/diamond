@@ -18,7 +18,8 @@ namespace errors {
     std::string reassigning_immutable_variable(ast::IdentifierNode& identifier, ast::AssignmentNode& assignment, std::filesystem::path file);
     std::string undefined_function(ast::CallNode& call, std::filesystem::path file);
     std::string undefined_function(ast::CallNode& call, std::vector<ast::Type> args, std::filesystem::path file);
-    std::string ambiguous_what_function_to_call(ast::CallNode& call, std::filesystem::path file);
+    std::string ambiguous_what_function_to_call(ast::CallNode& call, std::filesystem::path file, std::vector<ast::FunctionNode*> functions);
+    std::string unexpected_type(ast::CallNode& call, std::filesystem::path file, std::vector<ast::FunctionNode*> functions);
     std::string unhandled_return_value(ast::CallNode& call, std::filesystem::path file);
     std::string file_couldnt_be_found(std::filesystem::path path);
 }

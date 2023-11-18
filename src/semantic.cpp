@@ -1497,7 +1497,7 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::Ca
     // Get overload constraints
     if (is_function(*binding)) {
         if (binding->type == semantic::FunctionBinding) {
-            // Found functions that can be called
+            // Find functions that can be called
             std::vector<ast::FunctionNode*> functions_that_can_be_called;
             for (auto function: semantic::get_functions(*binding)) {
                 if (node.args.size() == function->args.size()) {
@@ -1537,7 +1537,7 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::Ca
                 return Error {};
             }
 
-            // Found new overload constraints
+            // Find new overload constraints
             std::unordered_map<ast::Type, Set<ast::Type>> new_overload_constraints;
             for (auto function: functions_that_can_be_called) {
                 for (size_t i = 0; i < node.args.size(); i++) {
@@ -1783,7 +1783,7 @@ Result<Ok, Error> semantic::get_concrete_as_type_bindings(Context& context, ast:
 
                 // Check what function to call is not ambiguos
                 if (functions_that_can_be_called.size() > 1) {
-                    context.errors.push_back(Error{"Ambiguos what function to call"});
+                    context.errors.push_back(errors::ambiguous_what_function_to_call(node, context.current_module, functions_that_can_be_called));
                     return Error {};
                 }
 
@@ -1885,7 +1885,7 @@ Result<Ok, Error> semantic::get_concrete_as_type_bindings(Context& context, ast:
 
                 // Check what function to call is not ambiguos
                 if (functions_that_can_be_called.size() > 1) {
-                    context.errors.push_back(Error{"Ambiguos what function to call"});
+                    context.errors.push_back(errors::ambiguous_what_function_to_call(node, context.current_module, functions_that_can_be_called));
                     return Error {};
                 }
                 auto& called_function = functions_that_can_be_called[0];

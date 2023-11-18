@@ -1,0 +1,20 @@
+function add(a, b)
+    return a + b
+
+function add(a, b)
+    return a * b
+
+a = 2
+b = 4
+print(add(2, 5))
+
+--- Output
+Ambiguous call
+
+9| print(add(2, 5))
+         ^^^
+Here 'add'  can refer to:
+    1| function add(a, b)
+    4| function add(a, b)
+
+---
