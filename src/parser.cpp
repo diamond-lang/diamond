@@ -850,7 +850,8 @@ Result<ast::Node*, Error> Parser::parse_call() {
     // Parse right paren
     auto right_paren = this->parse_token(token::RightParen);
     if (right_paren.is_error()) return Error {};
-
+    call.end_line = right_paren.get_value().line;
+    
     this->ast.push_back(call);
     return this->ast.last_element();
 }

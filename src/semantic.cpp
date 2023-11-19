@@ -1390,21 +1390,27 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::As
 }
 
 Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::FieldAssignmentNode& node) {
-    semantic::unify_types_and_type_check(context, *node.identifier);
-    semantic::unify_types_and_type_check(context, node.expression);
+    auto result = semantic::unify_types_and_type_check(context, *node.identifier);
+    if (result.is_error()) return result;
+    
+    result = semantic::unify_types_and_type_check(context, node.expression);
+    if (result.is_error()) return result;
 
     return Ok {};
 }
 
 Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::DereferenceAssignmentNode& node) {
-    semantic::unify_types_and_type_check(context, *node.identifier);
-    semantic::unify_types_and_type_check(context, node.expression);
+    auto result = semantic::unify_types_and_type_check(context, *node.identifier);
+    if (result.is_error()) return result;
+
+    result = semantic::unify_types_and_type_check(context, node.expression);
+    if (result.is_error()) return result;
 
     return Ok {};
 }
 
 Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::ReturnNode& node) {
-    if (node.expression.has_value()) semantic::unify_types_and_type_check(context, node.expression.value());
+    if (node.expression.has_value()) return semantic::unify_types_and_type_check(context, node.expression.value());
 
     return Ok {};
 }
@@ -1421,16 +1427,23 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::If
     if (ast::is_expression((ast::Node*) &node)) {
         node.type = semantic::get_unified_type(context, node.type);
     }
-    semantic::unify_types_and_type_check(context, node.condition);
-    semantic::unify_types_and_type_check(context, node.if_branch);
-    if (node.else_branch.has_value()) semantic::unify_types_and_type_check(context, node.else_branch.value());
+    auto result = semantic::unify_types_and_type_check(context, node.condition);
+    if (result.is_error()) return result;
+
+    result = semantic::unify_types_and_type_check(context, node.if_branch);
+    if (result.is_error()) return result;
+
+    if (node.else_branch.has_value()) return semantic::unify_types_and_type_check(context, node.else_branch.value());
 
     return Ok {};
 }
 
 Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::WhileNode& node) {
-    semantic::unify_types_and_type_check(context, node.condition);
-    semantic::unify_types_and_type_check(context, node.block);
+    auto result = semantic::unify_types_and_type_check(context, node.condition);
+    if (result.is_error()) return result;
+    
+    result = semantic::unify_types_and_type_check(context, node.block);
+    if (result.is_error()) return result;
 
     return Ok {};
 }
@@ -1464,7 +1477,8 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::St
 
 Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::ArrayNode& node) {
     for (auto element: node.elements) {
-        semantic::unify_types_and_type_check(context, element);
+        auto result = semantic::unify_types_and_type_check(context, element);
+        if (result.is_error()) return result;
     }
     
     node.type = semantic::get_unified_type(context, node.type);
@@ -1485,7 +1499,8 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::Fl
 
 Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::CallNode& node) {
     for (size_t i = 0; i < node.args.size(); i++) {
-        semantic::unify_types_and_type_check(context, *node.args[i]);
+        auto result = semantic::unify_types_and_type_check(context, *node.args[i]);
+        if (result.is_error()) return result;
     }
 
     node.type = semantic::get_unified_type(context, node.type);
@@ -1498,44 +1513,54 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::Ca
     if (is_function(*binding)) {
         if (binding->type == semantic::FunctionBinding) {
             // Find functions that can be called
-            std::vector<ast::FunctionNode*> functions_that_can_be_called;
-            for (auto function: semantic::get_functions(*binding)) {
-                if (node.args.size() == function->args.size()) {
-                    bool types_match = true;
-                    for (size_t i = 0; i < node.args.size(); i++) {
-                        if (node.args[i]->type.is_concrete()) {
-                            if (!function->args[i]->type.is_type_variable()
-                            &&  function->args[i]->type != node.args[i]->type) {
-                                types_match = false;
-                            }
-                            else if (function->args[i]->type.overload_constraints.size() > 0
-                            &&      !function->args[i]->type.overload_constraints.contains(node.args[i]->type)) {
-                                types_match = false;
-                            }
+            std::vector<ast::FunctionNode*> functions_that_can_be_called = semantic::get_functions(*binding);
+
+            // Remove functions whose number of arguments dont match with the call
+            functions_that_can_be_called.erase(std::remove_if(functions_that_can_be_called.begin(), functions_that_can_be_called.end(), [&node](ast::FunctionNode* function) {
+                return node.args.size() != function->args.size();
+            }), functions_that_can_be_called.end());
+
+            // For each arg
+            for (size_t i = 0; i < node.args.size(); i++) {
+                if (node.args[i]->type.is_concrete()) {
+                    auto backup = functions_that_can_be_called;
+                    auto function = functions_that_can_be_called.begin();
+                    while (function != functions_that_can_be_called.end()) {
+                        if (!(*function)->args[i]->type.is_type_variable()
+                        &&  (*function)->args[i]->type != node.args[i]->type) {
+                            function = functions_that_can_be_called.erase(function);
+                        }
+                        else if ((*function)->args[i]->type.overload_constraints.size() > 0
+                        &&      !(*function)->args[i]->type.overload_constraints.contains(node.args[i]->type)) {
+                            function = functions_that_can_be_called.erase(function);
+                        }
+                        else {
+                            function++;
                         }
                     }
-
-                    if (node.type.is_concrete()) {
-                        if (!function->return_type.is_type_variable()
-                        &&  node.type != function->return_type) {
-                            types_match = false;
+                    if (functions_that_can_be_called.size() == 0) {
+                        std::vector<ast::Type> possible_types;
+                        for (auto function: backup) {
+                            if (!function->args[i]->type.is_type_variable()) {
+                                possible_types.push_back(function->args[i]->type);
+                            }
+                            else if (function->args[i]->type.overload_constraints.size() > 0) {
+                                for (auto type: function->args[i]->type.overload_constraints.elements) {
+                                    possible_types.push_back(type);
+                                }
+                            }
+                            else {
+                                assert(false);
+                            }
                         }
-                        else if (function->return_type.overload_constraints.size() > 0
-                        &&       function->return_type.overload_constraints.contains(node.type)) {
-                            types_match = false;
-                        }
-                    }
 
-                    if (types_match) {
-                        functions_that_can_be_called.push_back(function);
+                        context.errors.push_back(errors::unexpected_type(node, context.current_module, i, possible_types));
+                        return Error{}; 
                     }
                 }
             }
             node.functions = functions_that_can_be_called;
-            if (node.functions.size() == 0) {
-                context.errors.push_back(Error{"Error: Undefined function for types"});
-                return Error {};
-            }
+            assert(node.functions.size() > 0);
 
             // Find new overload constraints
             std::unordered_map<ast::Type, Set<ast::Type>> new_overload_constraints;
@@ -1615,7 +1640,8 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::Fi
     semantic::StructType* struct_type = &context.type_inference.struct_types[node.fields_accessed[0]->type];
     
     // Unify
-    semantic::unify_types_and_type_check(context, *node.fields_accessed[0]);
+    auto result = semantic::unify_types_and_type_check(context, *node.fields_accessed[0]);
+    if (result.is_error()) return result;
 
     for (size_t i = 1; i < node.fields_accessed.size(); i++) {
         std::string field = node.fields_accessed[i]->value;
@@ -1638,13 +1664,17 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::Fi
 
 
 Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::AddressOfNode& node) {
-    semantic::unify_types_and_type_check(context, node.expression);
+    auto result = semantic::unify_types_and_type_check(context, node.expression);
+    if (result.is_error()) return result;
+
     node.type = semantic::get_unified_type(context, node.type);
     return Ok {};
 }
 
 Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::DereferenceNode& node) {
-    semantic::unify_types_and_type_check(context, node.expression);
+    auto result = semantic::unify_types_and_type_check(context, node.expression);
+    if (result.is_error()) return result;
+
     node.type = semantic::get_unified_type(context, node.type);
     return Ok {};
 }

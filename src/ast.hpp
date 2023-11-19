@@ -294,6 +294,7 @@ namespace ast {
 
     struct CallNode {
         size_t line;
+        size_t end_line;
         size_t column;
         Type type = Type("");
 

@@ -15,6 +15,7 @@ std::string make_bright_cyan(std::string str);
 std::string make_red(std::string str);
 std::string make_magenta(std::string str);
 std::string make_bright_magenta(std::string str);
+std::string get_lines(size_t start_line, size_t end_line, std::filesystem::path file_path);
 std::string current_line(Location location);
 std::string current_line(size_t line, std::filesystem::path file_path);
 std::string underline_current_char(Location location);
@@ -120,21 +121,37 @@ static std::string list_functions(std::vector<ast::FunctionNode*> functions) {
 }
 
 std::string errors::ambiguous_what_function_to_call(ast::CallNode& call, std::filesystem::path file, std::vector<ast::FunctionNode*> functions) {
-    auto& identifier = call.identifier->value;
-    return make_header("Ambiguous call\n\n") +
-           std::to_string(call.line) + "| " + current_line(call.line, file) + "\n" +
-           underline_identifier(*call.identifier, file) + "\n" +
-           "Here '" + call.identifier->value + "'  can refer to:\n" +
-           list_functions(functions);
+    std::string result = make_header("Type mismatch\n\n");
+    result += std::to_string(call.line) + "| " + current_line(call.line, file) + "\n";
+    result += underline_identifier(*call.identifier, file) + "\n";
+    result +=  "Here '" + call.identifier->value + "'  can refer to:\n";
+    result += list_functions(functions);
+    return result;
 }
 
-std::string errors::unexpected_type(ast::CallNode& call, std::filesystem::path file, std::vector<ast::FunctionNode*> functions) {
-    auto& identifier = call.identifier->value;
-    return make_header("Type mismatch\n\n") +
-           std::to_string(call.line) + "| " + current_line(call.line, file) + "\n" +
-           underline_identifier(*call.identifier, file) + "\n" +
-           "Here '" + call.identifier->value + "'  can refer to:\n" +
-           list_functions(functions);
+std::string ordinal(size_t number) {
+    std::string suffix = "th";
+    if (number % 100 < 11 || number % 100 > 13) {
+        if (number % 10 == 1) {suffix = "st";}
+        else if (number % 10 == 2) {suffix = "nd";}
+        else if (number % 10 == 3) {suffix = "rd";}
+    }
+    return  std::to_string(number) + suffix;
+}
+
+std::string errors::unexpected_type(ast::CallNode& call, std::filesystem::path file, size_t arg_index, std::vector<ast::Type> expected_types) {
+    std::string result = make_header("Type mismatch\n\n");
+    result += "The type of the " + ordinal(arg_index + 1) + " argument of '" + call.identifier->value + "' doesn't match with what I expect." + "\n\n";
+    result += get_lines(call.line, call.end_line, file) + "\n";
+    result += "The type received is:\n\n";
+    result += call.args[arg_index]->type.to_str() + "\n\n";
+    result += "But possible types are:\n\n";
+    for (size_t i = 0; i < expected_types.size(); i++) {
+        result += expected_types[i].to_str();
+        if (i + 1 != expected_types.size()) result += " or ";
+    }
+    result += "\n";
+    return result;
 }
 
 std::string errors::unhandled_return_value(ast::CallNode& call, std::filesystem::path file) {
@@ -146,6 +163,32 @@ std::string errors::unhandled_return_value(ast::CallNode& call, std::filesystem:
 std::string errors::file_couldnt_be_found(std::filesystem::path path) {
     return make_header("File not found\n\n") +
            "\"" + path.string() + "\"" + " couldn't be found." + "\n";
+}
+
+int number_of_digits(size_t number) {
+    int digits = 0;
+    while (number != 0) {
+        number /= 10;
+        digits++;
+    }
+    return digits;
+}
+
+std::string get_lines(size_t start_line, size_t end_line, std::filesystem::path file_path) {
+    assert(start_line <= end_line);
+    std::string result = "";
+    size_t digits_end = number_of_digits(end_line);
+
+    size_t current = start_line;
+    while (current <= end_line) {
+        size_t digits = number_of_digits(current);
+        for (size_t i = 0; i < digits_end - digits; i++) {
+            result += " ";
+        }
+        result += std::to_string(current) + "│ " + current_line(current, file_path) + "\n";
+        current++;
+    }
+    return result;
 }
 
 std::string current_line(Location location) {return current_line(location.line, location.file);}

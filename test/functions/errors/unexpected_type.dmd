@@ -1,0 +1,26 @@
+function add(a: int32, b: int32): int32
+    a + b
+
+function add(a: int8, b: int8): int8
+    a + b
+
+a = 2 : int64
+b = 4 : int64
+print(add(a, b))
+
+--- Output
+Type mismatch
+
+The type of the 1st argument of 'add' doesn't match with what I expect.
+
+9│ print(add(a, b))
+
+The type received is:
+
+int64
+
+But possible types are:
+
+int32 or int8
+
+---
