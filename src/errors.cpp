@@ -139,12 +139,12 @@ std::string ordinal(size_t number) {
     return  std::to_string(number) + suffix;
 }
 
-std::string errors::unexpected_type(ast::CallNode& call, std::filesystem::path file, size_t arg_index, std::vector<ast::Type> expected_types) {
+std::string errors::unexpected_type(ast::CallNode& call, std::filesystem::path file, size_t arg_index, ast::Type type_received, std::vector<ast::Type> expected_types) {
     std::string result = make_header("Type mismatch\n\n");
     result += "The type of the " + ordinal(arg_index + 1) + " argument of '" + call.identifier->value + "' doesn't match with what I expect." + "\n\n";
     result += get_lines(call.line, call.end_line, file) + "\n";
     result += "The type received is:\n\n";
-    result += call.args[arg_index]->type.to_str() + "\n\n";
+    result +=  type_received.to_str() + "\n\n";
     result += "But possible types are:\n\n";
     for (size_t i = 0; i < expected_types.size(); i++) {
         result += expected_types[i].to_str();

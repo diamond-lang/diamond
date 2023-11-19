@@ -1,7 +1,0 @@
-function add(a: int64, b: int64): int64
-    a + b
-
-function add2(a, b)
-    return add(a, b)
-
-print(add2(3.4, 4.5))

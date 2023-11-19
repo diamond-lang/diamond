@@ -1,0 +1,6 @@
+function add(a: int64, b: int64): int64
+    a + b
+
+function add(a: )
+
+print(add(3, 3.5))

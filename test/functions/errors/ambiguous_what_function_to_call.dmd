@@ -9,7 +9,7 @@ b = 4
 print(add(2, 5))
 
 --- Output
-Ambiguous call
+Type mismatch
 
 9| print(add(2, 5))
          ^^^

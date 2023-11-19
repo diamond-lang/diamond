@@ -1554,7 +1554,7 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::Ca
                             }
                         }
 
-                        context.errors.push_back(errors::unexpected_type(node, context.current_module, i, possible_types));
+                        context.errors.push_back(errors::unexpected_type(node, context.current_module, i,  node.args[i]->type, possible_types));
                         return Error{}; 
                     }
                 }
@@ -1828,7 +1828,7 @@ Result<Ok, Error> semantic::get_concrete_as_type_bindings(Context& context, ast:
                     if (arg_type.is_concrete()) {
                         // If type dont match with expected type
                         if (arg_type != called_function->args[i]->type) {
-                            context.errors.push_back(Error{"Error 1: Other expected type"});
+                            context.errors.push_back(Error{"Error: Other expected type"});
                             return Error {};
                         }
                         else {
@@ -1856,6 +1856,7 @@ Result<Ok, Error> semantic::get_concrete_as_type_bindings(Context& context, ast:
                     if (result.is_error()) return result;
 
                     // Remove functions that don't match with the type founded for the argument
+                    auto backup = functions_that_can_be_called;
                     functions_that_can_be_called.erase(std::remove_if(functions_that_can_be_called.begin(), functions_that_can_be_called.end(), [&node, &i, &context](ast::FunctionNode* function) {
                         auto arg_type = semantic::get_type(context, node.args[i]->type);
                         if (!function->args[i]->type.is_type_variable()) {
@@ -1880,12 +1881,12 @@ Result<Ok, Error> semantic::get_concrete_as_type_bindings(Context& context, ast:
                                 // If type dont match with expected type
                                 if (!called_function->args[j]->type.is_type_variable()
                                 &&   arg_type != called_function->args[j]->type) {
-                                    context.errors.push_back(Error{"Error: Other expected type"});
+                                    context.errors.push_back(errors::unexpected_type(node, context.current_module, j, arg_type, {called_function->args[j]->type}));
                                     return Error {};
                                 }
                                 else if (called_function->args[j]->type.is_type_variable()
                                 && !called_function->args[j]->type.overload_constraints.contains(arg_type)) {
-                                    context.errors.push_back(Error{"Error: Other expected type"});
+                                    context.errors.push_back(errors::unexpected_type(node, context.current_module, j, arg_type, called_function->args[j]->type.overload_constraints.elements));
                                     return Error {};
                                 }
                                 else {
@@ -1906,7 +1907,21 @@ Result<Ok, Error> semantic::get_concrete_as_type_bindings(Context& context, ast:
                         break;
                     }
                     else if (functions_that_can_be_called.size() == 0) {
-                        context.errors.push_back(Error{"Error: Other expected type"});
+                        std::vector<ast::Type> possible_types;
+                        for (auto function: backup) {
+                            if (!function->args[i]->type.is_type_variable()) {
+                                possible_types.push_back(function->args[i]->type);
+                            }
+                            else if (function->args[i]->type.overload_constraints.size() > 0) {
+                                for (auto type: function->args[i]->type.overload_constraints.elements) {
+                                    possible_types.push_back(type);
+                                }
+                            }
+                            else {
+                                assert(false);
+                            }
+                        }
+                        context.errors.push_back(errors::unexpected_type(node, context.current_module, i, semantic::get_type(context, node.args[i]->type), possible_types));
                         return Error {};
                     }
 
