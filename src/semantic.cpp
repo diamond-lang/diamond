@@ -1259,8 +1259,9 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
         return Ok {};
     }
     else if (is_function(*binding)) {
-        // Analyze return type
-        node.type = semantic::new_type_variable(context);
+        if (!node.type.is_concrete()) {
+            node.type = semantic::new_type_variable(context);
+        }
 
         if (binding->type == semantic::FunctionBinding) {
            // do nothing
@@ -1513,6 +1514,7 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::Ca
     if (is_function(*binding)) {
         if (binding->type == semantic::FunctionBinding) {
             // Find functions that can be called
+            // ---------------------------------
             std::vector<ast::FunctionNode*> functions_that_can_be_called = semantic::get_functions(*binding);
 
             // Remove functions whose number of arguments dont match with the call
@@ -1554,33 +1556,74 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::Ca
                             }
                         }
 
-                        context.errors.push_back(errors::unexpected_type(node, context.current_module, i,  node.args[i]->type, possible_types));
+                        context.errors.push_back(errors::unexpected_argument_type(node, context.current_module, i,  node.args[i]->type, possible_types));
                         return Error{}; 
                     }
+                }
+            }
+
+            // For return type
+            if (node.type.is_concrete()) {
+                auto backup = functions_that_can_be_called;
+                auto function = functions_that_can_be_called.begin();
+                while (function != functions_that_can_be_called.end()) {
+                    if (!(*function)->return_type.is_type_variable()
+                    &&  (*function)->return_type != node.type) {
+                        function = functions_that_can_be_called.erase(function);
+                    }
+                    else if ((*function)->return_type.overload_constraints.size() > 0
+                    &&      !(*function)->return_type.overload_constraints.contains(node.type)) {
+                        function = functions_that_can_be_called.erase(function);
+                    }
+                    else {
+                        function++;
+                    }
+                }
+
+                if (functions_that_can_be_called.size() == 0) {
+                    std::vector<ast::Type> possible_types;
+                    for (auto function: backup) {
+                        if (!function->return_type.is_type_variable()) {
+                            possible_types.push_back(function->return_type);
+                        }
+                        else if (function->return_type.overload_constraints.size() > 0) {
+                            for (auto type: function->return_type.overload_constraints.elements) {
+                                possible_types.push_back(type);
+                            }
+                        }
+                        else {
+                            assert(false);
+                        }
+                    }
+
+                    context.errors.push_back(errors::unexpected_return_type(node, context.current_module, node.type, possible_types));
+                    return Error{}; 
                 }
             }
             node.functions = functions_that_can_be_called;
             assert(node.functions.size() > 0);
 
-            // Find new overload constraints
-            std::unordered_map<ast::Type, Set<ast::Type>> new_overload_constraints;
-            for (auto function: functions_that_can_be_called) {
-                for (size_t i = 0; i < node.args.size(); i++) {
-                    auto arg = node.args[i];
-                    if (arg->type.is_concrete()) {
-                        continue;
-                    }
-                    
-                    if (new_overload_constraints.find(ast::get_type(arg->expression)) == new_overload_constraints.end()) {
-                        new_overload_constraints[ast::get_type(arg->expression)] = Set<ast::Type>();
-                    }
+            // Compare new overload constraints with previous
+            // ----------------------------------------------
+            auto& overload_constraints = context.type_inference.overload_constraints;
 
+            // For each argument
+            for (size_t i = 0; i < node.args.size(); i++) {
+                auto arg = node.args[i];
+
+                if (arg->type.is_concrete()) {
+                    continue;
+                }
+
+                // Find new overload constraints
+                Set<ast::Type> new_overload_constraints;
+                for (auto function: functions_that_can_be_called) {
                     if (!function->args[i]->type.is_type_variable()) {
-                        new_overload_constraints[ast::get_type(arg->expression)].insert(function->args[i]->type);
+                        new_overload_constraints.insert(function->args[i]->type);
                     }
                     else if (function->args[i]->type.overload_constraints.size() > 0) {
                         for (auto constraint: function->args[i]->type.overload_constraints.elements) {
-                            new_overload_constraints[ast::get_type(arg->expression)].insert(constraint);
+                            new_overload_constraints.insert(constraint);
                         }
                     }
                     else {
@@ -1588,41 +1631,19 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::Ca
                     }
                 }
 
-                // Add possible types for return type
-                if (node.type.is_concrete()) {
-                    continue;
-                }
-
-                if (new_overload_constraints.find(node.type) == new_overload_constraints.end()){
-                    new_overload_constraints[node.type] = Set<ast::Type>();
-                }
-
-                if (!function->return_type.is_type_variable()) {
-                    new_overload_constraints[node.type].insert(function->return_type);
-                }
-                else if (function->return_type.overload_constraints.size() > 0) {
-                    for (auto constraint: function->return_type.overload_constraints.elements) {
-                        new_overload_constraints[node.type].insert(constraint);
-                    }
+                // Add or intersect with previous overload constraints founded for argument type
+                if (overload_constraints.find(arg->type) == overload_constraints.end()) {
+                    overload_constraints[arg->type] = new_overload_constraints;
                 }
                 else {
-                    assert(false);
-                }
-            }
+                    auto intersection = overload_constraints[arg->type].intersect(new_overload_constraints);
 
-            // Intersect with previous overload constraints
-            auto& overload_constraints = context.type_inference.overload_constraints;
-            for (auto type: new_overload_constraints) {
-                if (overload_constraints.find(type.first) == overload_constraints.end()) {
-                    overload_constraints[type.first] = new_overload_constraints[type.first];
-                }
-                else {
-                    overload_constraints[type.first] = overload_constraints[type.first].intersect(new_overload_constraints[type.first]);
-
-                    if (overload_constraints[type.first].size() == 0) {
-                        context.errors.push_back(Error{"Error: Expected types doesnt work\n"});
+                    if (intersection.size() == 0) {
+                        context.errors.push_back(errors::unexpected_argument_types(node, context.current_module, i, overload_constraints[arg->type].elements, new_overload_constraints.elements));
                         return Error {};
                     }
+
+                    overload_constraints[arg->type] = intersection;
                 }
             }
         }
@@ -1881,12 +1902,12 @@ Result<Ok, Error> semantic::get_concrete_as_type_bindings(Context& context, ast:
                                 // If type dont match with expected type
                                 if (!called_function->args[j]->type.is_type_variable()
                                 &&   arg_type != called_function->args[j]->type) {
-                                    context.errors.push_back(errors::unexpected_type(node, context.current_module, j, arg_type, {called_function->args[j]->type}));
+                                    context.errors.push_back(errors::unexpected_argument_type(node, context.current_module, j, arg_type, {called_function->args[j]->type}));
                                     return Error {};
                                 }
                                 else if (called_function->args[j]->type.is_type_variable()
                                 && !called_function->args[j]->type.overload_constraints.contains(arg_type)) {
-                                    context.errors.push_back(errors::unexpected_type(node, context.current_module, j, arg_type, called_function->args[j]->type.overload_constraints.elements));
+                                    context.errors.push_back(errors::unexpected_argument_type(node, context.current_module, j, arg_type, called_function->args[j]->type.overload_constraints.elements));
                                     return Error {};
                                 }
                                 else {
@@ -1921,7 +1942,7 @@ Result<Ok, Error> semantic::get_concrete_as_type_bindings(Context& context, ast:
                                 assert(false);
                             }
                         }
-                        context.errors.push_back(errors::unexpected_type(node, context.current_module, i, semantic::get_type(context, node.args[i]->type), possible_types));
+                        context.errors.push_back(errors::unexpected_argument_type(node, context.current_module, i, semantic::get_type(context, node.args[i]->type), possible_types));
                         return Error {};
                     }
 
