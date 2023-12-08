@@ -281,8 +281,12 @@ namespace codegen {
                             match = false;
                             break;
                         }
-                        else if (!it->args[i]->type.overload_constraints.contains(arg_type)) {
+                        else if (it->args[i]->type.overload_constraints.size() > 0
+                        && !it->args[i]->type.overload_constraints.contains(arg_type)) {
                             match = false;
+                            break;
+                        }
+                        else {
                             break;
                         }
                     }
@@ -293,7 +297,7 @@ namespace codegen {
                     }
                 }
             }
-            assert(function);
+            assert(function != nullptr);
             return function;
         }
 

@@ -628,6 +628,12 @@ Result<Ok, Error> semantic::analyze_block_or_expression(semantic::Context& conte
     auto result = semantic::type_infer_and_analyze(context, node);
     if (result.is_error()) return Error {};
 
+    // If we are in expression add constraint for expression with function return type
+    if (node->index() != ast::Block) {
+        assert(context.current_function.has_value());
+        semantic::add_constraint(context, Set<ast::Type>({ast::get_type(node), context.current_function.value()->return_type}));
+    }
+
     // Merge type constraints that share elements
     context.type_inference.type_constraints = merge_sets_with_shared_elements<ast::Type>(context.type_inference.type_constraints);
 
@@ -1624,9 +1630,6 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::Ca
                             new_overload_constraints.insert(constraint);
                         }
                     }
-                    else {
-                        assert(false);
-                    }
                 }
 
                 // Add or intersect with previous overload constraints founded for argument type
@@ -1884,7 +1887,6 @@ Result<Ok, Error> semantic::get_concrete_as_type_bindings(Context& context, ast:
                         else if (function->args[i]->type.overload_constraints.size() > 0) {
                             return !function->args[i]->type.overload_constraints.contains(arg_type);
                         }
-                        assert(false);
                         return false;
                     }), functions_that_can_be_called.end());
 
