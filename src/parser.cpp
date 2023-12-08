@@ -985,6 +985,7 @@ Result<ast::Node*, Error> Parser::parse_binary(int precedence) {
             // Add right node to call
             this->ast.push_back(right_node);
             call.args.push_back((ast::CallArgumentNode*) this->ast.last_element());
+            call.end_line = right_node.line;
 
             // Iterate
             this->ast.push_back(call);

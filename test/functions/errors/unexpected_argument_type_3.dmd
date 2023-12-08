@@ -1,6 +1,27 @@
 function add(a: int64, b: int64): int64
     a + b
 
-function add(a: )
+function add(a: int64, b: bool): bool
+    a == 0 or b
 
-print(add(3, 3.5))
+function add2(a, b)
+    return add(a, b)
+
+print(add2(3, 3.5))
+
+--- Output
+Type mismatch
+
+The type of the 2nd argument of 'add2' doesn't match with what I expect.
+
+10│ print(add2(3, 3.5))
+
+The type received is:
+
+float64
+
+But possible types are:
+
+int64 or bool
+
+---

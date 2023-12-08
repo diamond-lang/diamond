@@ -152,14 +152,17 @@ namespace ast {
         std::vector<TypeNode*> types;
     };
 
-    struct FunctionPrototype {
+    struct CallInCallStack {
         std::string identifier;
         std::vector<Type> args;
         Type return_type;
+        CallNode* call;
+        FunctionNode* function;
+        std::filesystem::path file;
 
-        FunctionPrototype(std::string identifier, std::vector<Type> args, Type return_type) : identifier(identifier), args(args), return_type(return_type) {}
-        bool operator==(const FunctionPrototype &t) const;
-        bool operator!=(const FunctionPrototype &t) const;
+        CallInCallStack(std::string identifier, std::vector<Type> args, CallNode* call, FunctionNode* function, std::filesystem::path file) : identifier(identifier), args(args), call(call), function(function), file(file) {}
+        bool operator==(const CallInCallStack &t) const;
+        bool operator!=(const CallInCallStack &t) const;
     };
 
     struct FunctionSpecialization {

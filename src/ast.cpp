@@ -142,8 +142,8 @@ std::size_t std::hash<ast::Type>::operator()(const ast::Type& type) const {
     return std::hash<std::string>()(type.to_str());
 }
 
-// FunctionPrototype
-bool ast::FunctionPrototype::operator==(const FunctionPrototype &t) const {
+// CallInCallStack
+bool ast::CallInCallStack::operator==(const CallInCallStack &t) const {
     if (this->identifier == t.identifier && this->args.size() == t.args.size()) {
         for (size_t i = 0; i < this->args.size(); i++) {
             if (this->args[i] != t.args[i]) return false;
@@ -155,7 +155,7 @@ bool ast::FunctionPrototype::operator==(const FunctionPrototype &t) const {
     }
 }
 
-bool ast::FunctionPrototype::operator!=(const FunctionPrototype &t) const {
+bool ast::CallInCallStack::operator!=(const CallInCallStack &t) const {
     return !(t == *this);
 }
 

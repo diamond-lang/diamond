@@ -1,27 +1,27 @@
 function add(a: int64, b: int64): int64
-    a + b
+    return a + b
 
-function add(a: int64, b: bool): bool
-    a == 0 or b
+function awesome(a: bool, b: bool): bool
+    return a and b
 
-function add2(a, b)
-    return add(a, b)
-
-print(add2(3, 3.5))
+a = 20
+b = 50
+print(add(a, b))
+print(awesome(a, b))
 
 --- Output
 Type mismatch
 
-The type of the 2nd argument of 'add2' doesn't match with what I expect.
+The type of the 1st argument of 'awesome' doesn't match with what I expect.
 
-10│ print(add2(3, 3.5))
+10│ print(awesome(a, b))
 
 The type received is:
 
-float64
+int64
 
 But possible types are:
 
-int64 or bool
+bool
 
 ---
