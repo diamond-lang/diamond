@@ -335,7 +335,7 @@ void semantic::init_Context(semantic::Context& context, ast::Ast* ast) {
         for (auto& prototype: it->second) {
             // Create function node
             auto function_node = ast::FunctionNode {};
-            function_node.completely_typed = true;
+            function_node.state = ast::FunctionCompletelyTyped;
 
             // Create identifier node
             auto identifier_node = ast::IdentifierNode {};
@@ -731,7 +731,7 @@ Result<Ok, Error> semantic::analyze_block_or_expression(semantic::Context& conte
     // Make concrete
     // -------------
     if (!context.current_function.has_value()
-    ||   context.current_function.value()->completely_typed) {
+    ||   context.current_function.value()->state == ast::FunctionCompletelyTyped) {
         result = semantic::get_concrete_as_type_bindings(context, node, {});
         if (result.is_error()) return result;
         make_concrete(context, node);
@@ -770,7 +770,7 @@ Result<Ok, Error> semantic::analyze(semantic::Context& context, ast::FunctionNod
     semantic::add_scope(new_context);
 
     // Analyze function
-    if (!node.completely_typed) {
+    if (node.state == ast::FunctionNotAnalyzed) {
         // For every argument
         for (auto arg: node.args) {
             auto identifier = arg->value;
@@ -820,6 +820,9 @@ Result<Ok, Error> semantic::analyze(semantic::Context& context, ast::FunctionNod
         if (new_context.type_inference.overload_constraints.find(node.return_type) != new_context.type_inference.overload_constraints.end()) {
             node.return_type.overload_constraints = new_context.type_inference.overload_constraints[node.return_type];
         }
+
+        // Set function as analyzed
+        node.state = ast::FunctionAnalyzed;
     }
     else {
         for (auto arg: node.args) {
@@ -916,6 +919,8 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
         auto& binding = it.second;
         auto functions = semantic::get_functions(binding);
         for (size_t i = 0; i < functions.size(); i++) {
+            if (functions[i]->state == ast::FunctionAnalyzed) continue;
+
             auto result = semantic::analyze(context, *functions[i]);
             if (result.is_error()) return result;
         }
@@ -1526,6 +1531,15 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::Ca
                 return node.args.size() != function->args.size();
             }), functions_that_can_be_called.end());
 
+            // Assure the functions are analyzed
+            for (auto function: functions_that_can_be_called) {
+                if (function->state != ast::FunctionCompletelyTyped
+                && function->state != ast::FunctionAnalyzed) {
+                    auto result = semantic::analyze(context, *function);
+                    if (result.is_error()) return result;
+                }
+            }
+
             // For each arg
             for (size_t i = 0; i < node.args.size(); i++) {
                 if (node.args[i]->type.is_concrete()) {
@@ -1981,7 +1995,7 @@ Result<Ok, Error> semantic::get_concrete_as_type_bindings(Context& context, ast:
 
                 // Get type of called function
                 if (context.type_inference.type_bindings.find(node.type.to_str()) == context.type_inference.type_bindings.end()) {
-                    if (called_function->completely_typed) {
+                    if (called_function->state == ast::FunctionCompletelyTyped) {
                         context.type_inference.type_bindings[node.type.to_str()] = called_function->return_type;
                     }
                     else {

@@ -266,7 +266,7 @@ namespace codegen {
         ast::FunctionNode* get_function(ast::CallNode* call) {
             ast::FunctionNode* function = nullptr;
             for (auto it: call->functions) {
-                if (it->completely_typed) {
+                if (it->state == ast::FunctionCompletelyTyped) {
                     if (this->get_types(call->args) == ast::get_types(it->args)) {
                         function = it;
                         break;
@@ -730,7 +730,7 @@ void codegen::Context::codegen_types_bodies(std::vector<ast::TypeNode*> types) {
 
 void codegen::Context::codegen_function_prototypes(std::vector<ast::FunctionNode*> functions) {
     for (auto& function: functions) {
-        if (!function->completely_typed) {
+        if (function->state != ast::FunctionCompletelyTyped) {
             for (auto& specialization: function->specializations) {
                 this->codegen_function_prototypes(
                     function->module_path,
@@ -795,7 +795,7 @@ void codegen::Context::codegen_function_bodies(std::vector<ast::FunctionNode*> f
     for (auto& function: functions) {
         if (function->is_extern) continue;
 
-        if (!function->completely_typed) {
+        if (function->state != ast::FunctionCompletelyTyped) {
             for (auto& specialization: function->specializations) {
                 this->type_bindings = specialization.type_bindings;
 

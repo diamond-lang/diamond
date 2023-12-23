@@ -171,6 +171,12 @@ namespace ast {
         std::unordered_map<std::string, Type> type_bindings;
     };
 
+    enum FunctionState {
+        FunctionCompletelyTyped,
+        FunctionAnalyzed,
+        FunctionNotAnalyzed
+    };
+
     struct FunctionNode {
         size_t line;
         size_t column;
@@ -180,7 +186,8 @@ namespace ast {
         std::vector<FunctionArgumentNode*> args;
         Node* body;
 
-        bool completely_typed = true;
+        FunctionState state = FunctionCompletelyTyped;
+        bool analyzed = false;
         bool is_extern = false;
         std::vector<FunctionSpecialization> specializations;
         Type return_type = Type("");

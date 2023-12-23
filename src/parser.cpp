@@ -371,12 +371,12 @@ Result<ast::Node*, Error> Parser::parse_function() {
     // Check if function is completly typed or not
     for (auto arg: function.args) {
         if (arg->type == ast::Type("")) {
-            function.completely_typed = false;
+            function.state = ast::FunctionNotAnalyzed;
             break;
         }
     }
     if (function.return_type == ast::Type("")) {
-        function.completely_typed = false;
+        function.state = ast::FunctionNotAnalyzed;
     }
 
     this->ast.push_back(function);
