@@ -2125,8 +2125,16 @@ Result<ast::Type, Error> semantic::get_function_type(Context& context, ast::Call
     }
 
     if (function->return_type.is_type_variable() || ast::has_type_variables(function->return_type.parameters)) {
-        assert(specialization.type_bindings.find(function->return_type.name) != specialization.type_bindings.end());
-        specialization.return_type = specialization.type_bindings[function->return_type.name];
+        if (specialization.type_bindings.find(function->return_type.name) != specialization.type_bindings.end()) {
+            specialization.return_type = specialization.type_bindings[function->return_type.name];
+        }
+        else if (function->return_type.interface.has_value()) {
+            specialization.type_bindings[function->return_type.to_str()] = function->return_type.interface.value().get_default_type();
+            specialization.return_type = specialization.type_bindings[function->return_type.to_str()];
+        }
+        else {
+            assert(false);
+        }
     }
     else {
         specialization.return_type = function->return_type;
