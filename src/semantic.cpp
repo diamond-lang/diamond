@@ -753,6 +753,13 @@ Result<Ok, Error> semantic::analyze(semantic::Context& context, ast::FunctionNod
         return semantic::analyze(context, node.return_type);
     }
 
+    if (node.state == ast::FunctionBeingAnalyzed) {
+        return Ok {};
+    }
+    if (node.state == ast::FunctionNotAnalyzed) {
+        node.state = ast::FunctionBeingAnalyzed;
+    }
+
     // Create new context
     Context new_context;
     semantic::init_Context(new_context, context.ast);
@@ -770,7 +777,7 @@ Result<Ok, Error> semantic::analyze(semantic::Context& context, ast::FunctionNod
     semantic::add_scope(new_context);
 
     // Analyze function
-    if (node.state == ast::FunctionNotAnalyzed) {
+    if (node.state == ast::FunctionBeingAnalyzed) {
         // For every argument
         for (auto arg: node.args) {
             auto identifier = arg->value;
@@ -824,7 +831,7 @@ Result<Ok, Error> semantic::analyze(semantic::Context& context, ast::FunctionNod
         // Set function as analyzed
         node.state = ast::FunctionAnalyzed;
     }
-    else {
+    else if (node.state == ast::FunctionCompletelyTyped) {
         for (auto arg: node.args) {
             auto identifier = arg->value;
             auto result = semantic::analyze(new_context, arg->type);
@@ -846,6 +853,9 @@ Result<Ok, Error> semantic::analyze(semantic::Context& context, ast::FunctionNod
             context.errors.insert(context.errors.end(), new_context.errors.begin(), new_context.errors.end());
             return Error {};
         }
+    }
+    else {
+        assert(false);
     }
     return Ok {};
 }
@@ -1531,12 +1541,16 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::Ca
                 return node.args.size() != function->args.size();
             }), functions_that_can_be_called.end());
 
-            // Assure the functions are analyzed
+            // Analyze functions that still have not been analyzed
+            // and check for recursion
             for (auto function: functions_that_can_be_called) {
-                if (function->state != ast::FunctionCompletelyTyped
-                && function->state != ast::FunctionAnalyzed) {
+                if (function->state == ast::FunctionNotAnalyzed) {
                     auto result = semantic::analyze(context, *function);
                     if (result.is_error()) return result;
+                }
+                else if (function->state == ast::FunctionBeingAnalyzed) {
+                    node.functions = functions_that_can_be_called;
+                    return Ok {};
                 }
             }
 
@@ -2070,6 +2084,19 @@ Result<ast::Type, Error> semantic::get_function_type(Context& context, ast::Call
     }
 
     // Add call to call stack
+    for (auto& call_in_stack: call_stack) {
+        if (call_in_stack.identifier == call->identifier->value
+        && call_in_stack.args == args) {
+            if (function->return_type.interface.has_value()) {
+                context.type_inference.type_bindings[function->return_type.to_str()] = function->return_type.interface.value().get_default_type();
+                return context.type_inference.type_bindings[function->return_type.to_str()];
+            }
+            else {
+                std::cout << "RECURSION :O\n";
+                assert(false);
+            }
+        }
+    }
     call_stack.push_back(ast::CallInCallStack(function->identifier->value, args, call, function, context.current_module));
 
     // Else type check and create specialization type

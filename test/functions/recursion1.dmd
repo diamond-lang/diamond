@@ -4,15 +4,8 @@ function fib(n)
     else
         n
 
-function add(a, b)
-    a + b
-
 print(fib(10))
-print(add(3, 6))
-print(add(4.3, 356.32))
 
 --- Output
 55
-9
-360.62
 ---

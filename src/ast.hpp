@@ -174,6 +174,7 @@ namespace ast {
     enum FunctionState {
         FunctionCompletelyTyped,
         FunctionAnalyzed,
+        FunctionBeingAnalyzed,
         FunctionNotAnalyzed
     };
 
