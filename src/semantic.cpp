@@ -927,12 +927,14 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
     }
     for (auto& it: scope) {
         auto& binding = it.second;
-        auto functions = semantic::get_functions(binding);
-        for (size_t i = 0; i < functions.size(); i++) {
-            if (functions[i]->state == ast::FunctionAnalyzed) continue;
+        if (binding.type == semantic::FunctionBinding) {
+            auto functions = semantic::get_functions(binding);
+            for (size_t i = 0; i < functions.size(); i++) {
+                if (functions[i]->state == ast::FunctionAnalyzed) continue;
 
-            auto result = semantic::analyze(context, *functions[i]);
-            if (result.is_error()) return result;
+                auto result = semantic::analyze(context, *functions[i]);
+                if (result.is_error()) return result;
+            }
         }
     }
 
@@ -1848,7 +1850,11 @@ Result<Ok, Error> semantic::get_concrete_as_type_bindings(Context& context, ast:
     assert(binding);
 
     if (binding->type == semantic::TypeBinding) {
-        assert(false);
+        for (auto arg: node.args) {
+            auto result = semantic::get_concrete_as_type_bindings(context, *arg, call_stack);
+            if (result.is_error()) return result;
+        }
+        node.type = ast::Type(node.identifier->value, semantic::get_type_definition(*binding));
     }
     else if (is_function(*binding)) {
         if (binding->type == semantic::FunctionBinding) {
