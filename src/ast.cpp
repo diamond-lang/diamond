@@ -839,6 +839,7 @@ void ast::print(Node* node, PrintContext context) {
         }
 
         default: {
+            std::cout << node->index() << "\n";
             assert(false);
         }
     }
