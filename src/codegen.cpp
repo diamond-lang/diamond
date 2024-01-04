@@ -52,7 +52,7 @@ namespace codegen {
         llvm::BasicBlock* last_while_block = nullptr; // Needed for continue
 
         std::vector<std::unordered_map<std::string, llvm::AllocaInst*>> scopes;
-        std::unordered_map<std::string, ast::Type> type_bindings;
+        std::unordered_map<size_t, ast::Type> type_bindings;
         std::unordered_map<std::string, llvm::Constant*> globals;
 
         Context(ast::Ast& ast) : ast(ast) {
@@ -129,8 +129,10 @@ namespace codegen {
             else if (type == ast::Type("bool"))    return llvm::Type::getInt1Ty(*(this->context));
             else if (type == ast::Type("string"))  return llvm::Type::getInt8PtrTy(*(this->context));
             else if (type == ast::Type("void"))    return llvm::Type::getVoidTy(*(this->context));
-            else if (type.is_pointer())            return this->as_llvm_type(type.parameters[0])->getPointerTo();
-            else if (type.type_definition)         return this->get_struct_type(type.type_definition);
+            else if (type.is_pointer())            return this->as_llvm_type(type.as_nominal_type().parameters[0])->getPointerTo();
+            else if (type.is_nominal_type() && type.as_nominal_type().type_definition) {
+                return this->get_struct_type(type.as_nominal_type().type_definition);
+            }
             else {
                 std::cout <<"type: " << type.to_str() << "\n";
                 assert(false);
@@ -142,14 +144,15 @@ namespace codegen {
         }
 
         bool has_struct_type(ast::Node* expression) {
-            if (ast::get_concrete_type(expression, this->type_bindings).type_definition) {
+            auto concrete_type = ast::get_concrete_type(expression, this->type_bindings);
+            if (concrete_type.is_nominal_type() && concrete_type.as_nominal_type().type_definition) {
                 return true;
             }
             return false;
         }
 
         bool is_struct_type(ast::Type type) {
-            return type.type_definition != nullptr;
+            return type.is_nominal_type() && type.as_nominal_type().type_definition != nullptr;
         }
 
         StructType get_struct_type_as_argument(llvm::StructType* struct_type) {
@@ -159,7 +162,7 @@ namespace codegen {
 
                 size_t i = 0;
                 while (i < fields.size()) {
-                    ast::Type type = ast::Type("");
+                    ast::Type type = ast::Type(ast::NoType{});
                     size_t bytes = 0;
                     while (bytes < 8) {
                         if (fields[i]->isDoubleTy()) {
@@ -209,7 +212,7 @@ namespace codegen {
             // Get args types
             std::vector<llvm::Type*> llvm_args_types;
 
-            if (return_type.type_definition) {
+            if (this->is_struct_type(return_type)) {
                 llvm_args_types.push_back(this->as_llvm_type(return_type)->getPointerTo());
             }
 
@@ -226,7 +229,7 @@ namespace codegen {
 
             // Get return type
             llvm::Type* llvm_return_type = this->as_llvm_type(return_type);
-            if (return_type.type_definition) {
+            if (this->is_struct_type(return_type)) {
                 llvm_return_type = llvm::Type::getVoidTy(*this->context);
             }
 
@@ -281,10 +284,10 @@ namespace codegen {
                             match = false;
                             break;
                         }
-                        else if (it->args[i]->type.overload_constraints.size() > 0
-                        && !it->args[i]->type.overload_constraints.contains(arg_type)) {
+                        else if (it->args[i]->type.is_type_variable()
+                        &&       it->args[i]->type.as_type_variable().overload_constraints.size() > 0
+                        &&      !it->args[i]->type.as_type_variable().overload_constraints.contains(arg_type)) {
                             match = false;
-                            break;
                         }
                         else {
                             break;
@@ -303,7 +306,7 @@ namespace codegen {
 
         void store_fields(ast::Node* expression, llvm::Value* struct_allocation) {
             // Get struct type
-            llvm::StructType* struct_type = this->get_struct_type(ast::get_type(expression).type_definition);
+            llvm::StructType* struct_type = this->get_struct_type(ast::get_type(expression).as_nominal_type().type_definition);
 
             // If the struct expression is a call
             if (expression->index() == ast::Call) {
@@ -390,22 +393,22 @@ namespace codegen {
             assert(node.fields_accessed.size() >= 2);
 
             // Get struct allocation and type
-            assert(ast::get_concrete_type((ast::Node*) node.fields_accessed[0], this->type_bindings).type_definition);
+            assert(ast::get_concrete_type((ast::Node*) node.fields_accessed[0], this->type_bindings).as_nominal_type().type_definition);
             llvm::Value* struct_ptr = this->get_binding(node.fields_accessed[0]->value);
-            llvm::StructType* struct_type = this->get_struct_type(ast::get_concrete_type((ast::Node*) node.fields_accessed[0], this->type_bindings).type_definition);
+            llvm::StructType* struct_type = this->get_struct_type(ast::get_concrete_type((ast::Node*) node.fields_accessed[0], this->type_bindings).as_nominal_type().type_definition);
             if (((llvm::AllocaInst*)struct_ptr)->getAllocatedType()->isPointerTy()) {
                 struct_ptr = this->builder->CreateLoad(struct_type->getPointerTo(), struct_ptr);
             }
 
             // Get type definition
-            ast::TypeNode* type_definition = ast::get_concrete_type((ast::Node*) node.fields_accessed[0], this->type_bindings).type_definition;
+            ast::TypeNode* type_definition = ast::get_concrete_type((ast::Node*) node.fields_accessed[0], this->type_bindings).as_nominal_type().type_definition;
 
             for (size_t i = 1; i < node.fields_accessed.size() - 1; i++) {
                 // Get pointer to accessed fieldd
                 struct_ptr = this->builder->CreateStructGEP(struct_type, struct_ptr, get_index_of_field(node.fields_accessed[i]->value, type_definition));
 
                 // Update current type definition
-                type_definition = ast::get_concrete_type((ast::Node*) node.fields_accessed[i], this->type_bindings).type_definition;
+                type_definition = ast::get_concrete_type((ast::Node*) node.fields_accessed[i], this->type_bindings).as_nominal_type().type_definition;
                 struct_type = this->get_struct_type(type_definition);
             }
             
@@ -940,7 +943,7 @@ llvm::Value* codegen::Context::codegen(ast::AssignmentNode& node) {
     }
     else {
         // Create allocation
-        llvm::StructType* struct_type = this->get_struct_type(ast::get_type(node.expression).type_definition);
+        llvm::StructType* struct_type = this->get_struct_type(ast::get_type(node.expression).as_nominal_type().type_definition);
         this->current_scope()[node.identifier->value] = this->create_allocation(node.identifier->value, struct_type);
 
         // Store fields
@@ -1112,8 +1115,8 @@ llvm::Value* codegen::Context::codegen(ast::IfElseNode& node) {
             this->builder->SetInsertPoint(block);
             this->codegen(node.if_branch);
 
-            // Jump to merge block if does not return (Type("") means the if does not return)
-            if (ast::get_type(node.if_branch) == ast::Type("")) {
+            // Jump to merge block if does not return (NoType) means the if does not return)
+            if (ast::get_type(node.if_branch) == ast::Type(ast::NoType{})) {
                 this->builder->CreateBr(merge_block);
             }
 
@@ -1129,8 +1132,8 @@ llvm::Value* codegen::Context::codegen(ast::IfElseNode& node) {
             this->builder->SetInsertPoint(block);
             this->codegen(node.if_branch);
 
-            // Jump to merge block if if does not return (Type("") means the block does not return)
-            if (ast::get_type(node.if_branch) == ast::Type("")) {
+            // Jump to merge block if if does not return (NoType means the block does not return)
+            if (ast::get_type(node.if_branch) == ast::Type(ast::NoType{})) {
                 this->builder->CreateBr(merge_block);
             }
 
@@ -1139,13 +1142,13 @@ llvm::Value* codegen::Context::codegen(ast::IfElseNode& node) {
             this->builder->SetInsertPoint(else_block);
             this->codegen(node.else_branch.value());
 
-            // Jump to merge block if else does not return (Type("") means the block does not return)
-            if (ast::get_type(node.else_branch.value()) == ast::Type("")) {
+            // Jump to merge block if else does not return (NoType means the block does not return)
+            if (ast::get_type(node.else_branch.value()) == ast::Type(ast::NoType{})) {
                 this->builder->CreateBr(merge_block);
             }
 
             // Create merge block
-            if (ast::get_type(node.if_branch) == ast::Type("") || ast::get_type(node.else_branch.value()) == ast::Type("")) {
+            if (ast::get_type(node.if_branch) == ast::Type(ast::NoType{}) || ast::get_type(node.else_branch.value()) == ast::Type(ast::NoType{})) {
                 current_function->getBasicBlockList().push_back(merge_block);
                 this->builder->SetInsertPoint(merge_block);
             }
@@ -1184,7 +1187,7 @@ std::vector<llvm::Value*> codegen::Context::codegen_args(ast::FunctionNode* func
     for (size_t i = 0; i < args.size(); i++) {
         if (this->has_struct_type(args[i]->expression)) {
             // Create allocation
-            llvm::StructType* struct_type = this->get_struct_type(ast::get_concrete_type(args[i]->expression, this->type_bindings).type_definition);
+            llvm::StructType* struct_type = this->get_struct_type(ast::get_concrete_type(args[i]->expression, this->type_bindings).as_nominal_type().type_definition);
             llvm::AllocaInst* allocation = this->create_allocation(function->args[i]->value, struct_type);
 
             // Store fields
@@ -1224,7 +1227,7 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
     // If type is struct
     if (this->is_struct_type(node.type)) {
         // Create allocation
-        llvm::StructType* struct_type = this->get_struct_type(node.type.type_definition);
+        llvm::StructType* struct_type = this->get_struct_type(node.type.as_nominal_type().type_definition);
         llvm::AllocaInst* allocation = this->create_allocation(node.identifier->value, struct_type);
             
         // Store fields

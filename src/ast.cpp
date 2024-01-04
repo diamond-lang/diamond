@@ -22,22 +22,74 @@ ast::Type ast::Interface::get_default_type() {
     }
     else {
         assert(false);
-        return ast::Type("");
+        return ast::Type(ast::NoType{});
     }
 }
 
 // Type
 // ----
+ast::NoType& ast::Type::as_no_type() {
+    return std::get<ast::NoType>(this->type);
+}
+
+ast::TypeVariable& ast::Type::as_type_variable() {
+    return std::get<ast::TypeVariable>(this->type);
+}
+
+ast::NominalType& ast::Type::as_nominal_type() {
+    return std::get<ast::NominalType>(this->type);
+}
+
+ast::StructType& ast::Type::as_struct_type() {
+    return std::get<ast::StructType>(this->type);
+}
+
+ast::NoType ast::Type::as_no_type() const {
+    return std::get<ast::NoType>(this->type);
+}
+
+ast::TypeVariable ast::Type::as_type_variable() const {
+    return std::get<ast::TypeVariable>(this->type);
+}
+
+ast::NominalType ast::Type::as_nominal_type() const {
+    return std::get<ast::NominalType>(this->type);
+}
+
+ast::StructType ast::Type::as_struct_type() const {
+    return std::get<ast::StructType>(this->type);
+}
+
 bool ast::Type::operator==(const Type &t) const {
-    if (this->name == t.name && this->parameters.size() == t.parameters.size()) {
-        for (size_t i = 0; i < this->parameters.size(); i++) {
-            if (this->parameters[i] != t.parameters[i]) {
-                return false;
-            }
-        }
+    if (this->type.index() != t.type.index()) return false;
+
+    if (this->is_no_type()) {
         return true;
     }
+    else if (this->is_type_variable()) {
+        return std::get<ast::TypeVariable>(this->type).id == std::get<ast::TypeVariable>(t.type).id;
+    }
+    else if (this->is_nominal_type()) {
+        if (std::get<ast::NominalType>(this->type).name == std::get<ast::NominalType>(t.type).name) {
+            if (std::get<ast::NominalType>(this->type).parameters.size() == std::get<ast::NominalType>(t.type).parameters.size()) {
+                for (size_t i = 0; i < std::get<ast::NominalType>(this->type).parameters.size(); i++) {
+                    if (std::get<ast::NominalType>(this->type).parameters[i] != std::get<ast::NominalType>(t.type).parameters[i]) {
+                        return false;
+                    }
+                }
+
+                return true;
+            }
+        }
+
+        return false;
+    }
+    else if (this->is_struct_type()) {
+        assert(false);
+        return false;
+    }
     else {
+        assert(false);
         return false;
     }
 }
@@ -48,30 +100,34 @@ bool ast::Type::operator!=(const Type &t) const {
 
 std::string ast::Type::to_str() const {
     std::string output = "";
-    if (this->is_type_variable()) {
-        output += this->name;
+    if (this->is_no_type()) {
+        output += "ast::Notype";
+    }
 
-        if (this->interface.has_value()
-        ||  overload_constraints.size() > 0) {
+    if (this->is_type_variable()) {
+        output += std::to_string(std::get<ast::TypeVariable>(this->type).id);
+
+        if (std::get<ast::TypeVariable>(this->type).interface.has_value()
+        ||  std::get<ast::TypeVariable>(this->type).overload_constraints.size() > 0) {
             output += " :: ";
         }
 
 
-        if (this->interface.has_value()) {
-            output += this->interface.value().name;
+        if (std::get<ast::TypeVariable>(this->type).interface.has_value()) {
+            output += std::get<ast::TypeVariable>(this->type).interface.value().name;
         }
 
-        if (this->interface.has_value()
-        && this->overload_constraints.size() > 0) {
+        if (std::get<ast::TypeVariable>(this->type).interface.has_value()
+        &&  std::get<ast::TypeVariable>(this->type).overload_constraints.size() > 0) {
             output += " & ";
         }
 
-        if (this->overload_constraints.size() > 0) {
+        if (std::get<ast::TypeVariable>(this->type).overload_constraints.size() > 0) {
             output += "{";
 
-            for (size_t i = 0; i < this->overload_constraints.size(); i++) {
-                output += this->overload_constraints.elements[i].to_str();
-                if (i + 1 != this->overload_constraints.size()) output += ", ";
+            for (size_t i = 0; i < std::get<ast::TypeVariable>(this->type).overload_constraints.size(); i++) {
+                output += std::get<ast::TypeVariable>(this->type).overload_constraints.elements[i].to_str();
+                if (i + 1 != std::get<ast::TypeVariable>(this->type).overload_constraints.size()) output += ", ";
             }
 
             output += "}";
@@ -80,22 +136,20 @@ std::string ast::Type::to_str() const {
         return output;
     }
 
-    if (this->parameters.size() == 0) {
-        output += this->name;
-    }
-    else if (this->name == "@") {
-        output += this->name;
-        output += this->parameters[0].to_str();
-    }
-    else {
-        output += this->name;
-        output += "[";
-        output += this->parameters[0].to_str();
-        for (size_t i = 1; i < this->parameters.size(); i++) {
-            output += ", ";
-            output += this->parameters[i].to_str();
+    if (this->is_nominal_type()) {
+        if (std::get<ast::NominalType>(this->type).parameters.size() == 0) {
+            output += std::get<ast::NominalType>(this->type).name;
         }
-        output += "]";
+        else {
+            output += std::get<ast::NominalType>(this->type).name;
+            output += "[";
+            output += std::get<ast::NominalType>(this->type).parameters[0].to_str();
+            for (size_t i = 1; i < std::get<ast::NominalType>(this->type).parameters.size(); i++) {
+                output += ", ";
+                output += std::get<ast::NominalType>(this->type).parameters[i].to_str();
+            }
+            output += "]";
+        }
     }
     return output;
 }
@@ -107,15 +161,40 @@ static bool is_number(std::string str) {
     return true;
 }
 
+bool ast::Type::is_no_type() const {
+    return this->type.index() == ast::NoTypeVariant;
+}
+
 bool ast::Type::is_type_variable() const {
-    std::string str = this->name;
-    if (str.size() > 0 && str[0] == '$') return true;
-    else if (is_number(str))             return true;
-    else                                 return false;
+    return this->type.index() == ast::TypeVariableVariant;
+}
+
+bool ast::Type::is_nominal_type() const {
+    return this->type.index() == ast::NominalTypeVariant;
+}
+
+bool ast::Type::is_struct_type() const {
+    return this->type.index() == ast::StructTypeVariant;
 }
 
 bool ast::Type::is_concrete() const {
-    return !this->is_type_variable() && ast::types_are_concrete(this->parameters);
+    if (this->is_no_type()) {
+        return false;
+    }
+
+    if (this->is_type_variable()) {
+        return false;
+    }
+
+    if (this->is_nominal_type()) {
+        return ast::types_are_concrete(std::get<ast::NominalType>(this->type).parameters);
+    }
+
+    if (this->is_struct_type()) {
+        assert(false);
+    }
+
+    return true;
 }
 
 bool ast::Type::is_integer() const {
@@ -133,8 +212,27 @@ bool ast::Type::is_float() const {
 }
 
 bool ast::Type::is_pointer() const {
-    if (this->name == "pointer") return true;
-    else                         return false;
+    if (!this->is_nominal_type()) {
+        return false;
+    }
+
+    if (std::get<ast::NominalType>(this->type).name != "pointer") {
+        return false;
+    }
+    
+    return true;
+}
+
+bool ast::Type::is_array() const {
+    if (!this->is_nominal_type()) {
+        return false;
+    }
+
+    if (std::get<ast::NominalType>(this->type).name != "array") {
+        return false;
+    }
+    
+    return true;
 }
 
 // Add hash struct for ast::Type to be able to use ast::Type as keys of std::unordered_map
@@ -167,17 +265,17 @@ ast::Type ast::get_type(Node* node) {
     }, *node);
 }
 
-ast::Type ast::get_concrete_type(Node* node, std::unordered_map<std::string, Type>& type_bindings) {
+ast::Type ast::get_concrete_type(Node* node, std::unordered_map<size_t, Type>& type_bindings) {
     return ast::get_concrete_type(ast::get_type(node), type_bindings);
 }
 
-ast::Type ast::get_concrete_type(Type type_variable, std::unordered_map<std::string, Type>& type_bindings) {
+ast::Type ast::get_concrete_type(Type type_variable, std::unordered_map<size_t, Type>& type_bindings) {
     if (type_variable.is_type_variable()) {
-        if (type_bindings.find(type_variable.to_str()) != type_bindings.end()) {
-            type_variable = type_bindings[type_variable.to_str()];
+        if (type_bindings.find(type_variable.as_type_variable().id) != type_bindings.end()) {
+            type_variable = type_bindings[type_variable.as_type_variable().id];
         }
-        else if (type_variable.interface.has_value()) {
-            type_variable = type_variable.interface.value().get_default_type();
+        else if (type_variable.as_type_variable().interface.has_value()) {
+            type_variable = type_variable.as_type_variable().interface.value().get_default_type();
         }
         else {
             std::cout << "unknown type: " << type_variable.to_str() << "\n";
@@ -185,8 +283,8 @@ ast::Type ast::get_concrete_type(Type type_variable, std::unordered_map<std::str
         }
     }
     if (!type_variable.is_concrete()) {
-        for (size_t i = 0; i < type_variable.parameters.size(); i++) {
-            type_variable.parameters[i] = ast::get_concrete_type(type_variable.parameters[i], type_bindings);
+        for (size_t i = 0; i < type_variable.as_nominal_type().parameters.size(); i++) {
+            type_variable.as_nominal_type().parameters[i] = ast::get_concrete_type(type_variable.as_nominal_type().parameters[i], type_bindings);
         }
     }
     return type_variable;
@@ -230,13 +328,14 @@ std::vector<ast::Type> ast::get_types(std::vector<FunctionArgumentNode*> nodes) 
 std::vector<ast::Type> ast::get_default_types(std::vector<ast::Type> types) {
     std::vector<Type> result;
     for (size_t i = 0; i < types.size(); i++) {
-        assert(types[i].interface.has_value());
-        result.push_back(types[i].interface.value().get_default_type());
+        assert(types[i].is_type_variable());
+        assert(types[i].as_type_variable().interface.has_value());
+        result.push_back(types[i].as_type_variable().interface.value().get_default_type());
     }
     return result;
 }
 
-std::vector<ast::Type> ast::get_concrete_types(std::vector<Node*> nodes, std::unordered_map<std::string, Type>& type_bindings) {
+std::vector<ast::Type> ast::get_concrete_types(std::vector<Node*> nodes, std::unordered_map<size_t, Type>& type_bindings) {
     std::vector<Type> types;
     for (size_t i = 0; i < nodes.size(); i++) {
         types.push_back(get_concrete_type(nodes[i], type_bindings));
@@ -245,7 +344,7 @@ std::vector<ast::Type> ast::get_concrete_types(std::vector<Node*> nodes, std::un
 }
 
 
-std::vector<ast::Type> ast::get_concrete_types(std::vector<ast::Type> type_variables, std::unordered_map<std::string, Type>& type_bindings) {
+std::vector<ast::Type> ast::get_concrete_types(std::vector<ast::Type> type_variables, std::unordered_map<size_t, Type>& type_bindings) {
     std::vector<Type> types;
     for (size_t i = 0; i < type_variables.size(); i++) {
         types.push_back(get_concrete_type(type_variables[i], type_bindings));
@@ -503,14 +602,14 @@ void ast::print(Node* node, PrintContext context) {
 
                 auto& arg_type = function.args[i]->type;
 
-                if (arg_type != Type("")) {
+                if (arg_type != Type(ast::NoType{})) {
                     std::cout << ": " << get_concrete_type_or_type_variable(arg_type, context).to_str();
                 }
 
                 if (i != function.args.size() - 1) std::cout << ", ";
             }
             std::cout << ")";
-            if (function.return_type != Type("")) {
+            if (function.return_type != Type(ast::NoType{})) {
                 std::cout << ": " << get_concrete_type_or_type_variable(function.return_type, context).to_str();
             }
             std::cout << "\n";
@@ -589,7 +688,7 @@ void ast::print(Node* node, PrintContext context) {
 
             put_indent_level(context.indent_level, context.last);
             std::cout << "*";
-            if (ast::get_type(assignment.identifier->expression) != ast::Type("")) {
+            if (ast::get_type(assignment.identifier->expression) != ast::Type(ast::NoType{})) {
                 std::cout << ": " << ast::get_concrete_type_or_type_variable(assignment.identifier->type, context).to_str();
             }
             std::cout << "\n";
@@ -662,7 +761,7 @@ void ast::print(Node* node, PrintContext context) {
 
                 put_indent_level(context.indent_level, append(context.last, false));
                 std::cout << "if";
-                if (get_concrete_type_or_type_variable(if_else.type, context) != Type("")) std::cout << ": " << get_concrete_type_or_type_variable(if_else.type, context).to_str();
+                if (get_concrete_type_or_type_variable(if_else.type, context) != Type(ast::NoType{})) std::cout << ": " << get_concrete_type_or_type_variable(if_else.type, context).to_str();
                 std::cout << "\n";
                 print(if_else.condition, PrintContext{context.indent_level + 1, append(append(context.last, false), false), context.concrete, context.type_bindings});
                 print(if_else.if_branch, PrintContext{context.indent_level + 1, append(append(context.last, false), true), context.concrete, context.type_bindings});
@@ -718,7 +817,7 @@ void ast::print(Node* node, PrintContext context) {
 
             put_indent_level(context.indent_level, context.last);
             std::cout << call.identifier->value;
-            if (call.type != Type("")) std::cout << ": " << get_concrete_type_or_type_variable(call.type, context).to_str();
+            if (call.type != Type(ast::NoType{})) std::cout << ": " << get_concrete_type_or_type_variable(call.type, context).to_str();
             std::cout << "\n";
             for (size_t i = 0; i < call.args.size(); i++) {
                 print((ast::Node*) call.args[i], PrintContext{context.indent_level + 1, append(context.last, i == call.args.size() - 1), context.concrete, context.type_bindings});
@@ -731,7 +830,7 @@ void ast::print(Node* node, PrintContext context) {
 
             put_indent_level(context.indent_level, context.last);
             std::cout << float_node.value;
-            if (float_node.type != Type("")) std::cout << ": " << get_concrete_type_or_type_variable(float_node.type, context).to_str();
+            if (float_node.type != Type(ast::NoType{})) std::cout << ": " << get_concrete_type_or_type_variable(float_node.type, context).to_str();
             std::cout << "\n";
             break;
         }
@@ -741,7 +840,7 @@ void ast::print(Node* node, PrintContext context) {
 
             put_indent_level(context.indent_level, context.last);
             std::cout << integer.value;
-            if (integer.type != Type("")) std::cout << ": " << get_concrete_type_or_type_variable(integer.type, context).to_str();
+            if (integer.type != Type(ast::NoType{})) std::cout << ": " << get_concrete_type_or_type_variable(integer.type, context).to_str();
             std::cout << "\n";
             break;
         }
@@ -751,7 +850,7 @@ void ast::print(Node* node, PrintContext context) {
 
             put_indent_level(context.indent_level, context.last);
             std::cout << identifier.value;
-            if (identifier.type != Type("")) std::cout << ": " << get_concrete_type_or_type_variable(identifier.type, context).to_str();
+            if (identifier.type != Type(ast::NoType{})) std::cout << ": " << get_concrete_type_or_type_variable(identifier.type, context).to_str();
             std::cout << "\n";
             break;
         }
@@ -761,7 +860,7 @@ void ast::print(Node* node, PrintContext context) {
 
             put_indent_level(context.indent_level, context.last);
             std::cout << (boolean.value ? "true" : "false");
-            if (boolean.type != Type("")) std::cout << ": " << get_concrete_type_or_type_variable(boolean.type, context).to_str();
+            if (boolean.type != Type(ast::NoType{})) std::cout << ": " << get_concrete_type_or_type_variable(boolean.type, context).to_str();
             std::cout << "\n";
             break;
         }
@@ -771,7 +870,7 @@ void ast::print(Node* node, PrintContext context) {
 
             put_indent_level(context.indent_level, context.last);
             std::cout << "\"" << string.value << "\"";
-            if (string.type != Type("")) std::cout << ": " << get_concrete_type_or_type_variable(string.type, context).to_str();
+            if (string.type != Type(ast::NoType{})) std::cout << ": " << get_concrete_type_or_type_variable(string.type, context).to_str();
             std::cout << "\n";
             break;
         }
@@ -782,7 +881,7 @@ void ast::print(Node* node, PrintContext context) {
 
             put_indent_level(context.indent_level, context.last);
             std::cout << "array";
-            if (array.type != Type("")) std::cout << ": " << get_concrete_type_or_type_variable(array.type, context).to_str();
+            if (array.type != Type(ast::NoType{})) std::cout << ": " << get_concrete_type_or_type_variable(array.type, context).to_str();
             std::cout << "\n";
             for (size_t i = 0; i < array.elements.size(); i++) {
                 print(array.elements[i], PrintContext{context.indent_level + 1, append(context.last, i + 1 == array.elements.size()), context.concrete, context.type_bindings});
@@ -800,7 +899,7 @@ void ast::print(Node* node, PrintContext context) {
             for (size_t i = 0; i < field_access.fields_accessed.size(); i++) {
                 put_indent_level(context.indent_level + i, last);
                 std::cout << field_access.fields_accessed[i]->value;
-                if (field_access.fields_accessed[i]->type != Type("")) std::cout << ": " << get_concrete_type_or_type_variable(field_access.fields_accessed[i]->type, context).to_str();
+                if (field_access.fields_accessed[i]->type != Type(ast::NoType{})) std::cout << ": " << get_concrete_type_or_type_variable(field_access.fields_accessed[i]->type, context).to_str();
                 std::cout << "\n";
                 last.push_back(true);
             }
@@ -813,7 +912,7 @@ void ast::print(Node* node, PrintContext context) {
 
             put_indent_level(context.indent_level, context.last);
             std::cout << "&";
-            if (address_of.type != Type("")) std::cout << ": " << get_concrete_type_or_type_variable(address_of.type, context).to_str();
+            if (address_of.type != Type(ast::NoType{})) std::cout << ": " << get_concrete_type_or_type_variable(address_of.type, context).to_str();
             std::cout << "\n";
 
             context.indent_level += 1;
@@ -828,7 +927,7 @@ void ast::print(Node* node, PrintContext context) {
 
             put_indent_level(context.indent_level, context.last);
             std::cout << "*";
-            if (dereference.type != Type("")) std::cout << ": " << get_concrete_type_or_type_variable(dereference.type, context).to_str();
+            if (dereference.type != Type(ast::NoType{})) std::cout << ": " << get_concrete_type_or_type_variable(dereference.type, context).to_str();
             std::cout << "\n";
 
             context.indent_level += 1;

@@ -370,12 +370,12 @@ Result<ast::Node*, Error> Parser::parse_function() {
 
     // Check if function is completly typed or not
     for (auto arg: function.args) {
-        if (arg->type == ast::Type("")) {
+        if (arg->type == ast::Type(ast::NoType{})) {
             function.state = ast::FunctionNotAnalyzed;
             break;
         }
     }
-    if (function.return_type == ast::Type("")) {
+    if (function.return_type == ast::Type(ast::NoType{})) {
         function.state = ast::FunctionNotAnalyzed;
     }
 
@@ -532,7 +532,7 @@ Result<ast::Type, Error> Parser::parse_type() {
             auto parameter = this->parse_type();
             if (parameter.is_error()) return parameter;
 
-            type.parameters.push_back(parameter.get_value());
+            type.as_nominal_type().parameters.push_back(parameter.get_value());
 
             if (this->current() == token::Comma) this->advance();
             else if (this->current() == token::NewLine) this->advance_until_next_statement();

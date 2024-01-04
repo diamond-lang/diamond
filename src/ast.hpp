@@ -103,38 +103,85 @@ namespace ast {
         ast::Type get_default_type();
     };
 
-    struct Type {
-        std::string name;
-        std::vector<Type> parameters;
-        TypeNode* type_definition = nullptr;
+    struct NoType {
+
+    };
+
+    struct TypeVariable {
+        size_t id;
+        bool is_final = false;
         std::optional<Interface> interface;
         Set<ast::Type> overload_constraints;
 
-        Type() : name("") {}
-        Type(std::string name) : name(name) {}
-        Type(std::string name, std::vector<Type> parameters) : name(name), parameters(parameters) {}
-        Type(std::string name, TypeNode* type_definition) : name(name), type_definition(type_definition) {}
+        TypeVariable(size_t id) : id(id) {}
+        TypeVariable(size_t id, bool is_final) : id(id), is_final(is_final) {}
+    };
+
+    struct NominalType {
+        std::string name;
+        std::vector<Type> parameters;
+        TypeNode* type_definition = nullptr;
+
+        NominalType(std::string name) : name(name) {}
+        NominalType(std::string name, std::vector<Type> parameters) : name(name), parameters(parameters) {}
+        NominalType(std::string name, TypeNode* type_definition) : name(name), type_definition(type_definition) {}
+    };
+
+    struct StructType {
+        std::unordered_map<std::string, Type> fields;
+    };
+
+    enum TypeVariant {
+        NoTypeVariant,
+        TypeVariableVariant,
+        NominalTypeVariant,
+        StructTypeVariant
+    };
+
+    struct Type {
+        std::variant<NoType, TypeVariable, NominalType, StructType> type;
+
+        Type() : type(NoType{}) {}
+        Type(std::string name) : type(NominalType(name)) {}
+        Type(std::string name, std::vector<Type> parameters) : type(NominalType(name, parameters)) {}
+        Type(std::string name, TypeNode* type_definition) : type(NominalType(name, type_definition)) {}
+        Type(std::variant<NoType, TypeVariable, NominalType, StructType> type) : type(type) {}
+
+        ast::NoType& as_no_type();
+        ast::TypeVariable& as_type_variable();
+        ast::NominalType& as_nominal_type();
+        ast::StructType& as_struct_type();
+
+        ast::NoType as_no_type() const;
+        ast::TypeVariable as_type_variable() const;
+        ast::NominalType as_nominal_type() const;
+        ast::StructType as_struct_type() const;
+
         bool operator==(const Type &t) const;
         bool operator!=(const Type &t) const;
         std::string to_str() const;
+        bool is_no_type() const;
         bool is_type_variable() const;
+        bool is_nominal_type() const;
+        bool is_struct_type() const;
         bool is_concrete() const;
         bool is_integer() const;
         bool is_float() const;
         bool is_pointer() const;
+        bool is_array() const;
     };
 
     Type get_type(Node* node);
-    Type get_concrete_type(Node* node, std::unordered_map<std::string, Type>& type_bindings);
-    Type get_concrete_type(Type type_variable, std::unordered_map<std::string, Type>& type_bindings);
+    Type get_concrete_type(Node* node, std::unordered_map<size_t, Type>& type_bindings);
+    Type get_concrete_type(Type type_variable, std::unordered_map<size_t, Type>& type_bindings);
     void set_type(Node* node, Type type);
     void set_types(std::vector<CallArgumentNode*> nodes, std::vector<Type> types);
     std::vector<Type> get_types(std::vector<Node*> nodes);
     std::vector<Type> get_types(std::vector<CallArgumentNode*> nodes);
     std::vector<Type> get_types(std::vector<FunctionArgumentNode*> nodes);
     std::vector<Type> get_default_types(std::vector<ast::Type> types);
-    std::vector<Type> get_concrete_types(std::vector<Node*> nodes, std::unordered_map<std::string, Type>& type_bindings);
-    std::vector<Type> get_concrete_types(std::vector<Type> type_variables, std::unordered_map<std::string, Type>& type_bindings);
+    std::vector<Type> get_concrete_types(std::vector<Node*> nodes, std::unordered_map<size_t, Type>& type_bindings);
+    std::vector<Type> get_concrete_types(std::vector<Type> type_variables, std::unordered_map<size_t, Type>& type_bindings);
     bool is_expression(Node* node);
     bool could_be_expression(Node* node);
     void transform_to_expression(Node*& node);
@@ -144,7 +191,7 @@ namespace ast {
     struct BlockNode {
         size_t line;
         size_t column;
-        Type type = Type("");
+        Type type = Type(ast::NoType{});
 
         std::vector<Node*> statements;
         std::vector<UseNode*> use_statements;
@@ -168,7 +215,7 @@ namespace ast {
     struct FunctionSpecialization {
         std::vector<Type> args;
         Type return_type;
-        std::unordered_map<std::string, Type> type_bindings;
+        std::unordered_map<size_t, Type> type_bindings;
     };
 
     enum FunctionState {
@@ -181,7 +228,7 @@ namespace ast {
     struct FunctionNode {
         size_t line;
         size_t column;
-        Type type = Type("");
+        Type type = Type(ast::NoType{});
 
         IdentifierNode* identifier;
         std::vector<FunctionArgumentNode*> args;
@@ -191,14 +238,14 @@ namespace ast {
         bool analyzed = false;
         bool is_extern = false;
         std::vector<FunctionSpecialization> specializations;
-        Type return_type = Type("");
+        Type return_type = Type(ast::NoType{});
         std::filesystem::path module_path; // Used in to tell from which module the function comes from
     };
 
     struct TypeNode {
         size_t line;
         size_t column;
-        Type type = Type("");
+        Type type = Type(ast::NoType{});
 
         IdentifierNode* identifier;
         std::vector<IdentifierNode*> fields;
@@ -208,7 +255,7 @@ namespace ast {
     struct AssignmentNode {
         size_t line;
         size_t column;
-        Type type = Type("");
+        Type type = Type(ast::NoType{});
 
         bool is_mutable = false;
         bool nonlocal = false;
@@ -220,7 +267,7 @@ namespace ast {
     struct FieldAssignmentNode {
         size_t line;
         size_t column;
-        Type type = Type("");
+        Type type = Type(ast::NoType{});
 
         bool is_mutable = false;
         bool nonlocal = false;
@@ -232,7 +279,7 @@ namespace ast {
     struct DereferenceAssignmentNode {
         size_t line;
         size_t column;
-        Type type = Type("");
+        Type type = Type(ast::NoType{});
 
         DereferenceNode* identifier;
         Node* expression;
@@ -241,7 +288,7 @@ namespace ast {
     struct ReturnNode {
         size_t line;
         size_t column;
-        Type type = Type("");
+        Type type = Type(ast::NoType{});
 
         std::optional<Node*> expression;
     };
@@ -249,19 +296,19 @@ namespace ast {
     struct BreakNode {
         size_t line;
         size_t column;
-        Type type = Type("");
+        Type type = Type(ast::NoType{});
     };
 
     struct ContinueNode {
         size_t line;
         size_t column;
-        Type type = Type("");
+        Type type = Type(ast::NoType{});
     };
 
     struct IfElseNode {
         size_t line;
         size_t column;
-        Type type = Type("");
+        Type type = Type(ast::NoType{});
 
         Node* condition;
         Node* if_branch;
@@ -271,7 +318,7 @@ namespace ast {
     struct WhileNode {
         size_t line;
         size_t column;
-        Type type = Type("");
+        Type type = Type(ast::NoType{});
 
         Node* condition;
         Node* block;
@@ -280,7 +327,7 @@ namespace ast {
     struct UseNode {
         size_t line;
         size_t column;
-        Type type = Type("");
+        Type type = Type(ast::NoType{});
 
         StringNode* path;
         bool include = false;
@@ -289,7 +336,7 @@ namespace ast {
     struct LinkWithNode {
         size_t line;
         size_t column;
-        Type type = Type("");
+        Type type = Type(ast::NoType{});
 
         StringNode* directives;
     };
@@ -297,7 +344,7 @@ namespace ast {
     struct CallArgumentNode {
         size_t line;
         size_t column;
-        Type type = Type("");
+        Type type = Type(ast::NoType{});
 
         std::optional<IdentifierNode*> identifier = std::nullopt;
         Node* expression;
@@ -307,7 +354,7 @@ namespace ast {
         size_t line;
         size_t end_line;
         size_t column;
-        Type type = Type("");
+        Type type = Type(ast::NoType{});
 
         IdentifierNode* identifier;
         std::vector<CallArgumentNode*> args;
@@ -317,7 +364,7 @@ namespace ast {
     struct FloatNode {
         size_t line;
         size_t column;
-        Type type = Type("");
+        Type type = Type(ast::NoType{});
 
         double value;
     };
@@ -325,7 +372,7 @@ namespace ast {
     struct IntegerNode {
         size_t line;
         size_t column;
-        Type type = Type("");
+        Type type = Type(ast::NoType{});
 
         int64_t value;
     };
@@ -333,7 +380,7 @@ namespace ast {
     struct IdentifierNode {
         size_t line;
         size_t column;
-        Type type = Type("");
+        Type type = Type(ast::NoType{});
 
         std::string value;
     };
@@ -341,7 +388,7 @@ namespace ast {
     struct BooleanNode {
         size_t line;
         size_t column;
-        Type type = Type("");
+        Type type = Type(ast::NoType{});
 
         bool value;
     };
@@ -349,7 +396,7 @@ namespace ast {
     struct StringNode {
         size_t line;
         size_t column;
-        Type type = Type("");
+        Type type = Type(ast::NoType{});
 
         std::string value;
     };
@@ -357,7 +404,7 @@ namespace ast {
     struct ArrayNode {
         size_t line;
         size_t column;
-        Type type = Type("");
+        Type type = Type(ast::NoType{});
 
         std::vector<Node*> elements;
     };
@@ -365,7 +412,7 @@ namespace ast {
     struct FieldAccessNode {
         size_t line;
         size_t column;
-        Type type = Type("");
+        Type type = Type(ast::NoType{});
 
         std::vector<ast::IdentifierNode*> fields_accessed;
     };
@@ -373,7 +420,7 @@ namespace ast {
     struct AddressOfNode {
         size_t line;
         size_t column;
-        Type type = Type("");
+        Type type = Type(ast::NoType{});
 
         ast::Node* expression;
     };
@@ -381,7 +428,7 @@ namespace ast {
     struct DereferenceNode {
         size_t line;
         size_t column;
-        Type type = Type("");
+        Type type = Type(ast::NoType{});
     
         ast::Node* expression;
     };
@@ -411,7 +458,7 @@ namespace ast {
         size_t indent_level = 0;
         std::vector<bool> last = {};
         bool concrete = false;
-        std::unordered_map<std::string, ast::Type> type_bindings;
+        std::unordered_map<size_t, ast::Type> type_bindings;
     };
 
     Type get_concrete_type_or_type_variable(Type type, PrintContext context);
