@@ -85,8 +85,16 @@ bool ast::Type::operator==(const Type &t) const {
         return false;
     }
     else if (this->is_struct_type()) {
-        assert(false);
-        return false;
+        for (auto field: this->as_struct_type().fields) {
+            if (t.as_struct_type().fields.find(field.first) == t.as_struct_type().fields.end()) {
+                return false;
+            }
+
+            if (t.as_struct_type().fields[field.first] != field.second) {
+                return false;
+            }
+        }
+        return true;
     }
     else {
         assert(false);
@@ -103,8 +111,11 @@ std::string ast::Type::to_str() const {
     if (this->is_no_type()) {
         output += "ast::Notype";
     }
+    else if (this->is_type_variable()) {
+        if (this->as_type_variable().is_final) {
+            output += "$";
+        }
 
-    if (this->is_type_variable()) {
         output += std::to_string(std::get<ast::TypeVariable>(this->type).id);
 
         if (std::get<ast::TypeVariable>(this->type).interface.has_value()
@@ -133,10 +144,20 @@ std::string ast::Type::to_str() const {
             output += "}";
         }
 
+        if (std::get<ast::TypeVariable>(this->type).field_constraints.size() > 0) {
+            output += " | {";
+            auto fields = std::get<ast::TypeVariable>(this->type).field_constraints;
+            for(auto field = fields.begin(); field != fields.end(); field++) {
+                output += field->first + ": " + field->second.to_str() + ", ";
+
+            }
+
+            output += "...}";
+        }
+
         return output;
     }
-
-    if (this->is_nominal_type()) {
+    else if (this->is_nominal_type()) {
         if (std::get<ast::NominalType>(this->type).parameters.size() == 0) {
             output += std::get<ast::NominalType>(this->type).name;
         }
@@ -150,6 +171,25 @@ std::string ast::Type::to_str() const {
             }
             output += "]";
         }
+    }
+    else if (this->is_struct_type()) {
+        output += "struct {";
+        
+        auto fields = this->as_struct_type().fields;
+        for(auto field = fields.begin(); field != fields.end(); field++) {
+            output += field->first + ": " + field->second.to_str();
+
+            if (std::next(field) != this->as_struct_type().fields.end()
+            || this->as_struct_type().open) {
+                output += ", ";
+            }
+        }
+
+        if (this->as_struct_type().open) {
+            output += "...";
+        }
+
+        output += "}";
     }
     return output;
 }
@@ -191,7 +231,13 @@ bool ast::Type::is_concrete() const {
     }
 
     if (this->is_struct_type()) {
-        assert(false);
+        for (auto field: this->as_struct_type().fields) {
+            if (!field.second.is_concrete()) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     return true;
@@ -269,25 +315,31 @@ ast::Type ast::get_concrete_type(Node* node, std::unordered_map<size_t, Type>& t
     return ast::get_concrete_type(ast::get_type(node), type_bindings);
 }
 
-ast::Type ast::get_concrete_type(Type type_variable, std::unordered_map<size_t, Type>& type_bindings) {
-    if (type_variable.is_type_variable()) {
-        if (type_bindings.find(type_variable.as_type_variable().id) != type_bindings.end()) {
-            type_variable = type_bindings[type_variable.as_type_variable().id];
+ast::Type ast::get_concrete_type(Type type, std::unordered_map<size_t, Type>& type_bindings) {
+    if (type.is_type_variable()) {
+        if (type_bindings.find(type.as_type_variable().id) != type_bindings.end()) {
+            type = type_bindings[type.as_type_variable().id];
         }
-        else if (type_variable.as_type_variable().interface.has_value()) {
-            type_variable = type_variable.as_type_variable().interface.value().get_default_type();
+        else if (type.as_type_variable().interface.has_value()) {
+            type = type.as_type_variable().interface.value().get_default_type();
         }
         else {
-            std::cout << "unknown type: " << type_variable.to_str() << "\n";
+            std::cout << "unknown type: " << type.to_str() << "\n";
             assert(false);
         }
     }
-    if (!type_variable.is_concrete()) {
-        for (size_t i = 0; i < type_variable.as_nominal_type().parameters.size(); i++) {
-            type_variable.as_nominal_type().parameters[i] = ast::get_concrete_type(type_variable.as_nominal_type().parameters[i], type_bindings);
+    if (!type.is_concrete()) {
+        if (type.is_nominal_type()) {
+            for (size_t i = 0; i < type.as_nominal_type().parameters.size(); i++) {
+                type.as_nominal_type().parameters[i] = ast::get_concrete_type(type.as_nominal_type().parameters[i], type_bindings);
+            }
+        }
+        else if (type.is_struct_type()) {
+            std::cout << "WAHT ? " << type.to_str() << "\n";
+            assert(false);
         }
     }
-    return type_variable;
+    return type;
 }
 
 void ast::set_type(Node* node, Type type) {

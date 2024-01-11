@@ -110,8 +110,9 @@ namespace ast {
     struct TypeVariable {
         size_t id;
         bool is_final = false;
-        std::optional<Interface> interface;
+        std::optional<Interface> interface = std::nullopt;
         Set<ast::Type> overload_constraints;
+        std::unordered_map<std::string, ast::Type> field_constraints;
 
         TypeVariable(size_t id) : id(id) {}
         TypeVariable(size_t id, bool is_final) : id(id), is_final(is_final) {}
@@ -128,7 +129,11 @@ namespace ast {
     };
 
     struct StructType {
+        bool open = false;
         std::unordered_map<std::string, Type> fields;
+
+        StructType(std::unordered_map<std::string, Type> fields) : fields(fields) {}
+        StructType(std::unordered_map<std::string, Type> fields, bool open) : fields(fields), open(open) {}
     };
 
     enum TypeVariant {

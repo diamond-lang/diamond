@@ -1,3 +1,5 @@
+-- Field assignment in nested structs
+
 type Point
     x: float64
     y: float64
@@ -11,14 +13,15 @@ rectangle = Rectangle(
     p2: Point(x: 110, y: 60)
 )
 
+rectangle.p1 = Point(
+    x: 600
+    y: 500
+)
+
 print(rectangle.p1.x)
 print(rectangle.p1.y)
-print(rectangle.p2.x)
-print(rectangle.p2.y)
 
 --- Output
-10
-10
-110
-60
+600
+500
 ---

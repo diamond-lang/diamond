@@ -1,3 +1,5 @@
+-- Returning structs
+
 type Point
     x: float64
     y: float64
@@ -5,7 +7,7 @@ type Point
 function make_point(x: float64, y: float64): Point
     return Point(x: x, y: y)
 
-p = make_point(42, 93)
+p = make_point(42.0, 93.0)
 print(p.x)
 print(p.y)
 

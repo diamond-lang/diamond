@@ -51,6 +51,7 @@ namespace semantic {
         std::vector<Set<ast::Type>> type_constraints;
         std::unordered_map<ast::Type, Set<ast::Type>> labeled_type_constraints;
         std::unordered_map<ast::Type, Set<ast::Type>> overload_constraints;
+        std::unordered_map<ast::Type, std::unordered_map<std::string, ast::Type>> field_constraints;
         std::unordered_map<size_t, ast::Type> type_bindings;
     };
 
@@ -493,6 +494,12 @@ ast::Type semantic::get_unified_type(Context& context, ast::Type type_var) {
                     type_var.as_nominal_type().parameters[i] = semantic::get_unified_type(context, type_var.as_nominal_type().parameters[i]);
                 }
             }
+            else if (type_var.is_struct_type()) {
+                for (auto field: type_var.as_struct_type().fields) {
+                    type_var.as_struct_type().fields[field.first] = semantic::get_unified_type(context, field.second);
+                } 
+            }
+
             return type_var;
         }
     }
@@ -522,7 +529,8 @@ bool semantic::is_type_concrete(Context& context, ast::Type type) {
     if (type.is_concrete()) {
         return true;
     }
-    if (context.type_inference.type_bindings.find(type.as_type_variable().id) != context.type_inference.type_bindings.end()) {
+    if (type.is_type_variable()
+    &&  context.type_inference.type_bindings.find(type.as_type_variable().id) != context.type_inference.type_bindings.end()) {
         return true;
     }
     return false;
@@ -603,10 +611,16 @@ Result<Ok, Error> semantic::analyze_block_or_expression(semantic::Context& conte
         else {
             ast::Type representative = representatives[0];
             for (size_t i = 1; i < representatives.size(); i++) {
-                if (representative.as_nominal_type().name != representatives[i].as_nominal_type().name) {
+                if (representative.is_nominal_type() && representatives[i].is_nominal_type()) {
+                    if (representative.as_nominal_type().name != representatives[i].as_nominal_type().name) {
+                        std::cout << representative.to_str() << " <> " << representatives[i].to_str() << "\n";
+                        assert(false);
+                    }
+                }
+                else {
                     std::cout << representative.to_str() << " <> " << representatives[i].to_str() << "\n";
                     assert(false);
-                } 
+                }
             }
 
             if (context.type_inference.labeled_type_constraints.find(representative) == context.type_inference.labeled_type_constraints.end()) {
@@ -657,7 +671,7 @@ Result<Ok, Error> semantic::analyze_block_or_expression(semantic::Context& conte
             key.as_type_variable().interface = interface;
             context.type_inference.labeled_type_constraints.erase(type_constraint.first);
             context.type_inference.labeled_type_constraints[key] = type_constraint.second;
-        } 
+        }
     }
 
     // Unify
@@ -1262,8 +1276,29 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
         }
     }
     else {
-        std::cout << node.fields_accessed[0]->type.to_str() << "\n";
-        assert(false);
+        if (context.type_inference.field_constraints.find(node.fields_accessed[0]->type) == context.type_inference.field_constraints.end()) {
+            context.type_inference.field_constraints[node.fields_accessed[0]->type] = {};
+        }
+        std::unordered_map<std::string, ast::Type>* field_constraints = &context.type_inference.field_constraints[node.fields_accessed[0]->type];
+
+        for (size_t i = 1; i < node.fields_accessed.size(); i++) {
+            std::string field = node.fields_accessed[i]->value;
+
+            if (field_constraints->find(field) == field_constraints->end()) {
+                (*field_constraints)[field] = semantic::new_type_variable(context);
+            }
+
+            node.fields_accessed[i]->type = (*field_constraints)[field];
+
+            // Iterate on field constraints
+            if (i != node.fields_accessed.size() - 1) {
+                if (context.type_inference.field_constraints.find(node.fields_accessed[i]->type) == context.type_inference.field_constraints.end()) {
+                    context.type_inference.field_constraints[node.fields_accessed[i]->type] = {};
+                }
+
+                field_constraints = &context.type_inference.field_constraints[node.fields_accessed[i]->type];
+            }
+        }
     }
 
     // Set overall node type
@@ -1632,27 +1667,31 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::Ca
 Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::FieldAccessNode& node) {
     assert(node.fields_accessed.size() >= 2);
 
-    if (!node.type.is_type_variable()) return Ok {};
-    
-    // // Unify
-    // auto result = semantic::unify_types_and_type_check(context, *node.fields_accessed[0]);
-    // if (result.is_error()) return result;
+    if (!node.type.is_type_variable()) {
+        return Ok {};
+    }
+    else {
+        std::unordered_map<std::string, ast::Type>* field_constraints = &context.type_inference.field_constraints[node.fields_accessed[0]->type];
 
-    // for (size_t i = 1; i < node.fields_accessed.size(); i++) {
-    //     std::string field = node.fields_accessed[i]->value;
-    //     ast::Type type = node.fields_accessed[i]->type;
+        auto result = semantic::unify_types_and_type_check(context, *node.fields_accessed[0]);
+        if (result.is_error()) return result;
 
-    //     // Get unified type
-    //     node.fields_accessed[i]->type = semantic::get_unified_type(context, struct_type->fields[field]);
-        
-    //     // Iterate
-    //     if (i != node.fields_accessed.size() - 1) {
-    //         struct_type = &context.type_inference.struct_types[type];
-    //     }
-    // }
+        for (size_t i = 1; i < node.fields_accessed.size(); i++) {
+            std::string field = node.fields_accessed[i]->value;
+            ast::Type current_type = node.fields_accessed[i]->type;
 
-    // // Unify overall node type
-    // node.type = node.fields_accessed[node.fields_accessed.size() - 1]->type;
+            // Get unified type
+            node.fields_accessed[i]->type = semantic::get_unified_type(context, (*field_constraints)[field]);
+
+            // Iterate
+            if (i != node.fields_accessed.size() - 1) {
+                field_constraints = &context.type_inference.field_constraints[current_type];
+            }
+        }
+
+        // Unify overall node type
+        node.type = node.fields_accessed[node.fields_accessed.size() - 1]->type;
+    }
 
     return Ok {};
 }
@@ -1867,7 +1906,7 @@ Result<Ok, Error> semantic::get_concrete_as_type_bindings(Context& context, ast:
             }
             else {
                 size_t i = 0;
-                while (i < node.args.size()) {
+                while (i < node.args.size()) {       
                     // Get concrete type for current argument
                     auto result = get_concrete_as_type_bindings(context, *node.args[i], call_stack);
                     if (result.is_error()) return result;
@@ -1960,7 +1999,8 @@ Result<Ok, Error> semantic::get_concrete_as_type_bindings(Context& context, ast:
                 auto& called_function = functions_that_can_be_called[0];
 
                 // Get type of called function
-                if (context.type_inference.type_bindings.find(node.type.as_type_variable().id) == context.type_inference.type_bindings.end()) {
+                if (node.type.is_type_variable()
+                &&  context.type_inference.type_bindings.find(node.type.as_type_variable().id) == context.type_inference.type_bindings.end()) {
                     if (called_function->state == ast::FunctionCompletelyTyped) {
                         context.type_inference.type_bindings[node.type.as_type_variable().id] = called_function->return_type;
                     }
@@ -2008,11 +2048,42 @@ Result<Ok, Error> semantic::get_concrete_as_type_bindings(Context& context, ast:
 Result<Ok, Error> semantic::get_concrete_as_type_bindings(Context& context, ast::FieldAccessNode& node, std::vector<ast::CallInCallStack> call_stack) {
     assert(node.fields_accessed.size() >= 2);
 
-    if (!node.type.is_type_variable()) return Ok {};
+    if (!node.type.is_type_variable()) {
+        return Ok {};
+    }
+    else {
+        auto result = semantic::get_concrete_as_type_bindings(context, *node.fields_accessed[0], call_stack);
+        if (result.is_error()) return Error {};
 
-    // semantic::StructType* struct_type = &context.type_inference.struct_types[node.fields_accessed[0]->type];
+        assert(semantic::get_type(context, node.fields_accessed[0]->type).is_concrete());
 
-    return Ok {};
+        ast::Type struct_type = semantic::get_type(context, node.fields_accessed[0]->type);
+
+        for (size_t i = 1; i < node.fields_accessed.size(); i++) {
+            auto field = node.fields_accessed[i]->value;
+            assert(struct_type.is_nominal_type());
+
+            bool field_founded = false;
+            for (auto field_in_definition: struct_type.as_nominal_type().type_definition->fields) {
+                if (field == field_in_definition->value) {
+                    field_founded = true;
+                    context.type_inference.type_bindings[node.fields_accessed[i]->type.as_type_variable().id] = field_in_definition->type;
+                    break;
+                }
+            }
+            assert(field_founded);
+
+            // Iterate over struct type
+            if (i + 1 != node.fields_accessed.size()) {
+                struct_type = semantic::get_type(context, node.fields_accessed[i]->type);
+            }
+        }
+
+        // Set overall node type
+        node.type = node.fields_accessed[node.fields_accessed.size() - 1]->type;
+
+        return Ok {};
+    }
 }
 
 Result<Ok, Error> semantic::get_concrete_as_type_bindings(Context& context, ast::AddressOfNode& node, std::vector<ast::CallInCallStack> call_stack) {

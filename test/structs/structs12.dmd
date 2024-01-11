@@ -1,21 +1,20 @@
+-- Field assignment in generic functions
+
 type Point
     x: float64
     y: float64
 
-type Point3
-    x: float64
-    y: float64
-    z: float64
-
 function generic1(p)
-    print(p.x)
+    p.x = 50
+    p.y = 60
     print(p.x)
     print(p.y)
 
 function generic2()
     b = 10
     a = Point(x: b + 3.5, y: 10)
-    print(a.x)
+    a.x = b * 10
+    a.y = 100
     print(a.x)
     print(a.y)
 
@@ -23,10 +22,8 @@ generic1(Point(x: 20, y: 30))
 generic2()
 
 --- Output
-20
-20
-30
-13.5
-13.5
-10
+50
+60
+100
+100
 ---

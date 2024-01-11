@@ -61,3 +61,16 @@ std::string utilities::get_program_name(std::filesystem::path path) {
         return ".\\" + utilities::get_executable_name(program_name);
     }
 #endif
+
+std::string utilities::to_str(Set<ast::Type> set) {
+    std::string output = "{";
+    for (size_t i = 0; i < set.elements.size(); i++) {
+        output += set.elements[i].to_str();
+
+        if (i + 1 != set.elements.size()) {
+            output += ", ";
+        }
+    }
+    output += "}";
+    return output;
+}

@@ -1,3 +1,5 @@
+-- Passing structs by value
+
 type Point
     x: float64
     y: float64

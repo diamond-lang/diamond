@@ -1,12 +1,16 @@
+-- Field assignment
+
 type Point
     x: float64
     y: float64
 
 a = Point(x: 20, y: 30)
+a.x = 40
+a.y = 50
 print(a.x)
 print(a.y)
 
 --- Output
-20
-30
+40
+50
 ---

@@ -1,14 +1,14 @@
+-- Constructor and accessing
+
 type Point
     x: float64
     y: float64
 
 a = Point(x: 20, y: 30)
-a.x = 40
-a.y = 50
 print(a.x)
 print(a.y)
 
 --- Output
-40
-50
+20
+30
 ---
