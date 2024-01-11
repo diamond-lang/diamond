@@ -361,7 +361,6 @@ Result<Ok, Error> semantic::add_definitions_to_current_scope(Context& context, a
 
     for (auto& use_stmt: block.use_statements) {
         auto module_path = std::filesystem::canonical(current_directory / (use_stmt->path->value + ".dmd"));
-        std::cout << module_path << "\n";
         assert(std::filesystem::exists(module_path));
         auto result = semantic::add_module_functions(context, module_path, already_included_modules);
         if (result.is_error()) return result;
