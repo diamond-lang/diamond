@@ -8,7 +8,9 @@ function generic_add(a, b)
     return add(a, b)
 
 print(generic_add(10, 20))
+print(generic_add(10.5, 20.0))
 
 --- Output
 30
+30.5
 ---

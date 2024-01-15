@@ -1,0 +1,15 @@
+function add(a, b)
+    return a + b
+
+function add(a, b)
+    return a or b
+
+print(add(1, 2))
+print(add(3.5, 2.3))
+print(add(false, false))
+
+--- Output
+3
+5.8
+false
+---

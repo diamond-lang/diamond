@@ -15,3 +15,7 @@ function make_point(x: int64, y: int64): point_int64
 a = make_point(1, 2)
 print(a.x)
 print(a.y)
+
+b = make_point(1.5, 2.5)
+print(b.x)
+print(b.y)
