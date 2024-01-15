@@ -559,12 +559,26 @@ ast::Type semantic::get_type(Context& context, ast::Type type) {
 }
 
 bool semantic::are_types_compatible(ast::Type function_type, ast::Type argument_type) {
-    if (!function_type.is_type_variable()) {
+    assert(argument_type.is_concrete());
+
+    if (function_type.is_concrete()) {
         return argument_type == function_type;
     }
     else if (function_type.is_type_variable()
     &&       function_type.as_type_variable().overload_constraints.size() > 0) {
         return function_type.as_type_variable().overload_constraints.contains(argument_type);
+    }
+    else if (function_type.is_nominal_type()) {
+        if (function_type.as_nominal_type().name == argument_type.as_nominal_type().name
+        &&  function_type.as_nominal_type().parameters.size() == argument_type.as_nominal_type().parameters.size()) {
+            for (size_t i = 0; i < function_type.as_nominal_type().parameters.size(); i++) {
+                if (!semantic::are_types_compatible(function_type.as_nominal_type().parameters[i], argument_type.as_nominal_type().parameters[i])) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        return false;
     }
     return true;
 }
@@ -648,6 +662,7 @@ Result<Ok, Error> semantic::set_expected_types_of_arguments_and_check(Context& c
                 return Error {};
             }
             else if (called_function->args[i]->type.is_type_variable()
+            && called_function->args[i]->type.as_type_variable().overload_constraints.size() > 0
             && !called_function->args[i]->type.as_type_variable().overload_constraints.contains(arg_type)) {
                 arg_type = ast::get_concrete_type(call->args[i]->type, context.type_inference.type_bindings);
                 context.errors.push_back(errors::unexpected_argument_type(*call, context.current_module, i, arg_type, called_function->args[i]->type.as_type_variable().overload_constraints.elements, call_stack));
@@ -1594,8 +1609,10 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::Li
 }
 
 Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::CallArgumentNode& node) {
-    node.type = semantic::get_unified_type(context, node.type);
-    return semantic::unify_types_and_type_check(context, node.expression);
+    auto result = semantic::unify_types_and_type_check(context, node.expression);
+    if (result.is_error()) return Error{};
+    node.type = ast::get_type(node.expression);
+    return Ok{};
 }
 
 Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::IdentifierNode& node) {
@@ -1636,7 +1653,7 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::Fl
 
 Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::CallNode& node) {
     for (size_t i = 0; i < node.args.size(); i++) {
-        auto result = semantic::unify_types_and_type_check(context, *node.args[i]);
+        auto result = semantic::unify_types_and_type_check(context, *node.args[i]); 
         if (result.is_error()) return result;
     }
 
@@ -1793,7 +1810,7 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::De
     auto result = semantic::unify_types_and_type_check(context, node.expression);
     if (result.is_error()) return result;
 
-    node.type = semantic::get_unified_type(context, node.type);
+    node.type = ast::get_type(node.expression).as_nominal_type().parameters[0];
     return Ok {};
 }
 
@@ -2088,6 +2105,64 @@ Result<Ok, Error> semantic::get_concrete_as_type_bindings(Context& context, ast:
 
 // Get function type
 // -----------------
+void add_argument_type_to_context(semantic::Context& context, ast::Type function_type, ast::Type argument_type) {
+    if (function_type.is_type_variable()) {
+        // If it was no already included
+        if (context.type_inference.type_bindings.find(function_type.as_type_variable().id) == context.type_inference.type_bindings.end()) {
+            context.type_inference.type_bindings[function_type.as_type_variable().id] = argument_type;
+        }
+        // Else compare with previous type founded for it
+        else if (context.type_inference.type_bindings[function_type.as_type_variable().id] != argument_type) {
+            assert(false);
+        }
+    }
+    else if (function_type.is_concrete()
+    &&       function_type != argument_type) {
+        assert(false);
+    }
+    else if (function_type.is_nominal_type()) {
+        assert(argument_type.is_nominal_type());
+        assert(function_type.as_nominal_type().name == argument_type.as_nominal_type().name);
+        assert(function_type.as_nominal_type().parameters.size() == argument_type.as_nominal_type().parameters.size());
+        assert(argument_type.is_concrete());
+
+        for (size_t i = 0; i < function_type.as_nominal_type().parameters.size(); i++) {
+            add_argument_type_to_context(context, function_type.as_nominal_type().parameters[i], argument_type.as_nominal_type().parameters[i]);
+        }
+    }
+}
+
+void add_return_type_to_context(semantic::Context& context, ast::FunctionSpecialization& specialization, ast::Type function_type, ast::Type call_type) {
+    if (function_type.is_type_variable()) {
+        if (specialization.type_bindings.find(function_type.as_type_variable().id) != specialization.type_bindings.end()) {
+            specialization.return_type = specialization.type_bindings[function_type.as_type_variable().id];
+        }
+        else if (function_type.is_type_variable()
+        &&       function_type.as_type_variable().interface.has_value()) {
+            specialization.type_bindings[function_type.as_type_variable().id] = function_type.as_type_variable().interface.value().get_default_type();
+            specialization.return_type = specialization.type_bindings[function_type.as_type_variable().id];
+        }
+        else {
+            assert(false);
+        }
+    }
+    else if (function_type.is_nominal_type()
+    &&       call_type.is_nominal_type()) {
+        assert(function_type.as_nominal_type().name == call_type.as_nominal_type().name);
+        assert(function_type.as_nominal_type().parameters.size() == call_type.as_nominal_type().parameters.size());
+        assert(call_type.is_concrete());
+
+        for (size_t i = 0; i < function_type.as_nominal_type().parameters.size(); i++) {
+            add_return_type_to_context(context, specialization, function_type.as_nominal_type().parameters[i], call_type.as_nominal_type().parameters[i]);
+        }
+
+        specialization.return_type = semantic::get_type(context, function_type);
+    }
+    else {
+        specialization.return_type = function_type;
+    }
+}
+
 Result<ast::Type, Error> semantic::get_function_type(Context& context, ast::CallNode* call, ast::FunctionNode* function, std::vector<ast::Type> args, std::vector<ast::CallInCallStack> call_stack) {
     // Check if specialization already exists
     for (auto& specialization: function->specializations) {
@@ -2136,20 +2211,7 @@ Result<ast::Type, Error> semantic::get_function_type(Context& context, ast::Call
     for (size_t i = 0; i < args.size(); i++) {
         ast::Type call_type = args[i];
         ast::Type function_type = function->args[i]->type;
-
-        if (function_type.is_type_variable() || !function_type.is_concrete()) {
-            // If it was no already included
-            if (new_context.type_inference.type_bindings.find(function_type.as_type_variable().id) == new_context.type_inference.type_bindings.end()) {
-                new_context.type_inference.type_bindings[function_type.as_type_variable().id] = call_type;
-            }
-            // Else compare with previous type founded for it
-            else if (new_context.type_inference.type_bindings[function_type.as_type_variable().id] != call_type) {
-                assert(false);
-            }
-        }
-        else if (call_type != function_type) {
-            assert(false);
-        }
+        add_argument_type_to_context(new_context, function_type, call_type);
     }
 
     // Analyze function with call argument types
@@ -2165,22 +2227,7 @@ Result<ast::Type, Error> semantic::get_function_type(Context& context, ast::Call
         specialization.args.push_back(args[i]);
     }
 
-    if (function->return_type.is_type_variable() || !function->return_type.is_concrete()) {
-        if (specialization.type_bindings.find(function->return_type.as_type_variable().id) != specialization.type_bindings.end()) {
-            specialization.return_type = specialization.type_bindings[function->return_type.as_type_variable().id];
-        }
-        else if (function->return_type.is_type_variable()
-        &&       function->return_type.as_type_variable().interface.has_value()) {
-            specialization.type_bindings[function->return_type.as_type_variable().id] = function->return_type.as_type_variable().interface.value().get_default_type();
-            specialization.return_type = specialization.type_bindings[function->return_type.as_type_variable().id];
-        }
-        else {
-            assert(false);
-        }
-    }
-    else {
-        specialization.return_type = function->return_type;
-    }
+    add_return_type_to_context(new_context, specialization, function->return_type, call->type);
 
     function->specializations.push_back(specialization);
 

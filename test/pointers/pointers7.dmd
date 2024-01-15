@@ -1,6 +1,6 @@
 type Point
-    x: float64
-    y: pointer[float64]
+    x: int64
+    y: pointer[int64]
 
 function awesome(p)
     *p.y = 400
