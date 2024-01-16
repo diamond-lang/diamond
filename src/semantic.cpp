@@ -1835,6 +1835,13 @@ Result<Ok, Error> semantic::get_concrete_as_type_bindings(Context& context, ast:
     for (auto statement: node.statements) {
         auto result = semantic::get_concrete_as_type_bindings(context, statement, call_stack);
         if (result.is_error()) return result;
+
+        if (statement->index() == ast::Call) {
+            if (semantic::get_type(context, ast::get_type(statement)) != ast::Type("void")) {
+                context.errors.push_back(errors::unhandled_return_value(std::get<ast::CallNode>(*statement), context.current_module));
+                return Error{};
+            }
+        }
     }
 
     // Remove scope
@@ -1962,6 +1969,15 @@ Result<Ok, Error> semantic::get_concrete_as_type_bindings(Context& context, ast:
                 // Set and check expected types of arguments
                 auto result = semantic::set_expected_types_of_arguments_and_check(context, &node, called_function, 0, call_stack);
                 if (result.is_error()) return Error{};
+
+                // Check if type of called function matchs with expected
+                if (called_function->state != ast::FunctionCompletelyTyped) {
+                    auto result = semantic::get_function_type(context, &node, called_function, ast::get_concrete_types(ast::get_types(node.args), context.type_inference.type_bindings), call_stack);
+                    if (result.is_error()) return Error {};
+                    if (result.get_value().is_concrete()) {
+                        assert(semantic::get_type(context, node.type) == result.get_value());
+                    }
+                }
             }
             else {
                 size_t i = 0;
@@ -2181,8 +2197,7 @@ Result<ast::Type, Error> semantic::get_function_type(Context& context, ast::Call
                 return context.type_inference.type_bindings[function->return_type.as_type_variable().id];
             }
             else {
-                std::cout << "RECURSION :O\n";
-                assert(false);
+                return function->return_type;
             }
         }
     }
