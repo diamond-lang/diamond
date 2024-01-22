@@ -1,6 +1,6 @@
 type Point
-    x: int64
-    y: pointer[int64]
+    x: float64
+    y: pointer[float64]
 
 a = 10
 p = Point(x: 10, y: &a)

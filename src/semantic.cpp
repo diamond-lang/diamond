@@ -718,6 +718,32 @@ Result<Ok, Error> semantic::analyze_block_or_expression(semantic::Context& conte
     // Merge type constraints that share elements
     context.type_inference.type_constraints = merge_sets_with_shared_elements<ast::Type>(context.type_inference.type_constraints);
 
+    // Flatten type constrains
+    auto& type_constraints = context.type_inference.type_constraints;
+    for (size_t i = 0; i < type_constraints.size(); i++) {
+        size_t j = 0;
+        while (j < type_constraints[i].size()) {
+            if (!type_constraints[i].elements[j].is_nominal_type() || type_constraints[i].elements[j].as_nominal_type().parameters.size() < 0) {
+                j++;
+                continue;
+            }
+
+            for (size_t k = j + 1; k < type_constraints[i].size(); k++) {
+                if (type_constraints[i].elements[j].is_nominal_type() && type_constraints[i].elements[k].is_nominal_type()) {
+                    if (type_constraints[i].elements[j].as_nominal_type().name == type_constraints[i].elements[k].as_nominal_type().name) {
+                        assert(type_constraints[i].elements[k].as_nominal_type().parameters.size() > 0);
+                        semantic::add_constraint(context, Set<ast::Type>({type_constraints[i].elements[j].as_nominal_type().parameters[0], type_constraints[i].elements[k].as_nominal_type().parameters[0]}));
+                    }
+                }
+            }
+
+            j++;
+        }
+    }
+
+    // Merge type constraints that share elements
+    context.type_inference.type_constraints = merge_sets_with_shared_elements<ast::Type>(context.type_inference.type_constraints);
+
     // If we are in a function check if return type is alone, if is alone it means the function is void
     if (context.current_function.has_value()
     && context.current_function.value()->return_type.is_type_variable()) {
@@ -815,6 +841,16 @@ Result<Ok, Error> semantic::analyze_block_or_expression(semantic::Context& conte
     result = semantic::unify_types_and_type_check(context, node);
     if(result.is_error()) return Error {};
 
+    std::unordered_map<ast::Type, std::unordered_map<std::string, ast::Type>> unified_field_constraints;
+    for (auto type: context.type_inference.field_constraints) {
+        auto unified_type = semantic::get_unified_type(context, type.first);
+        unified_field_constraints[unified_type] = {};
+        for (auto field: type.second) {
+            unified_field_constraints[unified_type][field.first] = semantic::get_unified_type(context, field.second);
+        }
+    }
+    context.type_inference.field_constraints = unified_field_constraints;
+
     // Make concrete
     // -------------
     if (!context.current_function.has_value()
@@ -902,17 +938,24 @@ Result<Ok, Error> semantic::analyze(semantic::Context& context, ast::FunctionNod
             return Error {};
         }
 
-        // Unify args and return type
+        // Unify args and return type 
         for (size_t i = 0; i < node.args.size(); i++) {
             node.args[i]->type = semantic::get_unified_type(new_context, node.args[i]->type);
 
             if (new_context.type_inference.overload_constraints.find(node.args[i]->type) != new_context.type_inference.overload_constraints.end()) {
                 node.args[i]->type.as_type_variable().overload_constraints = new_context.type_inference.overload_constraints[node.args[i]->type];
             }
+            if (new_context.type_inference.field_constraints.find(node.args[i]->type) != new_context.type_inference.field_constraints.end()) {
+                node.args[i]->type.as_type_variable().field_constraints = new_context.type_inference.field_constraints[node.args[i]->type];
+            }
         }
+
         node.return_type = semantic::get_unified_type(new_context, node.return_type);
         if (new_context.type_inference.overload_constraints.find(node.return_type) != new_context.type_inference.overload_constraints.end()) {
             node.return_type.as_type_variable().overload_constraints = new_context.type_inference.overload_constraints[node.return_type];
+        }
+        if (new_context.type_inference.field_constraints.find(node.return_type) != new_context.type_inference.field_constraints.end()) {
+            node.return_type.as_type_variable().field_constraints = new_context.type_inference.field_constraints[node.return_type];
         }
 
         // Set function as analyzed
@@ -2121,6 +2164,20 @@ Result<Ok, Error> semantic::get_concrete_as_type_bindings(Context& context, ast:
 
 // Get function type
 // -----------------
+Result<ast::Type, Error> get_field_type(semantic::Context& context, std::string field, ast::Type struct_type) {
+    assert(struct_type.is_nominal_type() && struct_type.as_nominal_type().type_definition);
+
+    for (size_t i = 0; i < struct_type.as_nominal_type().type_definition->fields.size(); i++) {
+        if (field == struct_type.as_nominal_type().type_definition->fields[i]->value) {
+            return struct_type.as_nominal_type().type_definition->fields[i]->type;
+        }
+    }
+
+    assert(false);
+    return Error{};
+}
+
+
 void add_argument_type_to_context(semantic::Context& context, ast::Type function_type, ast::Type argument_type) {
     if (function_type.is_type_variable()) {
         // If it was no already included
@@ -2130,6 +2187,13 @@ void add_argument_type_to_context(semantic::Context& context, ast::Type function
         // Else compare with previous type founded for it
         else if (context.type_inference.type_bindings[function_type.as_type_variable().id] != argument_type) {
             assert(false);
+        }
+
+        // If function argument has field constraints
+        if (function_type.as_type_variable().field_constraints.size() > 0) {
+            for (auto field: function_type.as_type_variable().field_constraints) {
+                add_argument_type_to_context(context, field.second, get_field_type(context, field.first, argument_type).get_value());
+            }
         }
     }
     else if (function_type.is_concrete()
@@ -2160,6 +2224,13 @@ void add_return_type_to_context(semantic::Context& context, ast::FunctionSpecial
         }
         else {
             assert(false);
+        }
+
+        // If function return type has field constraints
+        if (function_type.as_type_variable().field_constraints.size() > 0) {
+            for (auto field: function_type.as_type_variable().field_constraints) {
+                add_return_type_to_context(context, specialization, field.second, get_field_type(context, field.first, call_type).get_value());
+            }
         }
     }
     else if (function_type.is_nominal_type()

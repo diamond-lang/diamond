@@ -627,7 +627,21 @@ void ast::print(Node* node, PrintContext context) {
                     print(nodes[i], PrintContext{context.indent_level + 1, append(context.last, is_last), context.concrete, context.type_bindings});
                 }
                 else {
-                    assert(false);
+                    auto function = (ast::FunctionNode*) nodes[i];
+                    for (size_t j = 0; j < function->specializations.size(); j++) {
+
+                        // Check if is last specialization
+                        bool is_last = j == function->specializations.size() - 1;
+                        for (size_t k = i + 1; k < nodes.size(); k++) {
+                            if (((FunctionNode*)nodes[k])->specializations.size() != 0) {
+                                is_last = false;
+                                break;
+                            }
+                        }
+
+                        context.type_bindings = function->specializations[j].type_bindings;
+                        print((ast::Node*) nodes[i], PrintContext{context.indent_level + 1, append(context.last, is_last), context.concrete, context.type_bindings});
+                    }
                 }
             }
             break;
