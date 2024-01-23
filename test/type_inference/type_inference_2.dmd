@@ -1,0 +1,11 @@
+a = 10 : int32
+print(a + 3)
+
+a = 50
+b = 3 : int8
+print(b + a) -- print(a + b) won't work until having interfaces
+
+--- Output
+13
+53
+---
