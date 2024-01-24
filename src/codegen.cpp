@@ -2,6 +2,7 @@
 #include <cstdio>
 #include <unordered_map>
 #include <filesystem>
+#include <fstream>
 #include <assert.h>
 
 #include "llvm/ADT/APFloat.h"
@@ -614,6 +615,30 @@ static void link(std::string executable_name, std::string object_file_name, std:
             major -= 4;
         }
 
+        std::string libclang_rtx_location = "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/";
+        if (std::filesystem::exists(libclang_rtx_location)) {
+            for(auto& entry: std::filesystem::recursive_directory_iterator(libclang_rtx_location)) {
+                libclang_rtx_location = entry.path().string();
+                break;
+            }
+            libclang_rtx_location += "/lib/darwin/libclang_rt.osx.a";
+        }
+        else {
+            const char *command = "cc --print-file-name=libclang_rt.osx.a";
+            FILE *fpipe =  (FILE*)popen(command, "r");
+            if (!fpipe) {
+                perror("popen() failed.");
+                exit(EXIT_FAILURE);
+            }
+            
+            char c;
+            libclang_rtx_location = "";
+            while (fread(&c, sizeof c, 1, fpipe)) {
+                if (c == '\n') break;
+                libclang_rtx_location += c;
+            }
+        }
+
         // Create link args
         std::vector<std::string> args = {
             "lld",
@@ -630,7 +655,7 @@ static void link(std::string executable_name, std::string object_file_name, std:
             "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk",
             "-L/usr/local/lib",
             "-lSystem",
-            "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/15.0.0/lib/darwin/libclang_rt.osx.a"
+            libclang_rtx_location
         };
 
         std::string output = "";
