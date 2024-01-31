@@ -51,7 +51,7 @@ namespace semantic {
         std::vector<Set<ast::Type>> type_constraints;
         std::unordered_map<ast::Type, Set<ast::Type>> labeled_type_constraints;
         std::unordered_map<ast::Type, Set<ast::Type>> overload_constraints;
-        std::unordered_map<ast::Type, std::unordered_map<std::string, ast::Type>> field_constraints;
+        std::unordered_map<ast::Type, ast::FieldTypes> field_constraints;
         std::unordered_map<size_t, ast::Type> type_bindings;
     };
 
@@ -500,7 +500,7 @@ ast::Type semantic::get_unified_type(Context& context, ast::Type type_var) {
             }
             else if (type_var.is_struct_type()) {
                 for (auto field: type_var.as_struct_type().fields) {
-                    type_var.as_struct_type().fields[field.first] = semantic::get_unified_type(context, field.second);
+                    type_var.as_struct_type().fields[field.name] = semantic::get_unified_type(context, field.type);
                 } 
             }
 
@@ -792,12 +792,12 @@ Result<Ok, Error> semantic::analyze_block_or_expression(semantic::Context& conte
     result = semantic::unify_types_and_type_check(context, node);
     if(result.is_error()) return Error {};
 
-    std::unordered_map<ast::Type, std::unordered_map<std::string, ast::Type>> unified_field_constraints;
+    std::unordered_map<ast::Type, ast::FieldTypes> unified_field_constraints;
     for (auto type: context.type_inference.field_constraints) {
         auto unified_type = semantic::get_unified_type(context, type.first);
         unified_field_constraints[unified_type] = {};
         for (auto field: type.second) {
-            unified_field_constraints[unified_type][field.first] = semantic::get_unified_type(context, field.second);
+            unified_field_constraints[unified_type][field.name] = semantic::get_unified_type(context, field.type);
         }
     }
     context.type_inference.field_constraints = unified_field_constraints;
@@ -1409,7 +1409,7 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
         if (context.type_inference.field_constraints.find(node.fields_accessed[0]->type) == context.type_inference.field_constraints.end()) {
             context.type_inference.field_constraints[node.fields_accessed[0]->type] = {};
         }
-        std::unordered_map<std::string, ast::Type>* field_constraints = &context.type_inference.field_constraints[node.fields_accessed[0]->type];
+        ast::FieldTypes* field_constraints = &context.type_inference.field_constraints[node.fields_accessed[0]->type];
 
         for (size_t i = 1; i < node.fields_accessed.size(); i++) {
             std::string field = node.fields_accessed[i]->value;
@@ -1417,7 +1417,7 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
             if (field_constraints->find(field) == field_constraints->end()) {
                 (*field_constraints)[field] = semantic::new_type_variable(context);
             }
-
+    
             node.fields_accessed[i]->type = (*field_constraints)[field];
 
             // Iterate on field constraints
@@ -1766,7 +1766,7 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::Fi
         return Ok {};
     }
     else {
-        std::unordered_map<std::string, ast::Type>* field_constraints = &context.type_inference.field_constraints[node.fields_accessed[0]->type];
+        ast::FieldTypes* field_constraints = &context.type_inference.field_constraints[node.fields_accessed[0]->type];
 
         auto result = semantic::unify_types_and_type_check(context, *node.fields_accessed[0]);
         if (result.is_error()) return result;
@@ -2188,7 +2188,7 @@ void add_argument_type_to_context(semantic::Context& context, ast::Type function
         // If function argument has field constraints
         if (function_type.as_type_variable().field_constraints.size() > 0) {
             for (auto field: function_type.as_type_variable().field_constraints) {
-                add_argument_type_to_context(context, field.second, get_field_type(context, field.first, argument_type).get_value());
+                add_argument_type_to_context(context, field.type, get_field_type(context, field.name, argument_type).get_value());
             }
         }
     }
@@ -2225,7 +2225,7 @@ void add_return_type_to_context(semantic::Context& context, ast::FunctionSpecial
         // If function return type has field constraints
         if (function_type.as_type_variable().field_constraints.size() > 0) {
             for (auto field: function_type.as_type_variable().field_constraints) {
-                add_return_type_to_context(context, specialization, field.second, get_field_type(context, field.first, call_type).get_value());
+                add_return_type_to_context(context, specialization, field.type, get_field_type(context, field.name, call_type).get_value());
             }
         }
     }

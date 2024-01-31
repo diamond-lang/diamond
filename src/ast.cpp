@@ -26,6 +26,60 @@ ast::Type ast::Interface::get_default_type() {
     }
 }
 
+// Field types
+// -----------
+std::vector<ast::FieldConstraint>::iterator ast::FieldTypes::begin() {
+    return this->fields.begin();
+}
+
+std::vector<ast::FieldConstraint>::iterator ast::FieldTypes::end() {
+    return this->fields.end();
+}
+
+std::size_t ast::FieldTypes::size() const {
+    return this->fields.size();
+}
+
+std::vector<ast::FieldConstraint>::iterator ast::FieldTypes::find(std::string field_name) {
+    for (auto field = this->begin(); field != this->fields.end(); field++) {
+        if (field_name == field->name) {
+            return field;
+        }
+    }
+    return this->end();
+}
+
+ast::Type& ast::FieldTypes::operator[](const std::string& field_name) {
+    for (size_t i = 0; i < this->fields.size(); i++) {
+        if (field_name == this->fields[i].name) {
+            return this->fields[i].type;
+        }
+    }
+    
+    this->fields.push_back(ast::FieldConstraint{field_name, ast::Type(ast::NoType{})});
+    return this->fields[this->fields.size() - 1].type;
+}
+
+const ast::Type& ast::FieldTypes::operator[](const std::string& field_name) const {
+    for (size_t i = 0; i < this->fields.size(); i++) {
+        if (field_name == this->fields[i].name) {
+            return this->fields[i].type;
+        }
+    }
+    assert(false);
+    return this->fields[0].type;
+}
+
+std::string ast::FieldTypes::to_str() const {
+    std::string result = "{";
+    for (size_t i = 0; i < this->fields.size(); i++) {
+        result += this->fields[i].name + ": " + this->fields[i].type.to_str();
+        if (i + 1 != this->fields.size()) result += ", ";
+    }
+    result += "}";
+    return result;
+}
+
 // Type
 // ----
 ast::NoType& ast::Type::as_no_type() {
@@ -86,11 +140,11 @@ bool ast::Type::operator==(const Type &t) const {
     }
     else if (this->is_struct_type()) {
         for (auto field: this->as_struct_type().fields) {
-            if (t.as_struct_type().fields.find(field.first) == t.as_struct_type().fields.end()) {
+            if (t.as_struct_type().fields.find(field.name) == t.as_struct_type().fields.end()) {
                 return false;
             }
 
-            if (t.as_struct_type().fields[field.first] != field.second) {
+            if (t.as_struct_type().fields[field.name] != field.type) {
                 return false;
             }
         }
@@ -148,7 +202,7 @@ std::string ast::Type::to_str() const {
             output += " | {";
             auto fields = std::get<ast::TypeVariable>(this->type).field_constraints;
             for(auto field = fields.begin(); field != fields.end(); field++) {
-                output += field->first + ": " + field->second.to_str() + ", ";
+                output += field->name + ": " + field->type.to_str() + ", ";
 
             }
 
@@ -177,7 +231,7 @@ std::string ast::Type::to_str() const {
         
         auto fields = this->as_struct_type().fields;
         for(auto field = fields.begin(); field != fields.end(); field++) {
-            output += field->first + ": " + field->second.to_str();
+            output += field->name + ": " + field->type.to_str();
 
             if (std::next(field) != this->as_struct_type().fields.end()
             || this->as_struct_type().open) {
@@ -232,7 +286,7 @@ bool ast::Type::is_concrete() const {
 
     if (this->is_struct_type()) {
         for (auto field: this->as_struct_type().fields) {
-            if (!field.second.is_concrete()) {
+            if (!field.type.is_concrete()) {
                 return false;
             }
         }

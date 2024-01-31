@@ -8,6 +8,7 @@
 #include <filesystem>
 #include <optional>
 #include <cmath>
+#include <cassert>
 #include "data_structures.hpp"
 
 namespace ast {
@@ -92,6 +93,19 @@ namespace ast {
     >;
 
     struct Type;
+    struct FieldConstraint;
+    
+    struct FieldTypes {
+        std::vector<FieldConstraint> fields;
+
+        std::vector<FieldConstraint>::iterator begin();
+        std::vector<FieldConstraint>::iterator end();
+        std::size_t size() const;
+        std::vector<FieldConstraint>::iterator find(std::string field_name);
+        ast::Type& operator[](const std::string& field_name);
+        const ast::Type& operator[](const std::string& field_name) const;
+        std::string to_str() const;
+    };
 
     struct Interface {
         std::string name;
@@ -112,7 +126,7 @@ namespace ast {
         bool is_final = false;
         std::optional<Interface> interface = std::nullopt;
         Set<ast::Type> overload_constraints;
-        std::unordered_map<std::string, ast::Type> field_constraints;
+        FieldTypes field_constraints;
 
         TypeVariable(size_t id) : id(id) {}
         TypeVariable(size_t id, bool is_final) : id(id), is_final(is_final) {}
@@ -130,10 +144,10 @@ namespace ast {
 
     struct StructType {
         bool open = false;
-        std::unordered_map<std::string, Type> fields;
+        FieldTypes fields;
 
-        StructType(std::unordered_map<std::string, Type> fields) : fields(fields) {}
-        StructType(std::unordered_map<std::string, Type> fields, bool open) : fields(fields), open(open) {}
+        StructType(FieldTypes fields) : fields(fields) {}
+        StructType(FieldTypes fields, bool open) : fields(fields), open(open) {}
     };
 
     enum TypeVariant {
@@ -192,6 +206,11 @@ namespace ast {
     void transform_to_expression(Node*& node);
     bool has_type_variables(std::vector<Type> types);
     bool types_are_concrete(std::vector<Type> types);
+
+    struct FieldConstraint {
+        std::string name;
+        ast::Type type;
+    };
 
     struct BlockNode {
         size_t line;
