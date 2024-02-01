@@ -4,6 +4,8 @@ import re
 import subprocess
 import sys
 
+there_was_an_error = False
+
 def test(file, expected):
     print(f"testing {file}...  ", end='')
     if not os.path.exists(file):
@@ -16,7 +18,8 @@ def test(file, expected):
         print('\u001b[32mOK\u001b[0m')
     else:
         print('\u001b[31mFailed\u001b[0m')
-        quit()
+        global there_was_an_error
+        there_was_an_error = True
 
 def get_all_files(folder):
     files = []
@@ -34,7 +37,11 @@ def main():
 
     if len(sys.argv) > 2:
         print("Too many arguments :/")
-        return
+        return sys.exit(1)
+
+    if not os.path.exists("diamond"):
+        print("diamond not found :(")
+        return sys.exit(1)
 
     if len(sys.argv) > 1:
         folder = sys.argv[1]
@@ -47,6 +54,9 @@ def main():
             test(file, expected)
         except:
             pass
+
+    if there_was_an_error:
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()
