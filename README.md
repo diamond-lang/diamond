@@ -1,5 +1,7 @@
 # diamond
 
+[![Build and test](https://github.com/diamond-lang/diamond/actions/workflows/build-and-test.yaml/badge.svg)](https://github.com/diamond-lang/diamond/actions/workflows/build-and-test.yaml)
+
 A programming language that aims to make programming easier.
 
 ## Usage
