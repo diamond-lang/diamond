@@ -12,19 +12,19 @@ if not os.path.exists('deps'):
     os.mkdir('deps')
 
 def get_url_llvm():
-    if   platform.system() == 'Linux': return 'https://github.com/llvm/llvm-project/releases/download/llvmorg-15.0.6/clang+llvm-15.0.6-x86_64-linux-gnu-ubuntu-18.04.tar.xz'
+    if   platform.system() == 'Linux': return 'https://github.com/diamond-lang/llvm-binaries/releases/download/v15.0.7/llvm+lld-linux-x86_64.tar.xz'
     elif platform.system() == 'Darwin': return 'https://github.com/diamond-lang/llvm-binaries/releases/download/v15.0.7/llvm+lld-macos-aarch64.tar.xz'
     elif platform.system() == 'Windows': assert False
     else: assert False
 
 def get_local_file_name_llvm():
-    if   platform.system() == 'Linux': return 'clang+llvm-15.0.6-x86_64-linux-gnu-ubuntu-18.04.tar.xz'
+    if   platform.system() == 'Linux': return 'llvm+lld-linux-x86_64.tar.xz'
     elif platform.system() == 'Darwin': return 'llvm+lld-macos-aarch64.tar.xz'
     elif platform.system() == 'Windows': assert False
     else: assert False
 
 def get_extracted_llvm_name():
-    if   platform.system() == 'Linux': return 'clang+llvm-15.0.6-x86_64-linux-gnu-ubuntu-18.04'
+    if   platform.system() == 'Linux': return 'llvm+lld-linux-x86_64'
     elif platform.system() == 'Darwin': return 'llvm+lld-macos-aarch64'
     elif platform.system() == 'Windows': assert False
     else: assert False
