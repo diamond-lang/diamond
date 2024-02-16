@@ -1,25 +1,33 @@
 #!/usr/bin/env python3
 import os
 import re
-import subprocess
 import sys
+import subprocess
+import multiprocessing
+import functools
 
-there_was_an_error = False
-
-def test(file, expected):
-    print(f"testing {file}...  ", end='')
+# Helper functions
+# ----------------
+def test(file, expected, max_file_path_len):
+    print(f"testing {file}", end='')
     if not os.path.exists(file):
         print("File not found :(")
         return
     result = subprocess.run(['./diamond', 'run', file], stdout=subprocess.PIPE, text=True)
     result = result.stdout
     result =  re.sub("\\x1b\\[.+?m", "", result) # Remove escape sequences for colored text
+    
+    # Print result
+    for _ in range(0, max_file_path_len - len(file), 1):
+        print(" ", end="")
+    print(" ", end="")
+
     if result == expected:
         print('\u001b[32mOK\u001b[0m')
+        return True
     else:
         print('\u001b[31mFailed\u001b[0m')
-        global there_was_an_error
-        there_was_an_error = True
+        return False
 
 def get_all_files(folder):
     files = []
@@ -32,6 +40,28 @@ def get_all_files(folder):
 
     return files
 
+def read_file_and_test(file, max_file_path_len):
+    with open(file) as content:
+        content = content.read()
+
+        try:
+            expected = re.search("(?<=--- Output\n)(.|\n)*(?=---)", content).group(0)
+            return test(file, expected, max_file_path_len)
+        
+        except:
+            return True
+        
+def get_max_path_len(files):
+    max_len = 0
+    
+    for file in files:
+        if len(file) > max_len:
+            max_len = len(file)
+
+    return max_len
+
+# Main
+# ----
 def main():
     folder = 'test'
 
@@ -46,17 +76,14 @@ def main():
     if len(sys.argv) > 1:
         folder = sys.argv[1]
 
-    for file in get_all_files(folder):
-        content = open(file).read()
+    file_paths = get_all_files(folder)
+    max_file_path_len = get_max_path_len(file_paths)
+    num_cores = multiprocessing.cpu_count()
+    with multiprocessing.Pool(num_cores) as pool:
+        results = pool.map(functools.partial(read_file_and_test, max_file_path_len=max_file_path_len), file_paths)
         
-        try:
-            expected = re.search("(?<=--- Output\n)(.|\n)*(?=---)", content).group(0)
-            test(file, expected)
-        except:
-            pass
-
-    if there_was_an_error:
-        sys.exit(1)
+        for result in results:
+            if result == False: sys.exit(1)
 
 if __name__ == "__main__":
     main()

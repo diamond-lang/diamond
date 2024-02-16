@@ -3,7 +3,8 @@ import os
 import platform
 import sys
 import multiprocessing
-from functools import partial
+import functools
+import subprocess
 
 # Configuration
 # -------------
@@ -67,31 +68,41 @@ def need_to_recompile():
         return True
 
 # Build
-# -----
-def build_object_file(source_file, llvm_config):
+# ----- 
+def build_object_file(source_file, llvm_include_path):
     # Create file name for output object file
     object_file = os.path.basename(source_file).split('.')[0] + get_object_file_extension()
     object_file = os.path.join('cache', object_file)
-
-    # Get llvm include path
-    command =f'"{llvm_config}" --includedir'
-    llvm_include_path = os.popen(command).read().strip()
 
     # If object file should be builded or rebuilded
     if not os.path.exists(object_file) or os.path.getmtime(source_file) > os.path.getmtime(object_file):
         # Build
         command = f'clang++ -std=c++17 -g {source_file} -c -o {object_file} -I {llvm_include_path}'
         print(command)
-        os.popen(command).read()
+    
+        result = subprocess.run(command.split(" "), capture_output=True, text=True)
+        if result.returncode == 0:
+            return True
+        else:
+            print(result.stderr)
+            return False
 
 def build_object_files(llvm_config):
     # Make cache dir if not exists
     if not os.path.exists('cache'):
         os.mkdir('cache')
 
+    # Get llvm include path
+    command = f'{llvm_config} --includedir'
+    llvm_include_path = subprocess.run(command.split(" "), capture_output=True, text=True).stdout.strip()
+
+    # Build object files in parallalel
     num_cores = multiprocessing.cpu_count()
-    pool = multiprocessing.Pool(num_cores)
-    _ = pool.map(partial(build_object_file, llvm_config=llvm_config), source_files)
+    with multiprocessing.Pool(num_cores) as pool:
+        results = pool.map(functools.partial(build_object_file, llvm_include_path=llvm_include_path), source_files)
+
+        for result in results:
+            if result == False: sys.exit(1)
 
 def build():
     llvm_config = get_default_llvm_config_path()
@@ -101,7 +112,7 @@ def build():
     # Check llvm-config exists
     if not os.path.exists(llvm_config):
         print(f'Couldn\'t found llvm-config in {os.path.dirname(llvm_config)} :(')
-        return
+        sys.exit(1)
 
     # Build object files
     build_object_files(llvm_config)
@@ -110,27 +121,30 @@ def build():
 
      # Get llvm libs
     command = f'{llvm_config} --libs --link-static'
-    llvm_libs = os.popen(command).read()
+    llvm_libs = subprocess.run(command.split(" "), capture_output=True, text=True).stdout.strip()
     llvm_libs = llvm_libs.strip()
 
     # Get libs path
     command = f'{llvm_config} --link-static --ldflags'
-    libpath = os.popen(command).read().strip()
+    libpath = subprocess.run(command.split(" "), capture_output=True, text=True).stdout.strip()
 
     if platform.system() == "Linux" or platform.system() == "Darwin":
         libpath = libpath.split("-L")[1]
 
     # Get system libs
     command = f'{llvm_config} --link-static --system-libs'
-    system_libs = os.popen(command).read().strip()
+    system_libs = subprocess.run(command.split(" "), capture_output=True, text=True).stdout.strip()
     system_libs = '-L/opt/homebrew/lib ' + system_libs
 
     # Build diamond
     command = f'clang++ -std=c++17 {objects_files} -o {get_name()} -L {libpath} {get_lld_libraries()} {llvm_libs} {system_libs}'
     print("Linking...")
-    output = os.popen(command).read()
-    if output != "":
-        print(output)
+    result = subprocess.run(command.split(" "), capture_output=True, text=True)
+    if result.returncode == 0:
+        return True
+    else:
+        print(result.stderr)
+        sys.exit(1)
 
 # Main
 # ----
