@@ -188,6 +188,7 @@ namespace ast {
         bool is_float() const;
         bool is_pointer() const;
         bool is_array() const;
+        size_t get_array_size() const;
     };
 
     Type get_type(Node* node);

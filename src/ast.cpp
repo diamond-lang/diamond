@@ -328,11 +328,23 @@ bool ast::Type::is_array() const {
         return false;
     }
 
-    if (std::get<ast::NominalType>(this->type).name != "array") {
+    if (this->as_nominal_type().name.size() >= 5
+    && this->as_nominal_type().name.substr(0, 5) != "array") {
+        return false;
+    }
+
+    if (this->as_nominal_type().name.size() > 5
+    && !is_number(this->as_nominal_type().name.substr(5, this->as_nominal_type().name.size()))) {
         return false;
     }
     
     return true;
+}
+
+size_t ast::Type::get_array_size() const {
+    assert(this->is_array());
+    assert(this->as_nominal_type().name.size() > 5);
+    return stoi(std::get<ast::NominalType>(this->type).name.substr(5, this->as_nominal_type().name.size()));
 }
 
 // Add hash struct for ast::Type to be able to use ast::Type as keys of std::unordered_map

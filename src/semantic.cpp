@@ -172,6 +172,7 @@ namespace semantic {
     Result<Ok, Error> get_concrete_as_type_bindings(Context& context, ast::AddressOfNode& node, std::vector<ast::CallInCallStack> call_stack);
     Result<Ok, Error> get_concrete_as_type_bindings(Context& context, ast::DereferenceNode& node, std::vector<ast::CallInCallStack> call_stack);
     
+    Result<ast::Type, Error> get_type_completly_typed_function(ast::FunctionNode* function, std::vector<ast::Type> args);
     Result<ast::Type, Error> get_function_type(Context& context, ast::CallNode* call, ast::FunctionNode* function, std::vector<ast::Type> args, std::vector<ast::CallInCallStack> call_stack);
     
     void make_concrete(Context& context, ast::Node* node);
@@ -1288,16 +1289,23 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
         if (result.is_error()) return Error {};
     }
 
-    assert(false);
-
-    // Add constraint
+    // Add constraint for elements
     if (node.elements.size() > 0) {
         Set<ast::Type> constraint;
         for (auto element: node.elements) {
             constraint.insert(ast::get_type(element));
         }
         semantic::add_constraint(context, constraint);
+    }
 
+    if (node.type.is_no_type()) {
+        node.type = ast::Type(ast::NominalType("array" + std::to_string(node.elements.size())));
+        if (node.elements.size() > 0) {
+            node.type.as_nominal_type().parameters.push_back(ast::get_type(node.elements[0]));
+        }
+    }
+    else {
+        assert(false);
     }
 
     return Ok {};
@@ -2059,7 +2067,9 @@ Result<Ok, Error> semantic::get_concrete_as_type_bindings(Context& context, ast:
             // Or get the function type
             else {
                 if (called_function->state == ast::FunctionCompletelyTyped) {
-                    context.type_inference.type_bindings[node.type.as_type_variable().id] = called_function->return_type;
+                    auto result =  semantic::get_type_completly_typed_function(called_function, ast::get_concrete_types(ast::get_types(node.args), context.type_inference.type_bindings));
+                    if (result.is_error()) return Error{};
+                    context.type_inference.type_bindings[node.type.as_type_variable().id] = result.get_value();
                 }
                 else {
                     auto result = semantic::get_function_type(context, &node, called_function, ast::get_concrete_types(ast::get_types(node.args), context.type_inference.type_bindings), call_stack);
@@ -2097,7 +2107,6 @@ Result<Ok, Error> semantic::get_concrete_as_type_bindings(Context& context, ast:
 }
 
 Result<Ok, Error> semantic::get_concrete_as_type_bindings(Context& context, ast::ArrayNode& node, std::vector<ast::CallInCallStack> call_stack) {
-    assert(false);
     return Ok {};
 }
 
@@ -2156,6 +2165,41 @@ Result<Ok, Error> semantic::get_concrete_as_type_bindings(Context& context, ast:
     if (result.is_error()) return result;
 
     return Ok {};
+}
+
+// Get type completly typed function
+// ---------------------------------
+Result<Ok, Error> unify_types(std::unordered_map<size_t, ast::Type>& type_bindings, ast::Type function_type, ast::Type argument_type) {
+    if (function_type.is_type_variable()) {
+        type_bindings[function_type.as_type_variable().id] = argument_type;
+    }
+    else if (function_type.is_nominal_type()) {
+        for (size_t i = 0; i < function_type.as_nominal_type().parameters.size(); i++) {
+            auto result = unify_types(type_bindings, function_type.as_nominal_type().parameters[i], argument_type.as_nominal_type().parameters[i]);
+            if (result.is_error()) return Error{};
+        }
+    }
+    else {
+        assert(false);
+    }
+
+    return Ok{};
+}
+
+Result<ast::Type, Error> semantic::get_type_completly_typed_function(ast::FunctionNode* function, std::vector<ast::Type> args) {
+    std::unordered_map<size_t, ast::Type> type_bindings;
+
+    for (size_t i = 0; i < function->args.size(); i++) {
+        ast::Type& function_type = function->args[i]->type;
+        if (function_type.is_concrete()) {
+            continue;
+        }
+
+        auto result = unify_types(type_bindings, function_type, args[i]);
+        if (result.is_error()) return Error{};
+    }
+
+    return ast::get_concrete_type(function->return_type, type_bindings);
 }
 
 // Get function type
@@ -2460,8 +2504,11 @@ void semantic::make_concrete(Context& context, ast::Node* node) {
         }
 
         case ast::Array: {
-            auto& array = std::get<ast::ArrayNode>(*node);
-            assert(false);
+            auto& array =  std::get<ast::ArrayNode>(*node);
+            for (auto element: array.elements) {
+                semantic::make_concrete(context, element);
+            }
+            array.type = ast::get_concrete_type(array.type, context.type_inference.type_bindings);
             break;
         }
 

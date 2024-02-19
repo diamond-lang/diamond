@@ -131,6 +131,7 @@ namespace codegen {
             else if (type == ast::Type("string"))  return llvm::Type::getInt8PtrTy(*(this->context));
             else if (type == ast::Type("void"))    return llvm::Type::getVoidTy(*(this->context));
             else if (type.is_pointer())            return this->as_llvm_type(type.as_nominal_type().parameters[0])->getPointerTo();
+            else if (type.is_array())              return llvm::ArrayType::get(this->as_llvm_type(type.as_nominal_type().parameters[0]), type.get_array_size());
             else if (type.is_nominal_type() && type.as_nominal_type().type_definition) {
                 return this->get_struct_type(type.as_nominal_type().type_definition);
             }
@@ -1417,6 +1418,18 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
             return nullptr;
         }
     }
+    if (node.identifier->value == "[]") {
+        if (node.args.size() == 2) {
+            llvm::Type* array_type = this->as_llvm_type(node.type);
+            llvm::Value* index = this->codegen(node.args[1]->expression);
+            llvm::Value* allocation = this->get_binding(std::get<ast::IdentifierNode>(*node.args[0]->expression).value);
+            llvm::Value* ptr = this->builder->CreateGEP(array_type, allocation, {index});
+            return this->builder->CreateLoad(
+                this->as_llvm_type(node.type.as_nominal_type().parameters[0]),
+                ptr
+            );
+        }
+    }
 
     // Get function
     std::string name = this->get_mangled_function_name(function->module_path, node.identifier->value, this->get_types(node.args), ast::get_concrete_type((ast::Node*) &node, this->type_bindings), function->is_extern);
@@ -1468,8 +1481,22 @@ llvm::Value* codegen::Context::codegen(ast::StringNode& node) {
 }
 
 llvm::Value* codegen::Context::codegen(ast::ArrayNode& node) {
-    assert(false);
-    return nullptr;
+    // Create allocation
+    llvm::Type* array_type = this->as_llvm_type(node.type);
+    llvm::AllocaInst* allocation = this->create_allocation("array", array_type);
+        
+    // Store array elements
+    for (size_t i = 0; i < node.elements.size(); i++) {
+        // Get pointer to the element
+        llvm::Value* index = llvm::ConstantInt::get(*(this->context), llvm::APInt(64, i, true));
+        llvm::Value* ptr = this->builder->CreateGEP(array_type, allocation, {index});
+
+        // Store element
+        this->builder->CreateStore(this->codegen(node.elements[i]), ptr);
+    }
+
+    // Return
+    return allocation;
 }
 
 llvm::Value* codegen::Context::codegen(ast::FieldAccessNode& node) {
