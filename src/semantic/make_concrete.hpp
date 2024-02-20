@@ -4,6 +4,9 @@
 #include "context.hpp"
 
 namespace semantic {
+    bool is_type_concrete(Context& context, ast::Type type);
+    ast::Type get_type(Context& context, ast::Type type);
+
     Result<Ok, Error> get_concrete_as_type_bindings(Context& context, ast::Node* node, std::vector<ast::CallInCallStack> call_stack);
     Result<Ok, Error> get_concrete_as_type_bindings(Context& context, ast::BlockNode& node, std::vector<ast::CallInCallStack> call_stack);
     Result<Ok, Error> get_concrete_as_type_bindings(Context& context, ast::FunctionNode& node, std::vector<ast::CallInCallStack> call_stack);

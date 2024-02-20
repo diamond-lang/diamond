@@ -1,7 +1,6 @@
 #ifndef SEMANTIC_CONTEXT_HPP
 #define SEMANTIC_CONTEXT_HPP
 
-#include <unordered_map>
 #include <cassert>
 #include <filesystem>
 #include <iostream>
@@ -24,12 +23,14 @@ namespace semantic {
     struct Binding {
         BindingType type;
         std::vector<ast::Node*> value;
-    };
 
-    Binding make_Binding(ast::AssignmentNode* assignment);
-    Binding make_Binding(ast::Node* function_argument);
-    Binding make_Binding(std::vector<ast::FunctionNode*> functions);
-    Binding make_Binding(ast::TypeNode* type);
+        Binding() {}
+        ~Binding() {}
+        Binding(ast::AssignmentNode* assignment);
+        Binding(ast::Node* function_argument);
+        Binding(std::vector<ast::FunctionNode*> functions);
+        Binding(ast::TypeNode* type);
+    };
 
     ast::AssignmentNode* get_assignment(Binding binding);
     ast::Node* get_function_argument(Binding binding);
@@ -60,9 +61,9 @@ namespace semantic {
         Scopes scopes;
         TypeInference type_inference;
         std::optional<ast::FunctionNode*> current_function = std::nullopt;
-    };
 
-    void init_Context(Context& context, ast::Ast* ast);
+        void init_with(ast::Ast* ast);
+    };
 
     // Manage scope
     void add_scope(Context& context);
@@ -75,14 +76,15 @@ namespace semantic {
     Result<Ok, Error> add_module_functions(Context& context, std::filesystem::path module_path, std::set<std::filesystem::path>& already_included_modules);
     std::vector<std::unordered_map<std::string, Binding>> get_definitions(Context& context);
 
-    // For type inference and unification
-    Result<Ok, Error> add_type_binding(Context& context, std::unordered_map<size_t, ast::Type>& type_bindings, ast::Type binding, ast::Type type);
+    // For type infer and analyze
     ast::Type new_type_variable(Context& context);
-    ast::Type new_final_type_variable(Context& context);
     void add_constraint(Context& context, Set<ast::Type> constraint);
+
+    // For unify and analyze
+    ast::Type new_final_type_variable(Context& context);
     ast::Type get_unified_type(Context& context, ast::Type type_var);
-    bool is_type_concrete(Context& context, ast::Type type);
-    ast::Type get_type(Context& context, ast::Type type);
+
+    // For unify and make concrete
     bool are_types_compatible(ast::Type function_type, ast::Type argument_type);
     std::vector<ast::FunctionNode*> remove_incompatible_functions_with_argument_type(std::vector<ast::FunctionNode*> functions, size_t argument_position, ast::Type argument_type);
     std::vector<ast::FunctionNode*> remove_incompatible_functions_with_return_type(std::vector<ast::FunctionNode*> functions, ast::Type return_type);

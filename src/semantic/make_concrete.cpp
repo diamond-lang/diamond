@@ -1,5 +1,33 @@
 #include "make_concrete.hpp"
 
+bool semantic::is_type_concrete(Context& context, ast::Type type) {
+    if (type.is_concrete()) {
+        return true;
+    }
+    if (type.is_type_variable()
+    &&  context.type_inference.type_bindings.find(type.as_type_variable().id) != context.type_inference.type_bindings.end()) {
+        return true;
+    }
+    return false;
+}
+
+ast::Type semantic::get_type(Context& context, ast::Type type) {
+    if (type.is_type_variable()) {
+        if (context.type_inference.type_bindings.find(type.as_type_variable().id) != context.type_inference.type_bindings.end()) {
+            type = context.type_inference.type_bindings[type.as_type_variable().id];
+        }
+        else {
+            return type;
+        }
+    }
+    if (!type.is_concrete()) {
+        for (size_t i = 0; i < type.as_nominal_type().parameters.size(); i++) {
+            type.as_nominal_type().parameters[i] = ast::get_concrete_type(type.as_nominal_type().parameters[i], context.type_inference.type_bindings);
+        }
+    }
+    return type;
+}
+
 Result<Ok, Error> semantic::get_concrete_as_type_bindings(Context& context, ast::Node* node, std::vector<ast::CallInCallStack> call_stack) {
     return std::visit([&context, node, &call_stack](auto& variant) {
         return semantic::get_concrete_as_type_bindings(context, variant, call_stack);
@@ -501,7 +529,7 @@ Result<ast::Type, Error> semantic::get_function_type(Context& context, ast::Call
 
     // Create new context
     Context new_context;
-    semantic::init_Context(new_context, context.ast);
+    new_context.init_with(context.ast);
     new_context.current_function = function;
 
     if (context.current_module == function->module_path) {

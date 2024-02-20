@@ -41,7 +41,7 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::As
     auto result = semantic::unify_types_and_type_check(context, node.expression);
     if (result.is_error()) return Error {};
 
-    semantic::current_scope(context)[node.identifier->value] = semantic::make_Binding(&node);
+    semantic::current_scope(context)[node.identifier->value] = semantic::Binding(&node);
     
     return Ok {};
 }

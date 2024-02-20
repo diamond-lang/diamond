@@ -123,7 +123,7 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
             return Error {};
         }
         semantic::add_constraint(context, Set<ast::Type>({semantic::get_binding_type(*binding), ast::get_type(node.expression)}));
-        *binding = semantic::make_Binding(&node);
+        *binding = semantic::Binding(&node);
     }
 
     // normal assignment
@@ -136,7 +136,7 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
                 return Error {};
             }
         }
-        semantic::current_scope(context)[identifier] = semantic::make_Binding(&node);
+        semantic::current_scope(context)[identifier] = semantic::Binding(&node);
     }
 
     return Ok {};

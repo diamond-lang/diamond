@@ -8,7 +8,7 @@
 // -----------------
 Result<Ok, Errors> semantic::analyze(ast::Ast& ast) {
     semantic::Context context;
-    init_Context(context, &ast);
+    context.init_with(&ast);
 
     semantic::analyze(context, *ast.program);
 
@@ -200,7 +200,7 @@ Result<Ok, Error> semantic::analyze(semantic::Context& context, ast::FunctionNod
 
     // Create new context
     Context new_context;
-    semantic::init_Context(new_context, context.ast);
+    new_context.init_with(context.ast);
     new_context.current_function = &node;
 
     if (context.current_module == node.module_path) {
@@ -231,7 +231,7 @@ Result<Ok, Error> semantic::analyze(semantic::Context& context, ast::FunctionNod
             }
 
             // Create binding
-            semantic::current_scope(new_context)[identifier] = semantic::make_Binding((ast::Node*) arg);
+            semantic::current_scope(new_context)[identifier] = semantic::Binding((ast::Node*) arg);
         }
 
         // For return type
@@ -284,7 +284,7 @@ Result<Ok, Error> semantic::analyze(semantic::Context& context, ast::FunctionNod
                 context.errors.insert(context.errors.end(), new_context.errors.begin(), new_context.errors.end());
                 return Error {};
             }
-            semantic::current_scope(new_context)[identifier] = semantic::make_Binding((ast::Node*) arg);
+            semantic::current_scope(new_context)[identifier] = semantic::Binding((ast::Node*) arg);
         }
 
         auto result = semantic::analyze(new_context, node.return_type);

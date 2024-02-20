@@ -4,34 +4,28 @@
 #include "../lexer.hpp"
 #include "../parser.hpp"
 
-semantic::Binding semantic::make_Binding(ast::AssignmentNode* assignment) {
-    semantic::Binding binding;
-    binding.type = semantic::AssignmentBinding;
-    binding.value.push_back((ast::Node*) assignment);
-    return binding;
+// Bindings
+// --------
+semantic::Binding::Binding(ast::AssignmentNode* assignment) {
+    this->type = semantic::AssignmentBinding;
+    this->value.push_back((ast::Node*) assignment);
 }
 
-semantic::Binding semantic::make_Binding(ast::Node* function_argument) {
-    semantic::Binding binding;
-    binding.type = semantic::FunctionArgumentBinding;
-    binding.value.push_back((ast::Node*) function_argument);
-    return binding;
+semantic::Binding::Binding(ast::Node* function_argument) {
+    this->type = semantic::FunctionArgumentBinding;
+    this->value.push_back((ast::Node*) function_argument);
 }
 
-semantic::Binding semantic::make_Binding(std::vector<ast::FunctionNode*> functions) {
-    semantic::Binding binding;
-    binding.type = semantic::FunctionBinding;
+semantic::Binding::Binding(std::vector<ast::FunctionNode*> functions) {
+    this->type = semantic::FunctionBinding;
     for (size_t i = 0; i < functions.size(); i++) {
-        binding.value.push_back((ast::Node*) functions[i]);
+        this->value.push_back((ast::Node*) functions[i]);
     }
-    return binding;
 }
 
-semantic::Binding semantic::make_Binding(ast::TypeNode* type) {
-    semantic::Binding binding;
-    binding.type = semantic::TypeBinding;
-    binding.value.push_back((ast::Node*) type);
-    return binding;
+semantic::Binding::Binding(ast::TypeNode* type) {
+    this->type = semantic::TypeBinding;
+    this->value.push_back((ast::Node*) type);
 }
 
 ast::AssignmentNode* semantic::get_assignment(semantic::Binding binding) {
@@ -91,16 +85,18 @@ bool semantic::is_function(semantic::Binding& binding) {
     return false;
 }
 
-void semantic::init_Context(semantic::Context& context, ast::Ast* ast) {
-    context.current_module = ast->module_path;
-    context.ast = ast;
+// Context
+// -------
+void semantic::Context::init_with(ast::Ast* ast) {
+    this->current_module = ast->module_path;
+    this->ast = ast;
 
     // Add intrinsic functions
-    semantic::add_scope(context);
+    semantic::add_scope(*this);
 
     for (auto it = intrinsic_functions.begin(); it != intrinsic_functions.end(); it++) {
         auto& identifier = it->first;
-        auto& scope = current_scope(context);
+        auto& scope = current_scope(*this);
         std::vector<ast::FunctionNode*> overloaded_functions;
         for (auto& prototype: it->second) {
             // Create function node
@@ -127,10 +123,11 @@ void semantic::init_Context(semantic::Context& context, ast::Ast* ast) {
             ast->push_back(function_node);
             overloaded_functions.push_back((ast::FunctionNode*) ast->last_element());
         }
-        scope[identifier] = semantic::make_Binding(overloaded_functions);
+        scope[identifier] = semantic::Binding(overloaded_functions);
     }
 }
 
+// Manage scopes
 void semantic::add_scope(Context& context) {
     context.scopes.push_back(std::unordered_map<std::string, semantic::Binding>());
 }
@@ -152,6 +149,7 @@ semantic::Binding* semantic::get_binding(Context& context, std::string identifie
     return nullptr;
 }
 
+// Work with modules
 Result<Ok, Error> semantic::add_definitions_to_current_scope(Context& context, ast::BlockNode& block) {
     // Add functions from block to current scope
     for (auto& function: block.functions) {
@@ -159,7 +157,7 @@ Result<Ok, Error> semantic::add_definitions_to_current_scope(Context& context, a
         auto& scope = semantic::current_scope(context);
 
         if (scope.find(identifier) == scope.end()) {
-            scope[identifier] = semantic::make_Binding(std::vector{function});
+            scope[identifier] = semantic::Binding(std::vector{function});
         }
         else if (is_function(scope[identifier])) {
             scope[identifier].value.push_back((ast::Node*) function);
@@ -175,7 +173,7 @@ Result<Ok, Error> semantic::add_definitions_to_current_scope(Context& context, a
         auto& scope = semantic::current_scope(context);
 
         if (scope.find(identifier) == scope.end()) {
-            scope[identifier] = make_Binding(type);
+            scope[identifier] = semantic::Binding(type);
         }
         else {
             context.errors.push_back(errors::generic_error(Location{type->line, type->column, type->module_path}, "This type is already defined."));
@@ -234,7 +232,7 @@ Result<Ok, Error> semantic::add_module_functions(Context& context, std::filesyst
             auto& scope = semantic::current_scope(context);
 
             if (scope.find(identifier) == scope.end()) {
-                scope[identifier] = semantic::make_Binding(std::vector{function});
+                scope[identifier] = semantic::Binding(std::vector{function});
             }
             else if (is_function(scope[identifier])) {
                 scope[identifier].value.push_back((ast::Node*) function);
@@ -250,7 +248,7 @@ Result<Ok, Error> semantic::add_module_functions(Context& context, std::filesyst
             auto& scope = semantic::current_scope(context);
 
             if (scope.find(identifier) == scope.end()) {
-                scope[identifier] = semantic::make_Binding(type);
+                scope[identifier] = semantic::Binding(type);
             }
             else {
                 context.errors.push_back(errors::generic_error(Location{type->line, type->column, type->module_path}, "This type is already defined in current parseModule."));
@@ -289,20 +287,9 @@ std::vector<std::unordered_map<std::string, semantic::Binding>> semantic::get_de
     return scopes;
 }
 
-Result<Ok, Error> semantic::add_type_binding(Context& context, std::unordered_map<size_t, ast::Type>& type_bindings, ast::Type binding, ast::Type type) {
-    assert(binding.is_type_variable());
-    type_bindings[binding.as_type_variable().id] = type;
-    return Ok {};
-}
-
+// For type infer and unify
 ast::Type semantic::new_type_variable(Context& context) {
     ast::Type new_type = ast::Type(ast::TypeVariable(context.type_inference.current_type_variable_number));
-    context.type_inference.current_type_variable_number++;
-    return new_type;
-}
-
-ast::Type semantic::new_final_type_variable(Context& context) {
-    ast::Type new_type = ast::Type(ast::TypeVariable(context.type_inference.current_type_variable_number, true));
     context.type_inference.current_type_variable_number++;
     return new_type;
 }
@@ -311,6 +298,7 @@ void semantic::add_constraint(Context& context, Set<ast::Type> constraint) {
     context.type_inference.type_constraints.push_back(constraint);
 }
 
+// For unify and analyze
 ast::Type semantic::get_unified_type(Context& context, ast::Type type_var) {
     for (auto it = context.type_inference.labeled_type_constraints.begin(); it != context.type_inference.labeled_type_constraints.end(); it++) {
         if (it->second.contains(type_var)) {
@@ -352,34 +340,13 @@ ast::Type semantic::get_unified_type(Context& context, ast::Type type_var) {
     return type_var;
 }
 
-bool semantic::is_type_concrete(Context& context, ast::Type type) {
-    if (type.is_concrete()) {
-        return true;
-    }
-    if (type.is_type_variable()
-    &&  context.type_inference.type_bindings.find(type.as_type_variable().id) != context.type_inference.type_bindings.end()) {
-        return true;
-    }
-    return false;
+ast::Type semantic::new_final_type_variable(Context& context) {
+    ast::Type new_type = ast::Type(ast::TypeVariable(context.type_inference.current_type_variable_number, true));
+    context.type_inference.current_type_variable_number++;
+    return new_type;
 }
 
-ast::Type semantic::get_type(Context& context, ast::Type type) {
-    if (type.is_type_variable()) {
-        if (context.type_inference.type_bindings.find(type.as_type_variable().id) != context.type_inference.type_bindings.end()) {
-            type = context.type_inference.type_bindings[type.as_type_variable().id];
-        }
-        else {
-            return type;
-        }
-    }
-    if (!type.is_concrete()) {
-        for (size_t i = 0; i < type.as_nominal_type().parameters.size(); i++) {
-            type.as_nominal_type().parameters[i] = ast::get_concrete_type(type.as_nominal_type().parameters[i], context.type_inference.type_bindings);
-        }
-    }
-    return type;
-}
-
+// For unify and make concrete
 bool semantic::are_types_compatible(ast::Type function_type, ast::Type argument_type) {
     assert(argument_type.is_concrete());
 
