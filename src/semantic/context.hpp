@@ -1,0 +1,93 @@
+#ifndef SEMANTIC_CONTEXT_HPP
+#define SEMANTIC_CONTEXT_HPP
+
+#include <unordered_map>
+#include <cassert>
+#include <filesystem>
+#include <iostream>
+#include <cassert>
+#include <set>
+#include <algorithm>
+
+#include "../ast.hpp"
+#include "../errors.hpp"
+
+namespace semantic {
+    // Bindings
+    enum BindingType {
+        AssignmentBinding,
+        FunctionArgumentBinding,
+        FunctionBinding,
+        TypeBinding
+    };
+
+    struct Binding {
+        BindingType type;
+        std::vector<ast::Node*> value;
+    };
+
+    Binding make_Binding(ast::AssignmentNode* assignment);
+    Binding make_Binding(ast::Node* function_argument);
+    Binding make_Binding(std::vector<ast::FunctionNode*> functions);
+    Binding make_Binding(ast::TypeNode* type);
+
+    ast::AssignmentNode* get_assignment(Binding binding);
+    ast::Node* get_function_argument(Binding binding);
+    std::vector<ast::FunctionNode*> get_functions(Binding binding);
+    ast::TypeNode* get_type_definition(Binding binding);
+    ast::Type get_binding_type(Binding& binding);
+    std::string get_binding_identifier(Binding& binding);
+    bool is_function(Binding& binding);
+
+    // Scopes
+    using Scopes = std::vector<std::unordered_map<std::string, Binding>>;
+
+    // Type inference
+    struct TypeInference {
+        size_t current_type_variable_number = 1;
+        std::vector<Set<ast::Type>> type_constraints;
+        std::unordered_map<ast::Type, Set<ast::Type>> labeled_type_constraints;
+        std::unordered_map<ast::Type, Set<ast::Type>> overload_constraints;
+        std::unordered_map<ast::Type, ast::FieldTypes> field_constraints;
+        std::unordered_map<size_t, ast::Type> type_bindings;
+    };
+
+    // Context
+    struct Context {
+        ast::Ast* ast;
+        Errors errors;
+        std::filesystem::path current_module;
+        Scopes scopes;
+        TypeInference type_inference;
+        std::optional<ast::FunctionNode*> current_function = std::nullopt;
+    };
+
+    void init_Context(Context& context, ast::Ast* ast);
+
+    // Manage scope
+    void add_scope(Context& context);
+    void remove_scope(Context& context);
+    std::unordered_map<std::string, Binding>& current_scope(Context& context);
+    Binding* get_binding(Context& context, std::string identifier);
+
+    // Work with modules
+    Result<Ok, Error> add_definitions_to_current_scope(Context& context, ast::BlockNode& block);
+    Result<Ok, Error> add_module_functions(Context& context, std::filesystem::path module_path, std::set<std::filesystem::path>& already_included_modules);
+    std::vector<std::unordered_map<std::string, Binding>> get_definitions(Context& context);
+
+    // For type inference and unification
+    Result<Ok, Error> add_type_binding(Context& context, std::unordered_map<size_t, ast::Type>& type_bindings, ast::Type binding, ast::Type type);
+    ast::Type new_type_variable(Context& context);
+    ast::Type new_final_type_variable(Context& context);
+    void add_constraint(Context& context, Set<ast::Type> constraint);
+    ast::Type get_unified_type(Context& context, ast::Type type_var);
+    bool is_type_concrete(Context& context, ast::Type type);
+    ast::Type get_type(Context& context, ast::Type type);
+    bool are_types_compatible(ast::Type function_type, ast::Type argument_type);
+    std::vector<ast::FunctionNode*> remove_incompatible_functions_with_argument_type(std::vector<ast::FunctionNode*> functions, size_t argument_position, ast::Type argument_type);
+    std::vector<ast::FunctionNode*> remove_incompatible_functions_with_return_type(std::vector<ast::FunctionNode*> functions, ast::Type return_type);
+    std::vector<ast::Type> get_possible_types_for_argument(std::vector<ast::FunctionNode*> functions, size_t argument_position);
+    std::vector<ast::Type> get_possible_types_for_return_type(std::vector<ast::FunctionNode*> functions);
+}
+
+#endif
