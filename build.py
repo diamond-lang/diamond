@@ -17,8 +17,12 @@ source_files = [
     'src/ast.cpp',
     'src/utilities.cpp',
     'src/parser.cpp',
-    'src/semantic.cpp',
-    'src/intrinsics.cpp',
+    'src/semantic/context.cpp',
+    'src/semantic/intrinsics.cpp',
+    'src/semantic/make_concrete.cpp',
+    'src/semantic/analyze.cpp',
+    'src/semantic/type_infer.cpp',
+    'src/semantic/unify.cpp',
     'src/codegen.cpp'
 ]
 
