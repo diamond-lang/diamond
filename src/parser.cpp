@@ -40,6 +40,7 @@ struct Parser {
     Result<ast::Node*, Error> parse_use_stmt();
     Result<ast::Node*, Error> parse_call_argument();
     Result<ast::Node*, Error> parse_call();
+    Result<ast::Node*, Error> parse_struct();
     Result<ast::Node*, Error> parse_expression();
     Result<ast::Node*, Error> parse_if_else_expr();
     Result<ast::Node*, Error> parse_not_expr();
@@ -856,6 +857,48 @@ Result<ast::Node*, Error> Parser::parse_call() {
     return this->ast.last_element();
 }
 
+Result<ast::Node*, Error> Parser::parse_struct() {
+    // Create node
+    auto struct_literal = ast::StructLiteralNode {this->current().line, this->current().column};
+
+    // Parse indentifier
+    auto identifier = this->parse_identifier();
+    if (identifier.is_error()) return identifier;
+    struct_literal.identifier = (ast::IdentifierNode*) identifier.get_value();
+
+    // Parse left curly
+    auto left_curly = this->parse_token(token::LeftCurly);
+    if (left_curly.is_error()) return Error {};
+
+    // Parse fields
+    while (this->current() != token::RightCurly && !this->at_end()) {
+        this->advance_until_next_statement();
+
+        auto identifier = this->parse_identifier();
+        if (identifier.is_error()) return Error {};
+
+        auto colon = this->parse_token(token::Colon);
+        if (colon.is_error()) return Error {};
+
+        auto expression = this->parse_expression();
+        if (expression.is_error()) return Error {};
+
+        struct_literal.fields[(ast::IdentifierNode*)identifier.get_value()] = expression.get_value();
+        
+        if (this->current() == token::Comma) this->advance();
+        else if (this->current() == token::NewLine) this->advance_until_next_statement();
+        else break;
+    }
+
+    // Parse right curly
+    auto right_curly = this->parse_token(token::RightCurly);
+    if (right_curly.is_error()) return Error {};
+    struct_literal.end_line = right_curly.get_value().line;
+    
+    this->ast.push_back(struct_literal);
+    return this->ast.last_element();
+}
+
 Result<ast::Node*, Error> Parser::parse_expression() {
     this->advance_until_next_statement();
 
@@ -1083,6 +1126,9 @@ Result<ast::Node*, Error> Parser::parse_primary() {
             Result<ast::Node*, Error> result;             
             if (this->match({token::Identifier, token::LeftParen})) {
                 result = this->parse_call();
+            }
+            else if (this->match({token::Identifier, token::LeftCurly})) {
+                result = this->parse_struct();
             }
             else if (this->match({token::Identifier, token::Dot})) {
                 result = this->parse_field_access();

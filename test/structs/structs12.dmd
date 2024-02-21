@@ -12,13 +12,13 @@ function generic1(p)
 
 function generic2()
     b = 10
-    a = Point(x: b + 3.5, y: 10)
+    a = Point{x: b + 3.5, y: 10}
     a.x = b * 10
     a.y = 100
     print(a.x)
     print(a.y)
 
-generic1(Point(x: 20, y: 30))
+generic1(Point{x: 20, y: 30})
 generic2()
 
 --- Output

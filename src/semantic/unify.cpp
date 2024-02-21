@@ -167,105 +167,118 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::Ca
     // Get binding
     semantic::Binding* binding = semantic::get_binding(context, node.identifier->value);
     assert(binding);
+    assert(binding->type == semantic::FunctionBinding);
 
     // Get overload constraints
-    if (is_function(*binding)) {
-        if (binding->type == semantic::FunctionBinding) {
-            // Find functions that can be called
-            // ---------------------------------
-            std::vector<ast::FunctionNode*> functions_that_can_be_called = semantic::get_functions(*binding);
 
-            // Remove functions whose number of arguments dont match with the call
-            functions_that_can_be_called.erase(std::remove_if(functions_that_can_be_called.begin(), functions_that_can_be_called.end(), [&node](ast::FunctionNode* function) {
-                return node.args.size() != function->args.size();
-            }), functions_that_can_be_called.end());
+    // Find functions that can be called
+    // ---------------------------------
+    std::vector<ast::FunctionNode*> functions_that_can_be_called = semantic::get_functions(*binding);
 
-            // Analyze functions that still have not been analyzed
-            // and check for recursion
-            for (auto function: functions_that_can_be_called) {
-                if (function->state == ast::FunctionNotAnalyzed) {
-                    auto result = semantic::analyze(context, *function);
-                    if (result.is_error()) return result;
-                }
-                else if (function->state == ast::FunctionBeingAnalyzed) {
-                    node.functions = functions_that_can_be_called;
-                    return Ok {};
-                }
-            }
+    // Remove functions whose number of arguments dont match with the call
+    functions_that_can_be_called.erase(std::remove_if(functions_that_can_be_called.begin(), functions_that_can_be_called.end(), [&node](ast::FunctionNode* function) {
+        return node.args.size() != function->args.size();
+    }), functions_that_can_be_called.end());
 
-            // For each arg
-            for (size_t i = 0; i < node.args.size(); i++) {
-                if (node.args[i]->type.is_concrete()) {
-                    // Remove functions that can't be called
-                    auto backup = functions_that_can_be_called;
-                    functions_that_can_be_called = semantic::remove_incompatible_functions_with_argument_type(functions_that_can_be_called, i, node.args[i]->type);
-
-                    // If there is no function that can be called
-                    if (functions_that_can_be_called.size() == 0) {
-                        std::vector<ast::Type> possible_types = semantic::get_possible_types_for_argument(backup, i);
-                        context.errors.push_back(errors::unexpected_argument_type(node, context.current_module, i,  node.args[i]->type, possible_types, {}));
-                        return Error{}; 
-                    }
-                }
-            }
-
-            // For return type
-            if (node.type.is_concrete()) {
-                auto backup = functions_that_can_be_called;
-                functions_that_can_be_called = semantic::remove_incompatible_functions_with_return_type(functions_that_can_be_called, node.type);
-
-                if (functions_that_can_be_called.size() == 0) {
-                    std::vector<ast::Type> possible_types = semantic::get_possible_types_for_return_type(backup);
-                    context.errors.push_back(errors::unexpected_return_type(node, context.current_module, node.type, possible_types, {}));
-                    return Error{}; 
-                }
-            }
+    // Analyze functions that still have not been analyzed
+    // and check for recursion
+    for (auto function: functions_that_can_be_called) {
+        if (function->state == ast::FunctionNotAnalyzed) {
+            auto result = semantic::analyze(context, *function);
+            if (result.is_error()) return result;
+        }
+        else if (function->state == ast::FunctionBeingAnalyzed) {
             node.functions = functions_that_can_be_called;
-            assert(node.functions.size() > 0);
+            return Ok {};
+        }
+    }
 
-            // Compare new overload constraints with previous
-            // ----------------------------------------------
-            auto& overload_constraints = context.type_inference.overload_constraints;
+    // For each arg
+    for (size_t i = 0; i < node.args.size(); i++) {
+        if (node.args[i]->type.is_concrete()) {
+            // Remove functions that can't be called
+            auto backup = functions_that_can_be_called;
+            functions_that_can_be_called = semantic::remove_incompatible_functions_with_argument_type(functions_that_can_be_called, i, node.args[i]->type);
 
-            // For each argument
-            for (size_t i = 0; i < node.args.size(); i++) {
-                auto arg = node.args[i];
-
-                if (arg->type.is_concrete()) {
-                    continue;
-                }
-
-                // Find new overload constraints
-                Set<ast::Type> new_overload_constraints;
-                for (auto function: functions_that_can_be_called) {
-                    if (!function->args[i]->type.is_type_variable()) {
-                        new_overload_constraints.insert(function->args[i]->type);
-                    }
-                    else if (function->args[i]->type.is_type_variable()
-                        &&   function->args[i]->type.as_type_variable().overload_constraints.size() > 0) {
-                        for (auto constraint: function->args[i]->type.as_type_variable().overload_constraints.elements) {
-                            new_overload_constraints.insert(constraint);
-                        }
-                    }
-                }
-
-                // Add or intersect with previous overload constraints founded for argument type
-                if (overload_constraints.find(arg->type) == overload_constraints.end()) {
-                    overload_constraints[arg->type] = new_overload_constraints;
-                }
-                else {
-                    auto intersection = overload_constraints[arg->type].intersect(new_overload_constraints);
-
-                    if (intersection.size() == 0) {
-                        context.errors.push_back(errors::unexpected_argument_types(node, context.current_module, i, overload_constraints[arg->type].elements, new_overload_constraints.elements, {}));
-                        return Error {};
-                    }
-
-                    overload_constraints[arg->type] = intersection;
-                }
+            // If there is no function that can be called
+            if (functions_that_can_be_called.size() == 0) {
+                std::vector<ast::Type> possible_types = semantic::get_possible_types_for_argument(backup, i);
+                context.errors.push_back(errors::unexpected_argument_type(node, context.current_module, i,  node.args[i]->type, possible_types, {}));
+                return Error{}; 
             }
         }
     }
+
+    // For return type
+    if (node.type.is_concrete()) {
+        auto backup = functions_that_can_be_called;
+        functions_that_can_be_called = semantic::remove_incompatible_functions_with_return_type(functions_that_can_be_called, node.type);
+
+        if (functions_that_can_be_called.size() == 0) {
+            std::vector<ast::Type> possible_types = semantic::get_possible_types_for_return_type(backup);
+            context.errors.push_back(errors::unexpected_return_type(node, context.current_module, node.type, possible_types, {}));
+            return Error{}; 
+        }
+    }
+    node.functions = functions_that_can_be_called;
+    assert(node.functions.size() > 0);
+
+    // Compare new overload constraints with previous
+    // ----------------------------------------------
+    auto& overload_constraints = context.type_inference.overload_constraints;
+
+    // For each argument
+    for (size_t i = 0; i < node.args.size(); i++) {
+        auto arg = node.args[i];
+
+        if (arg->type.is_concrete()) {
+            continue;
+        }
+
+        // Find new overload constraints
+        Set<ast::Type> new_overload_constraints;
+        for (auto function: functions_that_can_be_called) {
+            if (!function->args[i]->type.is_type_variable()) {
+                new_overload_constraints.insert(function->args[i]->type);
+            }
+            else if (function->args[i]->type.is_type_variable()
+                &&   function->args[i]->type.as_type_variable().overload_constraints.size() > 0) {
+                for (auto constraint: function->args[i]->type.as_type_variable().overload_constraints.elements) {
+                    new_overload_constraints.insert(constraint);
+                }
+            }
+        }
+
+        // Add or intersect with previous overload constraints founded for argument type
+        if (overload_constraints.find(arg->type) == overload_constraints.end()) {
+            overload_constraints[arg->type] = new_overload_constraints;
+        }
+        else {
+            auto intersection = overload_constraints[arg->type].intersect(new_overload_constraints);
+
+            if (intersection.size() == 0) {
+                context.errors.push_back(errors::unexpected_argument_types(node, context.current_module, i, overload_constraints[arg->type].elements, new_overload_constraints.elements, {}));
+                return Error {};
+            }
+
+            overload_constraints[arg->type] = intersection;
+        }
+    }
+
+    return Ok {};
+}
+
+Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::StructLiteralNode& node) {
+    for (auto field: node.fields) {
+        auto result = semantic::unify_types_and_type_check(context, field.second); 
+        if (result.is_error()) return result;
+    }
+
+    node.type = semantic::get_unified_type(context, node.type);
+
+    // Get binding
+    semantic::Binding* binding = semantic::get_binding(context, node.identifier->value);
+    assert(binding);
 
     return Ok {};
 }

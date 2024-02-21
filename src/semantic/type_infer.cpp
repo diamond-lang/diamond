@@ -346,53 +346,66 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
         return Error {};
     }
 
-    if (binding->type == semantic::TypeBinding) {
-        ast::TypeNode* type_definition = semantic::get_type_definition(*binding);
-        ast::Type type = ast::Type(type_definition->identifier->value, type_definition);
-        
-        // Set type
-        node.type = type;
-
-        // Add types constraints on fields
-        for (size_t i = 0; i < type_definition->fields.size(); i++) {
-            std::string field = type_definition->fields[i]->value;
-            bool founded = false;
-
-            for (auto& arg: node.args) {
-                assert(arg->identifier.has_value());
-
-                if (arg->identifier.value()->value == field) {
-                    founded = true;
-                    
-                    semantic::add_constraint(context, Set<ast::Type>({type_definition->fields[i]->type, ast::get_type(arg->expression)}));
-                }
-            }
-
-            if (!founded) {
-                context.errors.push_back(Error{"Error: Not all fields are initialized"});
-                return Error {};
-            }
-        }
-
-        return Ok {};
-    }
-    else if (is_function(*binding)) {
-        if (!node.type.is_concrete()) {
-            node.type = semantic::new_type_variable(context);
-        }
-
-        if (binding->type == semantic::FunctionBinding) {
-           // do nothing
-        }
-        else {
-            assert(false);
-        }
-
-        return Ok {};
+    assert(is_function(*binding));
+    
+    if (!node.type.is_concrete()) {
+        node.type = semantic::new_type_variable(context);
     }
 
-    assert(false);
-    return Error {};
+    if (binding->type == semantic::FunctionBinding) {
+        // do nothing
+    }
+    else {
+        assert(false);
+    }
+
+    return Ok {};
+}
+
+
+Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, ast::StructLiteralNode& node) {
+    auto& identifier = node.identifier->value;
+
+    // Analyze arguments
+    for (auto field: node.fields) {
+        auto result = semantic::type_infer_and_analyze(context, field.second);
+        if (result.is_error()) return Error {};
+    }
+      
+    // Check binding exists
+    semantic::Binding* binding = semantic::get_binding(context, identifier);
+    if (!binding) {
+        std::cout << "Error: Undefined type"; 
+        assert(false);
+        return Error {};
+    }
+
+    ast::TypeNode* type_definition = semantic::get_type_definition(*binding);
+    ast::Type type = ast::Type(type_definition->identifier->value, type_definition);
+    
+    // Set type
+    node.type = type;
+
+    // Add types constraints on fields
+    for (size_t i = 0; i < type_definition->fields.size(); i++) {
+        std::string field_name = type_definition->fields[i]->value;
+        bool founded = false;
+
+        for (auto& field: node.fields) {
+            if (field.first->value == field_name) {
+                founded = true;
+                
+                semantic::add_constraint(context, Set<ast::Type>({type_definition->fields[i]->type, ast::get_type(field.second)}));
+            }
+        }
+
+        if (!founded) {
+            context.errors.push_back(Error{"Error: Not all fields are initialized"});
+            return Error {};
+        }
+    }
+
+    return Ok {};
 }
 
 Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, ast::FieldAccessNode& node) {

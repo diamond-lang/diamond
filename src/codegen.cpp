@@ -96,6 +96,7 @@ namespace codegen {
         std::vector<llvm::Value*> codegen_args(ast::FunctionNode* function, std::vector<ast::CallArgumentNode*> args);
         llvm::Value* codegen(ast::CallArgumentNode& node) {return nullptr;}
         llvm::Value* codegen(ast::CallNode& node);
+        llvm::Value* codegen(ast::StructLiteralNode& node);
         llvm::Value* codegen(ast::FloatNode& node);
         llvm::Value* codegen(ast::IntegerNode& node);
         llvm::Value* codegen(ast::IdentifierNode& node);
@@ -306,48 +307,57 @@ namespace codegen {
             return function;
         }
 
+        size_t get_index_of_field(ast::TypeNode* definition, std::string field_name) {
+            for (size_t i = 0; i < definition->fields.size(); i++) {
+                if (definition->fields[i]->value == field_name) {
+                    return i;
+                }
+            }
+
+            assert(false);
+            return 0;
+        }
+
         void store_fields(ast::Node* expression, llvm::Value* struct_allocation) {
             // Get struct type
             llvm::StructType* struct_type = this->get_struct_type(ast::get_type(expression).as_nominal_type().type_definition);
 
-            // If the struct expression is a call
-            if (expression->index() == ast::Call) {
+            if (expression->index() == ast::StructLiteral) {
+                // Get call
+                auto& struct_literal = std::get<ast::StructLiteralNode>(*expression);
+
+                // For each field
+                for (auto field: struct_literal.fields) {
+                    // Get pointer to the field
+                    llvm::Value* ptr = this->builder->CreateStructGEP(struct_type, struct_allocation, get_index_of_field(ast::get_type(expression).as_nominal_type().type_definition, field.first->value));
+
+                    // If the field type has a struct type
+                    if (this->has_struct_type(field.second)) {
+                        this->store_fields(field.second, ptr);
+                    }
+                    else {
+                        this->builder->CreateStore(this->codegen(field.second), ptr);
+                    }
+                }
+            }
+            else if (expression->index() == ast::Call) {
                 // Get call
                 auto& call = std::get<ast::CallNode>(*expression);
 
-                // If call is a struct constructror
-                bool is_constructor = call.identifier->value == call.type.to_str();
-                if (is_constructor) {
-                    // For each field
-                    for (size_t i = 0; i < call.args.size(); i++) {
-                        // Get pointer to the field
-                        llvm::Value* ptr = this->builder->CreateStructGEP(struct_type, struct_allocation, i);
+                // Get function
+                ast::FunctionNode* function = this->get_function(&call);
+                std::string name = this->get_mangled_function_name(function->module_path, call.identifier->value, this->get_types(call.args), ast::get_concrete_type((ast::Node*) &call, this->type_bindings), function->is_extern);
+                llvm::Function* llvm_function = this->module->getFunction(name);
+                assert(llvm_function);
+                
+                // Codegen args
+                std::vector<llvm::Value*> args = this->codegen_args(function, call.args);
+                
+                // Add return type as arg (because its a struct)
+                args.insert(args.begin(), struct_allocation);
 
-                        // If the field type has a struct type
-                        if (this->has_struct_type(call.args[i]->expression)) {
-                            this->store_fields(call.args[i]->expression, ptr);
-                        }
-                        else {
-                            this->builder->CreateStore(this->codegen(call.args[i]->expression), ptr);
-                        }
-                    }
-                }
-                else {
-                    // Get function
-                    ast::FunctionNode* function = this->get_function(&call);
-                    std::string name = this->get_mangled_function_name(function->module_path, call.identifier->value, this->get_types(call.args), ast::get_concrete_type((ast::Node*) &call, this->type_bindings), function->is_extern);
-                    llvm::Function* llvm_function = this->module->getFunction(name);
-                    assert(llvm_function);
-                    
-                    // Codegen args
-                    std::vector<llvm::Value*> args = this->codegen_args(function, call.args);
-                    
-                    // Add return type as arg (because its a struct)
-                    args.insert(args.begin(), struct_allocation);
-
-                    // Make call
-                    this->builder->CreateCall(llvm_function, args, "calltmp");
-                }
+                // Make call
+                this->builder->CreateCall(llvm_function, args, "calltmp");
             }
             else if (expression->index() == ast::Identifier) {
                 auto& identifier = std::get<ast::IdentifierNode>(*expression);
@@ -1438,6 +1448,18 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
 
     // Make call
     return this->builder->CreateCall(llvm_function, args, "calltmp");
+}
+
+llvm::Value* codegen::Context::codegen(ast::StructLiteralNode& node) {
+    // Create allocation
+    llvm::StructType* struct_type = this->get_struct_type(node.type.as_nominal_type().type_definition);
+    llvm::AllocaInst* allocation = this->create_allocation(node.identifier->value, struct_type);
+        
+    // Store fields
+    this->store_fields((ast::Node*) &node, allocation);
+
+    // Return
+    return allocation;
 }
 
 llvm::Value* codegen::Context::codegen(ast::FloatNode& node) {

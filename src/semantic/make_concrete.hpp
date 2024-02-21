@@ -23,6 +23,7 @@ namespace semantic {
     Result<Ok, Error> get_concrete_as_type_bindings(Context& context, ast::LinkWithNode& node, std::vector<ast::CallInCallStack> call_stack);
     Result<Ok, Error> get_concrete_as_type_bindings(Context& context, ast::CallArgumentNode& node, std::vector<ast::CallInCallStack> call_stack);
     Result<Ok, Error> get_concrete_as_type_bindings(Context& context, ast::CallNode& node, std::vector<ast::CallInCallStack> call_stack);
+    Result<Ok, Error> get_concrete_as_type_bindings(Context& context, ast::StructLiteralNode& node, std::vector<ast::CallInCallStack> call_stack);
     Result<Ok, Error> get_concrete_as_type_bindings(Context& context, ast::FloatNode& node, std::vector<ast::CallInCallStack> call_stack);
     Result<Ok, Error> get_concrete_as_type_bindings(Context& context, ast::IntegerNode& node, std::vector<ast::CallInCallStack> call_stack);
     Result<Ok, Error> get_concrete_as_type_bindings(Context& context, ast::IdentifierNode& node, std::vector<ast::CallInCallStack> call_stack);

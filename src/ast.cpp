@@ -957,6 +957,22 @@ void ast::print(Node* node, PrintContext context) {
             break;
         }
 
+        case StructLiteral: {
+            auto& struct_literal = std::get<StructLiteralNode>(*node);
+
+            put_indent_level(context.indent_level, context.last);
+            std::cout << struct_literal.identifier->value << "{}";
+            if (struct_literal.type != Type(ast::NoType{})) std::cout << ": " << get_concrete_type_or_type_variable(struct_literal.type, context).to_str();
+            std::cout << "\n";
+            for (auto it = struct_literal.fields.begin(); it != struct_literal.fields.end(); it++) {
+                auto is_last = std::next(it) == struct_literal.fields.end();
+                put_indent_level(context.indent_level + 1, append(context.last, is_last));
+                std::cout << it->first->value << ":\n";
+                print(it->second, PrintContext{context.indent_level + 2, append(append(context.last, is_last), true), context.concrete, context.type_bindings});
+            }
+            break;
+        }
+
         case Float: {
             auto& float_node = std::get<FloatNode>(*node);
 

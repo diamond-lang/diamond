@@ -3,7 +3,7 @@ type Point
     y: pointer[float64]
 
 a = 10
-p = Point(x: 10, y: &a)
+p = Point{x: 10, y: &a}
 *p.y = 20
 print(*p.y)
 print(a)

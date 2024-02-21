@@ -21,6 +21,7 @@ namespace semantic {
     Result<Ok, Error> type_infer_and_analyze(Context& context, ast::LinkWithNode& node);
     Result<Ok, Error> type_infer_and_analyze(Context& context, ast::CallArgumentNode& node);
     Result<Ok, Error> type_infer_and_analyze(Context& context, ast::CallNode& node);
+    Result<Ok, Error> type_infer_and_analyze(Context& context, ast::StructLiteralNode& node);
     Result<Ok, Error> type_infer_and_analyze(Context& context, ast::FloatNode& node);
     Result<Ok, Error> type_infer_and_analyze(Context& context, ast::IntegerNode& node);
     Result<Ok, Error> type_infer_and_analyze(Context& context, ast::IdentifierNode& node);

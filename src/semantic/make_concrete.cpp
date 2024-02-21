@@ -198,102 +198,104 @@ Result<Ok, Error> semantic::get_concrete_as_type_bindings(Context& context, ast:
     // Get binding
     semantic::Binding* binding = semantic::get_binding(context, node.identifier->value);
     assert(binding);
+    assert(binding->type == semantic::FunctionBinding);
 
-    if (binding->type == semantic::TypeBinding) {
-        for (auto arg: node.args) {
-            auto result = semantic::get_concrete_as_type_bindings(context, *arg, call_stack);
-            if (result.is_error()) return result;
+    assert(node.functions.size() != 0);
+    auto functions_that_can_be_called = node.functions;
+
+    if (semantic::is_type_concrete(context, node.type)) {
+        // Remove functions that aren't expected
+        functions_that_can_be_called = remove_incompatible_functions_with_return_type(functions_that_can_be_called, ast::get_concrete_type(node.type, context.type_inference.type_bindings));
+
+        if (functions_that_can_be_called.size() == 0) {
+            std::vector<ast::Type> possible_types = semantic::get_possible_types_for_return_type(node.functions);
+            context.errors.push_back(errors::unexpected_return_type(node, context.current_module, ast::get_concrete_type(node.type, context.type_inference.type_bindings), possible_types, call_stack));
+            return Error {};
         }
-        node.type = ast::Type(node.identifier->value, semantic::get_type_definition(*binding));
     }
-    else if (is_function(*binding)) {
-        if (binding->type == semantic::FunctionBinding) {
-            assert(node.functions.size() != 0);
-            auto functions_that_can_be_called = node.functions;
 
-            if (semantic::is_type_concrete(context, node.type)) {
-                // Remove functions that aren't expected
-                functions_that_can_be_called = remove_incompatible_functions_with_return_type(functions_that_can_be_called, ast::get_concrete_type(node.type, context.type_inference.type_bindings));
+    if (functions_that_can_be_called.size() == 1) {
+        // Set and check expected types of arguments
+        auto result = set_expected_types_of_arguments_and_check(context, &node, functions_that_can_be_called[0], 0, call_stack);
+        if (result.is_error()) return Error{};
+    }
+    else {
+        size_t i = 0;
+        while (i < node.args.size()) {     
+            // Get concrete type for current argument
+            auto result = get_concrete_as_type_bindings(context, *node.args[i], call_stack);
+            if (result.is_error()) return result;
 
-                if (functions_that_can_be_called.size() == 0) {
-                    std::vector<ast::Type> possible_types = semantic::get_possible_types_for_return_type(node.functions);
-                    context.errors.push_back(errors::unexpected_return_type(node, context.current_module, ast::get_concrete_type(node.type, context.type_inference.type_bindings), possible_types, call_stack));
-                    return Error {};
-                }
-            }
+            // Remove functions that don't match with the type founded for the argument
+            functions_that_can_be_called = semantic::remove_incompatible_functions_with_argument_type(functions_that_can_be_called, i, ast::get_concrete_type(node.args[i]->type, context.type_inference.type_bindings));
 
+            // If only one function that can be called remains
             if (functions_that_can_be_called.size() == 1) {
-                // Set and check expected types of arguments
-                auto result = set_expected_types_of_arguments_and_check(context, &node, functions_that_can_be_called[0], 0, call_stack);
+                auto called_function = functions_that_can_be_called[0];
+
+                // Check types of remaining arguments
+                auto result = set_expected_types_of_arguments_and_check(context, &node, called_function, i + 1, call_stack);
                 if (result.is_error()) return Error{};
+                break;
             }
-            else {
-                size_t i = 0;
-                while (i < node.args.size()) {     
-                    // Get concrete type for current argument
-                    auto result = get_concrete_as_type_bindings(context, *node.args[i], call_stack);
-                    if (result.is_error()) return result;
-
-                    // Remove functions that don't match with the type founded for the argument
-                    functions_that_can_be_called = semantic::remove_incompatible_functions_with_argument_type(functions_that_can_be_called, i, ast::get_concrete_type(node.args[i]->type, context.type_inference.type_bindings));
-
-                    // If only one function that can be called remains
-                    if (functions_that_can_be_called.size() == 1) {
-                        auto called_function = functions_that_can_be_called[0];
-
-                        // Check types of remaining arguments
-                        auto result = set_expected_types_of_arguments_and_check(context, &node, called_function, i + 1, call_stack);
-                        if (result.is_error()) return Error{};
-                        break;
-                    }
-                    else if (functions_that_can_be_called.size() == 0) {
-                        std::vector<ast::Type> possible_types = semantic::get_possible_types_for_argument(node.functions, i);
-                        context.errors.push_back(errors::unexpected_argument_type(node, context.current_module, i, ast::get_concrete_type(node.args[i]->type, context.type_inference.type_bindings), possible_types, call_stack));
-                        return Error {};
-                    }
-
-                    i++;
-                }
-
-                // Check what function to call is not ambiguos
-                if (functions_that_can_be_called.size() > 1) {
-                    context.errors.push_back(errors::ambiguous_what_function_to_call(node, context.current_module, functions_that_can_be_called, call_stack));
-                    return Error {};
-                }
+            else if (functions_that_can_be_called.size() == 0) {
+                std::vector<ast::Type> possible_types = semantic::get_possible_types_for_argument(node.functions, i);
+                context.errors.push_back(errors::unexpected_argument_type(node, context.current_module, i, ast::get_concrete_type(node.args[i]->type, context.type_inference.type_bindings), possible_types, call_stack));
+                return Error {};
             }
 
-            auto called_function = functions_that_can_be_called[0];
+            i++;
+        }
 
-            // Check if type of called function matchs with expected
-            if (semantic::is_type_concrete(context, node.type)) {
-                if (called_function->state != ast::FunctionCompletelyTyped) {
-                    auto result = semantic::get_function_type(context, &node, called_function, ast::get_concrete_types(ast::get_types(node.args), context.type_inference.type_bindings), call_stack);
-                    if (result.is_error()) return Error {};
-                    if (result.get_value().is_concrete()) {
-                        assert(semantic::get_type(context, node.type) == result.get_value());
-                    }
-                }
+        // Check what function to call is not ambiguos
+        if (functions_that_can_be_called.size() > 1) {
+            context.errors.push_back(errors::ambiguous_what_function_to_call(node, context.current_module, functions_that_can_be_called, call_stack));
+            return Error {};
+        }
+    }
+
+    auto called_function = functions_that_can_be_called[0];
+
+    // Check if type of called function matchs with expected
+    if (semantic::is_type_concrete(context, node.type)) {
+        if (called_function->state != ast::FunctionCompletelyTyped) {
+            auto result = semantic::get_function_type(context, &node, called_function, ast::get_concrete_types(ast::get_types(node.args), context.type_inference.type_bindings), call_stack);
+            if (result.is_error()) return Error {};
+            if (result.get_value().is_concrete()) {
+                assert(semantic::get_type(context, node.type) == result.get_value());
             }
-            // Or get the function type
-            else {
-                if (called_function->state == ast::FunctionCompletelyTyped) {
-                    auto result =  semantic::get_type_completly_typed_function(called_function, ast::get_concrete_types(ast::get_types(node.args), context.type_inference.type_bindings));
-                    if (result.is_error()) return Error{};
-                    context.type_inference.type_bindings[node.type.as_type_variable().id] = result.get_value();
-                }
-                else {
-                    auto result = semantic::get_function_type(context, &node, called_function, ast::get_concrete_types(ast::get_types(node.args), context.type_inference.type_bindings), call_stack);
-                    if (result.is_error()) return Error {};
-                    context.type_inference.type_bindings[node.type.as_type_variable().id] = result.get_value();
-                }
-            }
+        }
+    }
+    // Or get the function type
+    else {
+        if (called_function->state == ast::FunctionCompletelyTyped) {
+            auto result =  semantic::get_type_completly_typed_function(called_function, ast::get_concrete_types(ast::get_types(node.args), context.type_inference.type_bindings));
+            if (result.is_error()) return Error{};
+            context.type_inference.type_bindings[node.type.as_type_variable().id] = result.get_value();
         }
         else {
-            assert(false);
+            auto result = semantic::get_function_type(context, &node, called_function, ast::get_concrete_types(ast::get_types(node.args), context.type_inference.type_bindings), call_stack);
+            if (result.is_error()) return Error {};
+            context.type_inference.type_bindings[node.type.as_type_variable().id] = result.get_value();
         }
     }
 
     return Ok {};
+}
+
+
+Result<Ok, Error> semantic::get_concrete_as_type_bindings(Context& context, ast::StructLiteralNode& node, std::vector<ast::CallInCallStack> call_stack) {
+    // Get binding
+    semantic::Binding* binding = semantic::get_binding(context, node.identifier->value);
+    assert(binding);
+
+    for (auto field: node.fields) {
+        auto result = semantic::get_concrete_as_type_bindings(context, field.second, call_stack);
+        if (result.is_error()) return result;
+    }
+    node.type = ast::Type(node.identifier->value, semantic::get_type_definition(*binding));
+
+    return Ok{};
 }
 
 Result<Ok, Error> semantic::get_concrete_as_type_bindings(Context& context, ast::FloatNode& node, std::vector<ast::CallInCallStack> call_stack) {
@@ -684,6 +686,16 @@ void semantic::make_concrete(Context& context, ast::Node* node) {
             }
             
             call.type = ast::get_concrete_type(call.type, context.type_inference.type_bindings);
+            break;
+        }
+
+        case ast::StructLiteral: {
+            auto& struct_litereal = std::get<ast::StructLiteralNode>(*node);
+            for (auto field: struct_litereal.fields) {
+                semantic::make_concrete(context, field.second);
+            }
+            
+            struct_litereal.type = ast::get_concrete_type(struct_litereal.type, context.type_inference.type_bindings);
             break;
         }
 

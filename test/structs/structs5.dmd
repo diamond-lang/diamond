@@ -8,15 +8,15 @@ type Rectangle
     p1: Point
     p2: Point
 
-rectangle = Rectangle(
-    p1: Point(x: 10, y: 10)
-    p2: Point(x: 110, y: 60)
-)
+rectangle = Rectangle{
+    p1: Point{x: 10, y: 10}
+    p2: Point{x: 110, y: 60}
+}
 
-rectangle.p1 = Point(
+rectangle.p1 = Point{
     x: 600
     y: 500
-)
+}
 
 print(rectangle.p1.x)
 print(rectangle.p1.y)

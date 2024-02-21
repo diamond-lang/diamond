@@ -14,10 +14,10 @@ function print_rectangle(rectangle: Rectangle): void
     print(rectangle.p2.x)
     print(rectangle.p2.y)
 
-rectangle = Rectangle(
-    p1: Point(x: 10, y: 10)
-    p2: Point(x: 110, y: 60)
-)
+rectangle = Rectangle{
+    p1: Point{x: 10, y: 10}
+    p2: Point{x: 110, y: 60}
+}
 
 print_rectangle(rectangle)
 

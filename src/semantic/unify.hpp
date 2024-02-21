@@ -20,6 +20,7 @@ namespace semantic {
     Result<Ok, Error> unify_types_and_type_check(Context& context, ast::LinkWithNode& node);
     Result<Ok, Error> unify_types_and_type_check(Context& context, ast::CallArgumentNode& node);
     Result<Ok, Error> unify_types_and_type_check(Context& context, ast::CallNode& node);
+    Result<Ok, Error> unify_types_and_type_check(Context& context, ast::StructLiteralNode& node);
     Result<Ok, Error> unify_types_and_type_check(Context& context, ast::FloatNode& node);
     Result<Ok, Error> unify_types_and_type_check(Context& context, ast::IntegerNode& node);
     Result<Ok, Error> unify_types_and_type_check(Context& context, ast::IdentifierNode& node);

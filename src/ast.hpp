@@ -27,6 +27,7 @@ namespace ast {
     struct LinkWithNode;
     struct CallArgumentNode;
     struct CallNode;
+    struct StructLiteralNode;
     struct FloatNode;
     struct IntegerNode;
     struct IdentifierNode;
@@ -54,6 +55,7 @@ namespace ast {
         LinkWith,
         CallArgument,
         Call,
+        StructLiteral,
         Float,
         Integer,
         Identifier,
@@ -81,6 +83,7 @@ namespace ast {
         LinkWithNode,
         CallArgumentNode,
         CallNode,
+        StructLiteralNode,
         FloatNode,
         IntegerNode,
         IdentifierNode,
@@ -384,6 +387,16 @@ namespace ast {
         IdentifierNode* identifier;
         std::vector<CallArgumentNode*> args;
         std::vector<FunctionNode*> functions;
+    };
+
+    struct StructLiteralNode {
+        size_t line;
+        size_t end_line;
+        size_t column;
+        Type type = Type(ast::NoType{});
+
+        IdentifierNode* identifier;
+        std::unordered_map<IdentifierNode*, Node*> fields;
     };
 
     struct FloatNode {

@@ -8,7 +8,7 @@ function passing_by_value(p: Point): void
     p.x = 10.5
     print(p.x)
 
-p = Point(x: 2, y: 3.5)
+p = Point{x: 2, y: 3.5}
 
 passing_by_value(p)
 print(p.x)
