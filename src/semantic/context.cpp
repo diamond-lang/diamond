@@ -3,6 +3,7 @@
 #include "../utilities.hpp"
 #include "../lexer.hpp"
 #include "../parser.hpp"
+#include  "../semantic.hpp"
 
 // Bindings
 // --------
@@ -354,6 +355,10 @@ bool semantic::are_types_compatible(ast::Type function_type, ast::Type argument_
         return argument_type == function_type;
     }
     else if (function_type.is_type_variable()
+    &&       function_type.as_type_variable().overload_constraints.size() == 0) {
+        return true;
+    }
+    else if (function_type.is_type_variable()
     &&       function_type.as_type_variable().overload_constraints.size() > 0) {
         return function_type.as_type_variable().overload_constraints.contains(argument_type);
     }
@@ -367,7 +372,24 @@ bool semantic::are_types_compatible(ast::Type function_type, ast::Type argument_
             }
             return true;
         }
+        if (function_type.as_nominal_type().name == "array" && argument_type.is_array()) {
+            for (size_t i = 0; i < function_type.as_nominal_type().parameters.size(); i++) {
+                if (!semantic::are_types_compatible(function_type.as_nominal_type().parameters[i], argument_type.as_nominal_type().parameters[i])) {
+                    return false;
+                }
+            }
+            return true;
+        }
         return false;
+    }
+    return true;
+}
+
+bool semantic::are_types_compatible(std::vector<ast::Type> function_types, std::vector<ast::Type> argument_types) {
+    for (size_t i = 0; i < function_types.size(); i++) {
+        if (!semantic::are_types_compatible(function_types[i], argument_types[i])) {
+            return false;
+        }
     }
     return true;
 }

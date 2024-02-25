@@ -328,8 +328,8 @@ bool ast::Type::is_array() const {
         return false;
     }
 
-    if (this->as_nominal_type().name.size() >= 5
-    && this->as_nominal_type().name.substr(0, 5) != "array") {
+    if (this->as_nominal_type().name.size() < 5
+    || this->as_nominal_type().name.substr(0, 5) != "array") {
         return false;
     }
 
