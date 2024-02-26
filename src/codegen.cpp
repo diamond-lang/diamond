@@ -461,8 +461,53 @@ namespace codegen {
 void codegen::print_llvm_ir(ast::Ast& ast, std::string program_name) {
     codegen::Context llvm_ir(ast);
     llvm_ir.codegen(ast);
-    llvm_ir.module->print(llvm::errs(), nullptr);
+    llvm_ir.module->print(llvm::outs(), nullptr);
 }
+
+
+// Print assembly
+// --------------
+void codegen::print_assembly(ast::Ast& ast, std::string program_name) {
+    codegen::Context llvm_ir(ast);
+    llvm_ir.codegen(ast);
+
+    // Select target
+    auto TargetTriple = llvm::sys::getDefaultTargetTriple();
+    llvm::InitializeAllTargetInfos();
+    llvm::InitializeAllTargets();
+    llvm::InitializeAllTargetMCs();
+    llvm::InitializeAllAsmParsers();
+    llvm::InitializeAllAsmPrinters();
+
+    std::string Error;
+    auto Target = llvm::TargetRegistry::lookupTarget(TargetTriple, Error);
+
+    if (!Target) {
+        llvm::errs() << Error;
+    }
+
+    auto CPU = "generic";
+    auto Features = "";
+
+    llvm::TargetOptions opt;
+    auto RM = llvm::Optional<llvm::Reloc::Model>();
+    auto TargetMachine = Target->createTargetMachine(TargetTriple, CPU, Features, opt, RM);
+
+    llvm_ir.module->setDataLayout(TargetMachine->createDataLayout());
+    llvm_ir.module->setTargetTriple(TargetTriple);
+
+    // Generate assembly
+    llvm::legacy::PassManager pass;
+    
+    auto& llvm_outs = llvm::outs();
+    if (TargetMachine->addPassesToEmitFile(pass, llvm_outs, nullptr, llvm::CGFT_AssemblyFile)) {
+        llvm::errs() << "TargetMachine can't emit a file of this type";
+    }
+
+    pass.run(*(llvm_ir.module));
+    llvm_outs.flush();
+}
+
 
 // Generate object code
 // --------------------
@@ -473,7 +518,7 @@ void codegen::generate_object_code(ast::Ast& ast, std::string program_name) {
     codegen::Context llvm_ir(ast);
     llvm_ir.codegen(ast);
 
-    // Generate object file
+    // Select target
     auto TargetTriple = llvm::sys::getDefaultTargetTriple();
     llvm::InitializeAllTargetInfos();
     llvm::InitializeAllTargets();
