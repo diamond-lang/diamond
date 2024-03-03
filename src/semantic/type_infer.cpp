@@ -323,8 +323,11 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
             node.type.as_nominal_type().parameters.push_back(ast::get_type(node.elements[0]));
         }
     }
-    else {
-        assert(false);
+    else if (node.type.is_array() && node.type.as_nominal_type().name == "array") {
+        node.type = ast::Type(ast::NominalType("array" + std::to_string(node.elements.size())));
+        if (node.elements.size() > 0) {
+            node.type.as_nominal_type().parameters.push_back(ast::get_type(node.elements[0]));
+        }
     }
 
     return Ok {};

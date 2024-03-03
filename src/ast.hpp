@@ -186,6 +186,7 @@ namespace ast {
         bool is_type_variable() const;
         bool is_nominal_type() const;
         bool is_struct_type() const;
+        bool is_structural_struct_type() const;
         bool is_concrete() const;
         bool is_integer() const;
         bool is_float() const;

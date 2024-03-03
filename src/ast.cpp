@@ -268,6 +268,10 @@ bool ast::Type::is_nominal_type() const {
 }
 
 bool ast::Type::is_struct_type() const {
+    return this->type.index() == ast::NominalTypeVariant && this->as_nominal_type().type_definition;
+}
+
+bool ast::Type::is_structural_struct_type() const {
     return this->type.index() == ast::StructTypeVariant;
 }
 
@@ -1017,7 +1021,16 @@ void ast::print(Node* node, PrintContext context) {
             auto& string = std::get<StringNode>(*node);
 
             put_indent_level(context.indent_level, context.last);
-            std::cout << "\"" << string.value << "\"";
+            std::cout << "\"";
+            for (size_t i = 0; i < string.value.size(); i++) {
+                if (string.value[i] == '\n') {
+                    std::cout << "\\n";
+                }
+                else {
+                    std::cout << string.value[i];
+                }
+            }
+            std::cout << "\"";
             if (string.type != Type(ast::NoType{})) std::cout << ": " << get_concrete_type_or_type_variable(string.type, context).to_str();
             std::cout << "\n";
             break;

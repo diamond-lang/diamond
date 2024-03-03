@@ -319,7 +319,7 @@ Result<Ok, Error> semantic::analyze(semantic::Context& context, ast::Type& type)
     else {
         Binding* type_binding = semantic::get_binding(context, type.to_str());
         if (!type_binding) {
-            context.errors.push_back(Error{"Errors: Undefined type"});
+            context.errors.push_back(Error{"Errors: Undefined type  \"" + type.to_str() + "\""});
             return Error {};
         }
         if (type_binding->type != semantic::TypeBinding) {
