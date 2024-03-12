@@ -1,5 +1,5 @@
 #include "unify.hpp"
-#include "analyze.hpp"
+#include "semantic.hpp"
 
 Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::Node* node) {
     return std::visit([&context, node](auto& variant) {return semantic::unify_types_and_type_check(context, variant);}, *node);

@@ -1,5 +1,5 @@
 #include "type_infer.hpp"
-#include "analyze.hpp"
+#include "semantic.hpp"
 
 Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, ast::Node* node) {
     return std::visit(

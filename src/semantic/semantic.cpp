@@ -1,5 +1,5 @@
 #include "../semantic.hpp"
-#include "analyze.hpp"
+#include "semantic.hpp"
 #include "type_infer.hpp"
 #include "unify.hpp"
 #include "make_concrete.hpp"
