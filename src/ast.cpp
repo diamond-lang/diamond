@@ -160,6 +160,16 @@ bool ast::Type::operator!=(const Type &t) const {
     return !(t == *this);
 }
 
+std::string as_letter(size_t type_var) {
+    char letters[] = "abcdefghijklmnopqrstuvwxyz";
+    if (type_var > 25) {
+        return letters[(type_var + 18) % 26] + std::to_string(1 + type_var / 26);
+    }
+    else {
+        return std::string(1, letters[(type_var + 18) % 26]);
+    }
+}
+
 std::string ast::Type::to_str() const {
     std::string output = "";
     if (this->is_no_type()) {
@@ -167,10 +177,11 @@ std::string ast::Type::to_str() const {
     }
     else if (this->is_type_variable()) {
         if (this->as_type_variable().is_final) {
-            output += "$";
+            output += as_letter(std::get<ast::TypeVariable>(this->type).id);
         }
-
-        output += std::to_string(std::get<ast::TypeVariable>(this->type).id);
+        else {
+            output += std::to_string(std::get<ast::TypeVariable>(this->type).id);
+        }
 
         if (std::get<ast::TypeVariable>(this->type).interface.has_value()
         ||  std::get<ast::TypeVariable>(this->type).overload_constraints.size() > 0) {
@@ -245,6 +256,38 @@ std::string ast::Type::to_str() const {
 
         output += "}";
     }
+    return output;
+}
+
+std::string ast::TypeVariable::as_type_parameter() {
+    std::string output = as_letter(this->id);
+
+    if (this->interface.has_value()
+    ||  this->overload_constraints.size() > 0
+    ||  this->field_constraints.size() > 0) {
+        output += ": ";
+    }
+
+    if (this->interface.has_value()) {
+        output += this->interface.value().name;
+    }
+    else if (this->overload_constraints.size() > 0) {
+        for (size_t i = 0; i < this->overload_constraints.size(); i++) {
+            output += this->overload_constraints.elements[i].to_str();
+            if (i + 1 != this->overload_constraints.size()) output += " or ";
+        }
+    }
+    else if (this->field_constraints.size() > 0) {
+        output += "{";
+        auto fields = this->field_constraints;
+        for(auto field = fields.begin(); field != fields.end(); field++) {
+            output += field->name + ": " + field->type.to_str() + ", ";
+
+        }
+
+        output += "...}";
+    }
+
     return output;
 }
 
@@ -730,7 +773,18 @@ void ast::print(Node* node, PrintContext context) {
                 std::cout << "extern " << function.identifier->value << '(';
             }
             else {
-                std::cout << "function " << function.identifier->value << '(';
+                std::cout << "function " << function.identifier->value;
+
+                if (function.type_parameters.size() > 0) {
+                    std::cout << '[';
+                    for (size_t i = 0; i < function.type_parameters.size(); i++) {
+                        std::cout << function.type_parameters[i].as_type_variable().as_type_parameter();
+                        if (i + 1 != function.type_parameters.size()) std::cout << ", ";
+                    }
+                    std::cout << ']';
+                }
+
+                std::cout << '(';
             }
             for (size_t i = 0; i < function.args.size(); i++) {
                 auto& arg_name = function.args[i]->value;

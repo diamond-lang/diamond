@@ -133,6 +133,8 @@ namespace ast {
 
         TypeVariable(size_t id) : id(id) {}
         TypeVariable(size_t id, bool is_final) : id(id), is_final(is_final) {}
+
+        std::string as_type_parameter();
     };
 
     struct NominalType {
@@ -260,6 +262,7 @@ namespace ast {
         Type type = Type(ast::NoType{});
 
         IdentifierNode* identifier;
+        std::vector<ast::Type> type_parameters;
         std::vector<FunctionArgumentNode*> args;
         Node* body;
 
@@ -269,6 +272,15 @@ namespace ast {
         std::vector<FunctionSpecialization> specializations;
         Type return_type = Type(ast::NoType{});
         std::filesystem::path module_path; // Used in to tell from which module the function comes from
+
+        bool typed_parameter_aready_added(ast::Type type) {
+            for (auto type_parameter: this->type_parameters) {
+                if (type_parameter == type) {
+                    return true;
+                }
+            }
+            return false;
+        }
     };
 
     struct TypeNode {
