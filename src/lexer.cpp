@@ -256,7 +256,7 @@ Result<token::Token, Error> lexer::get_identifier(Source& source) {
     if (literal == "function")  return token::Token(token::Function, "function", line, column);
     if (literal == "type")      return token::Token(token::Type, "type", line, column);
     if (literal == "be")        return token::Token(token::Be, "be", line, column);
-    if (literal == "nonlocal")  return token::Token(token::NonLocal, "nonlocal", line, column);
+    if (literal == "outer")  return token::Token(token::Outer, "outer", line, column);
     if (literal == "true")      return token::Token(token::True, "true", line, column);
     if (literal == "false")     return token::Token(token::False, "false", line, column);
     if (literal == "and")       return token::Token(token::And, "and", line, column);

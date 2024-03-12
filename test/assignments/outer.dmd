@@ -6,7 +6,7 @@ if true
 print(a)
 
 if true
-    nonlocal a = 6
+    outer a = 6
 
 print(a)
 

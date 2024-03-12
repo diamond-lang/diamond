@@ -40,7 +40,7 @@ namespace token {
         While,
         Function,
         Type,
-        NonLocal,
+        Outer,
         True,
         False,
         Or,

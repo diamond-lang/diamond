@@ -138,8 +138,8 @@ void token::print(std::vector<Token> token) {
                 std::cout << "token::Type";
                 break;
             }
-            case NonLocal: {
-                std::cout << "token::NonLocal";
+            case Outer: {
+                std::cout << "token::Outer";
                 break;
             }
             case True: {

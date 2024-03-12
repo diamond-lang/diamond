@@ -4,7 +4,7 @@ function printArray(array: array3[int64]): void
     i = 1
     while i <= 3
         print(array[i])
-        nonlocal i = i + 1
+        outer i = i + 1
 
 a = [1, 2, 3]
 printArray(a)

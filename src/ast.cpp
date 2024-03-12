@@ -847,7 +847,7 @@ void ast::print(Node* node, PrintContext context) {
             std::cout << assignment.identifier->value << "\n";
             if (assignment.nonlocal) {
                 put_indent_level(context.indent_level + 1, append(context.last, false));
-                std::cout << "nonlocal\n";
+                std::cout << "outer\n";
             }
             put_indent_level(context.indent_level + 1, append(context.last, false));
             std::cout << (assignment.is_mutable ? "=" : "be") << '\n';

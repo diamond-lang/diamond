@@ -240,7 +240,7 @@ Result<ast::Node*, Error> Parser::parse_statement() {
         case token::Continue: return this->parse_continue_stmt();
         case token::Use:      return this->parse_use_stmt();
         case token::Include:  return this->parse_use_stmt();
-        case token::NonLocal: return this->parse_assignment();
+        case token::Outer:    return this->parse_assignment();
         case token::Star:     return this->parse_dereference_assignment();
         case token::Identifier:
             if (this->match({token::Identifier, token::Equal}))     return this->parse_assignment();
@@ -553,7 +553,7 @@ Result<ast::Node*, Error> Parser::parse_assignment() {
     auto assignment = ast::AssignmentNode {this->current().line, this->current().column};
 
     // Parse nonlocal
-    if (this->current() == token::NonLocal) {
+    if (this->current() == token::Outer) {
         assignment.nonlocal = true;
         this->advance();
     }

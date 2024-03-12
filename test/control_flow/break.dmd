@@ -1,6 +1,6 @@
 i = 0
 while true
-    nonlocal i = i + 1
+    outer i = i + 1
     print(i)
     if i == 10 break
 
