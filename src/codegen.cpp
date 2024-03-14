@@ -273,41 +273,15 @@ namespace codegen {
         }
 
         ast::FunctionNode* get_function(ast::CallNode* call) {
-            ast::FunctionNode* function = nullptr;
-            for (auto it: call->functions) {
-                if (it->state == ast::FunctionCompletelyTyped) {
-                    if (semantic::are_types_compatible(ast::get_types(it->args), this->get_types(call->args))) {
-                        function = it;
-                        break;
-                    }
-                }
-                else {
-                    bool match = true;
-                    for (size_t i = 0; i < it->args.size(); i++) {
-                        auto arg_type = ast::get_concrete_type(call->args[i]->type, this->type_bindings);
-                        if (it->args[i]->type.is_concrete()
-                        &&  arg_type != it->args[i]->type) {
-                            match = false;
-                            break;
-                        }
-                        else if (it->args[i]->type.is_type_variable()
-                        &&       it->args[i]->type.as_type_variable().overload_constraints.size() > 0
-                        &&      !it->args[i]->type.as_type_variable().overload_constraints.contains(arg_type)) {
-                            match = false;
-                        }
-                        else {
-                            break;
-                        }
-                    }
-
-                    if (match) {
-                        function = it;
-                        break;
-                    }
+            ast::FunctionNode* result = nullptr;
+            for (auto function: call->functions) {
+                if (semantic::are_types_compatible(*function, ast::get_types(function->args), this->get_types(call->args))) {
+                    result = function;
+                    break;
                 }
             }
-            assert(function != nullptr);
-            return function;
+            assert(result != nullptr);
+            return result;
         }
 
         size_t get_index_of_field(ast::TypeNode* definition, std::string field_name) {

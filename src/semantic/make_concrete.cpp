@@ -167,10 +167,10 @@ Result<Ok, Error> set_expected_types_of_arguments_and_check(semantic::Context& c
                 return Error {};
             }
             else if (called_function->args[i]->type.is_type_variable()
-            && called_function->args[i]->type.as_type_variable().overload_constraints.size() > 0
-            && !called_function->args[i]->type.as_type_variable().overload_constraints.contains(arg_type)) {
+            &&  called_function->get_type_parameter(called_function->args[i]->type).value()->as_type_variable().overload_constraints.size() > 0
+            && !called_function->get_type_parameter(called_function->args[i]->type).value()->as_type_variable().overload_constraints.contains(arg_type)) {
                 arg_type = ast::get_concrete_type(call->args[i]->type, context.type_inference.type_bindings);
-                context.errors.push_back(errors::unexpected_argument_type(*call, context.current_module, i, arg_type, called_function->args[i]->type.as_type_variable().overload_constraints.elements, call_stack));
+                context.errors.push_back(errors::unexpected_argument_type(*call, context.current_module, i, arg_type, called_function->get_type_parameter(called_function->args[i]->type).value()->as_type_variable().overload_constraints.elements, call_stack));
                 return Error {};
             }
             else {
@@ -430,7 +430,7 @@ Result<ast::Type, Error> get_field_type(semantic::Context& context, std::string 
 }
 
 
-void add_argument_type_to_context(semantic::Context& context, ast::Type function_type, ast::Type argument_type) {
+void add_argument_type_to_context(semantic::Context& context, ast::FunctionNode& function, ast::Type function_type, ast::Type argument_type) {
     if (function_type.is_type_variable()) {
         // If it was no already included
         if (context.type_inference.type_bindings.find(function_type.as_type_variable().id) == context.type_inference.type_bindings.end()) {
@@ -442,9 +442,12 @@ void add_argument_type_to_context(semantic::Context& context, ast::Type function
         }
 
         // If function argument has field constraints
-        if (function_type.as_type_variable().field_constraints.size() > 0) {
-            for (auto field: function_type.as_type_variable().field_constraints) {
-                add_argument_type_to_context(context, field.type, get_field_type(context, field.name, argument_type).get_value());
+        if (function.get_type_parameter(function_type).has_value()) {
+            function_type = *function.get_type_parameter(function_type).value();
+            if (function_type.as_type_variable().field_constraints.size() > 0) {
+                for (auto field: function_type.as_type_variable().field_constraints) {
+                    add_argument_type_to_context(context, function, field.type, get_field_type(context, field.name, argument_type).get_value());
+                }
             }
         }
     }
@@ -459,7 +462,7 @@ void add_argument_type_to_context(semantic::Context& context, ast::Type function
         assert(argument_type.is_concrete());
 
         for (size_t i = 0; i < function_type.as_nominal_type().parameters.size(); i++) {
-            add_argument_type_to_context(context, function_type.as_nominal_type().parameters[i], argument_type.as_nominal_type().parameters[i]);
+            add_argument_type_to_context(context, function, function_type.as_nominal_type().parameters[i], argument_type.as_nominal_type().parameters[i]);
         }
     }
 }
@@ -549,7 +552,7 @@ Result<ast::Type, Error> semantic::get_function_type(Context& context, ast::Call
     for (size_t i = 0; i < args.size(); i++) {
         ast::Type call_type = args[i];
         ast::Type function_type = function->args[i]->type;
-        add_argument_type_to_context(new_context, function_type, call_type);
+        add_argument_type_to_context(new_context, *function, function_type, call_type);
     }
 
     // Analyze function with call argument types

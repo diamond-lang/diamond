@@ -272,10 +272,12 @@ std::string ast::TypeVariable::as_type_parameter() {
         output += this->interface.value().name;
     }
     else if (this->overload_constraints.size() > 0) {
+        output += "{";
         for (size_t i = 0; i < this->overload_constraints.size(); i++) {
             output += this->overload_constraints.elements[i].to_str();
-            if (i + 1 != this->overload_constraints.size()) output += " or ";
+            if (i + 1 != this->overload_constraints.size()) output += ", ";
         }
+        output += "}";
     }
     else if (this->field_constraints.size() > 0) {
         output += "{";
@@ -457,21 +459,6 @@ ast::Type ast::get_concrete_type(Type type, std::unordered_map<size_t, Type>& ty
 
 void ast::set_type(Node* node, Type type) {
     std::visit([type](auto& variant) {variant.type = type;}, *node);
-}
-
-void ast::set_types(std::vector<CallArgumentNode*> nodes, std::vector<Type> types) {
-    assert(nodes.size() == types.size());
-    for (size_t i = 0; i < nodes.size(); i++) {
-        ast::set_type(nodes[i]->expression, types[i]);
-    }
-}
-
-std::vector<ast::Type> ast::get_types(std::vector<Node*> nodes) {
-    std::vector<Type> types;
-    for (size_t i = 0; i < nodes.size(); i++) {
-        types.push_back(get_type(nodes[i]));
-    }
-    return types;
 }
 
 std::vector<ast::Type> ast::get_types(std::vector<CallArgumentNode*> nodes) {
@@ -1157,4 +1144,22 @@ void ast::print(Node* node, PrintContext context) {
             assert(false);
         }
     }
+}
+
+bool ast::FunctionNode::typed_parameter_aready_added(ast::Type type) {
+    for (auto type_parameter: this->type_parameters) {
+        if (type_parameter == type) {
+            return true;
+        }
+    }
+    return false;
+}
+
+std::optional<ast::Type*> ast::FunctionNode::get_type_parameter(ast::Type type) {
+    for (auto& type_parameter: this->type_parameters) {
+        if (type_parameter == type) {
+            return &type_parameter;
+        }
+    }
+    return std::nullopt;
 }

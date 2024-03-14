@@ -9,6 +9,7 @@
 #include <optional>
 #include <cmath>
 #include <cassert>
+#include <iostream>
 #include "data_structures.hpp"
 
 namespace ast {
@@ -201,8 +202,6 @@ namespace ast {
     Type get_concrete_type(Node* node, std::unordered_map<size_t, Type>& type_bindings);
     Type get_concrete_type(Type type_variable, std::unordered_map<size_t, Type>& type_bindings);
     void set_type(Node* node, Type type);
-    void set_types(std::vector<CallArgumentNode*> nodes, std::vector<Type> types);
-    std::vector<Type> get_types(std::vector<Node*> nodes);
     std::vector<Type> get_types(std::vector<CallArgumentNode*> nodes);
     std::vector<Type> get_types(std::vector<FunctionArgumentNode*> nodes);
     std::vector<Type> get_default_types(std::vector<ast::Type> types);
@@ -272,15 +271,9 @@ namespace ast {
         std::vector<FunctionSpecialization> specializations;
         Type return_type = Type(ast::NoType{});
         std::filesystem::path module_path; // Used in to tell from which module the function comes from
-
-        bool typed_parameter_aready_added(ast::Type type) {
-            for (auto type_parameter: this->type_parameters) {
-                if (type_parameter == type) {
-                    return true;
-                }
-            }
-            return false;
-        }
+    
+        bool typed_parameter_aready_added(ast::Type type);
+        std::optional<ast::Type*> get_type_parameter(ast::Type type);
     };
 
     struct TypeNode {

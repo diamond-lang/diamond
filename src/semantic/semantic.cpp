@@ -4,6 +4,33 @@
 #include "unify.hpp"
 #include "make_concrete.hpp"
 
+// Helper functions
+// ----------------
+void add_type_parameters(semantic::Context& context, ast::FunctionNode& node, ast::Type type) {
+    if (type.is_type_variable()) {
+        if (context.type_inference.overload_constraints.find(type) != context.type_inference.overload_constraints.end()) {
+            type.as_type_variable().overload_constraints = context.type_inference.overload_constraints[type];
+        }
+        if (context.type_inference.field_constraints.find(type) != context.type_inference.field_constraints.end()) {
+            type.as_type_variable().field_constraints = context.type_inference.field_constraints[type];
+        }
+
+        if (!node.typed_parameter_aready_added(type)) {
+            node.type_parameters.push_back(type);
+        }
+    }
+    else if (type.is_nominal_type()) {
+        for (auto parameter: type.as_nominal_type().parameters) {
+            if (!parameter.is_concrete()) {
+                add_type_parameters(context, node, parameter);
+            }
+        }
+    }
+    else {
+        assert(false);
+    }
+} 
+
 // Semantic analysis
 // -----------------
 Result<Ok, Errors> semantic::analyze(ast::Ast& ast) {
@@ -256,21 +283,14 @@ Result<Ok, Error> semantic::analyze(semantic::Context& context, ast::FunctionNod
         // Unify args and return type 
         for (size_t i = 0; i < node.args.size(); i++) {
             node.args[i]->type = semantic::get_unified_type(new_context, node.args[i]->type);
-
-            if (new_context.type_inference.overload_constraints.find(node.args[i]->type) != new_context.type_inference.overload_constraints.end()) {
-                node.args[i]->type.as_type_variable().overload_constraints = new_context.type_inference.overload_constraints[node.args[i]->type];
-            }
-            if (new_context.type_inference.field_constraints.find(node.args[i]->type) != new_context.type_inference.field_constraints.end()) {
-                node.args[i]->type.as_type_variable().field_constraints = new_context.type_inference.field_constraints[node.args[i]->type];
+            if (!node.args[i]->type.is_concrete()) {
+                add_type_parameters(new_context, node, node.args[i]->type);
             }
         }
 
         node.return_type = semantic::get_unified_type(new_context, node.return_type);
-        if (new_context.type_inference.overload_constraints.find(node.return_type) != new_context.type_inference.overload_constraints.end()) {
-            node.return_type.as_type_variable().overload_constraints = new_context.type_inference.overload_constraints[node.return_type];
-        }
-        if (new_context.type_inference.field_constraints.find(node.return_type) != new_context.type_inference.field_constraints.end()) {
-            node.return_type.as_type_variable().field_constraints = new_context.type_inference.field_constraints[node.return_type];
+        if (!node.return_type.is_concrete()) {
+            add_type_parameters(new_context, node, node.return_type);
         }
 
         // Set function as analyzed
@@ -341,4 +361,59 @@ Result<Ok, Error> semantic::analyze(semantic::Context& context, ast::TypeNode& n
     }
 
     return Ok {};
+}
+
+// Check two types are compatible
+// ------------------------------
+bool semantic::are_types_compatible(ast::FunctionNode& function, ast::Type function_type, ast::Type argument_type) {
+    assert(argument_type.is_concrete());
+
+    if (function_type.is_type_variable()) {
+        auto type_parameter = function.get_type_parameter(function_type);
+        if (type_parameter.has_value()) {
+            function_type = *(function.get_type_parameter(function_type).value());
+        }
+    }
+
+    if (function_type.is_concrete()) {
+        return argument_type == function_type;
+    }
+    else if (function_type.is_type_variable()
+    &&       function_type.as_type_variable().overload_constraints.size() == 0) {
+        return true;
+    }
+    else if (function_type.is_type_variable()
+    &&       function_type.as_type_variable().overload_constraints.size() > 0) {
+        return function_type.as_type_variable().overload_constraints.contains(argument_type);
+    }
+    else if (function_type.is_nominal_type()) {
+        if (function_type.as_nominal_type().name == argument_type.as_nominal_type().name
+        &&  function_type.as_nominal_type().parameters.size() == argument_type.as_nominal_type().parameters.size()) {
+            for (size_t i = 0; i < function_type.as_nominal_type().parameters.size(); i++) {
+                if (!semantic::are_types_compatible(function, function_type.as_nominal_type().parameters[i], argument_type.as_nominal_type().parameters[i])) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        if (function_type.as_nominal_type().name == "array" && argument_type.is_array()) {
+            for (size_t i = 0; i < function_type.as_nominal_type().parameters.size(); i++) {
+                if (!semantic::are_types_compatible(function, function_type.as_nominal_type().parameters[i], argument_type.as_nominal_type().parameters[i])) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        return false;
+    }
+    return true;
+}
+
+bool semantic::are_types_compatible(ast::FunctionNode& function, std::vector<ast::Type> function_types, std::vector<ast::Type> argument_types) {
+    for (size_t i = 0; i < function_types.size(); i++) {
+        if (!semantic::are_types_compatible(function, function_types[i], argument_types[i])) {
+            return false;
+        }
+    }
+    return true;
 }
