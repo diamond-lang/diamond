@@ -197,9 +197,9 @@ Result<Ok, Error> semantic::analyze_block_or_expression(semantic::Context& conte
     // -------------
     if (!context.current_function.has_value()
     ||   context.current_function.value()->state == ast::FunctionCompletelyTyped) {
-        result = semantic::get_concrete_as_type_bindings(context, node, {});
+        result = semantic::make_concrete(context, node, {});
         if (result.is_error()) return result;
-        make_concrete(context, node);
+        semantic::set_concrete_types(context, node);
     }
 
     return Ok {};
