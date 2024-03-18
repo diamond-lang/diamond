@@ -183,41 +183,9 @@ std::string ast::Type::to_str() const {
             output += std::to_string(std::get<ast::TypeVariable>(this->type).id);
         }
 
-        if (std::get<ast::TypeVariable>(this->type).interface.has_value()
-        ||  std::get<ast::TypeVariable>(this->type).overload_constraints.size() > 0) {
-            output += " :: ";
-        }
-
-
         if (std::get<ast::TypeVariable>(this->type).interface.has_value()) {
+            output += " :: ";
             output += std::get<ast::TypeVariable>(this->type).interface.value().name;
-        }
-
-        if (std::get<ast::TypeVariable>(this->type).interface.has_value()
-        &&  std::get<ast::TypeVariable>(this->type).overload_constraints.size() > 0) {
-            output += " & ";
-        }
-
-        if (std::get<ast::TypeVariable>(this->type).overload_constraints.size() > 0) {
-            output += "{";
-
-            for (size_t i = 0; i < std::get<ast::TypeVariable>(this->type).overload_constraints.size(); i++) {
-                output += std::get<ast::TypeVariable>(this->type).overload_constraints.elements[i].to_str();
-                if (i + 1 != std::get<ast::TypeVariable>(this->type).overload_constraints.size()) output += ", ";
-            }
-
-            output += "}";
-        }
-
-        if (std::get<ast::TypeVariable>(this->type).field_constraints.size() > 0) {
-            output += " | {";
-            auto fields = std::get<ast::TypeVariable>(this->type).field_constraints;
-            for(auto field = fields.begin(); field != fields.end(); field++) {
-                output += field->name + ": " + field->type.to_str() + ", ";
-
-            }
-
-            output += "...}";
         }
 
         return output;
@@ -259,17 +227,17 @@ std::string ast::Type::to_str() const {
     return output;
 }
 
-std::string ast::TypeVariable::as_type_parameter() {
-    std::string output = as_letter(this->id);
+std::string ast::TypeParameter::to_str() {
+    std::string output = as_letter(this->type.as_type_variable().id);
 
-    if (this->interface.has_value()
+    if (this->type.as_type_variable().interface.has_value()
     ||  this->overload_constraints.size() > 0
     ||  this->field_constraints.size() > 0) {
         output += ": ";
     }
 
-    if (this->interface.has_value()) {
-        output += this->interface.value().name;
+    if (this->type.as_type_variable().interface.has_value()) {
+        output += this->type.as_type_variable().interface.value().name;
     }
     else if (this->overload_constraints.size() > 0) {
         output += "{";
@@ -765,7 +733,7 @@ void ast::print(Node* node, PrintContext context) {
                 if (function.type_parameters.size() > 0) {
                     std::cout << '[';
                     for (size_t i = 0; i < function.type_parameters.size(); i++) {
-                        std::cout << function.type_parameters[i].as_type_variable().as_type_parameter();
+                        std::cout << function.type_parameters[i].to_str();
                         if (i + 1 != function.type_parameters.size()) std::cout << ", ";
                     }
                     std::cout << ']';
@@ -1148,16 +1116,16 @@ void ast::print(Node* node, PrintContext context) {
 
 bool ast::FunctionNode::typed_parameter_aready_added(ast::Type type) {
     for (auto type_parameter: this->type_parameters) {
-        if (type_parameter == type) {
+        if (type_parameter.type == type) {
             return true;
         }
     }
     return false;
 }
 
-std::optional<ast::Type*> ast::FunctionNode::get_type_parameter(ast::Type type) {
+std::optional<ast::TypeParameter*> ast::FunctionNode::get_type_parameter(ast::Type type) {
     for (auto& type_parameter: this->type_parameters) {
-        if (type_parameter == type) {
+        if (type_parameter.type == type) {
             return &type_parameter;
         }
     }

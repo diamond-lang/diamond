@@ -8,15 +8,18 @@
 // ----------------
 void add_type_parameters(semantic::Context& context, ast::FunctionNode& node, ast::Type type) {
     if (type.is_type_variable()) {
+        ast::TypeParameter parameter;
+        parameter.type = type;
+
         if (context.type_inference.overload_constraints.find(type) != context.type_inference.overload_constraints.end()) {
-            type.as_type_variable().overload_constraints = context.type_inference.overload_constraints[type];
+            parameter.overload_constraints = context.type_inference.overload_constraints[type];
         }
         if (context.type_inference.field_constraints.find(type) != context.type_inference.field_constraints.end()) {
-            type.as_type_variable().field_constraints = context.type_inference.field_constraints[type];
+            parameter.field_constraints = context.type_inference.field_constraints[type];
         }
 
         if (!node.typed_parameter_aready_added(type)) {
-            node.type_parameters.push_back(type);
+            node.type_parameters.push_back(parameter);
         }
     }
     else if (type.is_nominal_type()) {
@@ -368,23 +371,18 @@ Result<Ok, Error> semantic::analyze(semantic::Context& context, ast::TypeNode& n
 bool semantic::are_types_compatible(ast::FunctionNode& function, ast::Type function_type, ast::Type argument_type) {
     assert(argument_type.is_concrete());
 
-    if (function_type.is_type_variable()) {
-        auto type_parameter = function.get_type_parameter(function_type);
-        if (type_parameter.has_value()) {
-            function_type = *(function.get_type_parameter(function_type).value());
-        }
-    }
-
     if (function_type.is_concrete()) {
         return argument_type == function_type;
     }
     else if (function_type.is_type_variable()
-    &&       function_type.as_type_variable().overload_constraints.size() == 0) {
+    &&       function.get_type_parameter(function_type).has_value()
+    &&       function.get_type_parameter(function_type).value()->overload_constraints.size() == 0) {
         return true;
     }
     else if (function_type.is_type_variable()
-    &&       function_type.as_type_variable().overload_constraints.size() > 0) {
-        return function_type.as_type_variable().overload_constraints.contains(argument_type);
+    &&       function.get_type_parameter(function_type).has_value()
+    &&       function.get_type_parameter(function_type).value()->overload_constraints.size() > 0) {
+        return function.get_type_parameter(function_type).value()->overload_constraints.contains(argument_type);
     }
     else if (function_type.is_nominal_type()) {
         if (function_type.as_nominal_type().name == argument_type.as_nominal_type().name

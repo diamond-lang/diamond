@@ -374,8 +374,8 @@ std::vector<ast::Type> semantic::get_possible_types_for_argument(std::vector<ast
             possible_types.push_back(function->args[argument_position]->type);
         }
         else if (function->args[argument_position]->type.is_type_variable()
-        &&       function->get_type_parameter(function->args[argument_position]->type).value()->as_type_variable().overload_constraints.size() > 0) {
-            for (auto type: function->get_type_parameter(function->args[argument_position]->type).value()->as_type_variable().overload_constraints.elements) {
+        &&       function->get_type_parameter(function->args[argument_position]->type).value()->overload_constraints.size() > 0) {
+            for (auto type: function->get_type_parameter(function->args[argument_position]->type).value()->overload_constraints.elements) {
                 possible_types.push_back(type);
             }
         }
@@ -393,8 +393,8 @@ std::vector<ast::Type> semantic::get_possible_types_for_return_type(std::vector<
             possible_types.push_back(function->return_type);
         }
         else if (function->return_type.is_type_variable()
-        &&       function->get_type_parameter(function->return_type).value()->as_type_variable().overload_constraints.size() > 0) {
-            for (auto type: function->get_type_parameter(function->return_type).value()->as_type_variable().overload_constraints.elements) {
+        &&       function->get_type_parameter(function->return_type).value()->overload_constraints.size() > 0) {
+            for (auto type: function->get_type_parameter(function->return_type).value()->overload_constraints.elements) {
                 possible_types.push_back(type);
             }
         }

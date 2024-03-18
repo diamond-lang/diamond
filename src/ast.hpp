@@ -129,13 +129,9 @@ namespace ast {
         size_t id;
         bool is_final = false;
         std::optional<Interface> interface = std::nullopt;
-        Set<ast::Type> overload_constraints;
-        FieldTypes field_constraints;
 
         TypeVariable(size_t id) : id(id) {}
         TypeVariable(size_t id, bool is_final) : id(id), is_final(is_final) {}
-
-        std::string as_type_parameter();
     };
 
     struct NominalType {
@@ -218,6 +214,14 @@ namespace ast {
         ast::Type type;
     };
 
+    struct TypeParameter {
+        ast::Type type;
+        Set<ast::Type> overload_constraints;
+        FieldTypes field_constraints;
+
+        std::string to_str();
+    };
+
     struct BlockNode {
         size_t line;
         size_t column;
@@ -261,7 +265,7 @@ namespace ast {
         Type type = Type(ast::NoType{});
 
         IdentifierNode* identifier;
-        std::vector<ast::Type> type_parameters;
+        std::vector<ast::TypeParameter> type_parameters;
         std::vector<FunctionArgumentNode*> args;
         Node* body;
 
@@ -273,7 +277,7 @@ namespace ast {
         std::filesystem::path module_path; // Used in to tell from which module the function comes from
     
         bool typed_parameter_aready_added(ast::Type type);
-        std::optional<ast::Type*> get_type_parameter(ast::Type type);
+        std::optional<ast::TypeParameter*> get_type_parameter(ast::Type type);
     };
 
     struct TypeNode {

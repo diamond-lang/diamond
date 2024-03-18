@@ -242,7 +242,7 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::Ca
                 new_overload_constraints.insert(function->args[i]->type);
             }
             else if (function->args[i]->type.is_type_variable()) {
-                auto& function_overload_constraints = function->get_type_parameter(function->args[i]->type).value()->as_type_variable().overload_constraints;
+                auto& function_overload_constraints = function->get_type_parameter(function->args[i]->type).value()->overload_constraints;
                 if (function_overload_constraints.size() > 0) {
                     for (auto constraint: function_overload_constraints.elements) {
                         new_overload_constraints.insert(constraint);
