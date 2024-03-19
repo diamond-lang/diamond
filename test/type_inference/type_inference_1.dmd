@@ -1,5 +1,5 @@
-a = 10
-print(20.5 + a) -- print(a + 20.5) won't work until having interfaces
+a = 10.0
+print(20.5 + a) -- a = 10 won't work until having interfaces
 
 --- Output
 30.5

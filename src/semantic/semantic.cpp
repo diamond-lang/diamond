@@ -283,7 +283,7 @@ Result<Ok, Error> semantic::analyze(semantic::Context& context, ast::FunctionNod
             return Error {};
         }
 
-        // Unify args and return type 
+        // Unify args and return type and add type parameters
         for (size_t i = 0; i < node.args.size(); i++) {
             node.args[i]->type = semantic::get_unified_type(new_context, node.args[i]->type);
             if (!node.args[i]->type.is_concrete()) {

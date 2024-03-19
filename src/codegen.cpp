@@ -346,7 +346,7 @@ namespace codegen {
         }
 
         void store_array_elements(ast::Node* expression, llvm::Value* array_allocation) {
-            llvm::Type* array_type = this->as_llvm_type(ast::get_concrete_type(ast::get_type(expression), type_bindings));
+            llvm::Type* array_type = this->as_llvm_type(ast::get_concrete_type(expression, type_bindings));
 
             if (expression->index() == ast::Array) {
                 auto& array = std::get<ast::ArrayNode>(*expression);
@@ -1037,7 +1037,7 @@ llvm::Value* codegen::Context::codegen(ast::AssignmentNode& node) {
     }
     else if (this->has_array_type(node.expression)) {
         // Create allocation
-        llvm::Type* array_type = this->as_llvm_type(ast::get_concrete_type(ast::get_type(node.expression), this->type_bindings));
+        llvm::Type* array_type = this->as_llvm_type(ast::get_concrete_type(node.expression, this->type_bindings));
         this->current_scope()[node.identifier->value] = this->create_allocation("array", array_type);
             
         // Store array elements
@@ -1543,7 +1543,7 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
             }
             llvm::Value* ptr = this->builder->CreateGEP(array_type, array_ptr, {llvm::ConstantInt::get(*(this->context), llvm::APInt(64, 0, true)), index}, "", true);
             return this->builder->CreateLoad(
-                this->as_llvm_type(ast::get_concrete_type(node.type, this->type_bindings)),
+                this->as_llvm_type(ast::get_concrete_type((ast::Node*)&node, this->type_bindings)),
                 ptr
             );
         }

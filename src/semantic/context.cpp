@@ -320,15 +320,10 @@ ast::Type semantic::get_unified_type(Context& context, ast::Type type_var) {
         }
     }
 
-    if (type_var.is_type_variable() && !type_var.as_type_variable().is_final) {
-        std::optional<ast::Interface> interface = std::nullopt;
-        if (type_var.as_type_variable().interface.has_value()) {
-            interface = type_var.as_type_variable().interface;
-        }
+    if (type_var.is_type_variable() && !type_var.as_type_variable().is_final) { 
         ast::Type new_type_var = semantic::new_final_type_variable(context);
-        new_type_var.as_type_variable().interface = interface;
-        context.type_inference.labeled_type_constraints[new_type_var] = Set<ast::Type>({type_var});
         new_type_var.as_type_variable().interface = type_var.as_type_variable().interface;
+        context.type_inference.labeled_type_constraints[new_type_var] = Set<ast::Type>({type_var});
         return new_type_var;
     }
     else if (!type_var.is_type_variable()) {

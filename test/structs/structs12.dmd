@@ -11,7 +11,7 @@ function generic1(p)
     print(p.y)
 
 function generic2()
-    b = 10
+    b = 10.0
     a = Point{x: b + 3.5, y: 10}
     a.x = b * 10
     a.y = 100

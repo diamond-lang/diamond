@@ -6,6 +6,10 @@
 namespace semantic {
     bool is_type_concrete(Context& context, ast::Type type);
     ast::Type get_type(Context& context, ast::Type type);
+    ast::Type get_type_or_default(Context& context, ast::Type type);
+    ast::Type get_type_or_default(Context& context, ast::Node* node);;
+    std::vector<ast::Type> get_types_or_default(Context& context, std::vector<ast::Type> type_variables);
+    std::vector<ast::Type> get_types_or_default(Context& context, std::vector<ast::Node*> nodes);
 
     Result<Ok, Error> make_concrete(Context& context, ast::Node* node, std::vector<ast::CallInCallStack> call_stack);
     Result<Ok, Error> make_concrete(Context& context, ast::BlockNode& node, std::vector<ast::CallInCallStack> call_stack);
@@ -34,7 +38,7 @@ namespace semantic {
     Result<Ok, Error> make_concrete(Context& context, ast::AddressOfNode& node, std::vector<ast::CallInCallStack> call_stack);
     Result<Ok, Error> make_concrete(Context& context, ast::DereferenceNode& node, std::vector<ast::CallInCallStack> call_stack);
     
-    Result<ast::Type, Error> get_type_completly_typed_function(ast::FunctionNode* function, std::vector<ast::Type> args);
+    Result<ast::Type, Error> get_type_completely_typed_function(Context& context, ast::FunctionNode* function, std::vector<ast::Type> args);
     Result<ast::Type, Error> get_function_type(Context& context, ast::CallNode* call, ast::FunctionNode* function, std::vector<ast::Type> args, std::vector<ast::CallInCallStack> call_stack);
     
     void set_concrete_types(Context& context, ast::Node* node);

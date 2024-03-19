@@ -403,9 +403,6 @@ ast::Type ast::get_concrete_type(Type type, std::unordered_map<size_t, Type>& ty
         if (type_bindings.find(type.as_type_variable().id) != type_bindings.end()) {
             type = type_bindings[type.as_type_variable().id];
         }
-        else if (type.as_type_variable().interface.has_value()) {
-            type = type.as_type_variable().interface.value().get_default_type();
-        }
         else {
             std::cout << "unknown type: " << type.to_str() << "\n";
             assert(false);

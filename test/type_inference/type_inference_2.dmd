@@ -1,9 +1,9 @@
 a = 10 : int32
 print(a + 3)
 
-a = 50
+a = 50 : int8
 b = 3 : int8
-print(b + a) -- print(a + b) won't work until having interfaces
+print(a + b) -- a = 50 won't work until having interfaces
 
 --- Output
 13
