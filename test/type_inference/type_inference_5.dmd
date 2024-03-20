@@ -1,0 +1,14 @@
+-- Test getting different return types from generic function
+
+function awesome()
+    return 5
+
+print(3.5 + awesome())
+print(2 + awesome())
+print(awesome())
+
+--- Output
+8.5
+7
+5
+---

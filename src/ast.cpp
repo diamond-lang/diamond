@@ -725,7 +725,7 @@ void ast::print(Node* node, PrintContext context) {
             else {
                 std::cout << "function " << function.identifier->value;
 
-                if (function.type_parameters.size() > 0) {
+                if (function.type_parameters.size() > 0 && !context.concrete) {
                     std::cout << '[';
                     for (size_t i = 0; i < function.type_parameters.size(); i++) {
                         std::cout << function.type_parameters[i].to_str();
