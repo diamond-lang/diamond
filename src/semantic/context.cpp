@@ -299,6 +299,15 @@ void semantic::add_constraint(Context& context, Set<ast::Type> constraint) {
     context.type_inference.type_constraints.push_back(constraint);
 }
 
+void semantic::add_interface_constraint(Context& context, ast::Type type, ast::Interface interface) {
+    if (context.type_inference.interface_constraints.find(type) == context.type_inference.interface_constraints.end()) {
+        context.type_inference.interface_constraints[type] = interface;
+    }
+    else {
+        assert(false);
+    }
+}
+
 // For unify and analyze
 ast::Type semantic::get_unified_type(Context& context, ast::Type type_var) {
     for (auto it = context.type_inference.labeled_type_constraints.begin(); it != context.type_inference.labeled_type_constraints.end(); it++) {
@@ -322,7 +331,6 @@ ast::Type semantic::get_unified_type(Context& context, ast::Type type_var) {
 
     if (type_var.is_type_variable() && !type_var.as_type_variable().is_final) { 
         ast::Type new_type_var = semantic::new_final_type_variable(context);
-        new_type_var.as_type_variable().interface = type_var.as_type_variable().interface;
         context.type_inference.labeled_type_constraints[new_type_var] = Set<ast::Type>({type_var});
         return new_type_var;
     }

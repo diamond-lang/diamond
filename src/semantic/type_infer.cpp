@@ -268,7 +268,7 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
 Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, ast::IntegerNode& node) {
     if (node.type == ast::Type(ast::NoType{})) {   
         node.type = semantic::new_type_variable(context);
-        node.type.as_type_variable().interface = ast::Interface("Number");
+        semantic::add_interface_constraint(context, node.type,  ast::Interface("Number"));
     }
     else if (!node.type.is_type_variable() && !node.type.is_integer() && !node.type.is_float()) {
         context.errors.push_back(Error("Error: Type mismatch between type annotation and expression"));
@@ -281,7 +281,7 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
 Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, ast::FloatNode& node) {
     if (node.type == ast::Type(ast::NoType{})) {  
         node.type = semantic::new_type_variable(context);
-        node.type.as_type_variable().interface = ast::Interface("Float");
+        semantic::add_interface_constraint(context, node.type,  ast::Interface("Float"));
     }
     else if (!node.type.is_type_variable() && !node.type.is_float()) {
         context.errors.push_back(Error("Error: Type mismatch between type annotation and expression"));
@@ -333,6 +333,17 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
     return Ok {};
 }
 
+static std::vector<ast::Type> get_default_types(semantic::Context& context, std::vector<ast::Type> types) {
+    std::vector<ast::Type> result;
+    for (size_t i = 0; i < types.size(); i++) {
+        assert(types[i].is_type_variable());
+        assert(context.type_inference.interface_constraints.find(types[i]) != context.type_inference.interface_constraints.end());
+        result.push_back(context.type_inference.interface_constraints[types[i]].get_default_type());
+    }
+    return result;
+}
+
+
 Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, ast::CallNode& node) {
     auto& identifier = node.identifier->value;
 
@@ -345,7 +356,7 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
     // Check binding exists
     semantic::Binding* binding = semantic::get_binding(context, identifier);
     if (!binding) {
-        context.errors.push_back(errors::undefined_function(node, ast::get_default_types(ast::get_types(node.args)), context.current_module));
+        context.errors.push_back(errors::undefined_function(node, get_default_types(context, ast::get_types(node.args)), context.current_module));
         return Error {};
     }
 

@@ -26,6 +26,19 @@ ast::Type ast::Interface::get_default_type() {
     }
 }
 
+bool ast::Interface::is_compatible_with(ast::Type type) {
+    if (this->name== "Number") {
+        return type.is_integer() || type.is_float();
+    }
+    else if (this->name == "Float") {
+        return type.is_float();
+    }
+    else {
+        assert(false);
+        return false;
+    }
+}
+
 // Field types
 // -----------
 std::vector<ast::FieldConstraint>::iterator ast::FieldTypes::begin() {
@@ -183,11 +196,6 @@ std::string ast::Type::to_str() const {
             output += std::to_string(std::get<ast::TypeVariable>(this->type).id);
         }
 
-        if (std::get<ast::TypeVariable>(this->type).interface.has_value()) {
-            output += " :: ";
-            output += std::get<ast::TypeVariable>(this->type).interface.value().name;
-        }
-
         return output;
     }
     else if (this->is_nominal_type()) {
@@ -230,14 +238,14 @@ std::string ast::Type::to_str() const {
 std::string ast::TypeParameter::to_str() {
     std::string output = as_letter(this->type.as_type_variable().id);
 
-    if (this->type.as_type_variable().interface.has_value()
+    if (this->interface.has_value()
     ||  this->overload_constraints.size() > 0
     ||  this->field_constraints.size() > 0) {
         output += ": ";
     }
 
-    if (this->type.as_type_variable().interface.has_value()) {
-        output += this->type.as_type_variable().interface.value().name;
+    if (this->interface.has_value()) {
+        output += this->interface.value().name;
     }
     else if (this->overload_constraints.size() > 0) {
         output += "{";
@@ -440,16 +448,6 @@ std::vector<ast::Type> ast::get_types(std::vector<FunctionArgumentNode*> nodes) 
         types.push_back(nodes[i]->type);
     }
     return types;
-}
-
-std::vector<ast::Type> ast::get_default_types(std::vector<ast::Type> types) {
-    std::vector<Type> result;
-    for (size_t i = 0; i < types.size(); i++) {
-        assert(types[i].is_type_variable());
-        assert(types[i].as_type_variable().interface.has_value());
-        result.push_back(types[i].as_type_variable().interface.value().get_default_type());
-    }
-    return result;
 }
 
 std::vector<ast::Type> ast::get_concrete_types(std::vector<Node*> nodes, std::unordered_map<size_t, Type>& type_bindings) {

@@ -35,8 +35,8 @@ ast::Type semantic::get_type_or_default(Context& context, ast::Type type) {
         if (context.type_inference.type_bindings.find(type.as_type_variable().id) != context.type_inference.type_bindings.end()) {
             type = context.type_inference.type_bindings[type.as_type_variable().id];
         }
-        else if (type.as_type_variable().interface.has_value()) {
-            type = type.as_type_variable().interface.value().get_default_type();
+        else if (context.type_inference.interface_constraints.find(type) != context.type_inference.interface_constraints.end()) {
+            type = context.type_inference.interface_constraints[type].get_default_type();
         }
         else {
             std::cout << "unknown type: " << type.to_str() << "\n";
@@ -203,8 +203,8 @@ Result<Ok, Error> set_expected_types_of_arguments_and_check(semantic::Context& c
         auto arg_type = semantic::get_type(context, call->args[i]->type);
         if (!called_function->args[i]->type.is_concrete()) {
             if (arg_type.is_type_variable()
-            &&  arg_type.as_type_variable().interface.has_value()) {
-                arg_type = arg_type.as_type_variable().interface.value().get_default_type();
+            &&  context.type_inference.interface_constraints.find(arg_type) != context.type_inference.interface_constraints.end()) {
+                arg_type = context.type_inference.interface_constraints[arg_type].get_default_type();
             } 
         }
 
@@ -529,8 +529,9 @@ void add_return_type_to_context(semantic::Context& context, ast::FunctionNode& f
             specialization.return_type = specialization.type_bindings[function_type.as_type_variable().id];
         }
         else if (function_type.is_type_variable()
-        &&       function_type.as_type_variable().interface.has_value()) {
-            specialization.type_bindings[function_type.as_type_variable().id] = function_type.as_type_variable().interface.value().get_default_type();
+        &&       function.get_type_parameter(function_type).has_value()
+        &&       function.get_type_parameter(function_type).value()->interface.has_value()) {
+            specialization.type_bindings[function_type.as_type_variable().id] = function.get_type_parameter(function_type).value()->interface.value().get_default_type();
             specialization.return_type = specialization.type_bindings[function_type.as_type_variable().id];
         }
         else {
@@ -574,8 +575,8 @@ Result<ast::Type, Error> semantic::get_function_type(Context& context, ast::Call
         if (call_in_stack.identifier == call->identifier->value
         && call_in_stack.args == args) {
             if (function->return_type.is_type_variable()
-            &&  function->return_type.as_type_variable().interface.has_value()) {
-                context.type_inference.type_bindings[function->return_type.as_type_variable().id] = function->return_type.as_type_variable().interface.value().get_default_type();
+            &&  context.type_inference.interface_constraints.find(function->return_type) != context.type_inference.interface_constraints.end()) {
+                context.type_inference.type_bindings[function->return_type.as_type_variable().id] = context.type_inference.interface_constraints[function->return_type].get_default_type();
                 return context.type_inference.type_bindings[function->return_type.as_type_variable().id];
             }
             else {

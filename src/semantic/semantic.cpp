@@ -11,6 +11,9 @@ void add_type_parameters(semantic::Context& context, ast::FunctionNode& node, as
         ast::TypeParameter parameter;
         parameter.type = type;
 
+        if (context.type_inference.interface_constraints.find(type) != context.type_inference.interface_constraints.end()) {
+            parameter.interface = context.type_inference.interface_constraints[type];
+        }
         if (context.type_inference.overload_constraints.find(type) != context.type_inference.overload_constraints.end()) {
             parameter.overload_constraints = context.type_inference.overload_constraints[type];
         }
@@ -139,48 +142,6 @@ Result<Ok, Error> semantic::analyze_block_or_expression(semantic::Context& conte
         }
     }
 
-    // Unify of domains of type variables
-    auto labeled_type_constraints = context.type_inference.labeled_type_constraints;
-    for (auto type_constraint: labeled_type_constraints) {
-        if (type_constraint.first.is_type_variable()) {
-            auto interface = type_constraint.second.elements[0].as_type_variable().interface;
-            for (size_t i = 0; i < type_constraint.second.elements.size(); i++) {
-                auto current = type_constraint.second.elements[i].as_type_variable().interface;
-                if (interface == current) {
-                    continue;
-                }
-                else if (!interface.has_value()) {
-                    interface = current;
-                }
-                else if (!current.has_value()) {
-                    continue;
-                }
-                else if (interface == ast::Interface("Number") && current == ast::Interface("Float")) {
-                    interface = current;
-                }
-                else if (interface == ast::Interface("Float") && current == ast::Interface("Number")) {
-                    continue;
-                }
-                else {
-                    std::cout << type_constraint.second.elements[i].to_str() << "\n";
-                    std::cout << interface.value().name << " : " << current.value().name << "\n";
-                    assert(false);
-                }
-            }
-
-            // Update domain of type variables
-            for (size_t i = 0; i < type_constraint.second.elements.size(); i++) {
-                type_constraint.second.elements[i].as_type_variable().interface = interface;
-            }
-
-            // Update key
-            auto key = type_constraint.first;
-            key.as_type_variable().interface = interface;
-            context.type_inference.labeled_type_constraints.erase(type_constraint.first);
-            context.type_inference.labeled_type_constraints[key] = type_constraint.second;
-        }
-    }
-
     // Unify
     // -----
     result = semantic::unify_types_and_type_check(context, node);
@@ -195,6 +156,13 @@ Result<Ok, Error> semantic::analyze_block_or_expression(semantic::Context& conte
         }
     }
     context.type_inference.field_constraints = unified_field_constraints;
+
+    std::unordered_map<ast::Type, ast::Interface> unified_interface_constraints;
+    for (auto it: context.type_inference.interface_constraints) {
+        auto unified_type = semantic::get_unified_type(context, it.first);
+        unified_interface_constraints[unified_type] = it.second;
+    }
+    context.type_inference.interface_constraints = unified_interface_constraints;
 
     // Make concrete
     // -------------
@@ -373,6 +341,11 @@ bool semantic::are_types_compatible(ast::FunctionNode& function, ast::Type funct
 
     if (function_type.is_concrete()) {
         return argument_type == function_type;
+    }
+    else if (function_type.is_type_variable()
+    &&       function.get_type_parameter(function_type).has_value()
+    &&       function.get_type_parameter(function_type).value()->interface.has_value()) {
+        return function.get_type_parameter(function_type).value()->interface.value().is_compatible_with(argument_type);
     }
     else if (function_type.is_type_variable()
     &&       function.get_type_parameter(function_type).has_value()

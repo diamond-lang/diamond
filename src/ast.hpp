@@ -114,11 +114,13 @@ namespace ast {
     struct Interface {
         std::string name;
         
+        Interface() {}
         Interface(std::string name) : name(name) {}
         bool operator==(const Interface &interface) const;
         bool operator!=(const Interface &interface) const;
 
         ast::Type get_default_type();
+        bool is_compatible_with(ast::Type type);
     };
 
     struct NoType {
@@ -128,7 +130,6 @@ namespace ast {
     struct TypeVariable {
         size_t id;
         bool is_final = false;
-        std::optional<Interface> interface = std::nullopt;
 
         TypeVariable(size_t id) : id(id) {}
         TypeVariable(size_t id, bool is_final) : id(id), is_final(is_final) {}
@@ -199,8 +200,7 @@ namespace ast {
     Type get_concrete_type(Type type_variable, std::unordered_map<size_t, Type>& type_bindings);
     void set_type(Node* node, Type type);
     std::vector<Type> get_types(std::vector<CallArgumentNode*> nodes);
-    std::vector<Type> get_types(std::vector<FunctionArgumentNode*> nodes);
-    std::vector<Type> get_default_types(std::vector<ast::Type> types);
+    std::vector<Type> get_types(std::vector<FunctionArgumentNode*> nodes);  
     std::vector<Type> get_concrete_types(std::vector<Node*> nodes, std::unordered_map<size_t, Type>& type_bindings);
     std::vector<Type> get_concrete_types(std::vector<Type> type_variables, std::unordered_map<size_t, Type>& type_bindings);
     bool is_expression(Node* node);
@@ -218,6 +218,7 @@ namespace ast {
         ast::Type type;
         Set<ast::Type> overload_constraints;
         FieldTypes field_constraints;
+        std::optional<Interface> interface = std::nullopt;
 
         std::string to_str();
     };
