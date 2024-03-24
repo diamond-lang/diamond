@@ -14,9 +14,6 @@ void add_type_parameters(semantic::Context& context, ast::FunctionNode& node, as
         if (context.type_inference.interface_constraints.find(type) != context.type_inference.interface_constraints.end()) {
             parameter.interface = context.type_inference.interface_constraints[type];
         }
-        if (context.type_inference.overload_constraints.find(type) != context.type_inference.overload_constraints.end()) {
-            parameter.overload_constraints = context.type_inference.overload_constraints[type];
-        }
         if (context.type_inference.field_constraints.find(type) != context.type_inference.field_constraints.end()) {
             parameter.field_constraints = context.type_inference.field_constraints[type];
         }
@@ -346,16 +343,6 @@ bool semantic::are_types_compatible(ast::FunctionNode& function, ast::Type funct
     &&       function.get_type_parameter(function_type).has_value()
     &&       function.get_type_parameter(function_type).value()->interface.has_value()) {
         return function.get_type_parameter(function_type).value()->interface.value().is_compatible_with(argument_type);
-    }
-    else if (function_type.is_type_variable()
-    &&       function.get_type_parameter(function_type).has_value()
-    &&       function.get_type_parameter(function_type).value()->overload_constraints.size() == 0) {
-        return true;
-    }
-    else if (function_type.is_type_variable()
-    &&       function.get_type_parameter(function_type).has_value()
-    &&       function.get_type_parameter(function_type).value()->overload_constraints.size() > 0) {
-        return function.get_type_parameter(function_type).value()->overload_constraints.contains(argument_type);
     }
     else if (function_type.is_nominal_type()) {
         if (function_type.as_nominal_type().name == argument_type.as_nominal_type().name

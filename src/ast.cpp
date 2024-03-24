@@ -239,21 +239,12 @@ std::string ast::TypeParameter::to_str() {
     std::string output = as_letter(this->type.as_type_variable().id);
 
     if (this->interface.has_value()
-    ||  this->overload_constraints.size() > 0
     ||  this->field_constraints.size() > 0) {
         output += ": ";
     }
 
     if (this->interface.has_value()) {
         output += this->interface.value().name;
-    }
-    else if (this->overload_constraints.size() > 0) {
-        output += "{";
-        for (size_t i = 0; i < this->overload_constraints.size(); i++) {
-            output += this->overload_constraints.elements[i].to_str();
-            if (i + 1 != this->overload_constraints.size()) output += ", ";
-        }
-        output += "}";
     }
     else if (this->field_constraints.size() > 0) {
         output += "{";

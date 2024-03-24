@@ -216,7 +216,6 @@ namespace ast {
 
     struct TypeParameter {
         ast::Type type;
-        Set<ast::Type> overload_constraints;
         FieldTypes field_constraints;
         std::optional<Interface> interface = std::nullopt;
 

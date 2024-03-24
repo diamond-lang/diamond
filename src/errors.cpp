@@ -122,10 +122,10 @@ static std::string list_functions(std::vector<ast::FunctionNode*> functions) {
 }
 
 std::string errors::ambiguous_what_function_to_call(ast::CallNode& call, std::filesystem::path file, std::vector<ast::FunctionNode*> functions, std::vector<ast::CallInCallStack> call_stack) {
-    std::string result = make_header("Type mismatch\n\n");
+    std::string result = make_header("Ambiguous call\n\n");
     result += std::to_string(call.line) + "| " + current_line(call.line, file) + "\n";
     result += underline_identifier(*call.identifier, file) + "\n";
-    result +=  "Here '" + call.identifier->value + "'  can refer to:\n";
+    result +=  "Here '" + call.identifier->value + "' could refer to:\n";
     result += list_functions(functions);
     if (call_stack.size() > 0) {
         result += get_call_stack(call_stack);

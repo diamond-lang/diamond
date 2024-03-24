@@ -222,51 +222,6 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::Ca
     }
     node.functions = functions_that_can_be_called;
     assert(node.functions.size() > 0);
-
-    // Compare new overload constraints with previous
-    // ----------------------------------------------
-    auto& overload_constraints = context.type_inference.overload_constraints;
-
-    // For each argument
-    for (size_t i = 0; i < node.args.size(); i++) {
-        auto arg = node.args[i];
-
-        if (arg->type.is_concrete()) {
-            continue;
-        }
-
-        // Find new overload constraints
-        Set<ast::Type> new_overload_constraints;
-        for (auto function: functions_that_can_be_called) {
-            if (!function->args[i]->type.is_type_variable()) {
-                new_overload_constraints.insert(function->args[i]->type);
-            }
-            else if (function->args[i]->type.is_type_variable()) {
-                auto& function_overload_constraints = function->get_type_parameter(function->args[i]->type).value()->overload_constraints;
-                if (function_overload_constraints.size() > 0) {
-                    for (auto constraint: function_overload_constraints.elements) {
-                        new_overload_constraints.insert(constraint);
-                    }
-                }
-            }
-        }
-
-        // Add or intersect with previous overload constraints founded for argument type
-        if (overload_constraints.find(arg->type) == overload_constraints.end()) {
-            overload_constraints[arg->type] = new_overload_constraints;
-        }
-        else {
-            auto intersection = overload_constraints[arg->type].intersect(new_overload_constraints);
-
-            if (intersection.size() == 0) {
-                context.errors.push_back(errors::unexpected_argument_types(node, context.current_module, i, overload_constraints[arg->type].elements, new_overload_constraints.elements, {}));
-                return Error {};
-            }
-
-            overload_constraints[arg->type] = intersection;
-        }
-    }
-
     return Ok {};
 }
 

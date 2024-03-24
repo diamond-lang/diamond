@@ -1,15 +1,16 @@
-function add(a, b)
-    return a + b
+function add(a: int64, b: int64): int64
+    a + b
 
-function add(a, b)
-    return a or b
+function add(a: float64, b: float64): float64
+    a + b
 
-print(add(1, 2))
-print(add(3.5, 2.3))
-print(add(false, false))
+function generic_add(a, b)
+    return add(a, b)
+
+print(generic_add(10, 20))
+print(generic_add(10.5, 20.0))
 
 --- Output
-3
-5.8
-false
+30
+30.5
 ---

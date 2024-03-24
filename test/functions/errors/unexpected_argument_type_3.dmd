@@ -12,9 +12,9 @@ print(add2(3, 3.5))
 --- Output
 Type mismatch
 
-The type of the 2nd argument of 'add2' doesn't match with what I expect.
+The type of the 2nd argument of 'add' doesn't match with what I expect.
 
-10│ print(add2(3, 3.5))
+8│     return add(a, b)
 
 The type received is:
 
@@ -23,5 +23,8 @@ float64
 But possible types are:
 
 int64 or bool
+
+Called from:
+    test/functions/errors/unexpected_argument_type_3.dmd: 10| add2(a: int64, b: float64)
 
 ---

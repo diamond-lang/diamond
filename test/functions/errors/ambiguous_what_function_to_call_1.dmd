@@ -9,11 +9,11 @@ b = 4
 print(add(2, 5))
 
 --- Output
-Type mismatch
+Ambiguous call
 
 9| print(add(2, 5))
          ^^^
-Here 'add'  can refer to:
+Here 'add' could refer to:
     1| function add(a, b)
     4| function add(a, b)
 

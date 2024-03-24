@@ -217,13 +217,6 @@ Result<Ok, Error> set_expected_types_of_arguments_and_check(semantic::Context& c
                 context.errors.push_back(errors::unexpected_argument_type(*call, context.current_module, i, arg_type, {called_function->args[i]->type}, call_stack));
                 return Error {};
             }
-            else if (called_function->args[i]->type.is_type_variable()
-            &&  called_function->get_type_parameter(called_function->args[i]->type).value()->overload_constraints.size() > 0
-            && !called_function->get_type_parameter(called_function->args[i]->type).value()->overload_constraints.contains(arg_type)) {
-                arg_type = semantic::get_type_or_default(context, call->args[i]->type);
-                context.errors.push_back(errors::unexpected_argument_type(*call, context.current_module, i, arg_type, called_function->get_type_parameter(called_function->args[i]->type).value()->overload_constraints.elements, call_stack));
-                return Error {};
-            }
             else {
                 // Check if everything typechecks
                 auto result = make_concrete(context, *call->args[i], call_stack);
