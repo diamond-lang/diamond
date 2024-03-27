@@ -7,7 +7,7 @@ type Point
 function add(a: Point, b: Point): Point
     return Point{x: a.x + b.x, y: a.y + b.y}
 
-a = add(
+a := add(
     add(
         Point{x: 10, y: 4.6}
         Point{x: 35, y: 23}

@@ -1,9 +1,9 @@
 function add(a: int64, b: int64): bool
     a == b
 
-a = 2
-b = 4
-result = add(a, b) : int64
+a := 2
+b := 4
+result := add(a, b) : int64
 print(result)
 
 --- Output
@@ -11,7 +11,7 @@ Type mismatch
 
 The return type of 'add' doesn't match with what I expect.
 
-6│ result = add(a, b) : int64
+6│ result := add(a, b) : int64
 
 The specified type is:
 

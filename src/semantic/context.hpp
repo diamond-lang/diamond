@@ -14,7 +14,7 @@
 namespace semantic {
     // Bindings
     enum BindingType {
-        AssignmentBinding,
+        VariableBinding,
         FunctionArgumentBinding,
         FunctionBinding,
         TypeBinding
@@ -26,13 +26,13 @@ namespace semantic {
 
         Binding() {}
         ~Binding() {}
-        Binding(ast::AssignmentNode* assignment);
+        Binding(ast::DeclarationNode* variable);
         Binding(ast::Node* function_argument);
         Binding(std::vector<ast::FunctionNode*> functions);
         Binding(ast::TypeNode* type);
     };
 
-    ast::AssignmentNode* get_assignment(Binding binding);
+    ast::DeclarationNode* get_variable(Binding binding);
     ast::Node* get_function_argument(Binding binding);
     std::vector<ast::FunctionNode*> get_functions(Binding binding);
     ast::TypeNode* get_type_definition(Binding binding);

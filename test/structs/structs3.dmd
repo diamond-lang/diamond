@@ -5,8 +5,8 @@ type Point
     y: float64
     z: float64
 
-a = Point{x: 20, y: 30, z: 40}
-b = a
+a := Point{x: 20, y: 30, z: 40}
+b := a
 
 print(b.x)
 print(b.y)

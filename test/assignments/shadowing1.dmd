@@ -1,12 +1,12 @@
-a = 20
+a := 20
 
 if true
-    a = -20
+    a := -20
 
 print(a)
 
 if true
-    outer a = 6
+    a = 6
 
 print(a)
 

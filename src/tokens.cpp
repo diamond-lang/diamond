@@ -90,6 +90,10 @@ void token::print(std::vector<Token> token) {
                 std::cout << "token::LessEqual";
                 break;
             }
+            case ColonEqual: {
+                std::cout << "token::ColonEqual";
+                break;
+            }
             case Equal: {
                 std::cout << "token::Equal";
                 break;
@@ -136,10 +140,6 @@ void token::print(std::vector<Token> token) {
             }
             case Type: {
                 std::cout << "token::Type";
-                break;
-            }
-            case Outer: {
-                std::cout << "token::Outer";
                 break;
             }
             case True: {

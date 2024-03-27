@@ -5,8 +5,8 @@ type Point
 function awesome(p)
     *p.y = 400
 
-a = 10
-p = Point{x: 10, y: &a}
+a := 10
+p := Point{x: 10, y: &a}
 awesome(p)
 print(a)
 

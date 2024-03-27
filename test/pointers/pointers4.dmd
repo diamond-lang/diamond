@@ -1,6 +1,6 @@
-a = 10 : int64
-p = &a : pointer[int64]
-o = &p : pointer[pointer[int64]]
+a := 10 : int64
+p := &a : pointer[int64]
+o := &p : pointer[pointer[int64]]
 **o = 30
 print(a)
 

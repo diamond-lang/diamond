@@ -7,7 +7,7 @@ function expression(a, b)
     else
         add2(b, 10 * b)
 
-hello = expression(false, 10)
+hello := expression(false, 10)
 print(hello)
 
 function log(a)

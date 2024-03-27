@@ -4,8 +4,8 @@ function add(a: int32, b: int32): int32
 function add(a: int8, b: int8): int8
     a + b
 
-a = 2 : int8
-b = 4 : int8
+a := 2 : int8
+b := 4 : int8
 print(add(a, b))
 
 --- Output

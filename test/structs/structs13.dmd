@@ -12,11 +12,11 @@ function make_point(x: float64, y: float64): point_float64
 function make_point(x: int64, y: int64): point_int64
     return point_int64{x: x, y: y}
 
-a = make_point(1, 2)
+a := make_point(1, 2)
 print(a.x)
 print(a.y)
 
-b = make_point(1.5, 2.5)
+b := make_point(1.5, 2.5)
 print(b.x)
 print(b.y)
 

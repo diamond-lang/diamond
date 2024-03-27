@@ -15,8 +15,8 @@ function generic1(rectangle)
     print(rectangle.p2.y)
 
 function generic2()
-    b = 110
-    rectangle = Rectangle{
+    b be 110
+    rectangle be Rectangle{
         p1: Point{x: 10, y: 10}
         p2: Point{x: b, y: 60}
     }

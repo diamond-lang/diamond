@@ -85,6 +85,7 @@ namespace codegen {
         void codegen_function_prototypes(std::filesystem::path module_path, std::string identifier, std::vector<ast::FunctionArgumentNode*> args_names, std::vector<ast::Type> args_types, ast::Type return_type, bool is_extern);
         void codegen_function_bodies(std::vector<ast::FunctionNode*> functions);
         void codegen_function_bodies(std::filesystem::path module_path, std::string identifier, std::vector<ast::FunctionArgumentNode*> args_names, std::vector<ast::Type> args_types, ast::Type return_type, ast::Node* function_body);
+        llvm::Value* codegen(ast::DeclarationNode& node);
         llvm::Value* codegen(ast::AssignmentNode& node);
         llvm::Value* codegen(ast::FieldAssignmentNode& node);
         llvm::Value* codegen(ast::DereferenceAssignmentNode& node);
@@ -1023,7 +1024,7 @@ void codegen::Context::codegen_function_bodies(std::filesystem::path module_path
     this->remove_scope();
 }
 
-llvm::Value* codegen::Context::codegen(ast::AssignmentNode& node) {
+llvm::Value* codegen::Context::codegen(ast::DeclarationNode& node) {
     if (this->has_struct_type(node.expression)) {
         // Create allocation
         llvm::StructType* struct_type = this->get_struct_type(ast::get_type(node.expression).as_nominal_type().type_definition);
@@ -1050,20 +1051,41 @@ llvm::Value* codegen::Context::codegen(ast::AssignmentNode& node) {
         // Generate value of expression
         llvm::Value* expr = this->codegen(node.expression);
 
-        if (node.nonlocal) {
-            // Store value
-            this->builder->CreateStore(expr, this->get_binding(node.identifier->value));
+        // Create allocation if doesn't exists or if already exists, but it has a different type
+        if (this->current_scope().find(node.identifier->value) == this->current_scope().end()
+        ||  this->current_scope()[node.identifier->value]->getType() != expr->getType()) {
+            this->current_scope()[node.identifier->value] = this->create_allocation(node.identifier->value, expr->getType());
         }
-        else {
-            // Create allocation if doesn't exists or if already exists, but it has a different type
-            if (this->current_scope().find(node.identifier->value) == this->current_scope().end()
-            ||  this->current_scope()[node.identifier->value]->getType() != expr->getType()) {
-                this->current_scope()[node.identifier->value] = this->create_allocation(node.identifier->value, expr->getType());
-            }
 
-            // Store value
-            this->builder->CreateStore(expr, this->current_scope()[node.identifier->value]);
-        }
+        // Store value
+        this->builder->CreateStore(expr, this->current_scope()[node.identifier->value]);
+
+        return nullptr;
+    }
+}
+
+llvm::Value* codegen::Context::codegen(ast::AssignmentNode& node) {
+    if (this->has_struct_type(node.expression)) {
+        // Store fields
+        this->store_fields(node.expression, this->current_scope()[node.identifier->value]);
+  
+        // Return
+        return nullptr;
+    }
+    else if (this->has_array_type(node.expression)) {            
+        // Store array elements
+        this->store_array_elements(node.expression, this->current_scope()[node.identifier->value]);
+
+        // Return
+        return nullptr;
+    }
+    else {
+        // Generate value of expression
+        llvm::Value* expr = this->codegen(node.expression);
+
+        // Store value
+        this->builder->CreateStore(expr, this->get_binding(node.identifier->value));
+
         return nullptr;
     }
 }
