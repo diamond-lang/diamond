@@ -7,9 +7,9 @@
 
 // Bindings
 // --------
-semantic::Binding::Binding(ast::AssignmentNode* assignment) {
-    this->type = semantic::AssignmentBinding;
-    this->value.push_back((ast::Node*) assignment);
+semantic::Binding::Binding(ast::DeclarationNode* variable) {
+    this->type = semantic::VariableBinding;
+    this->value.push_back((ast::Node*) variable);
 }
 
 semantic::Binding::Binding(ast::Node* function_argument) {
@@ -29,9 +29,9 @@ semantic::Binding::Binding(ast::TypeNode* type) {
     this->value.push_back((ast::Node*) type);
 }
 
-ast::AssignmentNode* semantic::get_assignment(semantic::Binding binding) {
-    assert(binding.type == semantic::AssignmentBinding);
-    return (ast::AssignmentNode*)binding.value[0];
+ast::DeclarationNode* semantic::get_variable(semantic::Binding binding) {
+    assert(binding.type == semantic::VariableBinding);
+    return (ast::DeclarationNode*)binding.value[0];
 }
 
 ast::Node* semantic::get_function_argument(semantic::Binding binding) {
@@ -55,7 +55,7 @@ ast::TypeNode* semantic::get_type_definition(semantic::Binding binding) {
 
 ast::Type semantic::get_binding_type(semantic::Binding& binding) {
     switch (binding.type) {
-        case semantic::AssignmentBinding: return ast::get_type(((ast::AssignmentNode*)binding.value[0])->expression);
+        case semantic::VariableBinding: return ast::get_type(((ast::DeclarationNode*)binding.value[0])->expression);
         case semantic::FunctionArgumentBinding: return ast::get_type(binding.value[0]);
         case semantic::FunctionBinding: return ast::Type("function");
         case semantic::TypeBinding: return ast::Type("type");
@@ -66,7 +66,7 @@ ast::Type semantic::get_binding_type(semantic::Binding& binding) {
 
 std::string semantic::get_binding_identifier(semantic::Binding& binding) {
     switch (binding.type) {
-        case semantic::AssignmentBinding: return ((ast::AssignmentNode*)binding.value[0])->identifier->value;
+        case semantic::VariableBinding: return ((ast::DeclarationNode*)binding.value[0])->identifier->value;
         case semantic::FunctionArgumentBinding: return ((ast::IdentifierNode*)binding.value[0])->value;
         case semantic::FunctionBinding: return ((ast::FunctionNode*)binding.value[0])->identifier->value;
         case semantic::TypeBinding: return ((ast::TypeNode*)binding.value[0])->identifier->value;
@@ -77,7 +77,7 @@ std::string semantic::get_binding_identifier(semantic::Binding& binding) {
 
 bool semantic::is_function(semantic::Binding& binding) {
     switch (binding.type) {
-        case semantic::AssignmentBinding: return false;
+        case semantic::VariableBinding: return false;
         case semantic::FunctionArgumentBinding: return false;
         case semantic::FunctionBinding: return true;
         case semantic::TypeBinding: return false;

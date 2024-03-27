@@ -80,12 +80,12 @@ std::string errors::undefined_variable(ast::IdentifierNode& identifier, std::fil
            underline_identifier(identifier, file);
 }
 
-std::string errors::reassigning_immutable_variable(ast::IdentifierNode& identifier, ast::AssignmentNode& assignment, std::filesystem::path file) {
+std::string errors::reassigning_immutable_variable(ast::IdentifierNode& identifier, ast::DeclarationNode& declaration, std::filesystem::path file) {
     return make_header("Trying to reassign immutable variable\n\n") +
            std::to_string(identifier.line) + "| " + current_line(identifier.line, file) + "\n" +
            underline_identifier(identifier, file) + "\n" +
            "Previously defined here:\n\n" +
-           std::to_string(assignment.line) + "| " + current_line(assignment.line, file);
+           std::to_string(declaration.line) + "| " + current_line(declaration.line, file);
 }
 
 std::string errors::undefined_function(ast::CallNode& call, std::filesystem::path file) {

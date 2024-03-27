@@ -45,6 +45,7 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
 
         // Type checking
         switch (node.statements[i]->index()) {
+            case ast::Declaration: break;
             case ast::Assignment: break;
             case ast::FieldAssignment: break;
             case ast::DereferenceAssignment: break;
@@ -100,6 +101,34 @@ Result<Ok, Error> semantic::type_infer_and_analyze(Context& context, ast::TypeNo
     return Ok {};
 }
 
+Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, ast::DeclarationNode& node) {
+    // Type infer and analyze expression
+    auto result = semantic::type_infer_and_analyze(context, node.expression);
+    if (result.is_error()) return Error {};
+
+    // Analyze type of expression
+    if (!ast::get_type(node.expression).is_type_variable()) {
+        auto type = ast::get_type(node.expression);
+        auto result = semantic::analyze(context, type);
+        ast::set_type(node.expression, type);
+    }
+
+    // Get identifier
+    std::string identifier = node.identifier->value;
+
+    if (semantic::current_scope(context).find(identifier) != semantic::current_scope(context).end()
+    && semantic::current_scope(context)[identifier].type == VariableBinding) {
+        auto declaration = get_variable(semantic::current_scope(context)[identifier]);
+        if (!declaration->is_mutable) {
+            context.errors.push_back(errors::reassigning_immutable_variable(*node.identifier, *declaration, context.current_module));
+            return Error {};
+        }
+    }
+    semantic::current_scope(context)[identifier] = semantic::Binding(&node);
+
+    return Ok{};
+}
+
 Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, ast::AssignmentNode& node) {
     // Type infer and analyze expression
     auto result = semantic::type_infer_and_analyze(context, node.expression);
@@ -115,28 +144,21 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
     // Get identifier
     std::string identifier = node.identifier->value;
 
-    // nonlocal assignment
-    if (node.nonlocal) {
-        semantic::Binding* binding = semantic::get_binding(context, identifier);
-        if (!binding) {
-            context.errors.push_back(errors::undefined_variable(*node.identifier, context.current_module));
-            return Error {};
-        }
-        semantic::add_constraint(context, Set<ast::Type>({semantic::get_binding_type(*binding), ast::get_type(node.expression)}));
-        *binding = semantic::Binding(&node);
+    // Check variable exists
+    semantic::Binding* binding = semantic::get_binding(context, identifier);
+    if (!binding) {
+        context.errors.push_back(errors::undefined_variable(*node.identifier, context.current_module));
+        return Error {};
     }
+    semantic::add_constraint(context, Set<ast::Type>({semantic::get_binding_type(*binding), ast::get_type(node.expression)}));
 
     // normal assignment
-    else {
-        if (semantic::current_scope(context).find(identifier) != semantic::current_scope(context).end()
-        && semantic::current_scope(context)[identifier].type == AssignmentBinding) {
-            auto assignment = get_assignment(semantic::current_scope(context)[identifier]);
-            if (!assignment->is_mutable) {
-                context.errors.push_back(errors::reassigning_immutable_variable(*node.identifier, *assignment, context.current_module));
-                return Error {};
-            }
+    if (binding->type == VariableBinding) {
+        auto declaration = get_variable(*binding);
+        if (!declaration->is_mutable) {
+            context.errors.push_back(errors::reassigning_immutable_variable(*node.identifier, *declaration, context.current_module));
+            return Error {};
         }
-        semantic::current_scope(context)[identifier] = semantic::Binding(&node);
     }
 
     return Ok {};

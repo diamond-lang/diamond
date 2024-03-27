@@ -37,11 +37,18 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::Ty
     return Ok {};
 }
 
-Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::AssignmentNode& node) {
+Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::DeclarationNode& node) {
     auto result = semantic::unify_types_and_type_check(context, node.expression);
     if (result.is_error()) return Error {};
 
     semantic::current_scope(context)[node.identifier->value] = semantic::Binding(&node);
+
+    return Ok{};
+}
+
+Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::AssignmentNode& node) {
+    auto result = semantic::unify_types_and_type_check(context, node.expression);
+    if (result.is_error()) return Error {};
     
     return Ok {};
 }

@@ -123,6 +123,10 @@ Result<Ok, Error> semantic::make_concrete(Context& context, ast::TypeNode& node,
     return Ok {};
 }
 
+Result<Ok, Error> semantic::make_concrete(Context& context, ast::DeclarationNode& node, std::vector<ast::CallInCallStack> call_stack) {
+    return semantic::make_concrete(context, node.expression, call_stack);
+}
+
 Result<Ok, Error> semantic::make_concrete(Context& context, ast::AssignmentNode& node, std::vector<ast::CallInCallStack> call_stack) {
     return semantic::make_concrete(context, node.expression, call_stack);
 }
@@ -667,6 +671,12 @@ void semantic::set_concrete_types(Context& context, ast::Node* node) {
         }
 
         case ast::TypeDef: {
+            break;
+        }
+
+        case ast::Declaration: {
+            auto& declaration = std::get<ast::DeclarationNode>(*node);
+            semantic::set_concrete_types(context, declaration.expression);
             break;
         }
 

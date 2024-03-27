@@ -781,18 +781,27 @@ void ast::print(Node* node, PrintContext context) {
             break;
         }
 
+        case Declaration: {
+            auto& declaration = std::get<Declaration>(*node);
+
+            put_indent_level(context.indent_level, context.last);
+            std::cout << declaration.identifier->value << "\n";
+            put_indent_level(context.indent_level + 1, append(context.last, false));
+            std::cout << (declaration.is_mutable ? "=" : "be") << '\n';
+
+            context.indent_level += 1;
+            context.last.push_back(true);
+            print(declaration.expression, context);
+            break;
+        }
+
         case Assignment: {
             auto& assignment = std::get<AssignmentNode>(*node);
 
             put_indent_level(context.indent_level, context.last);
             std::cout << assignment.identifier->value << "\n";
-            if (assignment.nonlocal) {
-                put_indent_level(context.indent_level + 1, append(context.last, false));
-                std::cout << "outer\n";
-            }
             put_indent_level(context.indent_level + 1, append(context.last, false));
-            std::cout << (assignment.is_mutable ? "=" : "be") << '\n';
-
+            std::cout << ":=" << '\n';
             context.indent_level += 1;
             context.last.push_back(true);
             print(assignment.expression, context);

@@ -16,6 +16,7 @@ namespace ast {
     struct BlockNode;
     struct FunctionNode;
     struct TypeNode;
+    struct DeclarationNode;
     struct AssignmentNode;
     struct FieldAssignmentNode;
     struct DereferenceAssignmentNode;
@@ -44,6 +45,7 @@ namespace ast {
         Block,
         Function,
         TypeDef,
+        Declaration,
         Assignment,
         FieldAssignment,
         DereferenceAssignment,
@@ -72,6 +74,7 @@ namespace ast {
         BlockNode,
         FunctionNode,
         TypeNode,
+        DeclarationNode,
         AssignmentNode,
         FieldAssignmentNode,
         DereferenceAssignmentNode,
@@ -290,13 +293,21 @@ namespace ast {
         std::filesystem::path module_path; // Used in to tell from which module the type comes from
     };
 
-    struct AssignmentNode {
+    struct DeclarationNode {
         size_t line;
         size_t column;
         Type type = Type(ast::NoType{});
 
         bool is_mutable = false;
-        bool nonlocal = false;
+    
+        IdentifierNode* identifier;
+        Node* expression;
+    };
+
+    struct AssignmentNode {
+        size_t line;
+        size_t column;
+        Type type = Type(ast::NoType{});
 
         IdentifierNode* identifier;
         Node* expression;

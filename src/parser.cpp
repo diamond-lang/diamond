@@ -29,6 +29,7 @@ struct Parser {
     Result<ast::Node*, Error> parse_statement();
     Result<ast::Node*, Error> parse_block_or_statement();
     Result<ast::Node*, Error> parse_block_statement_or_expression();
+    Result<ast::Node*, Error> parse_declaration();
     Result<ast::Node*, Error> parse_assignment();
     Result<ast::Node*, Error> parse_field_assignment();
     Result<ast::Node*, Error> parse_dereference_assignment();
@@ -240,13 +241,13 @@ Result<ast::Node*, Error> Parser::parse_statement() {
         case token::Continue: return this->parse_continue_stmt();
         case token::Use:      return this->parse_use_stmt();
         case token::Include:  return this->parse_use_stmt();
-        case token::Outer:    return this->parse_assignment();
         case token::Star:     return this->parse_dereference_assignment();
         case token::Identifier:
-            if (this->match({token::Identifier, token::Equal}))     return this->parse_assignment();
-            if (this->match({token::Identifier, token::Be}))        return this->parse_assignment();
-            if (this->match({token::Identifier, token::Dot}))       return this->parse_field_assignment();
-            if (this->match({token::Identifier, token::LeftParen})) return this->parse_call();
+            if (this->match({token::Identifier, token::Equal}))      return this->parse_declaration();
+            if (this->match({token::Identifier, token::Be}))         return this->parse_declaration();
+            if (this->match({token::Identifier, token::ColonEqual})) return this->parse_assignment();
+            if (this->match({token::Identifier, token::Dot}))        return this->parse_field_assignment();
+            if (this->match({token::Identifier, token::LeftParen}))  return this->parse_call();
         default:
             break;
     }
@@ -548,29 +549,23 @@ Result<ast::Type, Error> Parser::parse_type() {
     return type;
 }
 
-Result<ast::Node*, Error> Parser::parse_assignment() {
+Result<ast::Node*, Error> Parser::parse_declaration() {
     // Create node
-    auto assignment = ast::AssignmentNode {this->current().line, this->current().column};
-
-    // Parse nonlocal
-    if (this->current() == token::Outer) {
-        assignment.nonlocal = true;
-        this->advance();
-    }
+    auto declaration = ast::DeclarationNode{this->current().line, this->current().column};
 
     // Parse identifier
     auto identifier = this->parse_identifier();
     if (identifier.is_error()) return Error {};
-    assignment.identifier = (ast::IdentifierNode*) identifier.get_value();
+    declaration.identifier = (ast::IdentifierNode*) identifier.get_value();
 
     // Parse equal or be
     switch (this->current().variant) {
         case token::Equal:
-            assignment.is_mutable = true;
+            declaration.is_mutable = true;
             break;
 
         case token::Be:
-            assignment.is_mutable = false;
+            declaration.is_mutable = false;
             break;
 
         default:
@@ -578,6 +573,38 @@ Result<ast::Node*, Error> Parser::parse_assignment() {
             return Error {};
     }
     this->advance();
+
+    // Parse expression
+    auto expression = this->parse_expression();
+    if (expression.is_error()) return expression;
+    declaration.expression = expression.get_value();
+
+    // Parse type annotation
+    if (this->current() == token::Colon) {
+        this->advance();
+
+        auto type = this->parse_type();
+        if (type.is_error()) return Error {};
+
+        ast::set_type(declaration.expression, type.get_value());
+    }
+
+    this->ast.push_back(declaration);
+    return this->ast.last_element();
+}
+
+Result<ast::Node*, Error> Parser::parse_assignment() {
+    // Create node
+    auto assignment = ast::AssignmentNode {this->current().line, this->current().column};
+
+    // Parse identifier
+    auto identifier = this->parse_identifier();
+    if (identifier.is_error()) return Error {};
+    assignment.identifier = (ast::IdentifierNode*) identifier.get_value();
+
+    // Parse equal
+    auto equal = this->parse_token(token::ColonEqual);
+    if (equal.is_error()) return Error {};
 
     // Parse expression
     auto expression = this->parse_expression();
