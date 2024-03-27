@@ -1,8 +1,8 @@
-a := 10 : int32
+a = 10 : int32
 print(a + 3)
 
-a := 50 : int8
-b := 3 : int8
+a = 50 : int8
+b = 3 : int8
 print(a + b) -- a = 50 won't work until having interfaces
 
 --- Output

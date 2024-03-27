@@ -1,5 +1,5 @@
-a := 10
-p := &a
+a = 10
+p = &a
 *p = 20
 print(*p)
 print(a)

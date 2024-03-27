@@ -4,8 +4,8 @@ function add(a: int64, b: int64): int64
 function awesome(a: bool, b: bool): bool
     return a and b
 
-a := 20
-b := 50
+a = 20
+b = 50
 print(add(a, b))
 print(awesome(a, b))
 

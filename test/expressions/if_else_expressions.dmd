@@ -1,19 +1,19 @@
-a := if true 20 else 30
+a = if true 20 else 30
 
-b := if false 
+b = if false 
         3.5
     else
         3.6
 
-c := if false 209
+c = if false 209
     else     10
 
-d := if true
+d = if true
    234
 else
    200
 
-e := 
+e = 
    if true
       35
     else

@@ -787,7 +787,7 @@ void ast::print(Node* node, PrintContext context) {
             put_indent_level(context.indent_level, context.last);
             std::cout << declaration.identifier->value << "\n";
             put_indent_level(context.indent_level + 1, append(context.last, false));
-            std::cout << (declaration.is_mutable ? ":=" : "be") << '\n';
+            std::cout << (declaration.is_mutable ? "=" : "be") << '\n';
 
             context.indent_level += 1;
             context.last.push_back(true);
@@ -801,7 +801,7 @@ void ast::print(Node* node, PrintContext context) {
             put_indent_level(context.indent_level, context.last);
             std::cout << assignment.identifier->value << "\n";
             put_indent_level(context.indent_level + 1, append(context.last, false));
-            std::cout << "=" << '\n';
+            std::cout << ":=" << '\n';
             context.indent_level += 1;
             context.last.push_back(true);
             print(assignment.expression, context);

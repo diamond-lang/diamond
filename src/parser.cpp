@@ -243,9 +243,9 @@ Result<ast::Node*, Error> Parser::parse_statement() {
         case token::Include:  return this->parse_use_stmt();
         case token::Star:     return this->parse_dereference_assignment();
         case token::Identifier:
-            if (this->match({token::Identifier, token::ColonEqual})) return this->parse_declaration();
+            if (this->match({token::Identifier, token::Equal}))      return this->parse_declaration();
             if (this->match({token::Identifier, token::Be}))         return this->parse_declaration();
-            if (this->match({token::Identifier, token::Equal}))      return this->parse_assignment();
+            if (this->match({token::Identifier, token::ColonEqual})) return this->parse_assignment();
             if (this->match({token::Identifier, token::Dot}))        return this->parse_field_assignment();
             if (this->match({token::Identifier, token::LeftParen}))  return this->parse_call();
         default:
@@ -560,7 +560,7 @@ Result<ast::Node*, Error> Parser::parse_declaration() {
 
     // Parse equal or be
     switch (this->current().variant) {
-        case token::ColonEqual:
+        case token::Equal:
             declaration.is_mutable = true;
             break;
 
@@ -603,7 +603,7 @@ Result<ast::Node*, Error> Parser::parse_assignment() {
     assignment.identifier = (ast::IdentifierNode*) identifier.get_value();
 
     // Parse equal
-    auto equal = this->parse_token(token::Equal);
+    auto equal = this->parse_token(token::ColonEqual);
     if (equal.is_error()) return Error {};
 
     // Parse expression

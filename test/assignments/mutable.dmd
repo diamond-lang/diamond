@@ -1,6 +1,6 @@
-a := 1.0 < 4.0
+a = 1.0 < 4.0
 print(a)
-a := 2.0
+a = 2.0
 print(a)
 
 --- Output

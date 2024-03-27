@@ -4,8 +4,8 @@ function add(a, b)
 function add(a, b)
     return a * b
 
-a := 2
-b := 4
+a = 2
+b = 4
 print(add(2, 5))
 
 --- Output
