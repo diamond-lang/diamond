@@ -114,6 +114,11 @@ Result<Ok, Error> semantic::make_concrete(Context& context, ast::BlockNode& node
     else                                          return Ok {};
 }
 
+Result<Ok, Error> semantic::make_concrete(Context& context, ast::FunctionArgumentNode& node, std::vector<ast::CallInCallStack> call_stack) {
+    assert(false);
+    return Ok {};
+}
+
 Result<Ok, Error> semantic::make_concrete(Context& context, ast::FunctionNode& node, std::vector<ast::CallInCallStack> call_stack) {
     assert(false);
     return Ok {};

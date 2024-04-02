@@ -21,6 +21,7 @@ struct Parser {
 
     Result<ast::Node*, Error> parse_program();
     Result<ast::Node*, Error> parse_block();
+    Result<ast::Node*, Error> parse_function_argument();
     Result<ast::Node*, Error> parse_function();
     Result<ast::Node*, Error> parse_extern();
     Result<ast::Node*, Error> parse_link_with();
@@ -309,6 +310,25 @@ Result<ast::Node*, Error> Parser::parse_block_statement_or_expression() {
     }
 }
 
+Result<ast::Node*, Error> Parser::parse_function_argument() {
+    // Create node
+    auto function_argument = ast::FunctionArgumentNode {this->current().line, this->current().column};
+
+    // Parse mut
+    if (this->current() == token::Mut) {
+        function_argument.is_mutable = true;
+        this->advance();
+    }
+
+    // Parse indentifier
+    auto identifier = this->parse_identifier();
+    if (identifier.is_error()) return identifier;
+    function_argument.identifier = (ast::IdentifierNode*) identifier.get_value();
+
+    this->ast.push_back(function_argument);
+    return this->ast.last_element();
+}
+
 Result<ast::Node*, Error> Parser::parse_function() {
     // Create node
     auto function = ast::FunctionNode {this->current().line, this->current().column};
@@ -329,7 +349,7 @@ Result<ast::Node*, Error> Parser::parse_function() {
 
     // Parse args
     while (this->current() != token::RightParen && !this->at_end()) {
-        auto arg = this->parse_identifier();
+        auto arg = this->parse_function_argument();
         if (arg.is_error()) return arg;
 
         // Parse type annotation
@@ -832,6 +852,13 @@ Result<ast::Node*, Error> Parser::parse_use_stmt() {
 Result<ast::Node*, Error> Parser::parse_call_argument() {
     auto arg = ast::CallArgumentNode {this->current().line, this->current().column};
 
+    // Parse mut
+    if (this->current() == token::Mut) {
+        arg.is_mutable = true;
+        this->advance();
+    }
+
+    // Parse expression
     auto expression = this->parse_expression();
     if (expression.is_error()) return Error {};
     arg.expression = expression.get_value();

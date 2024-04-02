@@ -14,6 +14,7 @@
 
 namespace ast {
     struct BlockNode;
+    struct FunctionArgumentNode;
     struct FunctionNode;
     struct TypeNode;
     struct DeclarationNode;
@@ -39,10 +40,10 @@ namespace ast {
     struct FieldAccessNode;
     struct AddressOfNode;
     struct DereferenceNode;
-    using FunctionArgumentNode = IdentifierNode;
 
     enum NodeVariant {
         Block,
+        FunctionArgument,
         Function,
         TypeDef,
         Declaration,
@@ -72,6 +73,7 @@ namespace ast {
 
     using Node = std::variant<
         BlockNode,
+        FunctionArgumentNode,
         FunctionNode,
         TypeNode,
         DeclarationNode,
@@ -236,6 +238,15 @@ namespace ast {
         std::vector<TypeNode*> types;
     };
 
+    struct FunctionArgumentNode {
+        size_t line;
+        size_t column;
+        Type type = Type(ast::NoType{});
+
+        bool is_mutable = false;
+        ast::IdentifierNode* identifier;
+    };
+
     struct CallInCallStack {
         std::string identifier;
         std::vector<Type> args;
@@ -395,6 +406,7 @@ namespace ast {
         size_t column;
         Type type = Type(ast::NoType{});
 
+        bool is_mutable = false;
         std::optional<IdentifierNode*> identifier = std::nullopt;
         Node* expression;
     };

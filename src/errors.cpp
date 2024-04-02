@@ -257,7 +257,7 @@ std::string get_call_stack(std::vector<ast::CallInCallStack> call_stack) {
         }
         result += std::to_string(call.call->line) + "| " + call.identifier + "(";
         for (size_t i = 0; i < call.args.size(); i++) {
-            result += call.function->args[i]->value + ": ";
+            result += call.function->args[i]->identifier->value + ": ";
             result += call.args[i].to_str();
             if (i + 1 != call.args.size()) result += ", ";
         }

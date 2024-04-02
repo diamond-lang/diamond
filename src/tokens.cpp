@@ -174,6 +174,10 @@ void token::print(std::vector<Token> token) {
                 std::cout << "token::Return";
                 break;
             }
+            case Mut: {
+                std::cout << "token::Mut";
+                break;
+            }
             case Include: {
                 std::cout << "token::Include";
                 break;

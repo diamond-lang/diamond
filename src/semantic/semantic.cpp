@@ -213,7 +213,7 @@ Result<Ok, Error> semantic::analyze(semantic::Context& context, ast::FunctionNod
     if (node.state == ast::FunctionBeingAnalyzed) {
         // For every argument
         for (auto arg: node.args) {
-            auto identifier = arg->value;
+            auto identifier = arg->identifier->value;
             if (arg->type == ast::Type(ast::NoType{})) {
                 // Create new type variable if it doesn't have a type
                 arg->type = semantic::new_type_variable(new_context);
@@ -266,7 +266,7 @@ Result<Ok, Error> semantic::analyze(semantic::Context& context, ast::FunctionNod
     }
     else if (node.state == ast::FunctionCompletelyTyped) {
         for (auto arg: node.args) {
-            auto identifier = arg->value;
+            auto identifier = arg->identifier->value;
             auto result = semantic::analyze(new_context, arg->type);
             if (result.is_error()) {
                 context.errors.insert(context.errors.end(), new_context.errors.begin(), new_context.errors.end());

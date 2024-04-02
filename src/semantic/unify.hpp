@@ -6,6 +6,7 @@
 namespace semantic {
     Result<Ok, Error> unify_types_and_type_check(Context& context, ast::Node* node);
     Result<Ok, Error> unify_types_and_type_check(Context& context, ast::BlockNode& node);
+    Result<Ok, Error> unify_types_and_type_check(Context& context, ast::FunctionArgumentNode& node);
     Result<Ok, Error> unify_types_and_type_check(Context& context, ast::FunctionNode& node);
     Result<Ok, Error> unify_types_and_type_check(Context& context, ast::TypeNode& node);
     Result<Ok, Error> unify_types_and_type_check(Context& context, ast::DeclarationNode& node);

@@ -49,6 +49,7 @@ namespace token {
         Break,
         Continue,
         Return,
+        Mut,
         Include,
         Extern,
         LinkWith,

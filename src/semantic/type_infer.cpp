@@ -89,6 +89,14 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
     else                                          return Ok {};
 }
 
+Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, ast::FunctionArgumentNode& node) {
+    auto result = semantic::type_infer_and_analyze(context, *node.identifier);
+    if (result.is_error()) return result;
+    node.type = node.identifier->type;
+
+    return Ok{};
+}
+
 Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, ast::FunctionNode& node) {
     return Ok {};
 }

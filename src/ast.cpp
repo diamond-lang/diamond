@@ -701,6 +701,11 @@ void ast::print(Node* node, PrintContext context) {
             break;
         }
 
+        case FunctionArgument: {
+            assert(false);
+            break;
+        }
+
         case Function: {
             auto& function = std::get<FunctionNode>(*node);
             bool last = true;
@@ -728,7 +733,10 @@ void ast::print(Node* node, PrintContext context) {
                 std::cout << '(';
             }
             for (size_t i = 0; i < function.args.size(); i++) {
-                auto& arg_name = function.args[i]->value;
+                auto& arg_name = function.args[i]->identifier->value;
+                if (function.args[i]->is_mutable) {
+                    std::cout << "mut ";
+                }
                 std::cout << arg_name;
 
                 auto& arg_type = function.args[i]->type;
@@ -942,11 +950,21 @@ void ast::print(Node* node, PrintContext context) {
             auto& call_argument = std::get<CallArgumentNode>(*node);
             if (call_argument.identifier.has_value()) {
                 put_indent_level(context.indent_level, context.last);
+                if (call_argument.is_mutable) {
+                    std::cout << "mut ";
+                }
                 std::cout << call_argument.identifier.value()->value << ":\n";
                 print(call_argument.expression, PrintContext{context.indent_level + 1, append(context.last, true), context.concrete, context.type_bindings});
             }
             else {
-                print(call_argument.expression, PrintContext{context.indent_level, context.last, context.concrete, context.type_bindings});
+                if (call_argument.is_mutable) {
+                    put_indent_level(context.indent_level, context.last);
+                    std::cout << "mut " << "\n";
+                    print(call_argument.expression, PrintContext{context.indent_level + 1, append(context.last, true), context.concrete, context.type_bindings});
+                }
+                else {
+                    print(call_argument.expression, PrintContext{context.indent_level, context.last, context.concrete, context.type_bindings});
+                }
             }
 
             break;

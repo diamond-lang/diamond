@@ -80,6 +80,7 @@ namespace codegen {
         llvm::Value* codegen(ast::TypeNode& node) {return nullptr;}
         void codegen_types_prototypes(std::vector<ast::TypeNode*> types);
         void codegen_types_bodies(std::vector<ast::TypeNode*> functions);
+        llvm::Value* codegen(ast::FunctionArgumentNode& node) {return nullptr;}
         llvm::Value* codegen(ast::FunctionNode& node) {return nullptr;}
         void codegen_function_prototypes(std::vector<ast::FunctionNode*> functions);
         void codegen_function_prototypes(std::filesystem::path module_path, std::string identifier, std::vector<ast::FunctionArgumentNode*> args_names, std::vector<ast::Type> args_types, ast::Type return_type, bool is_extern);
@@ -878,7 +879,7 @@ void codegen::Context::codegen_function_prototypes(std::filesystem::path module_
 
     // Name arguments
     for (size_t i = 0; i < args_names.size(); i++) {
-        std::string name = args_names[i]->value;
+        std::string name = args_names[i]->identifier->value;
         if (args_types[i].is_struct_type()) {
             auto struct_type = (llvm::StructType*) this->as_llvm_type(args_types[i]);
             auto new_args = this->get_struct_type_as_argument(struct_type);
@@ -961,7 +962,7 @@ void codegen::Context::codegen_function_bodies(std::filesystem::path module_path
     }
 
     for (size_t i = 0; i < args_names.size(); i++) {
-        std::string name = args_names[i]->value;
+        std::string name = args_names[i]->identifier->value;
         if (args_types[i].is_struct_type()) {
             auto struct_type = (llvm::StructType*) this->as_llvm_type(args_types[i]);
             auto new_args = this->get_struct_type_as_argument(struct_type);
@@ -1333,7 +1334,7 @@ std::vector<llvm::Value*> codegen::Context::codegen_args(ast::FunctionNode* func
         if (this->has_struct_type(args[i]->expression)) {
             // Create allocation
             llvm::StructType* struct_type = this->get_struct_type(ast::get_concrete_type(args[i]->expression, this->type_bindings).as_nominal_type().type_definition);
-            llvm::AllocaInst* allocation = this->create_allocation(function->args[i]->value, struct_type);
+            llvm::AllocaInst* allocation = this->create_allocation(function->args[i]->identifier->value, struct_type);
 
             // Store fields
             this->store_fields(args[i]->expression, allocation);
@@ -1363,7 +1364,7 @@ std::vector<llvm::Value*> codegen::Context::codegen_args(ast::FunctionNode* func
         else if (this->has_array_type(args[i]->expression)) {
             // Create allocation
             llvm::Type* array_type = this->as_llvm_type(ast::get_concrete_type(args[i]->expression, this->type_bindings));
-            llvm::AllocaInst* allocation = this->create_allocation(function->args[i]->value, array_type);
+            llvm::AllocaInst* allocation = this->create_allocation(function->args[i]->identifier->value, array_type);
 
             // Store array elements
             this->store_array_elements(args[i]->expression, allocation);

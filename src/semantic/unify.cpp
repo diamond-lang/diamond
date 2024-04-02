@@ -29,6 +29,14 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::Bl
     return Ok {};
 }
 
+Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::FunctionArgumentNode& node) {
+    auto result = semantic::unify_types_and_type_check(context, *node.identifier);
+    if (result.is_error()) return result;
+    node.type = node.identifier->type;
+
+    return Ok{};
+}
+
 Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::FunctionNode& node) {
     return Ok {};
 }

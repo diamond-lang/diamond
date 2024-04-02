@@ -266,6 +266,7 @@ Result<token::Token, Error> lexer::get_identifier(Source& source) {
     if (literal == "break")     return token::Token(token::Break, "break", line, column);
     if (literal == "continue")  return token::Token(token::Continue, "continue", line, column);
     if (literal == "return")    return token::Token(token::Return, "return", line, column);
+    if (literal == "mut")       return token::Token(token::Mut, "mut", line, column);
     if (literal == "not")       return token::Token(token::Not, "not", line, column);
     if (literal == "extern")    return token::Token(token::Extern, "extern", line, column);
     if (literal == "link_with") return token::Token(token::LinkWith, "link_with", line, column);
