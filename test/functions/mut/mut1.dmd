@@ -1,0 +1,12 @@
+function addOne(mut x: int64): void
+    x := x + 1
+
+x = 1
+print(x)
+addOne(mut x)
+print(x)
+
+--- Output
+1
+2
+---
