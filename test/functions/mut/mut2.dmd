@@ -1,0 +1,21 @@
+type Point
+    x: float64
+    y: float64
+
+function addTwo(mut point: Point): void
+    point := Point{x: point.x + 2, y: point.y + 2}
+
+point = Point{x: 1, y: 2}
+print(point.x)
+print(point.y)
+
+addTwo(mut point)
+print(point.x)
+print(point.y)
+
+--- Output
+1
+2
+3
+4
+---

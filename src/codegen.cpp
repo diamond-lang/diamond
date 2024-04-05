@@ -72,12 +72,12 @@ namespace codegen {
 
             // Add function pass optimizations
             this->function_pass_manager = new llvm::legacy::FunctionPassManager(this->module);
-            this->function_pass_manager->add(llvm::createPromoteMemoryToRegisterPass());
-            this->function_pass_manager->add(llvm::createInstructionCombiningPass());
-            this->function_pass_manager->add(llvm::createReassociatePass());
-            this->function_pass_manager->add(llvm::createGVNPass());
-            this->function_pass_manager->add(llvm::createCFGSimplificationPass());
-            this->function_pass_manager->doInitialization();
+            // this->function_pass_manager->add(llvm::createPromoteMemoryToRegisterPass());
+            // this->function_pass_manager->add(llvm::createInstructionCombiningPass());
+            // this->function_pass_manager->add(llvm::createReassociatePass());
+            // this->function_pass_manager->add(llvm::createGVNPass());
+            // this->function_pass_manager->add(llvm::createCFGSimplificationPass());
+            // this->function_pass_manager->doInitialization();
         }
 
         void codegen(ast::Ast& ast);
@@ -229,7 +229,8 @@ namespace codegen {
 
             for (size_t i = 0; i < args.size(); i++) {
                 llvm::Type* llvm_type = this->as_llvm_type(args_types[i].type);
-                if (args_types[i].is_struct_type()) {
+
+                if (args_types[i].is_struct_type() && !args[i]->is_mutable) {
                     auto new_args = this->get_struct_type_as_argument((llvm::StructType*) llvm_type).types;
                     llvm_args_types.insert(llvm_args_types.end(), new_args.begin(), new_args.end());
                 }
@@ -317,7 +318,14 @@ namespace codegen {
                 // For each field
                 for (auto field: struct_literal.fields) {
                     // Get pointer to the field
-                    llvm::Value* ptr = this->builder->CreateStructGEP(struct_type, struct_allocation, get_index_of_field(ast::get_type(expression).as_nominal_type().type_definition, field.first->value));
+                    llvm::Value* ptr = this->builder->CreateStructGEP(
+                        struct_type,
+                        struct_allocation,
+                        get_index_of_field(
+                            ast::get_type(expression).as_nominal_type().type_definition,
+                            field.first->value
+                        )
+                    );
 
                     // If the field type has a struct type
                     if (this->has_struct_type(field.second)) {
@@ -889,7 +897,7 @@ void codegen::Context::codegen_function_prototypes(std::filesystem::path module_
     // Name arguments
     for (size_t i = 0; i < args.size(); i++) {
         std::string name = args[i]->identifier->value;
-        if (args_types[i].is_struct_type()) {
+        if (args_types[i].is_struct_type() && !args[i]->is_mutable) {
             auto struct_type = (llvm::StructType*) this->as_llvm_type(args_types[i]);
             auto new_args = this->get_struct_type_as_argument(struct_type);
 
@@ -973,7 +981,7 @@ void codegen::Context::codegen_function_bodies(std::filesystem::path module_path
 
     for (size_t i = 0; i < args.size(); i++) {
         std::string name = args[i]->identifier->value;
-        if (args_types[i].is_struct_type()) {
+        if (args_types[i].is_struct_type() && !args[i]->is_mutable) {
             auto struct_type = (llvm::StructType*) this->as_llvm_type(args_types[i]);
             auto new_args = this->get_struct_type_as_argument(struct_type);
 
@@ -1085,39 +1093,35 @@ llvm::Value* codegen::Context::codegen(ast::DeclarationNode& node) {
 }
 
 llvm::Value* codegen::Context::codegen(ast::AssignmentNode& node) {
+    // Codegen pointer
+    llvm::Value* pointer = this->get_binding(node.identifier->value).pointer;
+    if (this->get_binding(node.identifier->value).is_mutable) {
+        pointer = this->builder->CreateLoad(
+            pointer->getType(),
+            pointer
+        );
+    }
+
     if (this->has_struct_type(node.expression)) {
         // Store fields
-        this->store_fields(node.expression, this->current_scope()[node.identifier->value].pointer);
+        this->store_fields(node.expression, pointer);
   
         // Return
         return nullptr;
     }
     else if (this->has_array_type(node.expression)) {            
         // Store array elements
-        this->store_array_elements(node.expression, this->current_scope()[node.identifier->value].pointer);
+        this->store_array_elements(node.expression, pointer);
 
         // Return
         return nullptr;
-    }
-    else if (this->get_binding(node.identifier->value).is_mutable) {
-        // Generate value of expression
-        llvm::Value* expr = this->codegen(node.expression);
-
-        // Codegen pointer
-        auto pointer = this->builder->CreateLoad(
-            this->get_binding(node.identifier->value).pointer->getType(),
-            this->get_binding(node.identifier->value).pointer
-        );
-
-        // Create store
-        this->builder->CreateStore(expr, pointer);
     }
     else {
         // Generate value of expression
         llvm::Value* expr = this->codegen(node.expression);
 
         // Store value
-        this->builder->CreateStore(expr, this->get_binding(node.identifier->value).pointer);
+        this->builder->CreateStore(expr, pointer);
 
         return nullptr;
     }
@@ -1363,7 +1367,7 @@ llvm::Value* codegen::Context::codegen(ast::WhileNode& node) {
 std::vector<llvm::Value*> codegen::Context::codegen_args(ast::FunctionNode* function, std::vector<ast::CallArgumentNode*> args) {
     std::vector<llvm::Value*> result;
     for (size_t i = 0; i < args.size(); i++) {
-        if (this->has_struct_type(args[i]->expression)) {
+        if (this->has_struct_type(args[i]->expression) && !args[i]->is_mutable) {
             // Create allocation
             llvm::StructType* struct_type = this->get_struct_type(ast::get_concrete_type(args[i]->expression, this->type_bindings).as_nominal_type().type_definition);
             llvm::AllocaInst* allocation = this->create_allocation(function->args[i]->identifier->value, struct_type);
@@ -1393,7 +1397,7 @@ std::vector<llvm::Value*> codegen::Context::codegen_args(ast::FunctionNode* func
                 result.push_back(allocation);
             }
         }
-        else if (this->has_array_type(args[i]->expression)) {
+        else if (this->has_array_type(args[i]->expression) && !args[i]->is_mutable) {
             // Create allocation
             llvm::Type* array_type = this->as_llvm_type(ast::get_concrete_type(args[i]->expression, this->type_bindings));
             llvm::AllocaInst* allocation = this->create_allocation(function->args[i]->identifier->value, array_type);
@@ -1656,10 +1660,10 @@ llvm::Value* codegen::Context::codegen(ast::IntegerNode& node) {
 }
 
 llvm::Value* codegen::Context::codegen(ast::IdentifierNode& node) {
-    if (this->has_struct_type((ast::Node*) &node)) {
+    if (this->has_struct_type((ast::Node*) &node) && !this->get_binding(node.value).is_mutable) {
         return this->get_binding(node.value).pointer;
     }
-    else if (this->has_array_type((ast::Node*) &node)) {
+    else if (this->has_array_type((ast::Node*) &node) && !this->get_binding(node.value).is_mutable) {
         return this->get_binding(node.value).pointer;
     }
     else {
