@@ -72,12 +72,12 @@ namespace codegen {
 
             // Add function pass optimizations
             this->function_pass_manager = new llvm::legacy::FunctionPassManager(this->module);
-            // this->function_pass_manager->add(llvm::createPromoteMemoryToRegisterPass());
-            // this->function_pass_manager->add(llvm::createInstructionCombiningPass());
-            // this->function_pass_manager->add(llvm::createReassociatePass());
-            // this->function_pass_manager->add(llvm::createGVNPass());
-            // this->function_pass_manager->add(llvm::createCFGSimplificationPass());
-            // this->function_pass_manager->doInitialization();
+            this->function_pass_manager->add(llvm::createPromoteMemoryToRegisterPass());
+            this->function_pass_manager->add(llvm::createInstructionCombiningPass());
+            this->function_pass_manager->add(llvm::createReassociatePass());
+            this->function_pass_manager->add(llvm::createGVNPass());
+            this->function_pass_manager->add(llvm::createCFGSimplificationPass());
+            this->function_pass_manager->doInitialization();
         }
 
         void codegen(ast::Ast& ast);
