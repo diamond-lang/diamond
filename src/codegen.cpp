@@ -1116,6 +1116,22 @@ llvm::Value* codegen::Context::codegen(ast::AssignmentNode& node) {
         // Return
         return nullptr;
     }
+    else if (this->get_binding(node.identifier->value).is_mutable) {
+        // Generate value of expression
+        llvm::Value* expr = this->codegen(node.expression);
+
+        // Codegen pointer
+        auto pointer = this->builder->CreateLoad(
+            this->get_binding(node.identifier->value).pointer->getType(),
+            this->get_binding(node.identifier->value).pointer
+        );
+
+        // Create store
+        this->builder->CreateStore(expr, pointer);
+
+        // Return
+        return nullptr;
+    }
     else {
         // Generate value of expression
         llvm::Value* expr = this->codegen(node.expression);
