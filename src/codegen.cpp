@@ -1111,6 +1111,9 @@ llvm::Value* codegen::Context::codegen(ast::AssignmentNode& node) {
 
         // Create store
         this->builder->CreateStore(expr, pointer);
+
+        // Return
+        return nullptr;
     }
     else {
         // Generate value of expression
