@@ -1429,6 +1429,10 @@ std::vector<llvm::Value*> codegen::Context::codegen_args(ast::FunctionNode* func
                 // Add to args
                 result.push_back(this->get_binding(((ast::IdentifierNode*) args[i]->expression)->value).pointer);
             }
+            else if (args[i]->expression->index() == ast::FieldAccess) {
+                // Add to args
+                result.push_back(this->get_field_pointer(std::get<ast::FieldAccessNode>(*args[i]->expression)));
+            }
             else {
                 assert(false);
             }

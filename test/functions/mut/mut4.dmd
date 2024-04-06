@@ -1,0 +1,17 @@
+type Point
+    x: float64
+    y: float64
+
+function addOne(mut x: float64): void
+    x := x + 1
+
+point = Point{x: 1, y: 2}
+print(point.x)
+
+addOne(mut point.x)
+print(point.x)
+
+--- Output
+1
+2
+---
