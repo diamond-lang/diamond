@@ -287,7 +287,7 @@ namespace codegen {
         ast::FunctionNode* get_function(ast::CallNode* call) {
             ast::FunctionNode* result = nullptr;
             for (auto function: call->functions) {
-                if (semantic::are_types_compatible(*function, ast::get_types(function->args), this->get_types(call->args))) {
+                if (semantic::are_arguments_compatible(*function, *call, ast::get_types(function->args), this->get_types(call->args))) {
                     result = function;
                     break;
                 }

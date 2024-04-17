@@ -86,7 +86,7 @@ namespace semantic {
     ast::Type get_unified_type(Context& context, ast::Type type_var);
 
     // For unify and make concrete
-    std::vector<ast::FunctionNode*> remove_incompatible_functions_with_argument_type(std::vector<ast::FunctionNode*> functions, size_t argument_position, ast::Type argument_type);
+    std::vector<ast::FunctionNode*> remove_incompatible_functions_with_argument_type(std::vector<ast::FunctionNode*> functions, size_t argument_position, ast::Type argument_type, bool is_mutable);
     std::vector<ast::FunctionNode*> remove_incompatible_functions_with_return_type(std::vector<ast::FunctionNode*> functions, ast::Type return_type);
     std::vector<ast::Type> get_possible_types_for_argument(std::vector<ast::FunctionNode*> functions, size_t argument_position);
     std::vector<ast::Type> get_possible_types_for_return_type(std::vector<ast::FunctionNode*> functions);

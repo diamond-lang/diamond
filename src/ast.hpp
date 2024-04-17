@@ -284,10 +284,10 @@ namespace ast {
         Node* body;
 
         FunctionState state = FunctionCompletelyTyped;
-        bool analyzed = false;
         bool is_extern = false;
         std::vector<FunctionSpecialization> specializations;
         Type return_type = Type(ast::NoType{});
+        bool return_type_is_mutable = false;
         std::filesystem::path module_path; // Used in to tell from which module the function comes from
     
         bool typed_parameter_aready_added(ast::Type type);

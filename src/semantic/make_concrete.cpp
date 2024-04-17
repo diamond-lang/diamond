@@ -280,7 +280,7 @@ Result<Ok, Error> semantic::make_concrete(Context& context, ast::CallNode& node,
             if (result.is_error()) return result;
 
             // Remove functions that don't match with the type founded for the argument
-            functions_that_can_be_called = semantic::remove_incompatible_functions_with_argument_type(functions_that_can_be_called, i, semantic::get_type_or_default(context, node.args[i]->type));
+            functions_that_can_be_called = semantic::remove_incompatible_functions_with_argument_type(functions_that_can_be_called, i, semantic::get_type_or_default(context, node.args[i]->type), node.args[i]->is_mutable);
 
             // If only one function that can be called remains
             if (functions_that_can_be_called.size() == 1) {

@@ -1,6 +1,6 @@
 #include "intrinsics.hpp"
 
-std::unordered_map<std::string, std::vector<std::pair<std::vector<ast::Type>, ast::Type>>> intrinsic_functions = {
+std::unordered_map<std::string, std::vector<intrinsics::Prototype>> intrinsic_functions = {
     {"+", {
         {{ast::Type("float64"), ast::Type("float64")}, ast::Type("float64")},
         {{ast::Type("int64"), ast::Type("int64")}, ast::Type("int64")},
@@ -90,6 +90,7 @@ std::unordered_map<std::string, std::vector<std::pair<std::vector<ast::Type>, as
         {{ast::Type("string")}, ast::Type("void")}
     }},
     {"[]", {
-        {{ast::Type("array", {ast::Type(ast::TypeVariable(1))}), ast::Type("int64")}, ast::Type(ast::TypeVariable(1))}
+        {{ast::Type("array", {ast::Type(ast::TypeVariable(1))}), ast::Type("int64")}, ast::Type(ast::TypeVariable(1))},
+        {{intrinsics::Type(ast::Type("array", {ast::Type(ast::TypeVariable(1))}), true), ast::Type("int64")}, intrinsics::Type(ast::Type(ast::TypeVariable(1)), true)}
     }}
 };

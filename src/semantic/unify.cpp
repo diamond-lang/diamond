@@ -213,7 +213,7 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::Ca
         if (node.args[i]->type.is_concrete()) {
             // Remove functions that can't be called
             auto backup = functions_that_can_be_called;
-            functions_that_can_be_called = semantic::remove_incompatible_functions_with_argument_type(functions_that_can_be_called, i, node.args[i]->type);
+            functions_that_can_be_called = semantic::remove_incompatible_functions_with_argument_type(functions_that_can_be_called, i, node.args[i]->type, node.args[i]->is_mutable);
 
             // If there is no function that can be called
             if (functions_that_can_be_called.size() == 0) {

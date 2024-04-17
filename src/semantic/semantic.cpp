@@ -375,3 +375,13 @@ bool semantic::are_types_compatible(ast::FunctionNode& function, std::vector<ast
     }
     return true;
 }
+
+bool semantic::are_arguments_compatible(ast::FunctionNode& function, ast::CallNode& call, std::vector<ast::Type> function_types, std::vector<ast::Type> argument_types) {
+    for (size_t i = 0; i < function_types.size(); i++) {
+        if (!semantic::are_types_compatible(function, function_types[i], argument_types[i])
+        ||  function.args[i]->is_mutable != call.args[i]->is_mutable) {
+            return false;
+        }
+    }
+    return true;
+}

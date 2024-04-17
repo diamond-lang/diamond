@@ -112,15 +112,17 @@ void semantic::Context::init_with(ast::Ast* ast) {
             function_node.identifier = (ast::IdentifierNode*) ast->last_element();
 
             // Create args nodes
-            for (auto& arg: prototype.first) {
-                auto arg_node = ast::IdentifierNode {};
-                arg_node.type = arg;
+            for (auto& arg: prototype.arguments) {
+                auto arg_node = ast::FunctionArgumentNode {};
+                arg_node.type = arg.type;
+                arg_node.is_mutable = arg.is_mutable;
 
                 ast->push_back(arg_node);
                 function_node.args.push_back((ast::FunctionArgumentNode*) ast->last_element());
             }
 
-            function_node.return_type = prototype.second;
+            function_node.return_type = prototype.return_type.type;
+            function_node.return_type_is_mutable = prototype.return_type.is_mutable;
             ast->push_back(function_node);
             overloaded_functions.push_back((ast::FunctionNode*) ast->last_element());
         }
@@ -350,11 +352,11 @@ ast::Type semantic::new_final_type_variable(Context& context) {
     return new_type;
 }
 
-std::vector<ast::FunctionNode*> semantic::remove_incompatible_functions_with_argument_type(std::vector<ast::FunctionNode*> functions, size_t argument_position, ast::Type argument_type) {
+std::vector<ast::FunctionNode*> semantic::remove_incompatible_functions_with_argument_type(std::vector<ast::FunctionNode*> functions, size_t argument_position, ast::Type argument_type, bool is_mutable) {
     assert(argument_type.is_concrete());
     
-    functions.erase(std::remove_if(functions.begin(), functions.end(), [&argument_position, &argument_type](ast::FunctionNode* function) {
-        return semantic::are_types_compatible(*function, function->args[argument_position]->type, argument_type) == false;
+    functions.erase(std::remove_if(functions.begin(), functions.end(), [&argument_position, &argument_type, &is_mutable](ast::FunctionNode* function) {
+        return semantic::are_types_compatible(*function, function->args[argument_position]->type, argument_type) == false || function->args[argument_position]->is_mutable != is_mutable;
     }), functions.end());
 
     return functions;
