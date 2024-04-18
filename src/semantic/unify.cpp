@@ -81,6 +81,16 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::De
     return Ok {};
 }
 
+Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::IndexAssignmentNode& node) {
+    auto result = semantic::unify_types_and_type_check(context, *node.index_access);
+    if (result.is_error()) return result;
+
+    result = semantic::unify_types_and_type_check(context, node.expression);
+    if (result.is_error()) return result;
+
+    return Ok {};
+}
+
 Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::ReturnNode& node) {
     if (node.expression.has_value()) return semantic::unify_types_and_type_check(context, node.expression.value());
 

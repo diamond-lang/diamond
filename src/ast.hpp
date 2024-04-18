@@ -21,6 +21,7 @@ namespace ast {
     struct AssignmentNode;
     struct FieldAssignmentNode;
     struct DereferenceAssignmentNode;
+    struct IndexAssignmentNode;
     struct ReturnNode;
     struct BreakNode;
     struct ContinueNode;
@@ -50,6 +51,7 @@ namespace ast {
         Assignment,
         FieldAssignment,
         DereferenceAssignment,
+        IndexAssignment,
         Return,
         Break,
         Continue,
@@ -80,6 +82,7 @@ namespace ast {
         AssignmentNode,
         FieldAssignmentNode,
         DereferenceAssignmentNode,
+        IndexAssignmentNode,
         ReturnNode,
         BreakNode,
         ContinueNode,
@@ -342,6 +345,15 @@ namespace ast {
         Type type = Type(ast::NoType{});
 
         DereferenceNode* identifier;
+        Node* expression;
+    };
+
+    struct IndexAssignmentNode {
+        size_t line;
+        size_t column;
+        Type type = Type(ast::NoType{});
+
+        CallNode* index_access;
         Node* expression;
     };
 

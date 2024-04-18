@@ -150,6 +150,16 @@ Result<Ok, Error> semantic::make_concrete(Context& context, ast::DereferenceAssi
     return Ok {};
 }
 
+Result<Ok, Error> semantic::make_concrete(Context& context, ast::IndexAssignmentNode& node, std::vector<ast::CallInCallStack> call_stack) {
+    auto result = semantic::make_concrete(context, *node.index_access, call_stack);
+    if (result.is_error()) return result;
+    
+    result = semantic::make_concrete(context, node.expression, call_stack);
+    if (result.is_error()) return result;
+
+    return Ok {};
+}
+
 Result<Ok, Error> semantic::make_concrete(Context& context, ast::ReturnNode& node, std::vector<ast::CallInCallStack> call_stack) {
     if (node.expression.has_value()) {
         return semantic::make_concrete(context, node.expression.value(), call_stack);
@@ -705,6 +715,13 @@ void semantic::set_concrete_types(Context& context, ast::Node* node) {
         case ast::DereferenceAssignment: {
             auto& assignment = std::get<ast::DereferenceAssignmentNode>(*node);
             semantic::set_concrete_types(context, (ast::Node*) assignment.identifier);
+            semantic::set_concrete_types(context, (ast::Node*) assignment.expression);
+            break;
+        }
+
+        case ast::IndexAssignment: {
+            auto& assignment = std::get<ast::IndexAssignment>(*node);
+            semantic::set_concrete_types(context, (ast::Node*) assignment.index_access);
             semantic::set_concrete_types(context, (ast::Node*) assignment.expression);
             break;
         }

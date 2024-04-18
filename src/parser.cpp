@@ -34,6 +34,7 @@ struct Parser {
     Result<ast::Node*, Error> parse_assignment();
     Result<ast::Node*, Error> parse_field_assignment();
     Result<ast::Node*, Error> parse_dereference_assignment();
+    Result<ast::Node*, Error> parse_index_assignment(ast::Node* expression_indexed);
     Result<ast::Node*, Error> parse_return_stmt();
     Result<ast::Node*, Error> parse_break_stmt();
     Result<ast::Node*, Error> parse_continue_stmt();
@@ -244,11 +245,12 @@ Result<ast::Node*, Error> Parser::parse_statement() {
         case token::Include:  return this->parse_use_stmt();
         case token::Star:     return this->parse_dereference_assignment();
         case token::Identifier:
-            if (this->match({token::Identifier, token::Equal}))      return this->parse_declaration();
-            if (this->match({token::Identifier, token::Be}))         return this->parse_declaration();
-            if (this->match({token::Identifier, token::ColonEqual})) return this->parse_assignment();
-            if (this->match({token::Identifier, token::Dot}))        return this->parse_field_assignment();
-            if (this->match({token::Identifier, token::LeftParen}))  return this->parse_call();
+            if (this->match({token::Identifier, token::Equal}))       return this->parse_declaration();
+            if (this->match({token::Identifier, token::Be}))          return this->parse_declaration();
+            if (this->match({token::Identifier, token::ColonEqual}))  return this->parse_assignment();
+            if (this->match({token::Identifier, token::Dot}))         return this->parse_field_assignment();
+            if (this->match({token::Identifier, token::LeftBracket})) return this->parse_index_assignment(nullptr);
+            if (this->match({token::Identifier, token::LeftParen}))   return this->parse_call();
         default:
             break;
     }
@@ -654,6 +656,11 @@ Result<ast::Node*, Error> Parser::parse_field_assignment() {
     if (identifier.is_error()) return Error {};
     assignment.identifier = (ast::FieldAccessNode*) identifier.get_value();
 
+    // If we are in a index assignment
+    if (this->current() == token::LeftBracket) {
+        return this->parse_index_assignment(identifier.get_value());
+    }
+
     // Parse equal
     auto equal = this->parse_token(token::Equal);
     if (equal.is_error()) return Error {};
@@ -691,6 +698,51 @@ Result<ast::Node*, Error> Parser::parse_dereference_assignment() {
     auto identifier = this->parse_dereference();
     if (identifier.is_error()) return Error {};
     assignment.identifier = (ast::DereferenceNode*) identifier.get_value();
+
+    // Parse equal
+    auto equal = this->parse_token(token::Equal);
+    if (equal.is_error()) return Error {};
+    
+    // Parse expression
+    auto expression = this->parse_expression();
+    if (expression.is_error()) return expression;
+    assignment.expression = expression.get_value();
+
+    // Parse type annotation
+    if (this->current() == token::Colon) {
+        this->advance();
+
+        auto type = this->parse_type();
+        if (type.is_error()) return Error {};
+
+        ast::set_type(assignment.expression, type.get_value());
+
+        if (assignment.expression->index() == ast::IfElse) {
+            auto& if_else = std::get<ast::IfElseNode>(*assignment.expression);
+            ast::set_type(if_else.if_branch, ast::get_type(assignment.expression));
+            ast::set_type(if_else.else_branch.value(), ast::get_type(assignment.expression));
+        }
+    }
+
+    this->ast.push_back(assignment);
+    return this->ast.last_element();
+}
+
+Result<ast::Node*, Error> Parser::parse_index_assignment(ast::Node* expression_indexed) {
+    // Create node
+    auto assignment = ast::IndexAssignmentNode {this->current().line, this->current().column};
+
+    // Parse index access
+    if (expression_indexed == nullptr) {
+        auto identifier = this->parse_identifier();
+        if (identifier.is_error()) return identifier;
+        expression_indexed = identifier.get_value();
+    }
+
+    auto index_access = this->parse_index_access(expression_indexed);
+    if (index_access.is_error()) return Error {};
+    assignment.index_access = (ast::CallNode*) index_access.get_value();
+    assignment.index_access->args[0]->is_mutable = true;
 
     // Parse equal
     auto equal = this->parse_token(token::Equal);

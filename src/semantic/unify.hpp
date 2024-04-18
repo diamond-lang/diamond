@@ -13,6 +13,7 @@ namespace semantic {
     Result<Ok, Error> unify_types_and_type_check(Context& context, ast::AssignmentNode& node);
     Result<Ok, Error> unify_types_and_type_check(Context& context, ast::FieldAssignmentNode& node);
     Result<Ok, Error> unify_types_and_type_check(Context& context, ast::DereferenceAssignmentNode& node);
+    Result<Ok, Error> unify_types_and_type_check(Context& context, ast::IndexAssignmentNode& node);
     Result<Ok, Error> unify_types_and_type_check(Context& context, ast::ReturnNode& node);
     Result<Ok, Error> unify_types_and_type_check(Context& context, ast::BreakNode& node);
     Result<Ok, Error> unify_types_and_type_check(Context& context, ast::ContinueNode& node);

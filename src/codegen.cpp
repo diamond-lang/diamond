@@ -96,6 +96,7 @@ namespace codegen {
         llvm::Value* codegen(ast::AssignmentNode& node);
         llvm::Value* codegen(ast::FieldAssignmentNode& node);
         llvm::Value* codegen(ast::DereferenceAssignmentNode& node);
+        llvm::Value* codegen(ast::IndexAssignmentNode& node);
         llvm::Value* codegen(ast::ReturnNode& node);
         llvm::Value* codegen(ast::BreakNode& node);
         llvm::Value* codegen(ast::ContinueNode& node);
@@ -467,6 +468,17 @@ namespace codegen {
             // Get pointer to accessed fieldd
             size_t last_element = node.fields_accessed.size() - 1;
             llvm::Value* ptr = this->builder->CreateStructGEP(struct_type, struct_ptr, get_index_of_field(node.fields_accessed[last_element]->value, type_definition));
+            return ptr;
+        }
+
+        llvm::Value* get_index_access_pointer(ast::CallNode& node) {
+            llvm::Type* array_type = this->as_llvm_type(ast::get_concrete_type(node.args[0]->expression, this->type_bindings));
+            llvm::Value* index = this->builder->CreateSub(this->codegen(node.args[1]->expression), llvm::ConstantInt::get(*(this->context), llvm::APInt(64, 1, true)));
+            llvm::Value* array_ptr = this->get_binding(std::get<ast::IdentifierNode>(*node.args[0]->expression).value).pointer;
+            if (((llvm::AllocaInst*) array_ptr)->getAllocatedType()->isPointerTy()) {
+                array_ptr = this->builder->CreateLoad(array_type->getPointerTo(), array_ptr);
+            }
+            llvm::Value* ptr = this->builder->CreateGEP(array_type, array_ptr, {llvm::ConstantInt::get(*(this->context), llvm::APInt(64, 0, true)), index}, "", true);
             return ptr;
         }
 
@@ -1192,6 +1204,27 @@ llvm::Value* codegen::Context::codegen(ast::DereferenceAssignmentNode& node) {
     return nullptr;
 }
 
+llvm::Value* codegen::Context::codegen(ast::IndexAssignmentNode& node) {
+    // Codegen expression
+    llvm::Value* expression = this->codegen(node.expression);
+
+    // Codegen pointer
+    auto pointer = this->codegen(node.index_access->args[0]->expression);
+
+    if (this->has_struct_type(node.expression)) {
+        // Store fields
+        this->store_fields(node.expression, pointer);
+    }
+    else if (this->has_array_type(node.expression)) {
+        assert(false);
+    }
+    else {
+        this->builder->CreateStore(expression, pointer);
+    }
+
+    return nullptr;
+}
+
 llvm::Value* codegen::Context::codegen(ast::ReturnNode& node) {
     if (node.expression.has_value()) {
         if (this->has_struct_type(node.expression.value())) {
@@ -1433,6 +1466,10 @@ std::vector<llvm::Value*> codegen::Context::codegen_args(ast::FunctionNode* func
                 // Add to args
                 result.push_back(this->get_field_pointer(std::get<ast::FieldAccessNode>(*args[i]->expression)));
             }
+            else if (args[i]->expression->index() == ast::Call && std::get<ast::CallNode>(*args[i]->expression).identifier->value == "[]") {
+                // Add to args
+                result.push_back(this->get_index_access_pointer(std::get<ast::CallNode>(*args[i]->expression)));
+            }
             else {
                 assert(false);
             }
@@ -1623,16 +1660,9 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
     }
     if (node.identifier->value == "[]") {
         if (node.args.size() == 2) {
-            llvm::Type* array_type = this->as_llvm_type(ast::get_concrete_type(node.args[0]->expression, this->type_bindings));
-            llvm::Value* index = this->builder->CreateSub(this->codegen(node.args[1]->expression), llvm::ConstantInt::get(*(this->context), llvm::APInt(64, 1, true)));
-            llvm::Value* array_ptr = this->get_binding(std::get<ast::IdentifierNode>(*node.args[0]->expression).value).pointer;
-            if (((llvm::AllocaInst*) array_ptr)->getAllocatedType()->isPointerTy()) {
-                array_ptr = this->builder->CreateLoad(array_type->getPointerTo(), array_ptr);
-            }
-            llvm::Value* ptr = this->builder->CreateGEP(array_type, array_ptr, {llvm::ConstantInt::get(*(this->context), llvm::APInt(64, 0, true)), index}, "", true);
             return this->builder->CreateLoad(
                 this->as_llvm_type(ast::get_concrete_type((ast::Node*)&node, this->type_bindings)),
-                ptr
+                this->get_index_access_pointer(node)
             );
         }
     }

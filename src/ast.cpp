@@ -856,6 +856,28 @@ void ast::print(Node* node, PrintContext context) {
             break;
         }
 
+        case IndexAssignment: {
+            auto& assignment = std::get<IndexAssignmentNode>(*node);
+
+            put_indent_level(context.indent_level, context.last);
+            if (assignment.index_access->args[0]->expression->index() == ast::Identifier) {
+                auto& identifier = std::get<ast::IdentifierNode>(*assignment.index_access->args[0]->expression);
+                std::cout << identifier.value;
+            }
+            else if (assignment.index_access->args[0]->expression->index() == ast::FieldAssignment) {
+                auto& identifier = std::get<ast::FieldAccessNode>(*assignment.index_access->args[0]->expression);
+                std::cout << identifier.fields_accessed[0]->value;
+                for (size_t i = 1; i < identifier.fields_accessed.size(); i++) {
+                    std::cout << "." << identifier.fields_accessed[i]->value;
+                }
+            }
+            std::cout << "[] =" << "\n";
+            context.indent_level += 1;
+            context.last.push_back(true);
+            print(assignment.expression, context);
+            break;
+        }
+
         case Return: {
             auto& return_node = std::get<ReturnNode>(*node);
 

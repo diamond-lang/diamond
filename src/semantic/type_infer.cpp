@@ -49,6 +49,7 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
             case ast::Assignment: break;
             case ast::FieldAssignment: break;
             case ast::DereferenceAssignment: break;
+            case ast::IndexAssignment: break;
             case ast::Call: break;
             case ast::Return: {
                 if (result.is_ok()) {
@@ -201,6 +202,28 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
 
     // Add constraint
     semantic::add_constraint(context, Set<ast::Type>({node.identifier->type, ast::get_type(node.expression)}));
+
+    return Ok {};
+}
+
+Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, ast::IndexAssignmentNode& node) {
+    // Type infer and analyze expression
+    auto result = semantic::type_infer_and_analyze(context, node.expression);
+    if (result.is_error()) return Error {};
+
+    // Analyze type of expression
+    if (!ast::get_type(node.expression).is_type_variable()) {
+        auto type = ast::get_type(node.expression);
+        auto result = semantic::analyze(context, type);
+        ast::set_type(node.expression, type);
+    }
+
+    // Analyze identifier
+    auto identifier = semantic::type_infer_and_analyze(context, *node.index_access);
+    if (identifier.is_error()) return Error {};
+
+    // Add constraint
+    semantic::add_constraint(context, Set<ast::Type>({node.index_access->type, ast::get_type(node.expression)}));
 
     return Ok {};
 }

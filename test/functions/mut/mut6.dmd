@@ -1,0 +1,15 @@
+-- Passing an element in an array mutably
+
+function addTen(mut x: int64): void
+    x := x + 10
+
+array = [1, 2, 3]
+print(array[1])
+
+addTen(mut array[1])
+print(array[1])
+
+--- Output
+1
+11
+---
