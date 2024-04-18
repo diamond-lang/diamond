@@ -142,8 +142,8 @@ namespace codegen {
             else if (type == ast::Type("bool"))    return llvm::Type::getInt1Ty(*(this->context));
             else if (type == ast::Type("string"))  return llvm::Type::getInt8PtrTy(*(this->context));
             else if (type == ast::Type("void"))    return llvm::Type::getVoidTy(*(this->context));
-            else if (type.is_pointer())            return this->as_llvm_type(type.as_nominal_type().parameters[0])->getPointerTo();
-            else if (type.is_array())              return llvm::ArrayType::get(this->as_llvm_type(type.as_nominal_type().parameters[0]), type.get_array_size());
+            else if (type.is_pointer())            return this->as_llvm_type(ast::get_concrete_type(type.as_nominal_type().parameters[0], this->type_bindings))->getPointerTo();
+            else if (type.is_array())              return llvm::ArrayType::get(this->as_llvm_type(ast::get_concrete_type(type.as_nominal_type().parameters[0], this->type_bindings)), type.get_array_size());
             else if (type.is_nominal_type() && type.as_nominal_type().type_definition) {
                 return this->get_struct_type(type.as_nominal_type().type_definition);
             }
@@ -868,6 +868,8 @@ void codegen::Context::codegen_function_prototypes(std::vector<ast::FunctionNode
     for (auto& function: functions) {
         if (function->state != ast::FunctionCompletelyTyped) {
             for (auto& specialization: function->specializations) {
+                this->type_bindings = specialization.type_bindings;
+                
                 this->codegen_function_prototypes(
                     function->module_path,
                     function->identifier->value,
@@ -876,6 +878,8 @@ void codegen::Context::codegen_function_prototypes(std::vector<ast::FunctionNode
                     specialization.return_type,
                     function->is_extern
                 );
+
+                this->type_bindings = {};
             }
         }
         else {
@@ -896,7 +900,7 @@ void codegen::Context::codegen_function_prototypes(std::filesystem::path module_
     llvm::FunctionType* function_type = this->get_function_type(args, args_types, return_type);
 
     // Create function
-    std::string name = this->get_mangled_function_name(module_path, identifier, args_types, return_type, is_extern);
+    std::string name = this->get_mangled_function_name(module_path, identifier, ast::get_concrete_types(args_types, this->type_bindings), ast::get_concrete_type(return_type, this->type_bindings), is_extern);
     llvm::Function* f = llvm::Function::Create(function_type, llvm::Function::ExternalLinkage, name, this->module);
 
     size_t offset = 0;
@@ -963,7 +967,7 @@ void codegen::Context::codegen_function_bodies(std::vector<ast::FunctionNode*> f
 }
 
 void codegen::Context::codegen_function_bodies(std::filesystem::path module_path, std::string identifier, std::vector<ast::FunctionArgumentNode*> args, std::vector<ast::Type> args_types, ast::Type return_type, ast::Node* function_body) {
-    std::string name = this->get_mangled_function_name(module_path, identifier, args_types, return_type, false);
+    std::string name = this->get_mangled_function_name(module_path, identifier, ast::get_concrete_types(args_types, this->type_bindings), ast::get_concrete_type(return_type, this->type_bindings), false);
     llvm::Function* f = this->module->getFunction(name);
 
     // Create the body of the function
@@ -1241,7 +1245,17 @@ llvm::Value* codegen::Context::codegen(ast::ReturnNode& node) {
             this->builder->CreateRetVoid();
         }
         else if (this->has_array_type(node.expression.value())) {
-            assert(false);
+            // Store elements
+            this->store_array_elements(
+                node.expression.value(),
+                this->builder->CreateLoad(
+                    this->as_llvm_type(ast::get_concrete_type(node.expression.value(), this->type_bindings))->getPointerTo(),
+                    this->get_binding("$result").pointer
+                )
+            );
+
+            // Return
+            this->builder->CreateRetVoid();
         }
         else {
             // Generate value of expression

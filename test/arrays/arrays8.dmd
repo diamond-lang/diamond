@@ -1,0 +1,15 @@
+-- Returning arrays
+
+function getArray(x: int64, y: int64, z: int64): array3[int64]   
+    return [x, y, z]
+
+a = getArray(10, 20, 30)
+print(a[1])
+print(a[2])
+print(a[3])
+
+--- Output
+10
+20
+30
+---

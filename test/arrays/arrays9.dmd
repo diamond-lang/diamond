@@ -1,0 +1,15 @@
+-- Returning arrays from generic functions
+
+function getArray(x, y, z)
+    return [x, y, z]
+
+a = getArray(10, 20, 30)
+print(a[1])
+print(a[2])
+print(a[3])
+
+--- Output
+10
+20
+30
+---
