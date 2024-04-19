@@ -1213,7 +1213,7 @@ llvm::Value* codegen::Context::codegen(ast::IndexAssignmentNode& node) {
     llvm::Value* expression = this->codegen(node.expression);
 
     // Codegen pointer
-    auto pointer = this->codegen(node.index_access->args[0]->expression);
+    auto pointer = this->get_index_access_pointer(*node.index_access);
 
     if (this->has_struct_type(node.expression)) {
         // Store fields
