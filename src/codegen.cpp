@@ -442,21 +442,21 @@ namespace codegen {
         }
 
         llvm::Value* get_field_pointer(ast::FieldAccessNode& node) {
-            // There should be at least 2 identifiers in fields accessed. eg: circle.radius
-            assert(node.fields_accessed.size() >= 2);
+            // There should be at least 1 identifiers in fields accessed. eg: circle.radius
+            assert(node.fields_accessed.size() >= 1);
 
             // Get struct allocation and type
-            assert(ast::get_concrete_type((ast::Node*) node.fields_accessed[0], this->type_bindings).as_nominal_type().type_definition);
-            llvm::Value* struct_ptr = this->get_binding(node.fields_accessed[0]->value).pointer;
-            llvm::StructType* struct_type = this->get_struct_type(ast::get_concrete_type((ast::Node*) node.fields_accessed[0], this->type_bindings).as_nominal_type().type_definition);
-            if (((llvm::AllocaInst*)struct_ptr)->getAllocatedType()->isPointerTy()) {
+            assert(ast::get_concrete_type(node.accessed, this->type_bindings).as_nominal_type().type_definition);
+            llvm::Value* struct_ptr = this->codegen(node.accessed);
+            llvm::StructType* struct_type = this->get_struct_type(ast::get_concrete_type(node.accessed, this->type_bindings).as_nominal_type().type_definition);
+            if (((llvm::AllocaInst*) struct_ptr)->getAllocatedType()->isPointerTy()) {
                 struct_ptr = this->builder->CreateLoad(struct_type->getPointerTo(), struct_ptr);
             }
 
             // Get type definition
-            ast::TypeNode* type_definition = ast::get_concrete_type((ast::Node*) node.fields_accessed[0], this->type_bindings).as_nominal_type().type_definition;
+            ast::TypeNode* type_definition = ast::get_concrete_type(node.accessed, this->type_bindings).as_nominal_type().type_definition;
 
-            for (size_t i = 1; i < node.fields_accessed.size() - 1; i++) {
+            for (size_t i = 0; i < node.fields_accessed.size() - 1; i++) {
                 // Get pointer to accessed fieldd
                 struct_ptr = this->builder->CreateStructGEP(struct_type, struct_ptr, get_index_of_field(node.fields_accessed[i]->value, type_definition));
 
@@ -1724,10 +1724,28 @@ llvm::Value* codegen::Context::codegen(ast::IntegerNode& node) {
 }
 
 llvm::Value* codegen::Context::codegen(ast::IdentifierNode& node) {
-    if (this->has_struct_type((ast::Node*) &node) && !this->get_binding(node.value).is_mutable) {
+    if (this->has_struct_type((ast::Node*) &node)) {
+        llvm::Value* pointer = this->get_binding(node.value).pointer;
+
+        if (this->get_binding(node.value).is_mutable) {
+            pointer = this->builder->CreateLoad(
+                pointer->getType(),
+                pointer
+            );
+        }
+
         return this->get_binding(node.value).pointer;
     }
-    else if (this->has_array_type((ast::Node*) &node) && !this->get_binding(node.value).is_mutable) {
+    else if (this->has_array_type((ast::Node*) &node)) {
+        llvm::Value* pointer = this->get_binding(node.value).pointer;
+
+        if (this->get_binding(node.value).is_mutable) {
+            pointer = this->builder->CreateLoad(
+                pointer->getType(),
+                pointer
+            );
+        }
+
         return this->get_binding(node.value).pointer;
     }
     else {
@@ -1764,8 +1782,7 @@ llvm::Value* codegen::Context::codegen(ast::ArrayNode& node) {
 llvm::Value* codegen::Context::codegen(ast::FieldAccessNode& node) {
     return this->builder->CreateLoad(
         this->as_llvm_type(ast::get_concrete_type((ast::Node*) &node, this->type_bindings)),
-        this->get_field_pointer(node),
-        node.fields_accessed[node.fields_accessed.size() - 1]->value
+        this->get_field_pointer(node)
     );
 }
 

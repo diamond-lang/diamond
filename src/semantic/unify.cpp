@@ -266,18 +266,18 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::St
 }
 
 Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::FieldAccessNode& node) {
-    assert(node.fields_accessed.size() >= 2);
+    assert(node.fields_accessed.size() >= 1);
 
     if (!node.type.is_type_variable()) {
         return Ok {};
     }
     else {
-        ast::FieldTypes* field_constraints = &context.type_inference.field_constraints[node.fields_accessed[0]->type];
+        ast::FieldTypes* field_constraints = &context.type_inference.field_constraints[ast::get_type(node.accessed)];
 
-        auto result = semantic::unify_types_and_type_check(context, *node.fields_accessed[0]);
+        auto result = semantic::unify_types_and_type_check(context, node.accessed);
         if (result.is_error()) return result;
 
-        for (size_t i = 1; i < node.fields_accessed.size(); i++) {
+        for (size_t i = 0; i < node.fields_accessed.size(); i++) {
             std::string field = node.fields_accessed[i]->value;
             ast::Type current_type = node.fields_accessed[i]->type;
 

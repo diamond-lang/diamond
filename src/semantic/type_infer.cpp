@@ -476,19 +476,19 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
 }
 
 Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, ast::FieldAccessNode& node) {
-    assert(node.fields_accessed.size() >= 2);
-    auto result = semantic::type_infer_and_analyze(context, *node.fields_accessed[0]);
+    assert(node.fields_accessed.size() >= 1);
+    auto result = semantic::type_infer_and_analyze(context, node.accessed);
     if (result.is_error()) return Error {};
 
-    if (!node.fields_accessed[0]->type.is_type_variable()) {
+    if (!ast::get_type(node.accessed).is_type_variable()) {
         // Get binding
-        semantic::Binding* binding = semantic::get_binding(context, node.fields_accessed[0]->type.as_nominal_type().name);
+        semantic::Binding* binding = semantic::get_binding(context, ast::get_type(node.accessed).as_nominal_type().name);
         assert(binding);
         assert(binding->type == semantic::TypeBinding);
 
         ast::TypeNode* type_definition = semantic::get_type_definition(*binding);
 
-        for (size_t i = 1; i < node.fields_accessed.size(); i++) {
+        for (size_t i = 0; i < node.fields_accessed.size(); i++) {
             bool founded = false;
             for (auto field: type_definition->fields) {
                 if (field->value == node.fields_accessed[i]->value) {
@@ -513,12 +513,12 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
         }
     }
     else {
-        if (context.type_inference.field_constraints.find(node.fields_accessed[0]->type) == context.type_inference.field_constraints.end()) {
-            context.type_inference.field_constraints[node.fields_accessed[0]->type] = {};
+        if (context.type_inference.field_constraints.find(ast::get_type(node.accessed)) == context.type_inference.field_constraints.end()) {
+            context.type_inference.field_constraints[ast::get_type(node.accessed)] = {};
         }
-        ast::FieldTypes* field_constraints = &context.type_inference.field_constraints[node.fields_accessed[0]->type];
+        ast::FieldTypes* field_constraints = &context.type_inference.field_constraints[ast::get_type(node.accessed)];
 
-        for (size_t i = 1; i < node.fields_accessed.size(); i++) {
+        for (size_t i = 0; i < node.fields_accessed.size(); i++) {
             std::string field = node.fields_accessed[i]->value;
 
             if (field_constraints->find(field) == field_constraints->end()) {

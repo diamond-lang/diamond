@@ -497,6 +497,7 @@ namespace ast {
         size_t column;
         Type type = Type(ast::NoType{});
 
+        ast::Node* accessed;
         std::vector<ast::IdentifierNode*> fields_accessed;
     };
 

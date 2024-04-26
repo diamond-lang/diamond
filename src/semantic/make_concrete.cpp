@@ -396,20 +396,19 @@ Result<Ok, Error> semantic::make_concrete(Context& context, ast::ArrayNode& node
 }
 
 Result<Ok, Error> semantic::make_concrete(Context& context, ast::FieldAccessNode& node, std::vector<ast::CallInCallStack> call_stack) {
-    assert(node.fields_accessed.size() >= 2);
+    assert(node.fields_accessed.size() >= 1);
 
     if (!node.type.is_type_variable()) {
         return Ok {};
     }
     else {
-        auto result = semantic::make_concrete(context, *node.fields_accessed[0], call_stack);
+        auto result = semantic::make_concrete(context, node.accessed, call_stack);
         if (result.is_error()) return Error {};
 
-        assert(semantic::get_type(context, node.fields_accessed[0]->type).is_concrete());
+        assert(semantic::get_type(context, ast::get_type(node.accessed)).is_concrete());
+        ast::Type struct_type = semantic::get_type(context, ast::get_type(node.accessed));
 
-        ast::Type struct_type = semantic::get_type(context, node.fields_accessed[0]->type);
-
-        for (size_t i = 1; i < node.fields_accessed.size(); i++) {
+        for (size_t i = 0; i < node.fields_accessed.size(); i++) {
             auto field = node.fields_accessed[i]->value;
             assert(struct_type.is_nominal_type());
 
@@ -837,6 +836,7 @@ void semantic::set_concrete_types(Context& context, ast::Node* node) {
 
         case ast::FieldAccess: {
             auto& field_access = std::get<ast::FieldAccessNode>(*node);
+            ast::set_type(field_access.accessed, semantic::get_type_or_default(context, ast::get_type(field_access.accessed)));
             for (auto field: field_access.fields_accessed) {
                 field->type = semantic::get_type_or_default(context, field->type);
             }

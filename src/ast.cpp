@@ -1073,12 +1073,14 @@ void ast::print(Node* node, PrintContext context) {
         case FieldAccess: {
             auto& field_access = std::get<FieldAccessNode>(*node);
 
-            // There should be at least 2 identifiers in fields accessed. eg: circle.radius
-            assert(field_access.fields_accessed.size() >= 2);
+            // There should be at least 1 identifiers in fields accessed. eg: circle.radius
+            assert(field_access.fields_accessed.size() >= 1);
 
-            std::vector<bool> last = context.last;
+            print(field_access.accessed, context);
+
+            std::vector<bool> last = append(context.last, true);
             for (size_t i = 0; i < field_access.fields_accessed.size(); i++) {
-                put_indent_level(context.indent_level + i, last);
+                put_indent_level(context.indent_level + i + 1, last);
                 std::cout << field_access.fields_accessed[i]->value;
                 if (field_access.fields_accessed[i]->type != Type(ast::NoType{})) std::cout << ": " << get_concrete_type_or_type_variable(field_access.fields_accessed[i]->type, context).to_str();
                 std::cout << "\n";
