@@ -2,6 +2,14 @@
 
 // Helper functions
 // ----------------
+static void print_bindings(std::unordered_map<size_t, ast::Type>& type_bindings) {
+    std::cout << "bindings\n";
+    for (auto binding: type_bindings) {
+        std::cout << "    " << binding.first << ": " << binding.second.to_str() << "\n";
+    }
+}
+    
+
 bool semantic::is_type_concrete(Context& context, ast::Type type) {
     if (type.is_concrete()) {
         return true;
@@ -50,7 +58,6 @@ ast::Type semantic::get_type_or_default(Context& context, ast::Type type) {
             }
         }
         else if (type.is_struct_type()) {
-            std::cout << "WAHT ? " << type.to_str() << "\n";
             assert(false);
         }
     }
@@ -571,6 +578,9 @@ void get_specialization_return_type(semantic::Context& context, ast::FunctionNod
 
         specialization.return_type = semantic::get_type(context, function_type);
     }
+    else if (function_type.is_nominal_type() && !function_type.is_concrete()) {
+        specialization.return_type = ast::get_concrete_type(function_type, specialization.type_bindings);
+    }
     else {
         specialization.return_type = function_type;
     }
@@ -581,7 +591,8 @@ Result<ast::Type, Error> semantic::get_function_type(Context& context, ast::Call
     for (auto& specialization: function->specializations) {
         if (specialization.args == args) {
             if (function->args.size() == 0 && !semantic::get_type(context, call->type).is_concrete()) {
-                context.type_inference.type_bindings[call->type.as_type_variable().id] = function->get_type_parameter(function->return_type).value()->interface.value().get_default_type();
+                auto type_parameter = function->get_type_parameter(function->return_type);
+                context.type_inference.type_bindings[call->type.as_type_variable().id] = type_parameter.value()->interface.value().get_default_type();
             }
             
             if (!semantic::get_type(context, call->type).is_concrete()) {

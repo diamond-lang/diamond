@@ -6,16 +6,16 @@
 
 // Helper functions
 // ----------------
-void add_type_parameters(semantic::Context& context, ast::FunctionNode& node, ast::Type type) {
+void add_type_parameters(semantic::Context& context, ast::FunctionNode& node, ast::Type type,  std::unordered_map<ast::Type, ast::FieldTypes>& unified_fields_constraints, std::unordered_map<ast::Type, ast::Interface>& unified_interface_constraints) {
     if (type.is_type_variable()) {
         ast::TypeParameter parameter;
         parameter.type = type;
 
-        if (context.type_inference.interface_constraints.find(type) != context.type_inference.interface_constraints.end()) {
-            parameter.interface = context.type_inference.interface_constraints[type];
+        if (unified_interface_constraints.find(type) != unified_interface_constraints.end()) {
+            parameter.interface = unified_interface_constraints[type];
         }
-        if (context.type_inference.field_constraints.find(type) != context.type_inference.field_constraints.end()) {
-            parameter.field_constraints = context.type_inference.field_constraints[type];
+        if (unified_fields_constraints.find(type) != unified_fields_constraints.end()) {
+            parameter.field_constraints = unified_fields_constraints[type];
         }
 
         if (!node.typed_parameter_aready_added(type)) {
@@ -25,7 +25,7 @@ void add_type_parameters(semantic::Context& context, ast::FunctionNode& node, as
     else if (type.is_nominal_type()) {
         for (auto parameter: type.as_nominal_type().parameters) {
             if (!parameter.is_concrete()) {
-                add_type_parameters(context, node, parameter);
+                add_type_parameters(context, node, parameter, unified_fields_constraints, unified_interface_constraints);
             }
         }
     }
@@ -141,9 +141,8 @@ Result<Ok, Error> semantic::analyze_block_or_expression(semantic::Context& conte
 
     // Unify
     // -----
-    result = semantic::unify_types_and_type_check(context, node);
-    if(result.is_error()) return Error {};
 
+    // Unify field constraints
     std::unordered_map<ast::Type, ast::FieldTypes> unified_field_constraints;
     for (auto type: context.type_inference.field_constraints) {
         auto unified_type = semantic::get_unified_type(context, type.first);
@@ -152,14 +151,34 @@ Result<Ok, Error> semantic::analyze_block_or_expression(semantic::Context& conte
             unified_field_constraints[unified_type][field.name] = semantic::get_unified_type(context, field.type);
         }
     }
-    context.type_inference.field_constraints = unified_field_constraints;
 
+    // Unify interface constraints
     std::unordered_map<ast::Type, ast::Interface> unified_interface_constraints;
     for (auto it: context.type_inference.interface_constraints) {
         auto unified_type = semantic::get_unified_type(context, it.first);
         unified_interface_constraints[unified_type] = it.second;
     }
-    context.type_inference.interface_constraints = unified_interface_constraints;
+    
+    // Unify args and return type if we are in funciton being analyzed
+    if (context.current_function.has_value()
+    && context.current_function.value()->state == ast::FunctionBeingAnalyzed) {
+        // Unify args and return type and add type parameters
+        for (size_t i = 0; i < context.current_function.value()->args.size(); i++) {
+            context.current_function.value()->args[i]->type = semantic::get_unified_type(context, context.current_function.value()->args[i]->type);
+            if (!context.current_function.value()->args[i]->type.is_concrete()) {
+                add_type_parameters(context, *context.current_function.value(), context.current_function.value()->args[i]->type, unified_field_constraints, unified_interface_constraints);
+            }
+        }
+
+        context.current_function.value()->return_type = semantic::get_unified_type(context, context.current_function.value()->return_type);
+        if (!context.current_function.value()->return_type.is_concrete()) {
+            add_type_parameters(context, *context.current_function.value(), context.current_function.value()->return_type, unified_field_constraints, unified_interface_constraints);
+        }
+    }
+
+    // Unify current program or body of function
+    result = semantic::unify_types_and_type_check(context, node);
+    if(result.is_error()) return Error {};
 
     // Make concrete
     // -------------
@@ -246,19 +265,6 @@ Result<Ok, Error> semantic::analyze(semantic::Context& context, ast::FunctionNod
         if (result.is_error()) {
             context.errors.insert(context.errors.end(), new_context.errors.begin(), new_context.errors.end());
             return Error {};
-        }
-
-        // Unify args and return type and add type parameters
-        for (size_t i = 0; i < node.args.size(); i++) {
-            node.args[i]->type = semantic::get_unified_type(new_context, node.args[i]->type);
-            if (!node.args[i]->type.is_concrete()) {
-                add_type_parameters(new_context, node, node.args[i]->type);
-            }
-        }
-
-        node.return_type = semantic::get_unified_type(new_context, node.return_type);
-        if (!node.return_type.is_concrete()) {
-            add_type_parameters(new_context, node, node.return_type);
         }
 
         // Set function as analyzed
