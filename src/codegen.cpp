@@ -61,7 +61,7 @@ namespace codegen {
         };
 
         std::vector<std::unordered_map<std::string, Binding>> scopes;
-        std::unordered_map<size_t, ast::Type> type_bindings;
+        std::unordered_map<std::string, ast::Type> type_bindings;
         std::unordered_map<std::string, llvm::Constant*> globals;
 
         Context(ast::Ast& ast) : ast(ast) {

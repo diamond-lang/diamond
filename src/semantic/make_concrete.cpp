@@ -2,7 +2,7 @@
 
 // Helper functions
 // ----------------
-static void print_bindings(std::unordered_map<size_t, ast::Type>& type_bindings) {
+static void print_bindings(std::unordered_map<std::string, ast::Type>& type_bindings) {
     std::cout << "bindings\n";
     for (auto binding: type_bindings) {
         std::cout << "    " << binding.first << ": " << binding.second.to_str() << "\n";
@@ -14,17 +14,17 @@ bool semantic::is_type_concrete(Context& context, ast::Type type) {
     if (type.is_concrete()) {
         return true;
     }
-    if (type.is_type_variable()
-    &&  context.type_inference.type_bindings.find(type.as_type_variable().id) != context.type_inference.type_bindings.end()) {
+    if (type.is_final_type_variable()
+    &&  context.type_inference.type_bindings.find(type.as_final_type_variable().id) != context.type_inference.type_bindings.end()) {
         return true;
     }
     return false;
 }
 
 ast::Type semantic::get_type(Context& context, ast::Type type) {
-    if (type.is_type_variable()) {
-        if (context.type_inference.type_bindings.find(type.as_type_variable().id) != context.type_inference.type_bindings.end()) {
-            type = context.type_inference.type_bindings[type.as_type_variable().id];
+    if (type.is_final_type_variable()) {
+        if (context.type_inference.type_bindings.find(type.as_final_type_variable().id) != context.type_inference.type_bindings.end()) {
+            type = context.type_inference.type_bindings[type.as_final_type_variable().id];
         }
         else {
             return type;
@@ -39,9 +39,11 @@ ast::Type semantic::get_type(Context& context, ast::Type type) {
 }
 
 ast::Type semantic::get_type_or_default(Context& context, ast::Type type) {
-    if (type.is_type_variable()) {
-        if (context.type_inference.type_bindings.find(type.as_type_variable().id) != context.type_inference.type_bindings.end()) {
-            type = context.type_inference.type_bindings[type.as_type_variable().id];
+    assert(!type.is_type_variable());
+
+    if (type.is_final_type_variable()) {
+        if (context.type_inference.type_bindings.find(type.as_final_type_variable().id) != context.type_inference.type_bindings.end()) {
+            type = context.type_inference.type_bindings[type.as_final_type_variable().id];
         }
         else if (context.type_inference.interface_constraints.find(type) != context.type_inference.interface_constraints.end()) {
             type = context.type_inference.interface_constraints[type].get_default_type();
@@ -228,7 +230,7 @@ Result<Ok, Error> set_expected_types_of_arguments_and_check(semantic::Context& c
     for (size_t i = from_argument; i < call->args.size(); i++) {
         auto arg_type = semantic::get_type(context, call->args[i]->type);
         if (!called_function->args[i]->type.is_concrete()) {
-            if (arg_type.is_type_variable()
+            if (arg_type.is_final_type_variable()
             &&  context.type_inference.interface_constraints.find(arg_type) != context.type_inference.interface_constraints.end()) {
                 arg_type = context.type_inference.interface_constraints[arg_type].get_default_type();
             } 
@@ -252,7 +254,7 @@ Result<Ok, Error> set_expected_types_of_arguments_and_check(semantic::Context& c
         else {
             // Set expected type
             if (called_function->args[i]->type.is_concrete()) {
-                context.type_inference.type_bindings[call->args[i]->type.as_type_variable().id] = called_function->args[i]->type;
+                context.type_inference.type_bindings[call->args[i]->type.as_final_type_variable().id] = called_function->args[i]->type;
             }
 
             // Check if it works
@@ -341,12 +343,12 @@ Result<Ok, Error> semantic::make_concrete(Context& context, ast::CallNode& node,
         if (called_function->state == ast::FunctionCompletelyTyped) {
             auto result =  semantic::get_type_completely_typed_function(context, called_function, semantic::get_types_or_default(context, ast::get_types(node.args)));
             if (result.is_error()) return Error{};
-            context.type_inference.type_bindings[node.type.as_type_variable().id] = result.get_value();
+            context.type_inference.type_bindings[node.type.as_final_type_variable().id] = result.get_value();
         }
         else {
             auto result = semantic::get_function_type(context, &node, called_function, semantic::get_types_or_default(context, ast::get_types(node.args)), call_stack);
             if (result.is_error()) return Error {};
-            context.type_inference.type_bindings[node.type.as_type_variable().id] = result.get_value();
+            context.type_inference.type_bindings[node.type.as_final_type_variable().id] = result.get_value();
         }
     }
 
@@ -369,15 +371,15 @@ Result<Ok, Error> semantic::make_concrete(Context& context, ast::StructLiteralNo
 }
 
 Result<Ok, Error> semantic::make_concrete(Context& context, ast::FloatNode& node, std::vector<ast::CallInCallStack> call_stack) {
-    if (semantic::get_type(context, node.type).is_type_variable()) {
-        context.type_inference.type_bindings[node.type.as_type_variable().id] = ast::Type("float64");
+    if (semantic::get_type(context, node.type).is_final_type_variable()) {
+        context.type_inference.type_bindings[node.type.as_final_type_variable().id] = ast::Type("float64");
     }
     return Ok {};
 }
 
 Result<Ok, Error> semantic::make_concrete(Context& context, ast::IntegerNode& node, std::vector<ast::CallInCallStack> call_stack) {
-    if (semantic::get_type(context, node.type).is_type_variable()) {
-        context.type_inference.type_bindings[node.type.as_type_variable().id] = ast::Type("int64");
+    if (semantic::get_type(context, node.type).is_final_type_variable()) {
+        context.type_inference.type_bindings[node.type.as_final_type_variable().id] = ast::Type("int64");
     }
     return Ok {};
 }
@@ -405,7 +407,7 @@ Result<Ok, Error> semantic::make_concrete(Context& context, ast::ArrayNode& node
 Result<Ok, Error> semantic::make_concrete(Context& context, ast::FieldAccessNode& node, std::vector<ast::CallInCallStack> call_stack) {
     assert(node.fields_accessed.size() >= 1);
 
-    if (!node.type.is_type_variable()) {
+    if (!node.type.is_final_type_variable()) {
         return Ok {};
     }
     else {
@@ -423,7 +425,7 @@ Result<Ok, Error> semantic::make_concrete(Context& context, ast::FieldAccessNode
             for (auto field_in_definition: struct_type.as_nominal_type().type_definition->fields) {
                 if (field == field_in_definition->value) {
                     field_founded = true;
-                    context.type_inference.type_bindings[node.fields_accessed[i]->type.as_type_variable().id] = field_in_definition->type;
+                    context.type_inference.type_bindings[node.fields_accessed[i]->type.as_final_type_variable().id] = field_in_definition->type;
                     break;
                 }
             }
@@ -460,9 +462,9 @@ Result<Ok, Error> semantic::make_concrete(Context& context, ast::DereferenceNode
 
 // Get type completly typed function
 // ---------------------------------
-Result<Ok, Error> unify_types(std::unordered_map<size_t, ast::Type>& type_bindings, ast::Type function_type, ast::Type argument_type) {
-    if (function_type.is_type_variable()) {
-        type_bindings[function_type.as_type_variable().id] = argument_type;
+Result<Ok, Error> unify_types(std::unordered_map<std::string, ast::Type>& type_bindings, ast::Type function_type, ast::Type argument_type) {
+    if (function_type.is_final_type_variable()) {
+        type_bindings[function_type.as_final_type_variable().id] = argument_type;
     }
     else if (function_type.is_nominal_type()) {
         for (size_t i = 0; i < function_type.as_nominal_type().parameters.size(); i++) {
@@ -478,7 +480,7 @@ Result<Ok, Error> unify_types(std::unordered_map<size_t, ast::Type>& type_bindin
 }
 
 Result<ast::Type, Error> semantic::get_type_completely_typed_function(Context& context, ast::FunctionNode* function, std::vector<ast::Type> args) {
-    std::unordered_map<size_t, ast::Type> type_bindings;
+    std::unordered_map<std::string, ast::Type> type_bindings;
 
     for (size_t i = 0; i < function->args.size(); i++) {
         ast::Type& function_type = function->args[i]->type;
@@ -510,13 +512,13 @@ Result<ast::Type, Error> get_field_type(semantic::Context& context, std::string 
 
 
 void add_argument_type_to_context(semantic::Context& context, ast::FunctionNode& function, ast::Type function_type, ast::Type argument_type) {
-    if (function_type.is_type_variable()) {
+    if (function_type.is_final_type_variable()) {
         // If it was no already included
-        if (context.type_inference.type_bindings.find(function_type.as_type_variable().id) == context.type_inference.type_bindings.end()) {
-            context.type_inference.type_bindings[function_type.as_type_variable().id] = argument_type;
+        if (context.type_inference.type_bindings.find(function_type.as_final_type_variable().id) == context.type_inference.type_bindings.end()) {
+            context.type_inference.type_bindings[function_type.as_final_type_variable().id] = argument_type;
         }
         // Else compare with previous type founded for it
-        else if (context.type_inference.type_bindings[function_type.as_type_variable().id] != argument_type) {
+        else if (context.type_inference.type_bindings[function_type.as_final_type_variable().id] != argument_type) {
             assert(false);
         }
 
@@ -546,14 +548,14 @@ void add_argument_type_to_context(semantic::Context& context, ast::FunctionNode&
 }
 
 void get_specialization_return_type(semantic::Context& context, ast::FunctionNode& function, ast::FunctionSpecialization& specialization, ast::Type function_type, ast::Type call_type) {
-    if (function_type.is_type_variable()) {
-        if (specialization.type_bindings.find(function_type.as_type_variable().id) != specialization.type_bindings.end()) {
-            specialization.return_type = specialization.type_bindings[function_type.as_type_variable().id];
+    if (function_type.is_final_type_variable()) {
+        if (specialization.type_bindings.find(function_type.as_final_type_variable().id) != specialization.type_bindings.end()) {
+            specialization.return_type = specialization.type_bindings[function_type.as_final_type_variable().id];
         }
         else if (function.get_type_parameter(function_type).has_value()
         &&       function.get_type_parameter(function_type).value()->interface.has_value()) {
-            specialization.type_bindings[function_type.as_type_variable().id] = function.get_type_parameter(function_type).value()->interface.value().get_default_type();
-            specialization.return_type = specialization.type_bindings[function_type.as_type_variable().id];
+            specialization.type_bindings[function_type.as_final_type_variable().id] = function.get_type_parameter(function_type).value()->interface.value().get_default_type();
+            specialization.return_type = specialization.type_bindings[function_type.as_final_type_variable().id];
         }
         else {
             assert(false);
@@ -592,7 +594,7 @@ Result<ast::Type, Error> semantic::get_function_type(Context& context, ast::Call
         if (specialization.args == args) {
             if (function->args.size() == 0 && !semantic::get_type(context, call->type).is_concrete()) {
                 auto type_parameter = function->get_type_parameter(function->return_type);
-                context.type_inference.type_bindings[call->type.as_type_variable().id] = type_parameter.value()->interface.value().get_default_type();
+                context.type_inference.type_bindings[call->type.as_final_type_variable().id] = type_parameter.value()->interface.value().get_default_type();
             }
             
             if (!semantic::get_type(context, call->type).is_concrete()) {
@@ -608,10 +610,10 @@ Result<ast::Type, Error> semantic::get_function_type(Context& context, ast::Call
     for (auto& call_in_stack: call_stack) {
         if (call_in_stack.identifier == call->identifier->value
         && call_in_stack.args == args) {
-            if (function->return_type.is_type_variable()
+            if (function->return_type.is_final_type_variable()
             &&  context.type_inference.interface_constraints.find(function->return_type) != context.type_inference.interface_constraints.end()) {
-                context.type_inference.type_bindings[function->return_type.as_type_variable().id] = context.type_inference.interface_constraints[function->return_type].get_default_type();
-                return context.type_inference.type_bindings[function->return_type.as_type_variable().id];
+                context.type_inference.type_bindings[function->return_type.as_final_type_variable().id] = context.type_inference.interface_constraints[function->return_type].get_default_type();
+                return context.type_inference.type_bindings[function->return_type.as_final_type_variable().id];
             }
             else {
                 return function->return_type;

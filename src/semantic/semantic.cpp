@@ -7,7 +7,7 @@
 // Helper functions
 // ----------------
 void add_type_parameters(semantic::Context& context, ast::FunctionNode& node, ast::Type type,  std::unordered_map<ast::Type, ast::FieldTypes>& unified_fields_constraints, std::unordered_map<ast::Type, ast::Interface>& unified_interface_constraints) {
-    if (type.is_type_variable()) {
+    if (type.is_final_type_variable()) {
         ast::TypeParameter parameter;
         parameter.type = type;
 
@@ -345,7 +345,7 @@ bool semantic::are_types_compatible(ast::FunctionNode& function, ast::Type funct
     if (function_type.is_concrete()) {
         return argument_type == function_type;
     }
-    else if (function_type.is_type_variable()
+    else if (function_type.is_final_type_variable()
     &&       function.get_type_parameter(function_type).has_value()
     &&       function.get_type_parameter(function_type).value()->interface.has_value()) {
         return function.get_type_parameter(function_type).value()->interface.value().is_compatible_with(argument_type);

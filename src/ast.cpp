@@ -103,6 +103,10 @@ ast::TypeVariable& ast::Type::as_type_variable() {
     return std::get<ast::TypeVariable>(this->type);
 }
 
+ast::FinalTypeVariable& ast::Type::as_final_type_variable() {
+    return std::get<ast::FinalTypeVariable>(this->type);
+}
+
 ast::NominalType& ast::Type::as_nominal_type() {
     return std::get<ast::NominalType>(this->type);
 }
@@ -117,6 +121,10 @@ ast::NoType ast::Type::as_no_type() const {
 
 ast::TypeVariable ast::Type::as_type_variable() const {
     return std::get<ast::TypeVariable>(this->type);
+}
+
+ast::FinalTypeVariable ast::Type::as_final_type_variable() const {
+    return std::get<ast::FinalTypeVariable>(this->type);
 }
 
 ast::NominalType ast::Type::as_nominal_type() const {
@@ -135,6 +143,9 @@ bool ast::Type::operator==(const Type &t) const {
     }
     else if (this->is_type_variable()) {
         return std::get<ast::TypeVariable>(this->type).id == std::get<ast::TypeVariable>(t.type).id;
+    }
+    else if (this->is_final_type_variable()) {
+        return std::get<ast::FinalTypeVariable>(this->type).id == std::get<ast::FinalTypeVariable>(t.type).id;
     }
     else if (this->is_nominal_type()) {
         if (std::get<ast::NominalType>(this->type).name == std::get<ast::NominalType>(t.type).name) {
@@ -173,7 +184,7 @@ bool ast::Type::operator!=(const Type &t) const {
     return !(t == *this);
 }
 
-std::string as_letter(size_t type_var) {
+static std::string as_letter(size_t type_var) {
     char letters[] = "abcdefghijklmnopqrstuvwxyz";
     if (type_var > 25) {
         return letters[(type_var + 18) % 26] + std::to_string(1 + type_var / 26);
@@ -189,14 +200,12 @@ std::string ast::Type::to_str() const {
         output += "ast::Notype";
     }
     else if (this->is_type_variable()) {
-        if (this->as_type_variable().is_final) {
-            output += as_letter(std::get<ast::TypeVariable>(this->type).id);
-        }
-        else {
-            output += std::to_string(std::get<ast::TypeVariable>(this->type).id);
-        }
+        output += std::to_string(std::get<ast::TypeVariable>(this->type).id);
 
         return output;
+    }
+    else if (this->is_final_type_variable()) {
+        output += std::get<ast::FinalTypeVariable>(this->type).id;
     }
     else if (this->is_nominal_type()) {
         if (std::get<ast::NominalType>(this->type).parameters.size() == 0) {
@@ -236,7 +245,8 @@ std::string ast::Type::to_str() const {
 }
 
 std::string ast::TypeParameter::to_str() {
-    std::string output = as_letter(this->type.as_type_variable().id);
+    assert(this->type.is_final_type_variable());
+    std::string output = this->type.as_final_type_variable().id;
 
     if (this->interface.has_value()
     ||  this->field_constraints.size() > 0) {
@@ -275,6 +285,10 @@ bool ast::Type::is_type_variable() const {
     return this->type.index() == ast::TypeVariableVariant;
 }
 
+bool ast::Type::is_final_type_variable() const {
+    return this->type.index() == ast::FinalTypeVariableVariant;
+}
+
 bool ast::Type::is_nominal_type() const {
     return this->type.index() == ast::NominalTypeVariant;
 }
@@ -293,6 +307,10 @@ bool ast::Type::is_concrete() const {
     }
 
     if (this->is_type_variable()) {
+        return false;
+    }
+
+    if (this->is_final_type_variable()) {
         return false;
     }
 
@@ -393,14 +411,14 @@ ast::Type ast::get_type(Node* node) {
     }, *node);
 }
 
-ast::Type ast::get_concrete_type(Node* node, std::unordered_map<size_t, Type>& type_bindings) {
+ast::Type ast::get_concrete_type(Node* node, std::unordered_map<std::string, Type>& type_bindings) {
     return ast::get_concrete_type(ast::get_type(node), type_bindings);
 }
 
-ast::Type ast::get_concrete_type(Type type, std::unordered_map<size_t, Type>& type_bindings) {
-    if (type.is_type_variable()) {
-        if (type_bindings.find(type.as_type_variable().id) != type_bindings.end()) {
-            type = type_bindings[type.as_type_variable().id];
+ast::Type ast::get_concrete_type(Type type, std::unordered_map<std::string, Type>& type_bindings) {
+    if (type.is_final_type_variable()) {
+        if (type_bindings.find(type.as_final_type_variable().id) != type_bindings.end()) {
+            type = type_bindings[type.as_final_type_variable().id];
         }
         else {
             std::cout << "unknown type: " << type.to_str() << "\n";
@@ -441,7 +459,7 @@ std::vector<ast::Type> ast::get_types(std::vector<FunctionArgumentNode*> nodes) 
     return types;
 }
 
-std::vector<ast::Type> ast::get_concrete_types(std::vector<Node*> nodes, std::unordered_map<size_t, Type>& type_bindings) {
+std::vector<ast::Type> ast::get_concrete_types(std::vector<Node*> nodes, std::unordered_map<std::string, Type>& type_bindings) {
     std::vector<Type> types;
     for (size_t i = 0; i < nodes.size(); i++) {
         types.push_back(get_concrete_type(nodes[i], type_bindings));
@@ -450,7 +468,7 @@ std::vector<ast::Type> ast::get_concrete_types(std::vector<Node*> nodes, std::un
 }
 
 
-std::vector<ast::Type> ast::get_concrete_types(std::vector<ast::Type> type_variables, std::unordered_map<size_t, Type>& type_bindings) {
+std::vector<ast::Type> ast::get_concrete_types(std::vector<ast::Type> type_variables, std::unordered_map<std::string, Type>& type_bindings) {
     std::vector<Type> types;
     for (size_t i = 0; i < type_variables.size(); i++) {
         types.push_back(get_concrete_type(type_variables[i], type_bindings));

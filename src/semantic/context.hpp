@@ -50,7 +50,7 @@ namespace semantic {
         std::unordered_map<ast::Type, Set<ast::Type>> labeled_type_constraints;
         std::unordered_map<ast::Type, ast::Interface> interface_constraints;
         std::unordered_map<ast::Type, ast::FieldTypes> field_constraints;
-        std::unordered_map<size_t, ast::Type> type_bindings;
+        std::unordered_map<std::string, ast::Type> type_bindings;
     };
 
     // Context

@@ -331,7 +331,7 @@ ast::Type semantic::get_unified_type(Context& context, ast::Type type_var) {
         }
     }
 
-    if (type_var.is_type_variable() && !type_var.as_type_variable().is_final) { 
+    if (type_var.is_type_variable()) { 
         ast::Type new_type_var = semantic::new_final_type_variable(context);
         context.type_inference.labeled_type_constraints[new_type_var] = Set<ast::Type>({type_var});
         return new_type_var;
@@ -346,8 +346,18 @@ ast::Type semantic::get_unified_type(Context& context, ast::Type type_var) {
     return type_var;
 }
 
+static std::string as_letter(size_t type_var) {
+    char letters[] = "abcdefghijklmnopqrstuvwxyz";
+    if (type_var > 25) {
+        return letters[(type_var + 18) % 26] + std::to_string(1 + type_var / 26);
+    }
+    else {
+        return std::string(1, letters[(type_var + 18) % 26]);
+    }
+}
+
 ast::Type semantic::new_final_type_variable(Context& context) {
-    ast::Type new_type = ast::Type(ast::TypeVariable(context.type_inference.current_type_variable_number, true));
+    ast::Type new_type = ast::Type(ast::FinalTypeVariable(as_letter(context.type_inference.current_type_variable_number)));
     context.type_inference.current_type_variable_number++;
     return new_type;
 }

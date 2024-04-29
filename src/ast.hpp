@@ -137,10 +137,14 @@ namespace ast {
 
     struct TypeVariable {
         size_t id;
-        bool is_final = false;
 
         TypeVariable(size_t id) : id(id) {}
-        TypeVariable(size_t id, bool is_final) : id(id), is_final(is_final) {}
+    };
+
+    struct FinalTypeVariable {
+        std::string id;
+
+        FinalTypeVariable(std::string id) : id(id) {}
     };
 
     struct NominalType {
@@ -164,26 +168,29 @@ namespace ast {
     enum TypeVariant {
         NoTypeVariant,
         TypeVariableVariant,
+        FinalTypeVariableVariant,
         NominalTypeVariant,
         StructTypeVariant
     };
 
     struct Type {
-        std::variant<NoType, TypeVariable, NominalType, StructType> type;
+        std::variant<NoType, TypeVariable, FinalTypeVariable, NominalType, StructType> type;
 
         Type() : type(NoType{}) {}
         Type(std::string name) : type(NominalType(name)) {}
         Type(std::string name, std::vector<Type> parameters) : type(NominalType(name, parameters)) {}
         Type(std::string name, TypeNode* type_definition) : type(NominalType(name, type_definition)) {}
-        Type(std::variant<NoType, TypeVariable, NominalType, StructType> type) : type(type) {}
+        Type(std::variant<NoType, TypeVariable, FinalTypeVariable, NominalType, StructType> type) : type(type) {}
 
         ast::NoType& as_no_type();
         ast::TypeVariable& as_type_variable();
+        ast::FinalTypeVariable& as_final_type_variable();
         ast::NominalType& as_nominal_type();
         ast::StructType& as_struct_type();
 
         ast::NoType as_no_type() const;
         ast::TypeVariable as_type_variable() const;
+        ast::FinalTypeVariable as_final_type_variable() const;
         ast::NominalType as_nominal_type() const;
         ast::StructType as_struct_type() const;
 
@@ -192,6 +199,7 @@ namespace ast {
         std::string to_str() const;
         bool is_no_type() const;
         bool is_type_variable() const;
+        bool is_final_type_variable() const;
         bool is_nominal_type() const;
         bool is_struct_type() const;
         bool is_structural_struct_type() const;
@@ -204,13 +212,13 @@ namespace ast {
     };
 
     Type get_type(Node* node);
-    Type get_concrete_type(Node* node, std::unordered_map<size_t, Type>& type_bindings);
-    Type get_concrete_type(Type type_variable, std::unordered_map<size_t, Type>& type_bindings);
+    Type get_concrete_type(Node* node, std::unordered_map<std::string, Type>& type_bindings);
+    Type get_concrete_type(Type type_variable, std::unordered_map<std::string, Type>& type_bindings);
     void set_type(Node* node, Type type);
     std::vector<Type> get_types(std::vector<CallArgumentNode*> nodes);
     std::vector<Type> get_types(std::vector<FunctionArgumentNode*> nodes);  
-    std::vector<Type> get_concrete_types(std::vector<Node*> nodes, std::unordered_map<size_t, Type>& type_bindings);
-    std::vector<Type> get_concrete_types(std::vector<Type> type_variables, std::unordered_map<size_t, Type>& type_bindings);
+    std::vector<Type> get_concrete_types(std::vector<Node*> nodes, std::unordered_map<std::string, Type>& type_bindings);
+    std::vector<Type> get_concrete_types(std::vector<Type> type_variables, std::unordered_map<std::string, Type>& type_bindings);
     bool is_expression(Node* node);
     bool could_be_expression(Node* node);
     void transform_to_expression(Node*& node);
@@ -266,7 +274,7 @@ namespace ast {
     struct FunctionSpecialization {
         std::vector<Type> args;
         Type return_type;
-        std::unordered_map<size_t, Type> type_bindings;
+        std::unordered_map<std::string, Type> type_bindings;
     };
 
     enum FunctionState {
@@ -542,7 +550,7 @@ namespace ast {
         size_t indent_level = 0;
         std::vector<bool> last = {};
         bool concrete = false;
-        std::unordered_map<size_t, ast::Type> type_bindings;
+        std::unordered_map<std::string, ast::Type> type_bindings;
     };
 
     Type get_concrete_type_or_type_variable(Type type, PrintContext context);

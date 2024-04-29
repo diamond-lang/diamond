@@ -90,7 +90,7 @@ std::unordered_map<std::string, std::vector<intrinsics::Prototype>> intrinsic_fu
         {{ast::Type("string")}, ast::Type("void")}
     }},
     {"[]", {
-        {{ast::Type("array", {ast::Type(ast::TypeVariable(1))}), ast::Type("int64")}, ast::Type(ast::TypeVariable(1))},
-        {{intrinsics::Type(ast::Type("array", {ast::Type(ast::TypeVariable(1))}), true), ast::Type("int64")}, intrinsics::Type(ast::Type(ast::TypeVariable(1)), true)}
+        {{ast::Type("array", {ast::Type(ast::FinalTypeVariable("t"))}), ast::Type("int64")}, ast::Type(ast::FinalTypeVariable("t"))},
+        {{intrinsics::Type(ast::Type("array", {ast::Type(ast::FinalTypeVariable("t"))}), true), ast::Type("int64")}, intrinsics::Type(ast::Type(ast::FinalTypeVariable("t")), true)}
     }}
 };
