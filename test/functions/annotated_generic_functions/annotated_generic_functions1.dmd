@@ -1,0 +1,8 @@
+function genericPrint[t](value: t): void
+    print(value)
+
+genericPrint(3.4)
+
+--- Output
+3.4
+---

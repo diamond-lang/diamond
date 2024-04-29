@@ -1,4 +1,5 @@
 #include "ast.hpp"
+#include "semantic/intrinsics.hpp"
 
 #include <cassert>
 #include <iostream>
@@ -246,7 +247,7 @@ std::string ast::Type::to_str() const {
 
 std::string ast::TypeParameter::to_str() {
     assert(this->type.is_final_type_variable());
-    std::string output = this->type.as_final_type_variable().id;
+    std::string output = this->type.to_str();
 
     if (this->interface.has_value()
     ||  this->field_constraints.size() > 0) {
@@ -373,6 +374,12 @@ bool ast::Type::is_array() const {
     }
     
     return true;
+}
+
+bool ast::Type::is_builtin_type() const {
+    return this->is_pointer()
+        || this->is_array()
+        || (this->is_nominal_type() && primitive_types.contains(this->as_nominal_type().name));
 }
 
 size_t ast::Type::get_array_size() const {

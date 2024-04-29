@@ -1,5 +1,15 @@
 #include "intrinsics.hpp"
 
+Set<std::string> primitive_types = Set<std::string>({
+    "int8",
+    "int32",
+    "int64",
+    "float64",
+    "bool",
+    "string",
+    "void"
+});
+
 std::unordered_map<std::string, std::vector<intrinsics::Prototype>> intrinsic_functions = {
     {"+", {
         {{ast::Type("float64"), ast::Type("float64")}, ast::Type("float64")},

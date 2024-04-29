@@ -336,14 +336,19 @@ ast::Type semantic::get_unified_type(Context& context, ast::Type type_var) {
         context.type_inference.labeled_type_constraints[new_type_var] = Set<ast::Type>({type_var});
         return new_type_var;
     }
-    else if (!type_var.is_type_variable()) {
+    else if (type_var.is_nominal_type()) {
         for (size_t i = 0; i < type_var.as_nominal_type().parameters.size(); i++) {
             type_var.as_nominal_type().parameters[i] = semantic::get_unified_type(context, type_var.as_nominal_type().parameters[i]);
         }
         return type_var;
     }
-    
-    return type_var;
+    else if (type_var.is_final_type_variable()) {
+        return type_var;
+    }
+    else {
+        assert(false);
+        return type_var;
+    }
 }
 
 static std::string as_letter(size_t type_var) {
@@ -357,6 +362,27 @@ static std::string as_letter(size_t type_var) {
 }
 
 ast::Type semantic::new_final_type_variable(Context& context) {
+    std::string letter = as_letter(context.type_inference.current_type_variable_number);
+    
+    if (context.current_function.has_value()) {
+        while (true) {
+            bool already_used = false;
+            for (auto& parameter: context.current_function.value()->type_parameters) {
+                if (parameter.type.as_final_type_variable().id == letter) {
+                    already_used = true;
+                    break;
+                }
+            }
+
+            if (!already_used) {
+                break;
+            }
+    
+            context.type_inference.current_type_variable_number++;
+            letter = as_letter(context.type_inference.current_type_variable_number);
+        }
+    }
+
     ast::Type new_type = ast::Type(ast::FinalTypeVariable(as_letter(context.type_inference.current_type_variable_number)));
     context.type_inference.current_type_variable_number++;
     return new_type;

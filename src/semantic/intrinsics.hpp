@@ -23,6 +23,7 @@ namespace intrinsics {
     };
 }
 
+extern Set<std::string> primitive_types;
 extern std::unordered_map<std::string, std::vector<intrinsics::Prototype>> intrinsic_functions;
 
 #endif

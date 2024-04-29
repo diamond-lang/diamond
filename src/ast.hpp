@@ -208,6 +208,7 @@ namespace ast {
         bool is_float() const;
         bool is_pointer() const;
         bool is_array() const;
+        bool is_builtin_type() const;
         size_t get_array_size() const;
     };
 
@@ -279,6 +280,7 @@ namespace ast {
 
     enum FunctionState {
         FunctionCompletelyTyped,
+        FunctionGenericCompletelyTyped,
         FunctionAnalyzed,
         FunctionBeingAnalyzed,
         FunctionNotAnalyzed

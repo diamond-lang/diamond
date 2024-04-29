@@ -2,6 +2,7 @@
 #include <map>
 #include <cstdlib>
 #include <iostream>
+#include <cstring>
 
 #include "errors.hpp"
 #include "parser.hpp"
@@ -377,7 +378,7 @@ Result<ast::Node*, Error> Parser::parse_function_argument() {
     return this->ast.last_element();
 }
 
-// function → "function" IDENTIFIER "(" (function_argument (":" type)? ",")* ")" (":" type)? block_statement_or_expression
+// function → "function" IDENTIFIER ("[" IDENTIFIER ("," IDENTIFIER)* "]")? "(" (function_argument (":" type)? ",")* ")" (":" type)? block_statement_or_expression
 Result<ast::Node*, Error> Parser::parse_function() {
     // Create node
     auto function = ast::FunctionNode {this->current().line, this->current().column};
@@ -391,6 +392,32 @@ Result<ast::Node*, Error> Parser::parse_function() {
     auto identifier = this->parse_identifier();
     if (identifier.is_error()) return identifier;
     function.identifier = (ast::IdentifierNode*) identifier.get_value();
+
+    // Parse possible type parameter
+    if (this->current() == token::LeftBracket) {
+        this->advance();
+
+        // Parse type parameters
+        size_t i = 0;
+        while (this->current() != token::RightBracket && !this->at_end()) {
+            auto parameter = this->parse_type();
+            if (parameter.is_error()) return parameter.get_error();
+
+            assert(parameter.get_value().is_final_type_variable());
+
+            ast::TypeParameter type_parameter;
+            type_parameter.type = parameter.get_value();
+            function.type_parameters.push_back(type_parameter);
+            i += 1;
+
+            if (this->current() == token::Comma) this->advance();
+            else                                 break;
+        }
+
+        // Parse right bracket
+        auto right_bracket = this->parse_token(token::RightBracket);
+        if (right_bracket.is_error()) return Error {};
+    }
 
     // Parse left paren
     auto left_paren = this->parse_token(token::LeftParen);
@@ -439,7 +466,7 @@ Result<ast::Node*, Error> Parser::parse_function() {
         ast::transform_to_expression(function.body);
     }
 
-    // Check if function is completly typed or not
+    // Check if function is completely typed or not
     for (auto arg: function.args) {
         if (arg->type == ast::Type(ast::NoType{})) {
             function.state = ast::FunctionNotAnalyzed;
@@ -448,6 +475,12 @@ Result<ast::Node*, Error> Parser::parse_function() {
     }
     if (function.return_type == ast::Type(ast::NoType{})) {
         function.state = ast::FunctionNotAnalyzed;
+    }
+
+    if (function.state == ast::FunctionCompletelyTyped) {
+        if (function.type_parameters.size() > 0) {
+            function.state = ast::FunctionGenericCompletelyTyped;
+        }
     }
 
     this->ast.push_back(function);
@@ -598,8 +631,15 @@ Result<ast::Node*, Error> Parser::parse_type_definition() {
 Result<ast::Type, Error> Parser::parse_type() {
     auto type_identifier = this->parse_token(token::Identifier);
     if (type_identifier.is_error()) return Error {};
-    ast::Type type = ast::Type(type_identifier.get_value().get_literal());
+    std::string literal = type_identifier.get_value().get_literal();
+    ast::Type type = ast::Type(literal);
 
+    // If is type variable
+    if (!type.is_builtin_type() && islower(literal[0])) {
+        return ast::Type(ast::FinalTypeVariable(literal));
+    }
+
+    // Else parse possible type parameters
     if (this->current() == token::LeftBracket) {
         this->advance();
 

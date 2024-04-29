@@ -270,7 +270,8 @@ Result<Ok, Error> semantic::analyze(semantic::Context& context, ast::FunctionNod
         // Set function as analyzed
         node.state = ast::FunctionAnalyzed;
     }
-    else if (node.state == ast::FunctionCompletelyTyped) {
+    else if (node.state == ast::FunctionCompletelyTyped
+    ||       node.state == ast::FunctionGenericCompletelyTyped) {
         for (auto arg: node.args) {
             auto identifier = arg->identifier->value;
             auto result = semantic::analyze(new_context, arg->type);
@@ -301,6 +302,7 @@ Result<Ok, Error> semantic::analyze(semantic::Context& context, ast::FunctionNod
 
 Result<Ok, Error> semantic::analyze(semantic::Context& context, ast::Type& type) {
     if      (type.is_type_variable()) return Ok {};
+    else if (type.is_final_type_variable()) return Ok {};
     else if (type == ast::Type("int64")) return Ok {};
     else if (type == ast::Type("int32")) return Ok {};
     else if (type == ast::Type("int8")) return Ok {};
