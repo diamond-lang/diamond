@@ -1540,8 +1540,14 @@ std::vector<llvm::Value*> codegen::Context::codegen_args(ast::FunctionNode* func
         }
         else if (args[i]->is_mutable) {
             if (args[i]->expression->index() == ast::Identifier) {
-                // Add to args
-                result.push_back(this->get_binding(((ast::IdentifierNode*) args[i]->expression)->value).pointer);
+                auto binding = this->get_binding(((ast::IdentifierNode*) args[i]->expression)->value);
+                if (binding.is_mutable) {
+                    result.push_back(this->builder->CreateLoad(binding.pointer->getType(), binding.pointer, ((ast::IdentifierNode*) args[i]->expression)->value));
+                }
+                else {
+                    // Add to args
+                    result.push_back(binding.pointer);
+                }
             }
             else if (args[i]->expression->index() == ast::FieldAccess) {
                 // Add to args
