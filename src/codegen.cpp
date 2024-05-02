@@ -143,7 +143,14 @@ namespace codegen {
             else if (type == ast::Type("string"))  return llvm::Type::getInt8PtrTy(*(this->context));
             else if (type == ast::Type("void"))    return llvm::Type::getVoidTy(*(this->context));
             else if (type.is_pointer())            return this->as_llvm_type(ast::get_concrete_type(type.as_nominal_type().parameters[0], this->type_bindings))->getPointerTo();
-            else if (type.is_array())              return llvm::ArrayType::get(this->as_llvm_type(ast::get_concrete_type(type.as_nominal_type().parameters[0], this->type_bindings)), type.get_array_size());
+            else if (type.is_array())              {
+                if (type.array_size_known()) {
+                    return llvm::ArrayType::get(this->as_llvm_type(ast::get_concrete_type(type.as_nominal_type().parameters[0], this->type_bindings)), type.get_array_size());
+                }
+                else {
+                    return llvm::StructType::getTypeByName(*this->context, "arrayWrapper");
+                }
+            }
             else if (type.is_nominal_type() && type.as_nominal_type().type_definition) {
                 return this->get_struct_type(type.as_nominal_type().type_definition);
             }
@@ -236,7 +243,14 @@ namespace codegen {
                     llvm_args_types.insert(llvm_args_types.end(), new_args.begin(), new_args.end());
                 }
                 else if (args_types[i].is_array()) {
-                    llvm_args_types.push_back(llvm_type->getPointerTo());
+                    if ((args[i]->type.is_array() && args[i]->type.array_size_known())
+                    ||  !args[i]->type.is_array()) {
+                        llvm_args_types.push_back(llvm_type->getPointerTo());
+                    }
+                    else {
+                        llvm::StructType* array_type = llvm::StructType::getTypeByName(*this->context, "arrayWrapper");
+                        llvm_args_types.push_back(array_type->getPointerTo());
+                    }
                 }
                 else if (args[i]->is_mutable) {
                     llvm_args_types.push_back(llvm_type->getPointerTo());
@@ -472,14 +486,34 @@ namespace codegen {
         }
 
         llvm::Value* get_index_access_pointer(ast::CallNode& node) {
-            llvm::Type* array_type = this->as_llvm_type(ast::get_concrete_type(node.args[0]->expression, this->type_bindings));
             llvm::Value* index = this->builder->CreateSub(this->codegen(node.args[1]->expression), llvm::ConstantInt::get(*(this->context), llvm::APInt(64, 1, true)));
-            llvm::Value* array_ptr = this->get_binding(std::get<ast::IdentifierNode>(*node.args[0]->expression).value).pointer;
-            if (((llvm::AllocaInst*) array_ptr)->getAllocatedType()->isPointerTy()) {
-                array_ptr = this->builder->CreateLoad(array_type->getPointerTo(), array_ptr);
+
+            if (ast::get_concrete_type(node.args[0]->expression, this->type_bindings).array_size_known()) {
+                llvm::Type* array_type = this->as_llvm_type(ast::get_concrete_type(node.args[0]->expression, this->type_bindings));
+                llvm::Value* array_ptr = this->get_binding(std::get<ast::IdentifierNode>(*node.args[0]->expression).value).pointer;
+
+                if (((llvm::AllocaInst*) array_ptr)->getAllocatedType()->isPointerTy()) {
+                    array_ptr = this->builder->CreateLoad(array_type->getPointerTo(), array_ptr);
+                }
+                
+                return this->builder->CreateGEP(array_type, array_ptr, {llvm::ConstantInt::get(*(this->context), llvm::APInt(64, 0, true)), index}, "", true);
             }
-            llvm::Value* ptr = this->builder->CreateGEP(array_type, array_ptr, {llvm::ConstantInt::get(*(this->context), llvm::APInt(64, 0, true)), index}, "", true);
-            return ptr;
+            else {
+                llvm::Type* wrapper_type = this->as_llvm_type(ast::get_concrete_type(node.args[0]->expression, this->type_bindings));
+                llvm::Value* wrapper_ptr = this->get_binding(std::get<ast::IdentifierNode>(*node.args[0]->expression).value).pointer;
+                wrapper_ptr = this->builder->CreateLoad(
+                    wrapper_ptr->getType(),
+                    wrapper_ptr
+                );
+                
+                // Get array pointer
+                llvm::Value* array_ptr = this->builder->CreateStructGEP(wrapper_type, wrapper_ptr, 1);
+                array_ptr = this->builder->CreateLoad(array_ptr->getType(), array_ptr);
+
+                ast::Type elements_type = ast::get_concrete_type(node.args[0]->expression, this->type_bindings).as_nominal_type().parameters[0];
+                llvm::Type* array_type = llvm::ArrayType::get(this->as_llvm_type(elements_type), 0);
+                return this->builder->CreateGEP(array_type, array_ptr, {llvm::ConstantInt::get(*(this->context), llvm::APInt(64, 0, true)), index}, "", true);
+            }
         }
 
         llvm::Constant* get_global_string(std::string str) {
@@ -794,6 +828,13 @@ void codegen::Context::codegen(ast::Ast& ast) {
     llvm::FunctionType *printfType = llvm::FunctionType::get(this->builder->getInt32Ty(), args, true); // `true` specifies the function as variadic
     llvm::Function::Create(printfType, llvm::Function::ExternalLinkage, "printf", this->module);
 
+    // Codegen array type
+    llvm::StructType* array_type = llvm::StructType::create(*this->context, "arrayWrapper");
+    std::vector<llvm::Type*> fields;
+    fields.push_back(this->as_llvm_type(ast::Type("int64")));
+    fields.push_back(llvm::Type::getVoidTy(*(this->context))->getPointerTo());
+    array_type->setBody(fields);
+
     // Codegen types
     for (auto it = ast.modules.begin(); it != ast.modules.end(); it++) {
         this->codegen_types_prototypes(it->second->types);
@@ -1083,7 +1124,7 @@ llvm::Value* codegen::Context::codegen(ast::DeclarationNode& node) {
     else if (this->has_array_type(node.expression)) {
         // Create allocation
         llvm::Type* array_type = this->as_llvm_type(ast::get_concrete_type(node.expression, this->type_bindings));
-        this->current_scope()[node.identifier->value] = Binding{this->create_allocation("array", array_type)};
+        this->current_scope()[node.identifier->value] = Binding{this->create_allocation(node.identifier->value, array_type)};
             
         // Store array elements
         this->store_array_elements(node.expression, this->current_scope()[node.identifier->value].pointer);
@@ -1461,15 +1502,41 @@ std::vector<llvm::Value*> codegen::Context::codegen_args(ast::FunctionNode* func
             }
         }
         else if (this->has_array_type(args[i]->expression) && !args[i]->is_mutable) {
-            // Create allocation
-            llvm::Type* array_type = this->as_llvm_type(ast::get_concrete_type(args[i]->expression, this->type_bindings));
-            llvm::AllocaInst* allocation = this->create_allocation(function->args[i]->identifier->value, array_type);
+            if ((function->args[i]->type.is_array() && function->args[i]->type.array_size_known())
+            ||  !function->args[i]->type.is_array()) {
+                // Create allocation
+                llvm::Type* array_type = this->as_llvm_type(ast::get_concrete_type(args[i]->expression, this->type_bindings));
+                llvm::AllocaInst* allocation = this->create_allocation(function->args[i]->identifier->value, array_type);
 
-            // Store array elements
-            this->store_array_elements(args[i]->expression, allocation);
+                // Store array elements
+                this->store_array_elements(args[i]->expression, allocation);
 
-            // Add to args
-            result.push_back(allocation);
+                // Add to args
+                result.push_back(allocation);
+            }
+            else {
+                // Create allocation
+                llvm::Type* array_type = this->as_llvm_type(ast::get_concrete_type(args[i]->expression, this->type_bindings));
+                llvm::AllocaInst* allocation = this->create_allocation(function->args[i]->identifier->value, array_type);
+
+                // Store array elements
+                this->store_array_elements(args[i]->expression, allocation);
+
+                // Create array type allocation
+                llvm::StructType* wrapper_type = llvm::StructType::getTypeByName(*this->context, "arrayWrapper");
+                llvm::AllocaInst* wrapper_allocation = this->create_allocation("array_wrapper", wrapper_type);
+
+                // Store fields
+                llvm::Value* size_ptr = this->builder->CreateStructGEP(wrapper_type, wrapper_allocation, 0);
+                llvm::Value* array_ptr = this->builder->CreateStructGEP(wrapper_type, wrapper_allocation, 1);
+
+                size_t number_of_elements = ast::get_concrete_type(args[i]->expression, this->type_bindings).get_array_size();
+                this->builder->CreateStore(llvm::ConstantInt::get(*(this->context), llvm::APInt(64, number_of_elements, true)), size_ptr);
+                this->builder->CreateStore(allocation, array_ptr);
+
+                // Add to args
+                result.push_back(wrapper_allocation);
+            }
         }
         else if (args[i]->is_mutable) {
             if (args[i]->expression->index() == ast::Identifier) {
@@ -1519,7 +1586,7 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
 
     // Codegen args
     std::vector<llvm::Value*> args; 
-    if (node.identifier->value != "[]") {
+    if (node.identifier->value != "[]" && node.identifier->value != "size") {
         args = this->codegen_args(function, node.args);
     }
   
@@ -1677,6 +1744,30 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
             return this->builder->CreateLoad(
                 this->as_llvm_type(ast::get_concrete_type((ast::Node*)&node, this->type_bindings)),
                 this->get_index_access_pointer(node)
+            );
+        }
+    }
+    if (node.identifier->value == "size") {
+        assert(ast::get_concrete_type((ast::Node*) node.args[0], this->type_bindings).is_array());
+        if (ast::get_concrete_type((ast::Node*) node.args[0], this->type_bindings).array_size_known()) {
+            return llvm::ConstantInt::get(*(this->context), llvm::APInt(64, ast::get_concrete_type((ast::Node*) node.args[0], this->type_bindings).get_array_size(), true));
+        }
+        else {
+            // Get array pointer and array type
+            llvm::Value* array_ptr = this->get_binding(std::get<ast::IdentifierNode>(*node.args[0]->expression).value).pointer;
+            array_ptr = this->builder->CreateLoad(
+                array_ptr->getType(),
+                array_ptr
+            );
+            llvm::StructType* array_type = llvm::StructType::getTypeByName(*this->context, "arrayWrapper");
+            
+            // Get size
+            llvm::Value* size_ptr = this->builder->CreateStructGEP(array_type, array_ptr, 0);
+            
+            // Load size
+            return this->builder->CreateLoad(
+                this->as_llvm_type(ast::Type("int64")),
+                size_ptr
             );
         }
     }

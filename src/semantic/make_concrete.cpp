@@ -535,6 +535,13 @@ void add_argument_type_to_context(semantic::Context& context, ast::FunctionNode&
     &&       function_type != argument_type) {
         assert(false);
     }
+    else if (function_type.is_array()) {
+        assert(argument_type.is_array());
+
+        for (size_t i = 0; i < function_type.as_nominal_type().parameters.size(); i++) {
+            add_argument_type_to_context(context, function, function_type.as_nominal_type().parameters[i], argument_type.as_nominal_type().parameters[i]);
+        }
+    }
     else if (function_type.is_nominal_type()) {
         assert(argument_type.is_nominal_type());
         assert(function_type.as_nominal_type().name == argument_type.as_nominal_type().name);

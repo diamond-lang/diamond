@@ -382,6 +382,11 @@ bool ast::Type::is_builtin_type() const {
         || (this->is_nominal_type() && primitive_types.contains(this->as_nominal_type().name));
 }
 
+size_t ast::Type::array_size_known() const {
+    assert(this->is_array());
+    return this->as_nominal_type().name.size() > 5;
+}
+
 size_t ast::Type::get_array_size() const {
     assert(this->is_array());
     assert(this->as_nominal_type().name.size() > 5);

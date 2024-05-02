@@ -1,0 +1,25 @@
+-- size
+
+function printArray[t](array: array[t]): void
+    i = 1
+    print("[]:\n")
+    
+    while i <= size(array)
+        print("    ")
+        print(array[i])
+        i := i + 1
+
+a = [1, 2, 3, 4, 5, 6]
+print(size(a))
+printArray(a)
+
+--- Output
+6
+[]:
+    1
+    2
+    3
+    4
+    5
+    6
+---

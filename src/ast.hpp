@@ -209,6 +209,7 @@ namespace ast {
         bool is_pointer() const;
         bool is_array() const;
         bool is_builtin_type() const;
+        size_t array_size_known() const;
         size_t get_array_size() const;
     };
 
