@@ -34,6 +34,7 @@ namespace semantic {
     Result<Ok, Error> type_infer_and_analyze(Context& context, ast::FieldAccessNode& node);
     Result<Ok, Error> type_infer_and_analyze(Context& context, ast::AddressOfNode& node);
     Result<Ok, Error> type_infer_and_analyze(Context& context, ast::DereferenceNode& node);
+    Result<Ok, Error> type_infer_and_analyze(Context& context, ast::NewNode& node);
 }
 
 #endif

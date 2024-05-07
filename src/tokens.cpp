@@ -178,6 +178,10 @@ void token::print(std::vector<Token> token) {
                 std::cout << "token::Mut";
                 break;
             }
+            case New: {
+                std::cout << "token::New";
+                break;
+            }
             case Include: {
                 std::cout << "token::Include";
                 break;

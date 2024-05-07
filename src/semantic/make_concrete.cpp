@@ -452,9 +452,17 @@ Result<Ok, Error> semantic::make_concrete(Context& context, ast::AddressOfNode& 
 }
 
 Result<Ok, Error> semantic::make_concrete(Context& context, ast::DereferenceNode& node, std::vector<ast::CallInCallStack> call_stack) {
-    assert(semantic::get_type(context, ast::get_type(node.expression)).is_pointer());
+    assert(semantic::get_type(context, ast::get_type(node.expression)).is_pointer()
+    ||     semantic::get_type(context, ast::get_type(node.expression)).is_boxed());
 
     auto result = make_concrete(context, node.expression, call_stack);
+    if (result.is_error()) return result;
+
+    return Ok {};
+}
+
+Result<Ok, Error> semantic::make_concrete(Context& context, ast::NewNode& node, std::vector<ast::CallInCallStack> call_stack) {
+    auto result = semantic::make_concrete(context, node.expression, call_stack);
     if (result.is_error()) return result;
 
     return Ok {};
@@ -878,9 +886,21 @@ void semantic::set_concrete_types(Context& context, ast::Node* node) {
 
         case ast::Dereference: {
             auto& dereference = std::get<ast::DereferenceNode>(*node);
-            assert(semantic::get_type_or_default(context, dereference.expression).is_pointer());
+            assert(semantic::get_type_or_default(context, dereference.expression).is_pointer()
+            ||     semantic::get_type_or_default(context, dereference.expression).is_boxed());
             dereference.type = semantic::get_type_or_default(context, dereference.type);
             semantic::set_concrete_types(context, dereference.expression);
+            break;
+        }
+
+        case ast::New: {
+            auto& new_node = std::get<ast::NewNode>(*node);
+            semantic::set_concrete_types(context, new_node.expression);
+    
+            assert(new_node.type.is_boxed());
+            if (!new_node.type.is_concrete()) {
+                new_node.type.as_nominal_type().parameters[0] = semantic::get_type_or_default(context, new_node.expression);
+            }            
             break;
         }
 

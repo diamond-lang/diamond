@@ -119,7 +119,11 @@ Result<Ok, Error> semantic::analyze_block_or_expression(semantic::Context& conte
             ast::Type representative = representatives[0];
             for (size_t i = 1; i < representatives.size(); i++) {
                 if (representative.is_nominal_type() && representatives[i].is_nominal_type()) {
-                    if (representative.as_nominal_type().name != representatives[i].as_nominal_type().name) {
+                    if ((representative.as_nominal_type().name == "boxed" || representatives[i].as_nominal_type().name == "boxed")
+                    &&  (representative.as_nominal_type().name == "pointer" || representatives[i].as_nominal_type().name == "pointer")) {
+                        representative = representative.as_nominal_type().name == "boxed" ?  representative : representatives[i];
+                    }
+                    else if (representative.as_nominal_type().name != representatives[i].as_nominal_type().name) {
                         std::cout << representative.to_str() << " <> " << representatives[i].to_str() << "\n";
                         assert(false);
                     }
@@ -311,6 +315,7 @@ Result<Ok, Error> semantic::analyze(semantic::Context& context, ast::Type& type)
     else if (type == ast::Type("void")) return Ok {};
     else if (type == ast::Type("string")) return Ok {};
     else if (type.is_pointer()) return semantic::analyze(context, type.as_nominal_type().parameters[0]);
+    else if (type.is_boxed()) return semantic::analyze(context, type.as_nominal_type().parameters[0]);
     else if (type.is_array()) return semantic::analyze(context, type.as_nominal_type().parameters[0]);
     else {
         Binding* type_binding = semantic::get_binding(context, type.to_str());

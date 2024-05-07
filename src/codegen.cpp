@@ -117,6 +117,7 @@ namespace codegen {
         llvm::Value* codegen(ast::FieldAccessNode& node);
         llvm::Value* codegen(ast::AddressOfNode& node);
         llvm::Value* codegen(ast::DereferenceNode& node);
+        llvm::Value* codegen(ast::NewNode& node);
 
         std::string get_mangled_type_name(std::filesystem::path module, std::string identifier) {
             return module.string() + "::" + identifier;
@@ -1891,4 +1892,9 @@ llvm::Value* codegen::Context::codegen(ast::AddressOfNode& node) {
 llvm::Value* codegen::Context::codegen(ast::DereferenceNode& node) {
     auto pointer = this->codegen(node.expression);
     return this->builder->CreateLoad(this->as_llvm_type(ast::get_concrete_type((ast::Node*) &node, this->type_bindings)), pointer);;
+}
+
+llvm::Value* codegen::Context::codegen(ast::NewNode& node) {
+    assert(false);
+    return nullptr;
 }

@@ -41,6 +41,7 @@ namespace ast {
     struct FieldAccessNode;
     struct AddressOfNode;
     struct DereferenceNode;
+    struct NewNode;
 
     enum NodeVariant {
         Block,
@@ -70,7 +71,8 @@ namespace ast {
         Array,
         FieldAccess,
         AddressOf,
-        Dereference
+        Dereference,
+        New
     };
 
     using Node = std::variant<
@@ -101,7 +103,8 @@ namespace ast {
         ArrayNode,
         FieldAccessNode,
         AddressOfNode,
-        DereferenceNode
+        DereferenceNode,
+        NewNode
     >;
 
     struct Type;
@@ -207,6 +210,7 @@ namespace ast {
         bool is_integer() const;
         bool is_float() const;
         bool is_pointer() const;
+        bool is_boxed() const;
         bool is_array() const;
         bool is_builtin_type() const;
         size_t array_size_known() const;
@@ -521,6 +525,14 @@ namespace ast {
     };
 
     struct DereferenceNode {
+        size_t line;
+        size_t column;
+        Type type = Type(ast::NoType{});
+    
+        ast::Node* expression;
+    };
+
+    struct NewNode {
         size_t line;
         size_t column;
         Type type = Type(ast::NoType{});

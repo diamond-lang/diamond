@@ -358,6 +358,18 @@ bool ast::Type::is_pointer() const {
     return true;
 }
 
+bool ast::Type::is_boxed() const {
+    if (!this->is_nominal_type()) {
+        return false;
+    }
+
+    if (std::get<ast::NominalType>(this->type).name != "boxed") {
+        return false;
+    }
+    
+    return true;
+}
+
 bool ast::Type::is_array() const {
     if (!this->is_nominal_type()) {
         return false;
@@ -1146,6 +1158,21 @@ void ast::print(Node* node, PrintContext context) {
             context.indent_level += 1;
             context.last.push_back(true);
             ast::print(dereference.expression, context);
+
+            break;
+        }
+
+        case New: {
+            auto& new_node = std::get<NewNode>(*node);
+
+            put_indent_level(context.indent_level, context.last);
+            std::cout << "new";
+            if (new_node.type != Type(ast::NoType{})) std::cout << ": " << get_concrete_type_or_type_variable(new_node.type, context).to_str();
+            std::cout << "\n";
+
+            context.indent_level += 1;
+            context.last.push_back(true);
+            ast::print(new_node.expression, context);
 
             break;
         }

@@ -594,3 +594,27 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
 
     return Ok {};
 }
+
+Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, ast::NewNode& node) {
+    // Type infer and analyze expression
+    auto result = semantic::type_infer_and_analyze(context, node.expression);
+    if (result.is_error()) return Error {};
+
+    // Analyze type of expression
+    if (!ast::get_type(node.expression).is_type_variable()) {
+        auto type = ast::get_type(node.expression);
+        auto result = semantic::analyze(context, type);
+        ast::set_type(node.expression, type);
+    }
+
+    if (node.type.is_no_type()) {
+        node.type = ast::Type(ast::NominalType("boxed"));
+        node.type.as_nominal_type().parameters.push_back(ast::get_type(node.expression));
+    }
+    else if (!node.type.is_type_variable() && !(node.type.as_nominal_type().name != "boxed")) {
+        context.errors.push_back(Error("Error: Type mismatch between type annotation and expression"));
+        return Error {};
+    }
+
+    return Ok {};
+}

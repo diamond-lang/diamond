@@ -50,6 +50,7 @@ namespace token {
         Continue,
         Return,
         Mut,
+        New,
         Include,
         Extern,
         LinkWith,

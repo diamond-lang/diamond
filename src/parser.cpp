@@ -48,6 +48,7 @@ struct Parser {
     Result<ast::Node*, Error> parse_expression();
     Result<ast::Node*, Error> parse_if_else_expr();
     Result<ast::Node*, Error> parse_not_expr();
+    Result<ast::Node*, Error> parse_new_expr();
     Result<ast::Node*, Error> parse_binary(int precedence = 1);
     Result<ast::Node*, Error> parse_primary();
     Result<ast::Node*, Error> parse_accessible();
@@ -1098,6 +1099,7 @@ Result<ast::Node*, Error> Parser::parse_struct() {
 }
 
 // expression → if_else_expression
+//            | new
 //            | not
 //            | binary
 Result<ast::Node*, Error> Parser::parse_expression() {
@@ -1105,6 +1107,7 @@ Result<ast::Node*, Error> Parser::parse_expression() {
 
     switch (this->current().variant) {
         case token::If:  return this->parse_if_else_expr();
+        case token::New: return this->parse_new_expr();
         case token::Not: return this->parse_not_expr();
         default:         return this->parse_binary();
     }
@@ -1154,6 +1157,24 @@ Result<ast::Node*, Error> Parser::parse_if_else_expr() {
         this->errors.push_back(errors::generic_error(this->location(), "Expecting else branch"));
         return Error {};
     }
+}
+
+Result<ast::Node*, Error> Parser::parse_new_expr() {
+    // Create node
+    auto new_node = ast::NewNode {this->current().line, this->current().column};
+
+    // Parse token
+    auto keyword = this->parse_token(token::New);
+    if (keyword.is_error()) return keyword.get_error();
+
+    // Parse expression
+    auto expression = this->parse_expression();
+    if (expression.is_error()) return Error {};
+    new_node.expression = expression.get_value();
+    
+    // Push node to ast
+    this->ast.push_back(new_node);
+    return this->ast.last_element();
 }
 
 // not → "not" expression

@@ -33,6 +33,7 @@ namespace semantic {
     Result<Ok, Error> unify_types_and_type_check(Context& context, ast::FieldAccessNode& node);
     Result<Ok, Error> unify_types_and_type_check(Context& context, ast::AddressOfNode& node);
     Result<Ok, Error> unify_types_and_type_check(Context& context, ast::DereferenceNode& node);
+    Result<Ok, Error> unify_types_and_type_check(Context& context, ast::NewNode& node);
 }
 
 #endif

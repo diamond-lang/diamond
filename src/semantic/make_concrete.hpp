@@ -40,6 +40,7 @@ namespace semantic {
     Result<Ok, Error> make_concrete(Context& context, ast::FieldAccessNode& node, std::vector<ast::CallInCallStack> call_stack);
     Result<Ok, Error> make_concrete(Context& context, ast::AddressOfNode& node, std::vector<ast::CallInCallStack> call_stack);
     Result<Ok, Error> make_concrete(Context& context, ast::DereferenceNode& node, std::vector<ast::CallInCallStack> call_stack);
+    Result<Ok, Error> make_concrete(Context& context, ast::NewNode& node, std::vector<ast::CallInCallStack> call_stack);
     
     Result<ast::Type, Error> get_type_completely_typed_function(Context& context, ast::FunctionNode* function, std::vector<ast::Type> args);
     Result<ast::Type, Error> get_function_type(Context& context, ast::CallNode* call, ast::FunctionNode* function, std::vector<ast::Type> args, std::vector<ast::CallInCallStack> call_stack);
