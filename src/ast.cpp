@@ -606,6 +606,17 @@ bool ast::is_expression(Node* node) {
     return false;
 }
 
+size_t ast::TypeNode::get_index_of_field(std::string field_name) {
+    for (size_t i = 0; i < this->fields.size(); i++) {
+        if (this->fields[i]->value == field_name) {
+            return i;
+        }
+    }
+
+    assert(false);
+    return 0;
+}
+
 // Ast
 // ---
 size_t ast::Ast::capacity() {

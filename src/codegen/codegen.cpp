@@ -5,536 +5,8 @@
 #include <fstream>
 #include <assert.h>
 
-#include "semantic.hpp"
-
-#include "llvm/ADT/APFloat.h"
-#include "llvm/ADT/Optional.h"
-#include "llvm/ADT/STLExtras.h"
-#include "llvm/IR/BasicBlock.h"
-#include "llvm/IR/Constants.h"
-#include "llvm/IR/DerivedTypes.h"
-#include "llvm/IR/Function.h"
-#include "llvm/IR/Instructions.h"
-#include "llvm/IR/IRBuilder.h"
-#include "llvm/IR/LLVMContext.h"
-#include "llvm/IR/LegacyPassManager.h"
-#include "llvm/IR/Module.h"
-#include "llvm/IR/Type.h"
-#include "llvm/IR/Verifier.h"
-#include "llvm/Support/FileSystem.h"
-#include "llvm/Support/Host.h"
-#include "llvm/Support/raw_ostream.h"
-#include "llvm/MC/TargetRegistry.h"
-#include "llvm/Support/TargetSelect.h"
-#include "llvm/Target/TargetMachine.h"
-#include "llvm/Target/TargetOptions.h"
-#include "llvm/Transforms/InstCombine/InstCombine.h"
-#include "llvm/Transforms/Scalar.h"
-#include "llvm/Transforms/Scalar/GVN.h"
-#include "llvm/Transforms/Utils.h"
-#include "lld/Common/Driver.h"
-
+#include "../codegen.hpp"
 #include "codegen.hpp"
-#include "utilities.hpp"
-
-namespace codegen {
-    struct StructType {
-        std::vector<llvm::Type*> types;
-        llvm::StructType* struct_type;
-    };
-
-    struct Context {
-        ast::Ast& ast;
-
-        llvm::LLVMContext* context;
-        llvm::Module* module;
-        llvm::IRBuilder<>* builder;
-        llvm::legacy::FunctionPassManager* function_pass_manager;
-        llvm::BasicBlock* current_entry_block = nullptr; // Needed for doing stack allocations
-        llvm::BasicBlock* last_after_while_block = nullptr; // Needed for break
-        llvm::BasicBlock* last_while_block = nullptr; // Needed for continue
-
-
-        struct Binding {
-            llvm::AllocaInst* pointer = nullptr;
-            bool is_mutable = false;
-        };
-
-        std::vector<std::unordered_map<std::string, Binding>> scopes;
-        std::unordered_map<std::string, ast::Type> type_bindings;
-        std::unordered_map<std::string, llvm::Constant*> globals;
-
-        Context(ast::Ast& ast) : ast(ast) {
-            // Create llvm context
-            this->context = new llvm::LLVMContext();
-            this->module = new llvm::Module("My cool jit", *(this->context));
-            this->builder = new llvm::IRBuilder(*(this->context));
-
-            // Add function pass optimizations
-            this->function_pass_manager = new llvm::legacy::FunctionPassManager(this->module);
-            this->function_pass_manager->add(llvm::createPromoteMemoryToRegisterPass());
-            this->function_pass_manager->add(llvm::createInstructionCombiningPass());
-            this->function_pass_manager->add(llvm::createReassociatePass());
-            this->function_pass_manager->add(llvm::createGVNPass());
-            this->function_pass_manager->add(llvm::createCFGSimplificationPass());
-            this->function_pass_manager->doInitialization();
-        }
-
-        void codegen(ast::Ast& ast);
-        llvm::Value* codegen(ast::Node* node);
-        llvm::Value* codegen(ast::BlockNode& node);
-        llvm::Value* codegen(ast::TypeNode& node) {return nullptr;}
-        void codegen_types_prototypes(std::vector<ast::TypeNode*> types);
-        void codegen_types_bodies(std::vector<ast::TypeNode*> functions);
-        llvm::Value* codegen(ast::FunctionArgumentNode& node) {return nullptr;}
-        llvm::Value* codegen(ast::FunctionNode& node) {return nullptr;}
-        void codegen_function_prototypes(std::vector<ast::FunctionNode*> functions);
-        void codegen_function_prototypes(std::filesystem::path module_path, std::string identifier, std::vector<ast::FunctionArgumentNode*> args, std::vector<ast::Type> args_types, ast::Type return_type, bool is_extern);
-        void codegen_function_bodies(std::vector<ast::FunctionNode*> functions);
-        void codegen_function_bodies(std::filesystem::path module_path, std::string identifier, std::vector<ast::FunctionArgumentNode*> args, std::vector<ast::Type> args_types, ast::Type return_type, ast::Node* function_body);
-        llvm::Value* codegen(ast::DeclarationNode& node);
-        llvm::Value* codegen(ast::AssignmentNode& node);
-        llvm::Value* codegen(ast::FieldAssignmentNode& node);
-        llvm::Value* codegen(ast::DereferenceAssignmentNode& node);
-        llvm::Value* codegen(ast::IndexAssignmentNode& node);
-        llvm::Value* codegen(ast::ReturnNode& node);
-        llvm::Value* codegen(ast::BreakNode& node);
-        llvm::Value* codegen(ast::ContinueNode& node);
-        llvm::Value* codegen(ast::IfElseNode& node);
-        llvm::Value* codegen(ast::WhileNode& node);
-        llvm::Value* codegen(ast::UseNode& node) {return nullptr;}
-        llvm::Value* codegen(ast::LinkWithNode& node) {return nullptr;}
-        std::vector<llvm::Value*> codegen_args(ast::FunctionNode* function, std::vector<ast::CallArgumentNode*> args);
-        llvm::Value* codegen(ast::CallArgumentNode& node) {return nullptr;}
-        llvm::Value* codegen(ast::CallNode& node);
-        llvm::Value* codegen(ast::StructLiteralNode& node);
-        llvm::Value* codegen(ast::FloatNode& node);
-        llvm::Value* codegen(ast::IntegerNode& node);
-        llvm::Value* codegen(ast::IdentifierNode& node);
-        llvm::Value* codegen(ast::BooleanNode& node);
-        llvm::Value* codegen(ast::StringNode& node);
-        llvm::Value* codegen(ast::ArrayNode& node);
-        llvm::Value* codegen(ast::FieldAccessNode& node);
-        llvm::Value* codegen(ast::AddressOfNode& node);
-        llvm::Value* codegen(ast::DereferenceNode& node);
-        llvm::Value* codegen(ast::NewNode& node);
-
-        std::string get_mangled_type_name(std::filesystem::path module, std::string identifier) {
-            return module.string() + "::" + identifier;
-        }
-
-        std::string get_mangled_function_name(std::filesystem::path module, std::string identifier, std::vector<ast::Type> args, ast::Type return_type, bool is_extern) {
-            if (is_extern) {
-                return identifier;
-            }
-
-            std::string name = module.string() + "::" + identifier;
-            for (size_t i = 0; i < args.size(); i++) {
-                name += "_" + args[i].to_str();
-            }
-            return name + "_" + return_type.to_str();
-        }
-
-        llvm::Type* as_llvm_type(ast::Type type) {
-            if      (type == ast::Type("float64")) return llvm::Type::getDoubleTy(*(this->context));
-            else if (type == ast::Type("int64"))   return llvm::Type::getInt64Ty(*(this->context));
-            else if (type == ast::Type("int32"))   return llvm::Type::getInt32Ty(*(this->context));
-            else if (type == ast::Type("int8"))    return llvm::Type::getInt8Ty(*(this->context));
-            else if (type == ast::Type("bool"))    return llvm::Type::getInt1Ty(*(this->context));
-            else if (type == ast::Type("string"))  return llvm::Type::getInt8PtrTy(*(this->context));
-            else if (type == ast::Type("void"))    return llvm::Type::getVoidTy(*(this->context));
-            else if (type.is_pointer())            return this->as_llvm_type(ast::get_concrete_type(type.as_nominal_type().parameters[0], this->type_bindings))->getPointerTo();
-            else if (type.is_array())              {
-                if (type.array_size_known()) {
-                    return llvm::ArrayType::get(this->as_llvm_type(ast::get_concrete_type(type.as_nominal_type().parameters[0], this->type_bindings)), type.get_array_size());
-                }
-                else {
-                    return llvm::StructType::getTypeByName(*this->context, "arrayWrapper");
-                }
-            }
-            else if (type.is_nominal_type() && type.as_nominal_type().type_definition) {
-                return this->get_struct_type(type.as_nominal_type().type_definition);
-            }
-            else {
-                std::cout <<"type: " << type.to_str() << "\n";
-                assert(false);
-            }
-        }
-
-        llvm::StructType* get_struct_type(ast::TypeNode* type_definition) {
-            return llvm::StructType::getTypeByName(*this->context, this->get_mangled_type_name(type_definition->module_path, type_definition->identifier->value));
-        }
-
-        bool has_struct_type(ast::Node* expression) {
-            auto concrete_type = ast::get_concrete_type(expression, this->type_bindings);
-            return concrete_type.is_struct_type();
-        }
-
-         bool has_array_type(ast::Node* expression) {
-            auto concrete_type = ast::get_concrete_type(expression, this->type_bindings);
-            return concrete_type.is_array();
-        }
-
-        StructType get_struct_type_as_argument(llvm::StructType* struct_type) {
-            std::vector<llvm::Type*> sub_types;
-            if (this->get_type_size(struct_type) <= 16) {
-                auto fields = struct_type->elements();
-
-                size_t i = 0;
-                while (i < fields.size()) {
-                    ast::Type type = ast::Type(ast::NoType{});
-                    size_t bytes = 0;
-                    while (bytes < 8) {
-                        if (fields[i]->isDoubleTy()) {
-                            type = ast::Type("float64");
-                            bytes += 8;
-                        }
-                        else if (fields[i]->isIntegerTy(64)) {
-                            type = ast::Type("int64");
-                            bytes += 8;
-                        }
-                        else if (fields[i]->isIntegerTy(32)) {
-                            type = ast::Type("int64");
-                            bytes += 4;
-                        }
-                        else if (fields[i]->isIntegerTy(8)) {
-                            type = ast::Type("int64");
-                            bytes += 4;
-                        }
-                        else if (fields[i]->isIntegerTy(1)) {
-                            type = ast::Type("int64");
-                            bytes += 1;
-                        }
-                        else if (fields[i]->isPointerTy()) {
-                            type = ast::Type("int64");
-                            bytes += 8;
-                        }
-                        else {
-                            assert(false);
-                        }
-                        i += 1;
-                    }
-
-                    sub_types.push_back(this->as_llvm_type(type));
-                }
-            }
-            else {
-                sub_types.push_back(struct_type->getPointerTo());
-            }
-
-            StructType result;
-            result.types = sub_types;
-            result.struct_type = llvm::StructType::get((*this->context), sub_types);
-            return result;
-        }
-
-        llvm::FunctionType* get_function_type(std::vector<ast::FunctionArgumentNode*> args, std::vector<ast::Type> args_types, ast::Type return_type) {
-            // Get args types
-            std::vector<llvm::Type*> llvm_args_types;
-
-            if (return_type.is_struct_type() || return_type.is_array()) {
-                llvm_args_types.push_back(this->as_llvm_type(return_type)->getPointerTo());
-            }
-
-            for (size_t i = 0; i < args.size(); i++) {
-                llvm::Type* llvm_type = this->as_llvm_type(args_types[i].type);
-
-                if (args_types[i].is_struct_type() && !args[i]->is_mutable) {
-                    auto new_args = this->get_struct_type_as_argument((llvm::StructType*) llvm_type).types;
-                    llvm_args_types.insert(llvm_args_types.end(), new_args.begin(), new_args.end());
-                }
-                else if (args_types[i].is_array()) {
-                    if ((args[i]->type.is_array() && args[i]->type.array_size_known())
-                    ||  !args[i]->type.is_array()) {
-                        llvm_args_types.push_back(llvm_type->getPointerTo());
-                    }
-                    else {
-                        llvm::StructType* array_type = llvm::StructType::getTypeByName(*this->context, "arrayWrapper");
-                        llvm_args_types.push_back(array_type->getPointerTo());
-                    }
-                }
-                else if (args[i]->is_mutable) {
-                    llvm_args_types.push_back(llvm_type->getPointerTo());
-                }
-                else {
-                    llvm_args_types.push_back(llvm_type);
-                }
-            }
-
-            // Get return type
-            llvm::Type* llvm_return_type = this->as_llvm_type(return_type);
-            if (return_type.is_struct_type() || return_type.is_array()) {
-                llvm_return_type = llvm::Type::getVoidTy(*this->context);
-            }
-
-            return llvm::FunctionType::get(llvm_return_type, llvm::ArrayRef(llvm_args_types), false);
-        }
-
-        std::vector<llvm::Type*> as_llvm_types(std::vector<ast::Type> types) {
-            std::vector<llvm::Type*> llvm_types;
-            for (size_t i = 0; i < types.size(); i++) {
-                llvm_types.push_back(this->as_llvm_type(types[i]));
-            }
-            return llvm_types;
-        }
-
-        std::vector<ast::Type> get_types(std::vector<ast::Node*> nodes) {
-            std::vector<ast::Type> types;
-            for (auto& node: nodes) {
-                types.push_back(ast::get_concrete_type(node, this->type_bindings));
-            }
-            return types;
-        }
-
-        std::vector<ast::Type> get_types(std::vector<ast::CallArgumentNode*> nodes) {
-            std::vector<ast::Type> types;
-            for (auto& node: nodes) {
-                types.push_back(ast::get_concrete_type(node->expression, this->type_bindings));
-            }
-            return types;
-        }
-
-        llvm::AllocaInst* create_allocation(std::string name, llvm::Type* type) {
-            assert(this->current_entry_block);
-            llvm::IRBuilder<> block(this->current_entry_block, this->current_entry_block->begin());
-            return block.CreateAlloca(type, 0, name.c_str());
-        }
-
-        ast::FunctionNode* get_function(ast::CallNode* call) {
-            ast::FunctionNode* result = nullptr;
-            for (auto function: call->functions) {
-                if (semantic::are_arguments_compatible(*function, *call, ast::get_types(function->args), this->get_types(call->args))) {
-                    result = function;
-                    break;
-                }
-            }
-            assert(result != nullptr);
-            return result;
-        }
-
-        size_t get_index_of_field(ast::TypeNode* definition, std::string field_name) {
-            for (size_t i = 0; i < definition->fields.size(); i++) {
-                if (definition->fields[i]->value == field_name) {
-                    return i;
-                }
-            }
-
-            assert(false);
-            return 0;
-        }
-
-        void store_fields(ast::Node* expression, llvm::Value* struct_allocation) {
-            // Get struct type
-            llvm::StructType* struct_type = this->get_struct_type(ast::get_type(expression).as_nominal_type().type_definition);
-
-            if (expression->index() == ast::StructLiteral) {
-                // Get call
-                auto& struct_literal = std::get<ast::StructLiteralNode>(*expression);
-
-                // For each field
-                for (auto field: struct_literal.fields) {
-                    // Get pointer to the field
-                    llvm::Value* ptr = this->builder->CreateStructGEP(
-                        struct_type,
-                        struct_allocation,
-                        get_index_of_field(
-                            ast::get_type(expression).as_nominal_type().type_definition,
-                            field.first->value
-                        )
-                    );
-
-                    // If the field type has a struct type
-                    if (this->has_struct_type(field.second)) {
-                        this->store_fields(field.second, ptr);
-                    }
-                    else {
-                        this->builder->CreateStore(this->codegen(field.second), ptr);
-                    }
-                }
-            }
-            else if (expression->index() == ast::Call) {
-                // Get call
-                auto& call = std::get<ast::CallNode>(*expression);
-
-                // Get function
-                ast::FunctionNode* function = this->get_function(&call);
-                std::string name = this->get_mangled_function_name(function->module_path, call.identifier->value, this->get_types(call.args), ast::get_concrete_type((ast::Node*) &call, this->type_bindings), function->is_extern);
-                llvm::Function* llvm_function = this->module->getFunction(name);
-                assert(llvm_function);
-                
-                // Codegen args
-                std::vector<llvm::Value*> args = this->codegen_args(function, call.args);
-                
-                // Add return type as arg (because its a struct)
-                args.insert(args.begin(), struct_allocation);
-
-                // Make call
-                this->builder->CreateCall(llvm_function, args, "calltmp");
-            }
-            else if (expression->index() == ast::Identifier) {
-                auto& identifier = std::get<ast::IdentifierNode>(*expression);
-                this->builder->CreateMemCpy(struct_allocation, llvm::MaybeAlign(), this->get_binding(identifier.value).pointer, llvm::MaybeAlign(), this->get_type_size(struct_type));
-            }
-            else {
-                assert(false);
-            }
-        }
-
-        void store_array_elements(ast::Node* expression, llvm::Value* array_allocation) {
-            llvm::Type* array_type = this->as_llvm_type(ast::get_concrete_type(expression, type_bindings));
-
-            if (expression->index() == ast::Array) {
-                auto& array = std::get<ast::ArrayNode>(*expression);
-
-                // Store array elements
-                for (size_t i = 0; i < array.elements.size(); i++) {
-                    // Get pointer to the element
-                    llvm::Value* index = llvm::ConstantInt::get(*(this->context), llvm::APInt(64, i, true));
-                    llvm::Value* ptr = this->builder->CreateGEP(array_type, array_allocation, {llvm::ConstantInt::get(*(this->context), llvm::APInt(64, 0, true)), index}, "", true);
-
-                    // Store element
-                    this->builder->CreateStore(this->codegen(array.elements[i]), ptr);
-                }
-            }
-            else if (expression->index() == ast::Call) {
-                // Get call
-                auto& call = std::get<ast::CallNode>(*expression);
-
-                // Get function
-                ast::FunctionNode* function = this->get_function(&call);
-                std::string name = this->get_mangled_function_name(function->module_path, call.identifier->value, this->get_types(call.args), ast::get_concrete_type((ast::Node*) &call, this->type_bindings), function->is_extern);
-                llvm::Function* llvm_function = this->module->getFunction(name);
-                assert(llvm_function);
-                
-                // Codegen args
-                std::vector<llvm::Value*> args = this->codegen_args(function, call.args);
-                
-                // Add return type as arg (because its a struct)
-                args.insert(args.begin(), array_allocation);
-
-                // Make call
-                this->builder->CreateCall(llvm_function, args, "calltmp");
-            }
-            else if (expression->index() == ast::Identifier) {
-                auto& identifier = std::get<ast::IdentifierNode>(*expression);
-                this->builder->CreateMemCpy(array_allocation, llvm::MaybeAlign(), this->get_binding(identifier.value).pointer, llvm::MaybeAlign(), this->get_type_size(array_type));
-            }
-            else {
-                assert(false);
-            }
-        }
-
-        void add_scope() {
-            this->scopes.push_back(std::unordered_map<std::string, Binding>());
-        }
-
-        std::unordered_map<std::string, Binding>& current_scope() {
-            return this->scopes[this->scopes.size() - 1];
-        }
-
-        void remove_scope() {
-            this->scopes.pop_back();
-        }
-
-        Binding get_binding(std::string identifier) {
-            for (auto scope = this->scopes.rbegin(); scope != this->scopes.rend(); scope++) {
-                if (scope->find(identifier) != scope->end()) {
-                    return (*scope)[identifier];
-                }
-            }
-            assert(false);
-            return Binding{};
-        }
-
-        size_t get_index_of_field(std::string field, ast::TypeNode* type_definition) {
-            for (size_t i = 0; i < type_definition->fields.size(); i++) {
-                if (field == type_definition->fields[i]->value) {
-                    return i;
-                }
-            }
-            assert(false);
-            return 0;
-        }
-
-        llvm::Value* get_field_pointer(ast::FieldAccessNode& node) {
-            // There should be at least 1 identifiers in fields accessed. eg: circle.radius
-            assert(node.fields_accessed.size() >= 1);
-
-            // Get struct allocation and type
-            assert(ast::get_concrete_type(node.accessed, this->type_bindings).as_nominal_type().type_definition);
-            llvm::Value* struct_ptr = this->codegen(node.accessed);
-            llvm::StructType* struct_type = this->get_struct_type(ast::get_concrete_type(node.accessed, this->type_bindings).as_nominal_type().type_definition);
-            if (((llvm::AllocaInst*) struct_ptr)->getAllocatedType()->isPointerTy()) {
-                struct_ptr = this->builder->CreateLoad(struct_type->getPointerTo(), struct_ptr);
-            }
-
-            // Get type definition
-            ast::TypeNode* type_definition = ast::get_concrete_type(node.accessed, this->type_bindings).as_nominal_type().type_definition;
-
-            for (size_t i = 0; i < node.fields_accessed.size() - 1; i++) {
-                // Get pointer to accessed fieldd
-                struct_ptr = this->builder->CreateStructGEP(struct_type, struct_ptr, get_index_of_field(node.fields_accessed[i]->value, type_definition));
-
-                // Update current type definition
-                type_definition = ast::get_concrete_type((ast::Node*) node.fields_accessed[i], this->type_bindings).as_nominal_type().type_definition;
-                struct_type = this->get_struct_type(type_definition);
-            }
-            
-            // Get pointer to accessed fieldd
-            size_t last_element = node.fields_accessed.size() - 1;
-            llvm::Value* ptr = this->builder->CreateStructGEP(struct_type, struct_ptr, get_index_of_field(node.fields_accessed[last_element]->value, type_definition));
-            return ptr;
-        }
-
-        llvm::Value* get_index_access_pointer(ast::CallNode& node) {
-            llvm::Value* index = this->builder->CreateSub(this->codegen(node.args[1]->expression), llvm::ConstantInt::get(*(this->context), llvm::APInt(64, 1, true)));
-
-            if (ast::get_concrete_type(node.args[0]->expression, this->type_bindings).array_size_known()) {
-                llvm::Type* array_type = this->as_llvm_type(ast::get_concrete_type(node.args[0]->expression, this->type_bindings));
-                llvm::Value* array_ptr = this->get_binding(std::get<ast::IdentifierNode>(*node.args[0]->expression).value).pointer;
-
-                if (((llvm::AllocaInst*) array_ptr)->getAllocatedType()->isPointerTy()) {
-                    array_ptr = this->builder->CreateLoad(array_type->getPointerTo(), array_ptr);
-                }
-                
-                return this->builder->CreateGEP(array_type, array_ptr, {llvm::ConstantInt::get(*(this->context), llvm::APInt(64, 0, true)), index}, "", true);
-            }
-            else {
-                llvm::Type* wrapper_type = this->as_llvm_type(ast::get_concrete_type(node.args[0]->expression, this->type_bindings));
-                llvm::Value* wrapper_ptr = this->get_binding(std::get<ast::IdentifierNode>(*node.args[0]->expression).value).pointer;
-                wrapper_ptr = this->builder->CreateLoad(
-                    wrapper_ptr->getType(),
-                    wrapper_ptr
-                );
-                
-                // Get array pointer
-                llvm::Value* array_ptr = this->builder->CreateStructGEP(wrapper_type, wrapper_ptr, 1);
-                array_ptr = this->builder->CreateLoad(array_ptr->getType(), array_ptr);
-
-                ast::Type elements_type = ast::get_concrete_type(node.args[0]->expression, this->type_bindings).as_nominal_type().parameters[0];
-                llvm::Type* array_type = llvm::ArrayType::get(this->as_llvm_type(elements_type), 0);
-                return this->builder->CreateGEP(array_type, array_ptr, {llvm::ConstantInt::get(*(this->context), llvm::APInt(64, 0, true)), index}, "", true);
-            }
-        }
-
-        llvm::Constant* get_global_string(std::string str) {
-            for (auto it = this->globals.begin(); it != this->globals.end(); it++) {
-                if (it->first == str) {
-                    return it->second;
-                }
-            }
-
-            this->globals[str] = this->builder->CreateGlobalStringPtr(str);
-            return this->globals[str];
-        }
-
-        llvm::TypeSize get_type_size(llvm::Type* type) {
-            llvm::DataLayout dl = llvm::DataLayout(this->module);
-            return dl.getTypeAllocSize(type);
-        }
-        
-    };
-};
 
 // Print LLVM IR
 // -------------
@@ -817,6 +289,416 @@ static void link(std::string executable_name, std::string object_file_name, std:
     }
 }
 #endif
+
+// Context
+// -------
+
+// Constructor
+codegen::Context::Context(ast::Ast& ast) : ast(ast) {
+    // Create llvm context
+    this->context = new llvm::LLVMContext();
+    this->module = new llvm::Module("My cool jit", *(this->context));
+    this->builder = new llvm::IRBuilder(*(this->context));
+
+    // Add function pass optimizations
+    this->function_pass_manager = new llvm::legacy::FunctionPassManager(this->module);
+    this->function_pass_manager->add(llvm::createPromoteMemoryToRegisterPass());
+    this->function_pass_manager->add(llvm::createInstructionCombiningPass());
+    this->function_pass_manager->add(llvm::createReassociatePass());
+    this->function_pass_manager->add(llvm::createGVNPass());
+    this->function_pass_manager->add(llvm::createCFGSimplificationPass());
+    this->function_pass_manager->doInitialization();
+}
+
+
+// Scope management
+void codegen::Context::add_scope() {
+    this->scopes.push_back(std::unordered_map<std::string, Binding>());
+}
+
+std::unordered_map<std::string, codegen::Context::Binding>& codegen::Context::current_scope() {
+    return this->scopes[this->scopes.size() - 1];
+}
+
+void codegen::Context::remove_scope() {
+    this->scopes.pop_back();
+}
+
+codegen::Context::Binding codegen::Context::get_binding(std::string identifier) {
+    for (auto scope = this->scopes.rbegin(); scope != this->scopes.rend(); scope++) {
+        if (scope->find(identifier) != scope->end()) {
+            return (*scope)[identifier];
+        }
+    }
+    assert(false);
+    return Binding{};
+}
+
+
+// Name mangling
+std::string codegen::Context::get_mangled_type_name(std::filesystem::path module, std::string identifier) {
+    return module.string() + "::" + identifier;
+}
+
+std::string codegen::Context::get_mangled_function_name(std::filesystem::path module, std::string identifier, std::vector<ast::Type> args, ast::Type return_type, bool is_extern) {
+    if (is_extern) {
+        return identifier;
+    }
+
+    std::string name = module.string() + "::" + identifier;
+    for (size_t i = 0; i < args.size(); i++) {
+        name += "_" + args[i].to_str();
+    }
+    return name + "_" + return_type.to_str();
+}
+
+
+// Types
+llvm::Type* codegen::Context::as_llvm_type(ast::Type type) {
+    if      (type == ast::Type("float64")) return llvm::Type::getDoubleTy(*(this->context));
+    else if (type == ast::Type("int64"))   return llvm::Type::getInt64Ty(*(this->context));
+    else if (type == ast::Type("int32"))   return llvm::Type::getInt32Ty(*(this->context));
+    else if (type == ast::Type("int8"))    return llvm::Type::getInt8Ty(*(this->context));
+    else if (type == ast::Type("bool"))    return llvm::Type::getInt1Ty(*(this->context));
+    else if (type == ast::Type("string"))  return llvm::Type::getInt8PtrTy(*(this->context));
+    else if (type == ast::Type("void"))    return llvm::Type::getVoidTy(*(this->context));
+    else if (type.is_pointer())            return this->as_llvm_type(ast::get_concrete_type(type.as_nominal_type().parameters[0], this->type_bindings))->getPointerTo();
+    else if (type.is_array())              {
+        if (type.array_size_known()) {
+            return llvm::ArrayType::get(this->as_llvm_type(ast::get_concrete_type(type.as_nominal_type().parameters[0], this->type_bindings)), type.get_array_size());
+        }
+        else {
+            return llvm::StructType::getTypeByName(*this->context, "arrayWrapper");
+        }
+    }
+    else if (type.is_nominal_type() && type.as_nominal_type().type_definition) {
+        return this->get_struct_type(type.as_nominal_type().type_definition);
+    }
+    else {
+        std::cout <<"type: " << type.to_str() << "\n";
+        assert(false);
+    }
+}
+
+llvm::StructType* codegen::Context::get_struct_type(ast::TypeNode* type_definition) {
+    return llvm::StructType::getTypeByName(*this->context, this->get_mangled_type_name(type_definition->module_path, type_definition->identifier->value));
+}
+
+bool codegen::Context::has_struct_type(ast::Node* expression) {
+    auto concrete_type = ast::get_concrete_type(expression, this->type_bindings);
+    return concrete_type.is_struct_type();
+}
+
+bool codegen::Context::has_array_type(ast::Node* expression) {
+    auto concrete_type = ast::get_concrete_type(expression, this->type_bindings);
+    return concrete_type.is_array();
+}
+
+codegen::StructType codegen::Context::get_struct_type_as_argument(llvm::StructType* struct_type) {
+    std::vector<llvm::Type*> sub_types;
+    if (this->get_type_size(struct_type) <= 16) {
+        auto fields = struct_type->elements();
+
+        size_t i = 0;
+        while (i < fields.size()) {
+            ast::Type type = ast::Type(ast::NoType{});
+            size_t bytes = 0;
+            while (bytes < 8) {
+                if (fields[i]->isDoubleTy()) {
+                    type = ast::Type("float64");
+                    bytes += 8;
+                }
+                else if (fields[i]->isIntegerTy(64)) {
+                    type = ast::Type("int64");
+                    bytes += 8;
+                }
+                else if (fields[i]->isIntegerTy(32)) {
+                    type = ast::Type("int64");
+                    bytes += 4;
+                }
+                else if (fields[i]->isIntegerTy(8)) {
+                    type = ast::Type("int64");
+                    bytes += 4;
+                }
+                else if (fields[i]->isIntegerTy(1)) {
+                    type = ast::Type("int64");
+                    bytes += 1;
+                }
+                else if (fields[i]->isPointerTy()) {
+                    type = ast::Type("int64");
+                    bytes += 8;
+                }
+                else {
+                    assert(false);
+                }
+                i += 1;
+            }
+
+            sub_types.push_back(this->as_llvm_type(type));
+        }
+    }
+    else {
+        sub_types.push_back(struct_type->getPointerTo());
+    }
+
+    StructType result;
+    result.types = sub_types;
+    result.struct_type = llvm::StructType::get((*this->context), sub_types);
+    return result;
+}
+
+llvm::FunctionType* codegen::Context::get_function_type(std::vector<ast::FunctionArgumentNode*> args, std::vector<ast::Type> args_types, ast::Type return_type) {
+    // Get args types
+    std::vector<llvm::Type*> llvm_args_types;
+
+    if (return_type.is_struct_type() || return_type.is_array()) {
+        llvm_args_types.push_back(this->as_llvm_type(return_type)->getPointerTo());
+    }
+
+    for (size_t i = 0; i < args.size(); i++) {
+        llvm::Type* llvm_type = this->as_llvm_type(args_types[i].type);
+
+        if (args_types[i].is_struct_type() && !args[i]->is_mutable) {
+            auto new_args = this->get_struct_type_as_argument((llvm::StructType*) llvm_type).types;
+            llvm_args_types.insert(llvm_args_types.end(), new_args.begin(), new_args.end());
+        }
+        else if (args_types[i].is_array()) {
+            if ((args[i]->type.is_array() && args[i]->type.array_size_known())
+            ||  !args[i]->type.is_array()) {
+                llvm_args_types.push_back(llvm_type->getPointerTo());
+            }
+            else {
+                llvm::StructType* array_type = llvm::StructType::getTypeByName(*this->context, "arrayWrapper");
+                llvm_args_types.push_back(array_type->getPointerTo());
+            }
+        }
+        else if (args[i]->is_mutable) {
+            llvm_args_types.push_back(llvm_type->getPointerTo());
+        }
+        else {
+            llvm_args_types.push_back(llvm_type);
+        }
+    }
+
+    // Get return type
+    llvm::Type* llvm_return_type = this->as_llvm_type(return_type);
+    if (return_type.is_struct_type() || return_type.is_array()) {
+        llvm_return_type = llvm::Type::getVoidTy(*this->context);
+    }
+
+    return llvm::FunctionType::get(llvm_return_type, llvm::ArrayRef(llvm_args_types), false);
+}
+
+std::vector<llvm::Type*> codegen::Context::as_llvm_types(std::vector<ast::Type> types) {
+    std::vector<llvm::Type*> llvm_types;
+    for (size_t i = 0; i < types.size(); i++) {
+        llvm_types.push_back(this->as_llvm_type(types[i]));
+    }
+    return llvm_types;
+}
+
+std::vector<ast::Type> codegen::Context::get_types(std::vector<ast::CallArgumentNode*> nodes) {
+    std::vector<ast::Type> types;
+    for (auto& node: nodes) {
+        types.push_back(ast::get_concrete_type((ast::Node*)node, this->type_bindings));
+    }
+    return types;
+}
+
+llvm::TypeSize codegen::Context::get_type_size(llvm::Type* type) {
+    llvm::DataLayout dl = llvm::DataLayout(this->module);
+    return dl.getTypeAllocSize(type);
+}
+
+
+// Codegen helpers
+llvm::AllocaInst* codegen::Context::create_allocation(std::string name, llvm::Type* type) {
+    assert(this->current_entry_block);
+    llvm::IRBuilder<> block(this->current_entry_block, this->current_entry_block->begin());
+    return block.CreateAlloca(type, 0, name.c_str());
+}
+
+ast::FunctionNode* codegen::Context::get_function(ast::CallNode* call) {
+    ast::FunctionNode* result = nullptr;
+    for (auto function: call->functions) {
+        if (semantic::are_arguments_compatible(*function, *call, ast::get_types(function->args), this->get_types(call->args))) {
+            result = function;
+            break;
+        }
+    }
+    assert(result != nullptr);
+    return result;
+}
+
+void codegen::Context::store_fields(ast::Node* expression, llvm::Value* struct_allocation) {
+    // Get struct type
+    llvm::StructType* struct_type = this->get_struct_type(ast::get_type(expression).as_nominal_type().type_definition);
+
+    if (expression->index() == ast::StructLiteral) {
+        // Get call
+        auto& struct_literal = std::get<ast::StructLiteralNode>(*expression);
+
+        // For each field
+        for (auto field: struct_literal.fields) {
+            // Get pointer to the field
+            llvm::Value* ptr = this->builder->CreateStructGEP(
+                struct_type,
+                struct_allocation,
+                ast::get_type(expression).as_nominal_type().type_definition->get_index_of_field(field.first->value)
+            );
+
+            // If the field type has a struct type
+            if (this->has_struct_type(field.second)) {
+                this->store_fields(field.second, ptr);
+            }
+            else {
+                this->builder->CreateStore(this->codegen(field.second), ptr);
+            }
+        }
+    }
+    else if (expression->index() == ast::Call) {
+        // Get call
+        auto& call = std::get<ast::CallNode>(*expression);
+
+        // Get function
+        ast::FunctionNode* function = this->get_function(&call);
+        std::string name = this->get_mangled_function_name(function->module_path, call.identifier->value, this->get_types(call.args), ast::get_concrete_type((ast::Node*) &call, this->type_bindings), function->is_extern);
+        llvm::Function* llvm_function = this->module->getFunction(name);
+        assert(llvm_function);
+        
+        // Codegen args
+        std::vector<llvm::Value*> args = this->codegen_args(function, call.args);
+        
+        // Add return type as arg (because its a struct)
+        args.insert(args.begin(), struct_allocation);
+
+        // Make call
+        this->builder->CreateCall(llvm_function, args, "calltmp");
+    }
+    else if (expression->index() == ast::Identifier) {
+        auto& identifier = std::get<ast::IdentifierNode>(*expression);
+        this->builder->CreateMemCpy(struct_allocation, llvm::MaybeAlign(), this->get_binding(identifier.value).pointer, llvm::MaybeAlign(), this->get_type_size(struct_type));
+    }
+    else {
+        assert(false);
+    }
+}
+
+void codegen::Context::store_array_elements(ast::Node* expression, llvm::Value* array_allocation) {
+    llvm::Type* array_type = this->as_llvm_type(ast::get_concrete_type(expression, type_bindings));
+
+    if (expression->index() == ast::Array) {
+        auto& array = std::get<ast::ArrayNode>(*expression);
+
+        // Store array elements
+        for (size_t i = 0; i < array.elements.size(); i++) {
+            // Get pointer to the element
+            llvm::Value* index = llvm::ConstantInt::get(*(this->context), llvm::APInt(64, i, true));
+            llvm::Value* ptr = this->builder->CreateGEP(array_type, array_allocation, {llvm::ConstantInt::get(*(this->context), llvm::APInt(64, 0, true)), index}, "", true);
+
+            // Store element
+            this->builder->CreateStore(this->codegen(array.elements[i]), ptr);
+        }
+    }
+    else if (expression->index() == ast::Call) {
+        // Get call
+        auto& call = std::get<ast::CallNode>(*expression);
+
+        // Get function
+        ast::FunctionNode* function = this->get_function(&call);
+        std::string name = this->get_mangled_function_name(function->module_path, call.identifier->value, this->get_types(call.args), ast::get_concrete_type((ast::Node*) &call, this->type_bindings), function->is_extern);
+        llvm::Function* llvm_function = this->module->getFunction(name);
+        assert(llvm_function);
+        
+        // Codegen args
+        std::vector<llvm::Value*> args = this->codegen_args(function, call.args);
+        
+        // Add return type as arg (because its a struct)
+        args.insert(args.begin(), array_allocation);
+
+        // Make call
+        this->builder->CreateCall(llvm_function, args, "calltmp");
+    }
+    else if (expression->index() == ast::Identifier) {
+        auto& identifier = std::get<ast::IdentifierNode>(*expression);
+        this->builder->CreateMemCpy(array_allocation, llvm::MaybeAlign(), this->get_binding(identifier.value).pointer, llvm::MaybeAlign(), this->get_type_size(array_type));
+    }
+    else {
+        assert(false);
+    }
+}
+
+llvm::Value* codegen::Context::get_field_pointer(ast::FieldAccessNode& node) {
+    // There should be at least 1 identifiers in fields accessed. eg: circle.radius
+    assert(node.fields_accessed.size() >= 1);
+
+    // Get struct allocation and type
+    assert(ast::get_concrete_type(node.accessed, this->type_bindings).as_nominal_type().type_definition);
+    llvm::Value* struct_ptr = this->codegen(node.accessed);
+    llvm::StructType* struct_type = this->get_struct_type(ast::get_concrete_type(node.accessed, this->type_bindings).as_nominal_type().type_definition);
+    if (((llvm::AllocaInst*) struct_ptr)->getAllocatedType()->isPointerTy()) {
+        struct_ptr = this->builder->CreateLoad(struct_type->getPointerTo(), struct_ptr);
+    }
+
+    // Get type definition
+    ast::TypeNode* type_definition = ast::get_concrete_type(node.accessed, this->type_bindings).as_nominal_type().type_definition;
+
+    for (size_t i = 0; i < node.fields_accessed.size() - 1; i++) {
+        // Get pointer to accessed fieldd
+        struct_ptr = this->builder->CreateStructGEP(struct_type, struct_ptr, type_definition->get_index_of_field(node.fields_accessed[i]->value));
+
+        // Update current type definition
+        type_definition = ast::get_concrete_type((ast::Node*) node.fields_accessed[i], this->type_bindings).as_nominal_type().type_definition;
+        struct_type = this->get_struct_type(type_definition);
+    }
+    
+    // Get pointer to accessed fieldd
+    size_t last_element = node.fields_accessed.size() - 1;
+    llvm::Value* ptr = this->builder->CreateStructGEP(struct_type, struct_ptr, type_definition->get_index_of_field(node.fields_accessed[last_element]->value));
+    return ptr;
+}
+
+llvm::Value* codegen::Context::get_index_access_pointer(ast::CallNode& node) {
+    llvm::Value* index = this->builder->CreateSub(this->codegen(node.args[1]->expression), llvm::ConstantInt::get(*(this->context), llvm::APInt(64, 1, true)));
+
+    if (ast::get_concrete_type(node.args[0]->expression, this->type_bindings).array_size_known()) {
+        llvm::Type* array_type = this->as_llvm_type(ast::get_concrete_type(node.args[0]->expression, this->type_bindings));
+        llvm::Value* array_ptr = this->get_binding(std::get<ast::IdentifierNode>(*node.args[0]->expression).value).pointer;
+
+        if (((llvm::AllocaInst*) array_ptr)->getAllocatedType()->isPointerTy()) {
+            array_ptr = this->builder->CreateLoad(array_type->getPointerTo(), array_ptr);
+        }
+        
+        return this->builder->CreateGEP(array_type, array_ptr, {llvm::ConstantInt::get(*(this->context), llvm::APInt(64, 0, true)), index}, "", true);
+    }
+    else {
+        llvm::Type* wrapper_type = this->as_llvm_type(ast::get_concrete_type(node.args[0]->expression, this->type_bindings));
+        llvm::Value* wrapper_ptr = this->get_binding(std::get<ast::IdentifierNode>(*node.args[0]->expression).value).pointer;
+        wrapper_ptr = this->builder->CreateLoad(
+            wrapper_ptr->getType(),
+            wrapper_ptr
+        );
+        
+        // Get array pointer
+        llvm::Value* array_ptr = this->builder->CreateStructGEP(wrapper_type, wrapper_ptr, 1);
+        array_ptr = this->builder->CreateLoad(array_ptr->getType(), array_ptr);
+
+        ast::Type elements_type = ast::get_concrete_type(node.args[0]->expression, this->type_bindings).as_nominal_type().parameters[0];
+        llvm::Type* array_type = llvm::ArrayType::get(this->as_llvm_type(elements_type), 0);
+        return this->builder->CreateGEP(array_type, array_ptr, {llvm::ConstantInt::get(*(this->context), llvm::APInt(64, 0, true)), index}, "", true);
+    }
+}
+
+llvm::Constant* codegen::Context::get_global_string(std::string str) {
+    for (auto it = this->globals.begin(); it != this->globals.end(); it++) {
+        if (it->first == str) {
+            return it->second;
+        }
+    }
+
+    this->globals[str] = this->builder->CreateGlobalStringPtr(str);
+    return this->globals[str];
+}
 
 // Codegeneration
 // --------------

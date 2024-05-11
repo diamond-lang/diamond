@@ -23,7 +23,7 @@ source_files = [
     'src/semantic/semantic.cpp',
     'src/semantic/type_infer.cpp',
     'src/semantic/unify.cpp',
-    'src/codegen.cpp'
+    'src/codegen/codegen.cpp'
 ]
 
 # Platform specific constants

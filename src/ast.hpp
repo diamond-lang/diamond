@@ -320,6 +320,8 @@ namespace ast {
         IdentifierNode* identifier;
         std::vector<IdentifierNode*> fields;
         std::filesystem::path module_path; // Used in to tell from which module the type comes from
+
+        size_t get_index_of_field(std::string field_name);
     };
 
     struct DeclarationNode {
