@@ -33,9 +33,9 @@
 #include "../semantic.hpp"
 
 namespace codegen {
-    struct StructType {
+    struct CollectionAsArguments {
         std::vector<llvm::Type*> types;
-        llvm::StructType* struct_type;
+        std::optional<llvm::StructType*> struct_type = std::nullopt;
     };
 
     struct Context {
@@ -77,7 +77,9 @@ namespace codegen {
         llvm::StructType* get_struct_type(ast::TypeNode* type_definition);
         bool has_struct_type(ast::Node* expression);
         bool has_array_type(ast::Node* expression);
-        StructType get_struct_type_as_argument(llvm::StructType* struct_type);
+        bool has_collection_type(ast::Node* expression);
+        CollectionAsArguments get_collection_as_argument(ast::Type type);
+        CollectionAsArguments get_struct_type_as_argument(llvm::StructType* struct_type);
         llvm::FunctionType* get_function_type(std::vector<ast::FunctionArgumentNode*> args, std::vector<ast::Type> args_types, ast::Type return_type);
         std::vector<llvm::Type*> as_llvm_types(std::vector<ast::Type> types);
         std::vector<ast::Type> get_types(std::vector<ast::CallArgumentNode*> nodes);

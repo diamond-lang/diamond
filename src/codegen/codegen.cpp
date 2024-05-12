@@ -394,7 +394,25 @@ bool codegen::Context::has_array_type(ast::Node* expression) {
     return concrete_type.is_array();
 }
 
-codegen::StructType codegen::Context::get_struct_type_as_argument(llvm::StructType* struct_type) {
+bool codegen::Context::has_collection_type(ast::Node* expression) {
+    return this->has_struct_type(expression) || this->has_array_type(expression);
+}
+
+codegen::CollectionAsArguments codegen::Context::get_collection_as_argument(ast::Type type) {
+    if (type.is_struct_type()) {
+        return this->get_struct_type_as_argument((llvm::StructType*) this->as_llvm_type(type));
+    }
+    else if (type.is_array()) {
+        CollectionAsArguments result;
+        result.types.push_back(this->as_llvm_type(type));
+        return result;
+    }
+    else {
+        assert(false);
+    }
+}
+
+codegen::CollectionAsArguments codegen::Context::get_struct_type_as_argument(llvm::StructType* struct_type) {
     std::vector<llvm::Type*> sub_types;
     if (this->get_type_size(struct_type) <= 16) {
         auto fields = struct_type->elements();
@@ -441,7 +459,7 @@ codegen::StructType codegen::Context::get_struct_type_as_argument(llvm::StructTy
         sub_types.push_back(struct_type->getPointerTo());
     }
 
-    StructType result;
+    CollectionAsArguments result;
     result.types = sub_types;
     result.struct_type = llvm::StructType::get((*this->context), sub_types);
     return result;
@@ -451,32 +469,47 @@ llvm::FunctionType* codegen::Context::get_function_type(std::vector<ast::Functio
     // Get args types
     std::vector<llvm::Type*> llvm_args_types;
 
-    if (return_type.is_struct_type() || return_type.is_array()) {
+    if (return_type.is_collection()) {
         llvm_args_types.push_back(this->as_llvm_type(return_type)->getPointerTo());
     }
 
     for (size_t i = 0; i < args.size(); i++) {
         llvm::Type* llvm_type = this->as_llvm_type(args_types[i].type);
 
-        if (args_types[i].is_struct_type() && !args[i]->is_mutable) {
-            auto new_args = this->get_struct_type_as_argument((llvm::StructType*) llvm_type).types;
-            llvm_args_types.insert(llvm_args_types.end(), new_args.begin(), new_args.end());
-        }
-        else if (args_types[i].is_array()) {
-            if ((args[i]->type.is_array() && args[i]->type.array_size_known())
-            ||  !args[i]->type.is_array()) {
-                llvm_args_types.push_back(llvm_type->getPointerTo());
+        if (args[i]->is_mutable) {
+            if (args_types[i].is_array()) {
+                if ((args[i]->type.is_array() && args[i]->type.array_size_known())
+                ||  !args[i]->type.is_array()) {
+                    llvm_args_types.push_back(llvm_type->getPointerTo());
+                }
+                else {
+                    assert(false);
+                }
             }
             else {
-                llvm::StructType* array_type = llvm::StructType::getTypeByName(*this->context, "arrayWrapper");
-                llvm_args_types.push_back(array_type->getPointerTo());
+                llvm_args_types.push_back(llvm_type->getPointerTo());
             }
         }
-        else if (args[i]->is_mutable) {
-            llvm_args_types.push_back(llvm_type->getPointerTo());
-        }
         else {
-            llvm_args_types.push_back(llvm_type);
+            if (args_types[i].is_collection()) {
+                if (args_types[i].is_array()) {
+                    if ((args[i]->type.is_array() && args[i]->type.array_size_known())
+                    ||  !args[i]->type.is_array()) {
+                        llvm_args_types.push_back(llvm_type->getPointerTo());
+                    }
+                    else {
+                        llvm::StructType* array_type = llvm::StructType::getTypeByName(*this->context, "arrayWrapper");
+                        llvm_args_types.push_back(array_type->getPointerTo());
+                    }
+                }
+                else {
+                    auto new_args = this->get_collection_as_argument(args_types[i]).types;
+                    llvm_args_types.insert(llvm_args_types.end(), new_args.begin(), new_args.end());
+                }
+            }
+            else {
+                llvm_args_types.push_back(llvm_type);
+            }
         }
     }
 
@@ -892,9 +925,9 @@ void codegen::Context::codegen_function_prototypes(std::filesystem::path module_
     // Name arguments
     for (size_t i = 0; i < args.size(); i++) {
         std::string name = args[i]->identifier->value;
-        if (args_types[i].is_struct_type() && !args[i]->is_mutable) {
-            auto struct_type = (llvm::StructType*) this->as_llvm_type(args_types[i]);
-            auto new_args = this->get_struct_type_as_argument(struct_type);
+        
+        if (args_types[i].is_collection() && !args[i]->is_mutable) {
+            auto new_args = this->get_collection_as_argument(args_types[i]);
 
             if (new_args.types.size() > 1) {
                 // Store values on struct
@@ -961,7 +994,7 @@ void codegen::Context::codegen_function_bodies(std::filesystem::path module_path
 
     size_t offset = 0;
     
-    if (return_type.is_struct_type() || return_type.is_array()) {
+    if (return_type.is_collection()) {
         // Create allocation for argument
         auto allocation = this->create_allocation("$result", f->getArg(0)->getType());
 
@@ -976,20 +1009,29 @@ void codegen::Context::codegen_function_bodies(std::filesystem::path module_path
 
     for (size_t i = 0; i < args.size(); i++) {
         std::string name = args[i]->identifier->value;
-        if (args_types[i].is_struct_type() && !args[i]->is_mutable) {
-            auto struct_type = (llvm::StructType*) this->as_llvm_type(args_types[i]);
-            auto new_args = this->get_struct_type_as_argument(struct_type);
 
-            auto struct_allocation = this->create_allocation(name, struct_type);
+        if (args[i]->is_mutable) {
+            // Create allocation for argument
+            auto allocation = this->create_allocation(name, f->getArg(i + offset)->getType());
 
-            if (new_args.types.size() > 1) {
+            // Store initial value
+            this->builder->CreateStore(f->getArg(i + offset), allocation);
+
+            // Add arguments to scope
+            this->current_scope()[name] = Binding{allocation, args[i]->is_mutable};
+        }
+        else {
+            if (args_types[i].is_collection() && this->get_collection_as_argument(args_types[i]).types.size() > 1) {
+                auto new_args = this->get_collection_as_argument(args_types[i]);
+                auto allocation = this->create_allocation(name, new_args.struct_type.value());
+
                 // Store values on struct
                 for (size_t j = 0; j < new_args.types.size(); j++) {
                     llvm::Value* field_ptr = this->builder->CreateStructGEP(
-                        new_args.struct_type,
+                        new_args.struct_type.value(),
                         this->builder->CreateBitCast(
-                            struct_allocation,
-                            new_args.struct_type->getPointerTo()
+                            allocation,
+                            new_args.struct_type.value()->getPointerTo()
                         ), 
                         j
                     );
@@ -998,7 +1040,7 @@ void codegen::Context::codegen_function_bodies(std::filesystem::path module_path
                 offset += new_args.types.size() - 1;
 
                 // Add struct to scope
-                this->current_scope()[name] = Binding{struct_allocation};
+                this->current_scope()[name] = Binding{allocation};
             }
             else {
                 // Create allocation for argument
@@ -1008,18 +1050,8 @@ void codegen::Context::codegen_function_bodies(std::filesystem::path module_path
                 this->builder->CreateStore(f->getArg(i + offset), allocation);
 
                 // Add arguments to scope
-                this->current_scope()[name] = Binding{allocation};
+                this->current_scope()[name] = Binding{allocation, args[i]->is_mutable};
             }
-        }
-        else {
-            // Create allocation for argument
-            auto allocation = this->create_allocation(name, f->getArg(i + offset)->getType());
-
-            // Store initial value
-            this->builder->CreateStore(f->getArg(i + offset), allocation);
-
-            // Add arguments to scope
-            this->current_scope()[name] = Binding{allocation, args[i]->is_mutable};
         }
     }
 
@@ -1324,10 +1356,10 @@ std::vector<llvm::Value*> codegen::Context::codegen_args(ast::FunctionNode* func
             if (new_args.types.size() > 1) {
                 for (size_t j = 0; j < new_args.types.size(); j++) {
                     llvm::Value* field_ptr = this->builder->CreateStructGEP(
-                        new_args.struct_type,
+                        new_args.struct_type.value(),
                         this->builder->CreateBitCast(
                             allocation,
-                            new_args.struct_type->getPointerTo()
+                            new_args.struct_type.value()->getPointerTo()
                         ),
                         j
                     );
