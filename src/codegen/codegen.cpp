@@ -512,12 +512,6 @@ llvm::TypeSize codegen::Context::get_type_size(llvm::Type* type) {
 
 
 // Codegen helpers
-llvm::AllocaInst* codegen::Context::create_allocation(std::string name, llvm::Type* type) {
-    assert(this->current_entry_block);
-    llvm::IRBuilder<> block(this->current_entry_block, this->current_entry_block->begin());
-    return block.CreateAlloca(type, 0, name.c_str());
-}
-
 ast::FunctionNode* codegen::Context::get_function(ast::CallNode* call) {
     ast::FunctionNode* result = nullptr;
     for (auto function: call->functions) {
@@ -698,6 +692,67 @@ llvm::Constant* codegen::Context::get_global_string(std::string str) {
 
     this->globals[str] = this->builder->CreateGlobalStringPtr(str);
     return this->globals[str];
+}
+
+llvm::AllocaInst* codegen::Context::create_allocation(std::string name, llvm::Type* type) {
+    assert(this->current_entry_block);
+    llvm::IRBuilder<> block(this->current_entry_block, this->current_entry_block->begin());
+    return block.CreateAlloca(type, 0, name.c_str());
+}
+
+llvm::AllocaInst* codegen::Context::copy_expression_to_memory(llvm::Value* pointer, ast::Node* expression) {
+    if (this->has_struct_type(expression)) {
+        // Store fields
+        this->store_fields(expression, pointer);
+  
+        // Return
+        return nullptr;
+    }
+    else if (this->has_array_type(expression)) {            
+        // Store array elements
+        this->store_array_elements(expression, pointer);
+
+        // Return
+        return nullptr;
+    }
+    else {
+        // Generate value of expression
+        llvm::Value* expr = this->codegen(expression);
+
+        // Store value
+        this->builder->CreateStore(expr, pointer);
+
+        return nullptr;
+    }
+}
+
+llvm::Value* codegen::Context::get_pointer_to(ast::Node* expression) {
+    if (expression->index() == ast::Identifier) {
+        auto& node = std::get<ast::IdentifierNode>(*expression);
+        llvm::Value* pointer = this->get_binding(node.value).pointer;
+        if (this->get_binding(node.value).is_mutable) {
+            pointer = this->builder->CreateLoad(
+                pointer->getType(),
+                pointer
+            );
+        }
+        return pointer;
+    }
+    else if (expression->index() == ast::FieldAccess) {
+        auto& node = std::get<ast::FieldAccessNode>(*expression);
+        auto pointer = this->get_field_pointer(node);
+        return pointer;
+    }
+    else if (expression->index() == ast::Call && std::get<ast::CallNode>(*expression).identifier->value == "[]") {
+        auto& node = std::get<ast::CallNode>(*expression);
+        auto pointer = this->get_index_access_pointer(node);
+        return pointer;
+    }
+    else {
+        assert(false);
+    }
+
+    return nullptr;
 }
 
 // Codegeneration
@@ -1033,123 +1088,26 @@ llvm::Value* codegen::Context::codegen(ast::DeclarationNode& node) {
 }
 
 llvm::Value* codegen::Context::codegen(ast::AssignmentNode& node) {
-    // Codegen pointer
-    llvm::Value* pointer = this->get_binding(node.identifier->value).pointer;
-    if (this->get_binding(node.identifier->value).is_mutable) {
-        pointer = this->builder->CreateLoad(
-            pointer->getType(),
-            pointer
-        );
-    }
-
-    if (this->has_struct_type(node.expression)) {
-        // Store fields
-        this->store_fields(node.expression, pointer);
-  
-        // Return
-        return nullptr;
-    }
-    else if (this->has_array_type(node.expression)) {            
-        // Store array elements
-        this->store_array_elements(node.expression, pointer);
-
-        // Return
-        return nullptr;
-    }
-    else if (this->get_binding(node.identifier->value).is_mutable) {
-        // Generate value of expression
-        llvm::Value* expr = this->codegen(node.expression);
-
-        // Codegen pointer
-        auto pointer = this->builder->CreateLoad(
-            this->get_binding(node.identifier->value).pointer->getType(),
-            this->get_binding(node.identifier->value).pointer
-        );
-
-        // Create store
-        this->builder->CreateStore(expr, pointer);
-
-        // Return
-        return nullptr;
-    }
-    else {
-        // Generate value of expression
-        llvm::Value* expr = this->codegen(node.expression);
-
-        // Store value
-        this->builder->CreateStore(expr, pointer);
-
-        return nullptr;
-    }
+    auto pointer = this->get_pointer_to((ast::Node*) node.identifier);    
+    this->copy_expression_to_memory(pointer, node.expression);
+    return nullptr;
 }
 
 llvm::Value* codegen::Context::codegen(ast::FieldAssignmentNode& node) {
-    if (this->has_struct_type(node.expression)) {
-        // Get field pointer
-        llvm::Value* ptr = this->get_field_pointer(*node.identifier);
-
-        // Store fields
-        this->store_fields(node.expression, ptr);
-  
-        // Return
-        return nullptr;
-    }
-    else if (this->has_array_type(node.expression)) {
-        assert(false);
-    }
-    else {
-        // Generate value of expression
-        llvm::Value* expr = this->codegen(node.expression);
-
-        // Get field pointer
-        llvm::Value* ptr = this->get_field_pointer(*node.identifier);
-
-        // Store value
-        this->builder->CreateStore(expr, ptr);
-
-        return nullptr;
-    }
+    auto pointer = this->get_pointer_to((ast::Node*) node.identifier);    
+    this->copy_expression_to_memory(pointer, node.expression);
+    return nullptr;
 }
 
 llvm::Value* codegen::Context::codegen(ast::DereferenceAssignmentNode& node) {
-    // Codegen expression
-    llvm::Value* expression = this->codegen(node.expression);
-
-    // Codegen pointer
     auto pointer = this->codegen(node.identifier->expression);
-
-    if (this->has_struct_type(node.expression)) {
-        // Store fields
-        this->store_fields(node.expression, pointer);
-    }
-    else if (this->has_array_type(node.expression)) {
-        assert(false);
-    }
-    else {
-        this->builder->CreateStore(expression, pointer);
-    }
-
+    this->copy_expression_to_memory(pointer, node.expression);
     return nullptr;
 }
 
 llvm::Value* codegen::Context::codegen(ast::IndexAssignmentNode& node) {
-    // Codegen expression
-    llvm::Value* expression = this->codegen(node.expression);
-
-    // Codegen pointer
-    auto pointer = this->get_index_access_pointer(*node.index_access);
-
-    if (this->has_struct_type(node.expression)) {
-        // Store fields
-        this->store_fields(node.expression, pointer);
-    }
-    else if (this->has_array_type(node.expression)) {
-        assert(false);
-    }
-    else {
-        this->builder->CreateStore(expression, pointer);
-    }
-
+    auto pointer = this->get_pointer_to((ast::Node*) node.index_access);    
+    this->copy_expression_to_memory(pointer, node.expression);
     return nullptr;
 }
 

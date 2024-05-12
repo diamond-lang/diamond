@@ -84,13 +84,15 @@ namespace codegen {
         llvm::TypeSize get_type_size(llvm::Type* type);
 
         // Codegen helpers
-        llvm::AllocaInst* create_allocation(std::string name, llvm::Type* type);
         ast::FunctionNode* get_function(ast::CallNode* call);
         void store_fields(ast::Node* expression, llvm::Value* struct_allocation);
         void store_array_elements(ast::Node* expression, llvm::Value* array_allocation);
         llvm::Value* get_field_pointer(ast::FieldAccessNode& node);
         llvm::Value* get_index_access_pointer(ast::CallNode& node);
         llvm::Constant* get_global_string(std::string str);
+        llvm::AllocaInst* create_allocation(std::string name, llvm::Type* type);
+        llvm::AllocaInst* copy_expression_to_memory(llvm::Value* pointer, ast::Node* expression);
+        llvm::Value* get_pointer_to(ast::Node* expression);
 
         // Codegen
         void codegen(ast::Ast& ast);
