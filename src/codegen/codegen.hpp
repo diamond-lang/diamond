@@ -78,6 +78,7 @@ namespace codegen {
         bool has_struct_type(ast::Node* expression);
         bool has_array_type(ast::Node* expression);
         bool has_collection_type(ast::Node* expression);
+        bool has_boxed_type(ast::Node* expression);
         CollectionAsArguments get_collection_as_argument(ast::Type type);
         CollectionAsArguments get_struct_type_as_argument(llvm::StructType* struct_type);
         llvm::FunctionType* get_function_type(std::vector<ast::FunctionArgumentNode*> args, std::vector<ast::Type> args_types, ast::Type return_type);
@@ -95,6 +96,7 @@ namespace codegen {
         llvm::AllocaInst* create_allocation(std::string name, llvm::Type* type);
         llvm::AllocaInst* copy_expression_to_memory(llvm::Value* pointer, ast::Node* expression);
         llvm::Value* get_pointer_to(ast::Node* expression);
+        llvm::Value* create_heap_allocation(ast::Type type);
 
         // Codegen
         void codegen(ast::Ast& ast);

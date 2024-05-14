@@ -399,6 +399,10 @@ bool codegen::Context::has_collection_type(ast::Node* expression) {
     return this->has_struct_type(expression) || this->has_array_type(expression);
 }
 
+bool codegen::Context::has_boxed_type(ast::Node* expression) {
+    return ast::get_concrete_type(expression, this->type_bindings).is_boxed();
+}
+
 codegen::CollectionAsArguments codegen::Context::get_collection_as_argument(ast::Type type) {
     if (type.is_struct_type()) {
         return this->get_struct_type_as_argument((llvm::StructType*) this->as_llvm_type(type));
@@ -808,6 +812,13 @@ llvm::Value* codegen::Context::get_pointer_to(ast::Node* expression) {
     return nullptr;
 }
 
+llvm::Value* codegen::Context::create_heap_allocation(ast::Type type) {
+    std::vector<llvm::Value*> mallocArgs;
+    mallocArgs.push_back(llvm::ConstantInt::get(*(this->context), llvm::APInt(64, this->get_type_size(this->as_llvm_type(type)), true)));
+    llvm::Value* malloc_call = this->builder->CreateCall(this->module->getFunction("malloc"), mallocArgs);
+    return malloc_call;
+}
+
 // Codegeneration
 // --------------
 void codegen::Context::codegen(ast::Ast& ast) {
@@ -1106,11 +1117,31 @@ void codegen::Context::codegen_function_bodies(std::filesystem::path module_path
 }
 
 llvm::Value* codegen::Context::codegen(ast::DeclarationNode& node) {
-    // Generate value of expression
-    llvm::Value* expr = this->codegen(node.expression);
-
     if (this->has_collection_type(node.expression)) {
-        this->current_scope()[node.identifier->value] = Binding{(llvm::AllocaInst*)expr};
+        // Create binding and allocation
+        this->current_scope()[node.identifier->value] = Binding{this->create_allocation("", this->as_llvm_type(ast::get_concrete_type(node.expression, this->type_bindings)))};
+
+        // Copy expression into memory
+        this->copy_expression_to_memory(this->current_scope()[node.identifier->value].pointer, node.expression);
+
+        // Return
+        return nullptr;
+    }
+    else if (this->has_boxed_type(node.expression) && node.expression->index() != ast::New) {
+        ast::Type type = ast::get_concrete_type(node.expression, this->type_bindings);
+
+        // Create stack allocation
+        this->current_scope()[node.identifier->value] = Binding{this->create_allocation(node.identifier->value, this->as_llvm_type(type))};
+
+        // Create heap allocation
+        auto heap_allocation = this->create_heap_allocation(type.as_nominal_type().parameters[0]);
+
+        // Copy memory
+        llvm::Value* value = this->builder->CreateLoad(this->as_llvm_type(type.as_nominal_type().parameters[0]), this->codegen(node.expression));
+        this->builder->CreateStore(value, heap_allocation);
+
+        // Store pointer in binding
+         this->builder->CreateStore(heap_allocation, this->current_scope()[node.identifier->value].pointer);
 
         // Return
         return nullptr;
@@ -1419,6 +1450,19 @@ std::vector<llvm::Value*> codegen::Context::codegen_args(ast::FunctionNode* func
                     // Add to args
                     result.push_back(wrapper_allocation);
             }
+            else if (this->has_collection_type(args[i]->expression)) {
+                // Create allocation
+                llvm::AllocaInst* allocation = this->create_allocation("", this->as_llvm_type(ast::get_concrete_type(args[i]->expression, this->type_bindings)));
+
+                // Copy expression into memory
+                this->copy_expression_to_memory(allocation, args[i]->expression);
+
+                // Add to args
+                result.push_back(allocation);
+            }
+            else if (this->has_boxed_type(args[i]->expression) && args[i]->expression->index() != ast::New) {
+                assert(false);
+            }
             else {
                 result.push_back(this->codegen(args[i]->expression));
             }
@@ -1642,15 +1686,8 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
 }
 
 llvm::Value* codegen::Context::codegen(ast::StructLiteralNode& node) {
-    // Create allocation
-    llvm::StructType* struct_type = this->get_struct_type(node.type.as_nominal_type().type_definition);
-    llvm::AllocaInst* allocation = this->create_allocation(node.identifier->value, struct_type);
-        
-    // Store fields
-    this->store_fields((ast::Node*) &node, allocation);
-
-    // Return
-    return allocation;
+    assert(false);
+    return nullptr;
 }
 
 llvm::Value* codegen::Context::codegen(ast::FloatNode& node) {
@@ -1675,30 +1712,20 @@ llvm::Value* codegen::Context::codegen(ast::IntegerNode& node) {
 }
 
 llvm::Value* codegen::Context::codegen(ast::IdentifierNode& node) {
-    if (this->has_collection_type((ast::Node*) &node)) {
-        llvm::Type* collection_type = this->as_llvm_type(ast::get_concrete_type(node.type, this->type_bindings));
-        llvm::AllocaInst* allocation = this->create_allocation("", collection_type);
+    llvm::Value* pointer = this->get_binding(node.value).pointer;
 
-        this->copy_expression_to_memory(allocation, (ast::Node*) &node);
-
-        return allocation;
-    }
-    else {
-        llvm::Value* pointer = this->get_binding(node.value).pointer;
-
-        if (this->get_binding(node.value).is_mutable) {
-            pointer = this->builder->CreateLoad(
-                pointer->getType(),
-                pointer
-            );
-        }
-
-        return this->builder->CreateLoad(
-            this->as_llvm_type(ast::get_concrete_type((ast::Node*) &node, this->type_bindings)),
-            pointer,
-            node.value.c_str()
+    if (this->get_binding(node.value).is_mutable) {
+        pointer = this->builder->CreateLoad(
+            pointer->getType(),
+            pointer
         );
     }
+
+    return this->builder->CreateLoad(
+        this->as_llvm_type(ast::get_concrete_type((ast::Node*) &node, this->type_bindings)),
+        pointer,
+        node.value.c_str()
+    );
 }
 
 llvm::Value* codegen::Context::codegen(ast::BooleanNode& node) {
@@ -1710,15 +1737,8 @@ llvm::Value* codegen::Context::codegen(ast::StringNode& node) {
 }
 
 llvm::Value* codegen::Context::codegen(ast::ArrayNode& node) {
-    // Create allocation
-    llvm::Type* array_type = this->as_llvm_type(ast::get_concrete_type((ast::Node*) &node, this->type_bindings));
-    llvm::AllocaInst* allocation = this->create_allocation("array", array_type);
-        
-    // Store array elements
-    this->store_array_elements((ast::Node*) &node, allocation);
-
-    // Return
-    return allocation;
+    assert(false);
+    return nullptr;
 }
 
 llvm::Value* codegen::Context::codegen(ast::FieldAccessNode& node) {
@@ -1739,9 +1759,7 @@ llvm::Value* codegen::Context::codegen(ast::DereferenceNode& node) {
 }
 
 llvm::Value* codegen::Context::codegen(ast::NewNode& node) {
-    std::vector<llvm::Value*> mallocArgs;
-    mallocArgs.push_back(llvm::ConstantInt::get(*(this->context), llvm::APInt(64, this->get_type_size(this->as_llvm_type(ast::get_concrete_type(node.expression, this->type_bindings))), true)));
-    llvm::Value* malloc_call = this->builder->CreateCall(this->module->getFunction("malloc"), mallocArgs);
-    this->copy_expression_to_memory(malloc_call, node.expression);
-    return malloc_call;
+   auto allocation = this->create_heap_allocation(ast::get_concrete_type(node.expression, this->type_bindings));
+   this->copy_expression_to_memory(allocation, node.expression);
+   return allocation;
 }
