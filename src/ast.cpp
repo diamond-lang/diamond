@@ -516,6 +516,7 @@ bool ast::could_be_expression(Node* node) {
         case Assignment: return false;
         case FieldAssignment: return false;
         case DereferenceAssignment: return false;
+        case IndexAssignment: return false;
         case Return: return false;
         case Break: return false;
         case Continue: return false;
@@ -536,7 +537,10 @@ bool ast::could_be_expression(Node* node) {
         case Identifier: return true;
         case Boolean: return true;
         case String: return true;
-        default: assert(false);
+        default: {
+            std::cout << node->index() << "\n";
+            assert(false);
+        }
     }
     return false;
 }

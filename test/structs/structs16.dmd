@@ -1,0 +1,32 @@
+-- Assigning struct as field
+type Point
+    x: float64
+    y: float64
+
+type Rectangle
+    p1: Point
+    p2: Point
+
+rectangle = Rectangle{
+    p1: Point{x: 10, y: 10}
+    p2: Point{x: 110, y: 60}
+}
+
+rectangle2 = Rectangle{
+    p1: Point{x: 20, y: 20}
+    p2: Point{x: 210, y: 260}
+}
+
+rectangle.p1 = rectangle2.p1
+
+print(rectangle.p1.x)
+print(rectangle.p1.y)
+print(rectangle.p2.x)
+print(rectangle.p2.y)
+
+--- Output
+20
+20
+110
+60
+---
