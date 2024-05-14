@@ -213,6 +213,7 @@ namespace ast {
         bool is_boxed() const;
         bool is_array() const;
         bool is_builtin_type() const;
+        bool is_collection() const;
         size_t array_size_known() const;
         size_t get_array_size() const;
     };
@@ -320,6 +321,8 @@ namespace ast {
         IdentifierNode* identifier;
         std::vector<IdentifierNode*> fields;
         std::filesystem::path module_path; // Used in to tell from which module the type comes from
+
+        size_t get_index_of_field(std::string field_name);
     };
 
     struct DeclarationNode {

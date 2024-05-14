@@ -1,0 +1,22 @@
+-- Passing structs by value
+
+type Point
+    x: float64
+    y: float64
+    z: float64
+    w: float64
+
+function awesome(point: Point): void
+    point.x = 100
+    print(point.x)
+
+point = Point{x: 10, y: 10, z: 10, w: 10}
+print(point.x)
+awesome(point)
+print(point.x)
+
+--- Output
+10
+100
+10
+---

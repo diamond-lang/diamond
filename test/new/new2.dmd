@@ -1,0 +1,12 @@
+a = new 20
+b = a
+print(*a)
+*b = 10
+print(*b)
+print(*a)
+
+--- Output
+20
+10
+20
+---

@@ -1,0 +1,15 @@
+-- Passing arrays by value
+function awesome(array: array3[int64]): void  
+    array[1] = 100
+    print(array[1])
+
+a = [1, 2, 3]
+print(a[1])
+awesome(a)
+print(a[1])
+
+--- Output
+1
+100
+1
+---
