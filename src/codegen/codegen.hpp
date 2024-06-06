@@ -51,8 +51,14 @@ namespace codegen {
 
 
         struct Binding {
+            ast::Node* node = nullptr;
             llvm::AllocaInst* pointer = nullptr;
             bool is_mutable = false;
+
+            Binding() {}
+            Binding(ast::Node* node, llvm::AllocaInst* pointer) : node(node), pointer(pointer) {}
+            Binding(ast::Node* node, llvm::AllocaInst* pointer, bool is_mutable) : node(node), pointer(pointer), is_mutable(is_mutable) {}
+            ~Binding() {}
         };
 
         std::vector<std::unordered_map<std::string, Binding>> scopes;
@@ -65,6 +71,7 @@ namespace codegen {
         // Scope management
         void add_scope();
         std::unordered_map<std::string, Binding>& current_scope();
+        void delete_binding(Binding binding);
         void remove_scope();
         Binding get_binding(std::string identifier);
 

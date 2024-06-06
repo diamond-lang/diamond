@@ -320,7 +320,21 @@ std::unordered_map<std::string, codegen::Context::Binding>& codegen::Context::cu
     return this->scopes[this->scopes.size() - 1];
 }
 
+void codegen::Context::delete_binding(Binding binding) {
+    if (binding.node) {
+        if (ast::get_concrete_type(ast::get_type(binding.node), this->type_bindings).is_boxed()) {
+            std::vector<llvm::Value*> args;
+            args.push_back(this->builder->CreateLoad(binding.pointer->getType(), binding.pointer));
+            this->builder->CreateCall(this->module->getFunction("free"), args);
+        }
+    }
+}
+
 void codegen::Context::remove_scope() {
+    for (auto binding: this->current_scope()) {
+        this->delete_binding(binding.second);
+    }
+
     this->scopes.pop_back();
 }
 
@@ -836,6 +850,12 @@ void codegen::Context::codegen(ast::Ast& ast) {
     llvm::FunctionType* mallocType = llvm::FunctionType::get(llvm::Type::getVoidTy(*(this->context))->getPointerTo(), args, false);
     llvm::Function::Create(mallocType, llvm::Function::ExternalLinkage, "malloc", this->module);
 
+    // Declare free
+    args = {};
+    args.push_back(llvm::Type::getVoidTy(*(this->context))->getPointerTo());
+    llvm::FunctionType* freeType = llvm::FunctionType::get(llvm::Type::getVoidTy(*(this->context)), args, false);
+    llvm::Function::Create(freeType, llvm::Function::ExternalLinkage, "free", this->module);
+
     // Codegen array wrapper type
     llvm::StructType* array_type = llvm::StructType::create(*this->context, "arrayWrapper");
     std::vector<llvm::Type*> fields;
@@ -1039,7 +1059,7 @@ void codegen::Context::codegen_function_bodies(std::filesystem::path module_path
         this->builder->CreateStore(f->getArg(0), allocation);
 
         // Add arguments to scope
-        this->current_scope()["$result"] = Binding{allocation};
+        this->current_scope()["$result"] = Binding(nullptr, allocation);
 
         offset += 1;
     }
@@ -1055,7 +1075,7 @@ void codegen::Context::codegen_function_bodies(std::filesystem::path module_path
             this->builder->CreateStore(f->getArg(i + offset), allocation);
 
             // Add arguments to scope
-            this->current_scope()[name] = Binding{allocation, args[i]->is_mutable};
+            this->current_scope()[name] = Binding((ast::Node*) args[i], allocation, args[i]->is_mutable);
         }
         else {
             if (args_types[i].is_collection() && this->get_collection_as_argument(args_types[i]).types.size() > 1) {
@@ -1077,7 +1097,7 @@ void codegen::Context::codegen_function_bodies(std::filesystem::path module_path
                 offset += new_args.types.size() - 1;
 
                 // Add struct to scope
-                this->current_scope()[name] = Binding{allocation};
+                this->current_scope()[name] = Binding((ast::Node*) args[i], allocation);
             }
             else {
                 // Create allocation for argument
@@ -1087,7 +1107,7 @@ void codegen::Context::codegen_function_bodies(std::filesystem::path module_path
                 this->builder->CreateStore(f->getArg(i + offset), allocation);
 
                 // Add arguments to scope
-                this->current_scope()[name] = Binding{allocation, args[i]->is_mutable};
+                this->current_scope()[name] =  Binding((ast::Node*) args[i], allocation, args[i]->is_mutable);
             }
         }
     }
@@ -1119,7 +1139,7 @@ void codegen::Context::codegen_function_bodies(std::filesystem::path module_path
 llvm::Value* codegen::Context::codegen(ast::DeclarationNode& node) {
     if (this->has_collection_type(node.expression)) {
         // Create binding and allocation
-        this->current_scope()[node.identifier->value] = Binding{this->create_allocation("", this->as_llvm_type(ast::get_concrete_type(node.expression, this->type_bindings)))};
+        this->current_scope()[node.identifier->value] = Binding(node.expression, this->create_allocation("", this->as_llvm_type(ast::get_concrete_type(node.expression, this->type_bindings))));
 
         // Copy expression into memory
         this->copy_expression_to_memory(this->current_scope()[node.identifier->value].pointer, node.expression);
@@ -1130,8 +1150,14 @@ llvm::Value* codegen::Context::codegen(ast::DeclarationNode& node) {
     else if (this->has_boxed_type(node.expression) && node.expression->index() != ast::New) {
         ast::Type type = ast::get_concrete_type(node.expression, this->type_bindings);
 
-        // Create stack allocation
-        this->current_scope()[node.identifier->value] = Binding{this->create_allocation(node.identifier->value, this->as_llvm_type(type))};
+        // Create allocation if doesn't exists or if already exists, but it has a different type
+        if (this->current_scope().find(node.identifier->value) == this->current_scope().end()
+        ||  ast::get_concrete_type(ast::get_type(this->current_scope()[node.identifier->value].node), this->type_bindings) != ast::get_concrete_type(ast::get_type(node.expression), this->type_bindings)) {
+            this->current_scope()[node.identifier->value] = Binding(node.expression, this->create_allocation(node.identifier->value, this->as_llvm_type(type)));
+        }
+        else {
+            this->delete_binding(this->current_scope()[node.identifier->value]);
+        }
 
         // Create heap allocation
         auto heap_allocation = this->create_heap_allocation(type.as_nominal_type().parameters[0]);
@@ -1153,7 +1179,10 @@ llvm::Value* codegen::Context::codegen(ast::DeclarationNode& node) {
         // Create allocation if doesn't exists or if already exists, but it has a different type
         if (this->current_scope().find(node.identifier->value) == this->current_scope().end()
         ||  this->current_scope()[node.identifier->value].pointer->getType() != expr->getType()) {
-            this->current_scope()[node.identifier->value] = Binding{this->create_allocation(node.identifier->value, expr->getType())};
+            this->current_scope()[node.identifier->value] = Binding(node.expression, this->create_allocation(node.identifier->value, expr->getType()));
+        }
+        else {
+            this->delete_binding(this->current_scope()[node.identifier->value]);
         }
 
         // Store value
