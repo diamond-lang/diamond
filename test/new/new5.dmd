@@ -1,0 +1,15 @@
+type Point
+    x: float64
+    y: float64
+    z: float64
+
+point = new Point{x: 1, y: 2, z: 3}
+print((*point).x)
+print((*point).y)
+print((*point).z)
+
+--- Output
+1
+2
+3
+---

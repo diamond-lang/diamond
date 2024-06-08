@@ -695,9 +695,6 @@ llvm::Value* codegen::Context::get_field_pointer(ast::FieldAccessNode& node) {
     assert(ast::get_concrete_type(node.accessed, this->type_bindings).as_nominal_type().type_definition);
     llvm::Value* struct_ptr = this->get_pointer_to(node.accessed);
     llvm::StructType* struct_type = this->get_struct_type(ast::get_concrete_type(node.accessed, this->type_bindings).as_nominal_type().type_definition);
-    if (((llvm::AllocaInst*) struct_ptr)->getAllocatedType()->isPointerTy()) {
-        struct_ptr = this->builder->CreateLoad(struct_type->getPointerTo(), struct_ptr);
-    }
 
     // Get type definition
     ast::TypeNode* type_definition = ast::get_concrete_type(node.accessed, this->type_bindings).as_nominal_type().type_definition;
@@ -794,9 +791,17 @@ llvm::AllocaInst* codegen::Context::copy_expression_to_memory(llvm::Value* point
 llvm::Value* codegen::Context::get_pointer_to(ast::Node* expression) {
     if (expression->index() == ast::Identifier) {
         auto& node = std::get<ast::IdentifierNode>(*expression);
-        
-        if (node.type.is_collection()) {
-            return this->get_binding(node.value).pointer;
+
+        if (ast::get_concrete_type(node.type, this->type_bindings).is_collection()) {
+            llvm::Value* pointer = this->get_binding(node.value).pointer;
+            if (this->get_binding(node.value).is_mutable
+            || ((llvm::AllocaInst*) pointer)->getAllocatedType()->isPointerTy()) {
+                pointer = this->builder->CreateLoad(
+                    pointer->getType(),
+                    pointer
+                );
+            }
+            return pointer;
         }
         else {
             llvm::Value* pointer = this->get_binding(node.value).pointer;
@@ -818,6 +823,10 @@ llvm::Value* codegen::Context::get_pointer_to(ast::Node* expression) {
         auto& node = std::get<ast::CallNode>(*expression);
         auto pointer = this->get_index_access_pointer(node);
         return pointer;
+    }
+    else if (expression->index() == ast::Dereference) {
+        auto& node = std::get<ast::DereferenceNode>(*expression);
+        return this->codegen(node.expression);
     }
     else {
         assert(false);
