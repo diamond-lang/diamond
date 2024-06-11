@@ -211,6 +211,7 @@ namespace ast {
         bool is_float() const;
         bool is_pointer() const;
         bool is_boxed() const;
+        bool has_boxed_elements() const;
         bool is_array() const;
         bool is_builtin_type() const;
         bool is_collection() const;

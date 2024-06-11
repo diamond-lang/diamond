@@ -1,0 +1,15 @@
+type Point
+    x: boxed[int64]
+    y: boxed[int64]
+    z: boxed[int64]
+
+point = Point{x: new 100, y: new 200, z: new 300}
+print(*point.x)
+print(*point.y)
+print(*point.z)
+
+--- Output
+100
+200
+300
+---

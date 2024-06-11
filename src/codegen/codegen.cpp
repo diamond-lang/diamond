@@ -320,19 +320,40 @@ std::unordered_map<std::string, codegen::Context::Binding>& codegen::Context::cu
     return this->scopes[this->scopes.size() - 1];
 }
 
-void codegen::Context::delete_binding(Binding binding) {
-    if (binding.node) {
-        if (ast::get_concrete_type(ast::get_type(binding.node), this->type_bindings).is_boxed()) {
-            std::vector<llvm::Value*> args;
-            args.push_back(this->builder->CreateLoad(binding.pointer->getType(), binding.pointer));
-            this->builder->CreateCall(this->module->getFunction("free"), args);
+void codegen::Context::delete_binding(llvm::Value* pointer, ast::Type type) {
+    bool is_boxed = type.is_boxed();
+    if (is_boxed) {
+        pointer = this->builder->CreateLoad(pointer->getType(), pointer);
+        type = type.as_nominal_type().parameters[0];
+    }
+
+    if (type.has_boxed_elements()) {
+        if (type.is_nominal_type()
+        &&  type.as_nominal_type().type_definition) {
+            auto struct_type = this->get_struct_type(type.as_nominal_type().type_definition);
+            for (size_t i = 0; i < type.as_nominal_type().type_definition->fields.size(); i++) {
+                llvm::Value* field_pointer = this->builder->CreateStructGEP(struct_type, pointer, i);
+                this->delete_binding(field_pointer, type.as_nominal_type().type_definition->fields[i]->type);
+            }
         }
+        else {
+            assert(false);
+        }
+    }
+
+    if (is_boxed) {
+        std::vector<llvm::Value*> args;
+        args.push_back(pointer);
+        this->builder->CreateCall(this->module->getFunction("free"), args);
     }
 }
 
 void codegen::Context::remove_scope() {
     for (auto binding: this->current_scope()) {
-        this->delete_binding(binding.second);
+        if (binding.second.node) {
+            llvm::Value* pointer = binding.second.pointer;
+            this->delete_binding(pointer, ast::get_concrete_type(ast::get_type(binding.second.node), this->type_bindings));
+        }
     }
 
     this->scopes.pop_back();
@@ -700,7 +721,7 @@ llvm::Value* codegen::Context::get_field_pointer(ast::FieldAccessNode& node) {
     ast::TypeNode* type_definition = ast::get_concrete_type(node.accessed, this->type_bindings).as_nominal_type().type_definition;
 
     for (size_t i = 0; i < node.fields_accessed.size() - 1; i++) {
-        // Get pointer to accessed fieldd
+        // Get pointer to accessed field
         struct_ptr = this->builder->CreateStructGEP(struct_type, struct_ptr, type_definition->get_index_of_field(node.fields_accessed[i]->value));
 
         // Update current type definition
@@ -829,6 +850,7 @@ llvm::Value* codegen::Context::get_pointer_to(ast::Node* expression) {
         return this->codegen(node.expression);
     }
     else {
+        std::cout << expression->index() << "\n";
         assert(false);
     }
 
@@ -1165,7 +1187,8 @@ llvm::Value* codegen::Context::codegen(ast::DeclarationNode& node) {
             this->current_scope()[node.identifier->value] = Binding(node.expression, this->create_allocation(node.identifier->value, this->as_llvm_type(type)));
         }
         else {
-            this->delete_binding(this->current_scope()[node.identifier->value]);
+            llvm::Value* pointer = this->current_scope()[node.identifier->value].pointer;
+            this->delete_binding(pointer, ast::get_concrete_type(ast::get_type(this->current_scope()[node.identifier->value].node), this->type_bindings));
         }
 
         // Create heap allocation
@@ -1191,7 +1214,8 @@ llvm::Value* codegen::Context::codegen(ast::DeclarationNode& node) {
             this->current_scope()[node.identifier->value] = Binding(node.expression, this->create_allocation(node.identifier->value, expr->getType()));
         }
         else {
-            this->delete_binding(this->current_scope()[node.identifier->value]);
+            llvm::Value* pointer = this->current_scope()[node.identifier->value].pointer;
+            this->delete_binding(pointer, ast::get_concrete_type(ast::get_type(this->current_scope()[node.identifier->value].node), this->type_bindings));
         }
 
         // Store value

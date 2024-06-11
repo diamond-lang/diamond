@@ -71,7 +71,7 @@ namespace codegen {
         // Scope management
         void add_scope();
         std::unordered_map<std::string, Binding>& current_scope();
-        void delete_binding(Binding binding);
+        void delete_binding(llvm::Value* pointer, ast::Type type);
         void remove_scope();
         Binding get_binding(std::string identifier);
 

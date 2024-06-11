@@ -370,6 +370,26 @@ bool ast::Type::is_boxed() const {
     return true;
 }
 
+bool ast::Type::has_boxed_elements() const {
+    if (!this->is_nominal_type()) {
+        return false;
+    }
+
+    for (auto parameter: this->as_nominal_type().parameters) {
+        return parameter.is_boxed() || parameter.has_boxed_elements();
+    }
+
+    if (this->as_nominal_type().type_definition != nullptr) {
+        for (auto field: this->as_nominal_type().type_definition->fields) {
+            if (field->type.is_boxed() || field->type.has_boxed_elements()) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
 bool ast::Type::is_array() const {
     if (!this->is_nominal_type()) {
         return false;
@@ -390,6 +410,7 @@ bool ast::Type::is_array() const {
 
 bool ast::Type::is_builtin_type() const {
     return this->is_pointer()
+        || this->is_boxed()
         || this->is_array()
         || (this->is_nominal_type() && primitive_types.contains(this->as_nominal_type().name));
 }

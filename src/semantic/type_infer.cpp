@@ -580,7 +580,8 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
     }
 
     if (node.type.is_no_type()) {
-        if (ast::get_type(node.expression).is_pointer()) {
+        if (ast::get_type(node.expression).is_pointer()
+        ||  ast::get_type(node.expression).is_boxed()) {
             node.type = ast::get_type(node.expression).as_nominal_type().parameters[0];
         }
         else {
