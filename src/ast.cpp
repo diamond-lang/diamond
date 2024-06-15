@@ -34,7 +34,11 @@ bool ast::Interface::is_compatible_with(ast::Type type) {
     else if (this->name == "Float") {
         return type.is_float();
     }
+    else if (this->name == "pointer") {
+        return type.is_pointer() || type.is_boxed();
+    }
     else {
+        std::cout << this->name << " :: " << type.to_str() << "\n";
         assert(false);
         return false;
     }

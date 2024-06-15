@@ -1146,12 +1146,14 @@ void codegen::Context::codegen_function_bodies(std::filesystem::path module_path
     // Codegen body
     if (ast::is_expression(function_body) && return_type != ast::Type("void")) {
         llvm::Value* result = this->codegen(function_body);
+        this->remove_scope();
         if (result) {
             this->builder->CreateRet(result);
         }
     }
     else {
         this->codegen(function_body);
+        this->remove_scope();
         if (return_type == ast::Type("void")) {
             this->builder->CreateRetVoid();
         }
@@ -1162,9 +1164,6 @@ void codegen::Context::codegen_function_bodies(std::filesystem::path module_path
 
     // Run optimizations
     this->function_pass_manager->run(*f);
-
-    // Remove scope
-    this->remove_scope();
 }
 
 llvm::Value* codegen::Context::codegen(ast::DeclarationNode& node) {
@@ -1523,7 +1522,14 @@ std::vector<llvm::Value*> codegen::Context::codegen_args(ast::FunctionNode* func
                 result.push_back(allocation);
             }
             else if (this->has_boxed_type(args[i]->expression) && args[i]->expression->index() != ast::New) {
-                assert(false);
+                // Create heap allocation
+                auto heap_allocation = this->create_heap_allocation(ast::get_concrete_type(ast::get_type((args[i]->expression)), this->type_bindings).as_nominal_type().parameters[0]);
+
+                // Copy memory
+                llvm::Value* value = this->builder->CreateLoad(this->as_llvm_type(ast::get_concrete_type(ast::get_type((args[i]->expression)), this->type_bindings).as_nominal_type().parameters[0]), this->codegen(args[i]->expression));
+                this->builder->CreateStore(value, heap_allocation);
+
+                result.push_back(heap_allocation);
             }
             else {
                 result.push_back(this->codegen(args[i]->expression));

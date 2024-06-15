@@ -586,10 +586,7 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
         }
         else {
             node.type = semantic::new_type_variable(context);
-            
-            auto pointer_type = ast::Type(ast::NominalType("pointer"));
-            pointer_type.as_nominal_type().parameters.push_back(node.type);
-            semantic::add_constraint(context, Set<ast::Type>({ast::get_type(node.expression), pointer_type}));
+            semantic::add_interface_constraint(context, ast::get_type(node.expression),  ast::Interface("pointer"));
         }
     }
 

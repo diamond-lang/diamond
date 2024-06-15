@@ -305,6 +305,9 @@ void semantic::add_interface_constraint(Context& context, ast::Type type, ast::I
     if (context.type_inference.interface_constraints.find(type) == context.type_inference.interface_constraints.end()) {
         context.type_inference.interface_constraints[type] = interface;
     }
+    else if (context.type_inference.interface_constraints[type] == interface) {
+        // do nothing
+    }
     else {
         assert(false);
     }

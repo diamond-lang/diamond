@@ -3,7 +3,7 @@ type Point
     y: pointer[float64]
 
 function awesome(p)
-    *p.y = 400
+    *p.y = 400.0
 
 a = 10
 p = Point{x: 10, y: &a}
