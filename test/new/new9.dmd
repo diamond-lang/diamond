@@ -1,0 +1,4 @@
+a = [new 1, new 2, new 3] : array[boxed[int64]]
+print(*a[1])
+print(*a[2])
+print(*a[3])

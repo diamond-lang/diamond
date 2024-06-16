@@ -132,6 +132,7 @@ namespace codegen {
         llvm::Value* codegen(ast::LinkWithNode& node) {return nullptr;}
         std::vector<llvm::Value*> codegen_args(ast::FunctionNode* function, std::vector<ast::CallArgumentNode*> args);
         llvm::Value* codegen(ast::CallArgumentNode& node) {return nullptr;}
+        llvm::Value* codegen_size_function(llvm::Value* pointer, ast::Type type);
         llvm::Value* codegen(ast::CallNode& node);
         llvm::Value* codegen(ast::StructLiteralNode& node);
         llvm::Value* codegen(ast::FloatNode& node);
