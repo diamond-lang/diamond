@@ -51,7 +51,7 @@ struct Parser {
     Result<ast::Node*, Error> parse_new_expr();
     Result<ast::Node*, Error> parse_binary(int precedence = 1);
     Result<ast::Node*, Error> parse_primary();
-    Result<ast::Node*, Error> parse_accessible_or_grouping();
+    Result<ast::Node*, Error> parse_grouping_or_assignable();
     Result<ast::Node*, Error> parse_negation();
     Result<ast::Node*, Error> parse_address_of();
     Result<ast::Node*, Error> parse_dereference();
@@ -266,6 +266,7 @@ Result<ast::Node*, Error> Parser::parse_statement() {
         case token::Include:  return this->parse_use_stmt();
         case token::Star:     return this->parse_dereference_assignment();
         case token::Identifier:
+        case token::LeftParen:
             if (this->match({token::Identifier, token::Equal})) {
                 return this->parse_declaration();
             }
@@ -276,7 +277,7 @@ Result<ast::Node*, Error> Parser::parse_statement() {
                 return this->parse_assignment();
             }
             else {
-                auto result = this->parse_accessible_or_grouping();
+                auto result = this->parse_grouping_or_assignable();
                 if (result.is_error()) return result;
 
                 if (result.get_value()->index() == ast::Call) {
@@ -1159,6 +1160,7 @@ Result<ast::Node*, Error> Parser::parse_if_else_expr() {
     }
 }
 
+// new → "new" expression
 Result<ast::Node*, Error> Parser::parse_new_expr() {
     // Create node
     auto new_node = ast::NewNode {this->current().line, this->current().column};
@@ -1280,13 +1282,13 @@ Result<ast::Node*, Error> Parser::parse_binary(int precedence) {
 //         | string
 //         | call
 //         | struct
-//         | accessible
+//         | grouping_or_assignable
 Result<ast::Node*, Error> Parser::parse_primary() {
     switch (this->current().variant) {
         case token::Minus:       return this->parse_negation();
         case token::Star:        return this->parse_dereference();
         case token::Ampersand:   return this->parse_address_of();
-        case token::LeftParen:   return this->parse_accessible_or_grouping();
+        case token::LeftParen:   return this->parse_grouping_or_assignable();
         case token::LeftBracket: return this->parse_array();
         case token::Float:       return this->parse_float();
         case token::Integer:     return this->parse_integer();
@@ -1298,7 +1300,7 @@ Result<ast::Node*, Error> Parser::parse_primary() {
                 return this->parse_struct();
             }
             else {
-                return this->parse_accessible_or_grouping();
+                return this->parse_grouping_or_assignable();
             }
         }
         default: break;
@@ -1307,43 +1309,43 @@ Result<ast::Node*, Error> Parser::parse_primary() {
     return Error {};
 }
 
-// accessible → grouping
-//            | identifier
-//            | index_access
-//            | field_access
-//            | call
-Result<ast::Node*, Error> Parser::parse_accessible_or_grouping() {
+// grouping_or_assignable → grouping
+//                        | identifier
+//                        | index_access
+//                        | field_access
+//                        | call
+Result<ast::Node*, Error> Parser::parse_grouping_or_assignable() {
     // Parse indentifier
-    Result<ast::Node*, Error> accessible;
+    Result<ast::Node*, Error> assignable;
     if (this->current() == token::Identifier) {
-        accessible = this->parse_identifier();
+        assignable = this->parse_identifier();
     }
     // Parse grouping
     else if (this->current() == token::LeftParen) {
-        accessible = this->parse_grouping();
+        assignable = this->parse_grouping();
     }
     else {
         assert(false);
     }
     
-    if (accessible.is_error()) return accessible;
+    if (assignable.is_error()) return assignable;
 
-    // Iterate over accessibles
+    // Iterate over assignables
     while (true) {
         if (this->current() == token::Dot) {
-            accessible = this->parse_field_access(accessible.get_value());
+            assignable = this->parse_field_access(assignable.get_value());
         }
         else if (this->current() == token::LeftBracket) {
-            accessible = this->parse_index_access(accessible.get_value());
+            assignable = this->parse_index_access(assignable.get_value());
         }
         else if (this->current() == token::LeftParen) {
-            accessible = this->parse_call(accessible.get_value());
+            assignable = this->parse_call(assignable.get_value());
         }
         else {
-            return accessible;
+            return assignable;
         }
 
-        if (accessible.is_error()) return accessible;
+        if (assignable.is_error()) return assignable;
     }
 }
 
@@ -1377,7 +1379,7 @@ Result<ast::Node*, Error> Parser::parse_address_of() {
     this->advance();
 
     // Parse expression
-    Result<ast::Node*, Error> expression = this->parse_accessible_or_grouping();
+    Result<ast::Node*, Error> expression = this->parse_grouping_or_assignable();
     if (expression.is_error()) return Error {};
     address_of.expression = expression.get_value();
 
@@ -1386,7 +1388,7 @@ Result<ast::Node*, Error> Parser::parse_address_of() {
     return this->ast.last_element();
 }
 
-// dereference → "*" (dereference|accessible)
+// dereference → "*" (dereference|assignable)
 Result<ast::Node*, Error> Parser::parse_dereference() {
     // Create node
     auto dereference = ast::DereferenceNode {this->current().line, this->current().column};
@@ -1401,7 +1403,7 @@ Result<ast::Node*, Error> Parser::parse_dereference() {
         expression = this->parse_dereference();
     }
     else {
-        expression = this->parse_accessible_or_grouping();
+        expression = this->parse_grouping_or_assignable();
     }
     if (expression.is_error()) return Error {};
     dereference.expression = expression.get_value();
@@ -1531,7 +1533,7 @@ Result<ast::Node*, Error> Parser::parse_array() {
     return this->ast.last_element();
 }
 
-// field_access → accessible "." IDENTFIER ("." IDENTIFIER)*
+// field_access → assignable "." IDENTFIER ("." IDENTIFIER)*
 Result<ast::Node*, Error> Parser::parse_field_access(ast::Node* accessed) {
     // Create node
     auto field_access = ast::FieldAccessNode {this->current().line, this->current().column};
@@ -1556,7 +1558,7 @@ Result<ast::Node*, Error> Parser::parse_field_access(ast::Node* accessed) {
     return this->ast.last_element();
 }
 
-// index_access → accessible "[" expression "]"
+// index_access → assignable "[" expression "]"
 Result<ast::Node*, Error> Parser::parse_index_access(ast::Node* expression) {
     // Create node
     auto index_access = ast::CallNode {this->current().line, this->current().column};
