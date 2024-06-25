@@ -1289,25 +1289,7 @@ llvm::Value* codegen::Context::codegen(ast::DeclarationNode& node) {
 }
 
 llvm::Value* codegen::Context::codegen(ast::AssignmentNode& node) {
-    auto pointer = this->get_pointer_to((ast::Node*) node.identifier);    
-    this->copy_expression_to_memory(pointer, node.expression);
-    return nullptr;
-}
-
-llvm::Value* codegen::Context::codegen(ast::FieldAssignmentNode& node) {
-    auto pointer = this->get_pointer_to((ast::Node*) node.identifier);    
-    this->copy_expression_to_memory(pointer, node.expression);
-    return nullptr;
-}
-
-llvm::Value* codegen::Context::codegen(ast::DereferenceAssignmentNode& node) {
-    auto pointer = this->codegen(node.identifier->expression);
-    this->copy_expression_to_memory(pointer, node.expression);
-    return nullptr;
-}
-
-llvm::Value* codegen::Context::codegen(ast::IndexAssignmentNode& node) {
-    auto pointer = this->get_pointer_to((ast::Node*) node.index_access);    
+    auto pointer = this->get_pointer_to(node.assignable);    
     this->copy_expression_to_memory(pointer, node.expression);
     return nullptr;
 }

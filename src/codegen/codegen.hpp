@@ -120,9 +120,6 @@ namespace codegen {
         void codegen_function_bodies(std::filesystem::path module_path, std::string identifier, std::vector<ast::FunctionArgumentNode*> args, std::vector<ast::Type> args_types, ast::Type return_type, ast::Node* function_body);
         llvm::Value* codegen(ast::DeclarationNode& node);
         llvm::Value* codegen(ast::AssignmentNode& node);
-        llvm::Value* codegen(ast::FieldAssignmentNode& node);
-        llvm::Value* codegen(ast::DereferenceAssignmentNode& node);
-        llvm::Value* codegen(ast::IndexAssignmentNode& node);
         llvm::Value* codegen(ast::ReturnNode& node);
         llvm::Value* codegen(ast::BreakNode& node);
         llvm::Value* codegen(ast::ContinueNode& node);

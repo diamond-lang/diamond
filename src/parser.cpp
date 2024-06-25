@@ -717,7 +717,7 @@ Result<ast::Node*, Error> Parser::parse_assignment() {
     // Parse identifier
     auto identifier = this->parse_identifier();
     if (identifier.is_error()) return Error {};
-    assignment.identifier = (ast::IdentifierNode*) identifier.get_value();
+    assignment.assignable = identifier.get_value();
 
     // Parse equal
     auto equal = this->parse_token(token::ColonEqual);
@@ -745,10 +745,10 @@ Result<ast::Node*, Error> Parser::parse_assignment() {
 // field_assignment → field_assignment "=" expression (":" type)?
 Result<ast::Node*, Error> Parser::parse_field_assignment(ast::Node* identifier) {
     // Create node
-    auto assignment = ast::FieldAssignmentNode {this->current().line, this->current().column};
+    auto assignment = ast::AssignmentNode{this->current().line, this->current().column};
 
     // Parse field access
-    assignment.identifier = (ast::FieldAccessNode*) identifier;
+    assignment.assignable = identifier;
 
     // Parse equal
     auto equal = this->parse_token(token::Equal);
@@ -783,12 +783,12 @@ Result<ast::Node*, Error> Parser::parse_field_assignment(ast::Node* identifier) 
 // dereference_assignment → dereference "=" expression (":" type)?
 Result<ast::Node*, Error> Parser::parse_dereference_assignment() {
     // Create node
-    auto assignment = ast::DereferenceAssignmentNode {this->current().line, this->current().column};
+    auto assignment = ast::AssignmentNode{this->current().line, this->current().column};
 
     // Parse dereference
     auto identifier = this->parse_dereference();
     if (identifier.is_error()) return Error {};
-    assignment.identifier = (ast::DereferenceNode*) identifier.get_value();
+    assignment.assignable = identifier.get_value();
 
     // Parse equal
     auto equal = this->parse_token(token::Equal);
@@ -823,11 +823,11 @@ Result<ast::Node*, Error> Parser::parse_dereference_assignment() {
 // index_assignment → index_access "=" expression (":" type)?
 Result<ast::Node*, Error> Parser::parse_index_assignment(ast::Node* index_access) {
     // Create node
-    auto assignment = ast::IndexAssignmentNode {this->current().line, this->current().column};
+    auto assignment = ast::AssignmentNode{this->current().line, this->current().column};
 
     // Parse index access
-    assignment.index_access = (ast::CallNode*) index_access;
-    assignment.index_access->args[0]->is_mutable = true;
+    assignment.assignable = index_access;
+    ((ast::CallNode*) index_access)->args[0]->is_mutable = true;
 
     // Parse equal
     auto equal = this->parse_token(token::Equal);
