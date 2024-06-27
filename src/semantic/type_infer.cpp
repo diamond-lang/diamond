@@ -47,9 +47,6 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
         switch (node.statements[i]->index()) {
             case ast::Declaration: break;
             case ast::Assignment: break;
-            case ast::FieldAssignment: break;
-            case ast::DereferenceAssignment: break;
-            case ast::IndexAssignment: break;
             case ast::Call: break;
             case ast::Return: {
                 if (result.is_ok()) {
@@ -139,6 +136,10 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
 }
 
 Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, ast::AssignmentNode& node) {
+    // Type infer and analyze assignable
+    auto identifier = semantic::type_infer_and_analyze(context, node.assignable);
+    if (identifier.is_error()) return Error {};
+
     // Type infer and analyze expression
     auto result = semantic::type_infer_and_analyze(context, node.expression);
     if (result.is_error()) return Error {};
@@ -150,80 +151,31 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
         ast::set_type(node.expression, type);
     }
 
-    // Get identifier
-    std::string identifier = node.identifier->value;
+    // Add constraint
+    semantic::add_constraint(context, Set<ast::Type>({ast::get_type(node.assignable), ast::get_type(node.expression)}));
 
-    // Check variable exists
-    semantic::Binding* binding = semantic::get_binding(context, identifier);
-    if (!binding) {
-        context.errors.push_back(errors::undefined_variable(*node.identifier, context.current_module));
-        return Error {};
-    }
-    semantic::add_constraint(context, Set<ast::Type>({semantic::get_binding_type(*binding), ast::get_type(node.expression)}));
+    // Check we aren't mutating a inmutable binding
+    if (node.assignable->index() == ast::Identifier) {
+         // Get identifier
+        std::string identifier = ((ast::IdentifierNode*) node.assignable)->value;
 
-    // normal assignment
-    if (binding->type == VariableBinding) {
-        auto declaration = get_variable(*binding);
-        if (!declaration->is_mutable) {
-            context.errors.push_back(errors::reassigning_immutable_variable(*node.identifier, *declaration, context.current_module));
+        // Check variable exists
+        semantic::Binding* binding = semantic::get_binding(context, identifier);
+        if (!binding) {
+            context.errors.push_back(errors::undefined_variable(*((ast::IdentifierNode*) node.assignable), context.current_module));
             return Error {};
         }
+        semantic::add_constraint(context, Set<ast::Type>({semantic::get_binding_type(*binding), ast::get_type(node.expression)}));
+
+        // normal assignment
+        if (binding->type == VariableBinding) {
+            auto declaration = get_variable(*binding);
+            if (!declaration->is_mutable) {
+                context.errors.push_back(errors::reassigning_immutable_variable(*((ast::IdentifierNode*) node.assignable), *declaration, context.current_module));
+                return Error {};
+            }
+        }   
     }
-
-    return Ok {};
-}
-
-Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, ast::FieldAssignmentNode& node) {
-    auto identifier = semantic::type_infer_and_analyze(context, *node.identifier);
-    if (identifier.is_error()) return Error {};
-
-    auto result = semantic::type_infer_and_analyze(context, node.expression);
-    if (result.is_error()) return Error {};
-    
-    semantic::add_constraint(context, Set<ast::Type>({node.identifier->type, ast::get_type(node.expression)}));
-    return Ok {};
-}
-
-Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, ast::DereferenceAssignmentNode& node) {
-    // Type infer and analyze expression
-    auto result = semantic::type_infer_and_analyze(context, node.expression);
-    if (result.is_error()) return Error {};
-
-    // Analyze type of expression
-    if (!ast::get_type(node.expression).is_type_variable()) {
-        auto type = ast::get_type(node.expression);
-        auto result = semantic::analyze(context, type);
-        ast::set_type(node.expression, type);
-    }
-
-    // Analyze identifier
-    auto identifier = semantic::type_infer_and_analyze(context, *node.identifier);
-    if (identifier.is_error()) return Error {};
-
-    // Add constraint
-    semantic::add_constraint(context, Set<ast::Type>({node.identifier->type, ast::get_type(node.expression)}));
-
-    return Ok {};
-}
-
-Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, ast::IndexAssignmentNode& node) {
-    // Type infer and analyze expression
-    auto result = semantic::type_infer_and_analyze(context, node.expression);
-    if (result.is_error()) return Error {};
-
-    // Analyze type of expression
-    if (!ast::get_type(node.expression).is_type_variable()) {
-        auto type = ast::get_type(node.expression);
-        auto result = semantic::analyze(context, type);
-        ast::set_type(node.expression, type);
-    }
-
-    // Analyze identifier
-    auto identifier = semantic::type_infer_and_analyze(context, *node.index_access);
-    if (identifier.is_error()) return Error {};
-
-    // Add constraint
-    semantic::add_constraint(context, Set<ast::Type>({node.index_access->type, ast::get_type(node.expression)}));
 
     return Ok {};
 }
@@ -586,10 +538,7 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
         }
         else {
             node.type = semantic::new_type_variable(context);
-            
-            auto pointer_type = ast::Type(ast::NominalType("pointer"));
-            pointer_type.as_nominal_type().parameters.push_back(node.type);
-            semantic::add_constraint(context, Set<ast::Type>({ast::get_type(node.expression), pointer_type}));
+            semantic::add_interface_constraint(context, ast::get_type(node.expression),  ast::Interface("pointer"));
         }
     }
 

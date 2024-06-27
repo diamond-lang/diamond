@@ -18,9 +18,6 @@ namespace semantic {
     Result<Ok, Error> make_concrete(Context& context, ast::TypeNode& node, std::vector<ast::CallInCallStack> call_stack);
     Result<Ok, Error> make_concrete(Context& context, ast::DeclarationNode& node, std::vector<ast::CallInCallStack> call_stack);
     Result<Ok, Error> make_concrete(Context& context, ast::AssignmentNode& node, std::vector<ast::CallInCallStack> call_stack);
-    Result<Ok, Error> make_concrete(Context& context, ast::FieldAssignmentNode& node, std::vector<ast::CallInCallStack> call_stack);
-    Result<Ok, Error> make_concrete(Context& context, ast::DereferenceAssignmentNode& node, std::vector<ast::CallInCallStack> call_stack);
-    Result<Ok, Error> make_concrete(Context& context, ast::IndexAssignmentNode& node, std::vector<ast::CallInCallStack> call_stack);
     Result<Ok, Error> make_concrete(Context& context, ast::ReturnNode& node, std::vector<ast::CallInCallStack> call_stack);
     Result<Ok, Error> make_concrete(Context& context, ast::BreakNode& node, std::vector<ast::CallInCallStack> call_stack);
     Result<Ok, Error> make_concrete(Context& context, ast::ContinueNode& node, std::vector<ast::CallInCallStack> call_stack);
@@ -42,6 +39,7 @@ namespace semantic {
     Result<Ok, Error> make_concrete(Context& context, ast::DereferenceNode& node, std::vector<ast::CallInCallStack> call_stack);
     Result<Ok, Error> make_concrete(Context& context, ast::NewNode& node, std::vector<ast::CallInCallStack> call_stack);
     
+   Result<Ok, Error> unify_types(std::unordered_map<std::string, ast::Type>& type_bindings, ast::Type function_type, ast::Type argument_type);
     Result<ast::Type, Error> get_type_completely_typed_function(Context& context, ast::FunctionNode* function, std::vector<ast::Type> args);
     Result<ast::Type, Error> get_function_type(Context& context, ast::CallNode* call, ast::FunctionNode* function, std::vector<ast::Type> args, std::vector<ast::CallInCallStack> call_stack);
     

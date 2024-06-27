@@ -1,0 +1,14 @@
+function awesome(pointer, value)
+    *pointer = value
+    print(*pointer)
+
+pointer = new 20
+awesome(pointer, 30)
+a = 10
+realPointer = &a
+awesome(realPointer, 30)
+
+--- Output
+30
+30
+---

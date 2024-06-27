@@ -55,36 +55,9 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::De
 }
 
 Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::AssignmentNode& node) {
-    auto result = semantic::unify_types_and_type_check(context, node.expression);
-    if (result.is_error()) return Error {};
-    
-    return Ok {};
-}
-
-Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::FieldAssignmentNode& node) {
-    auto result = semantic::unify_types_and_type_check(context, *node.identifier);
+    auto result = semantic::unify_types_and_type_check(context, node.assignable);
     if (result.is_error()) return result;
     
-    result = semantic::unify_types_and_type_check(context, node.expression);
-    if (result.is_error()) return result;
-
-    return Ok {};
-}
-
-Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::DereferenceAssignmentNode& node) {
-    auto result = semantic::unify_types_and_type_check(context, *node.identifier);
-    if (result.is_error()) return result;
-
-    result = semantic::unify_types_and_type_check(context, node.expression);
-    if (result.is_error()) return result;
-
-    return Ok {};
-}
-
-Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::IndexAssignmentNode& node) {
-    auto result = semantic::unify_types_and_type_check(context, *node.index_access);
-    if (result.is_error()) return result;
-
     result = semantic::unify_types_and_type_check(context, node.expression);
     if (result.is_error()) return result;
 
@@ -310,7 +283,12 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::De
     auto result = semantic::unify_types_and_type_check(context, node.expression);
     if (result.is_error()) return result;
 
-    node.type = ast::get_type(node.expression).as_nominal_type().parameters[0];
+    if (node.type.is_pointer() || node.type.is_boxed()) {
+        node.type = ast::get_type(node.expression).as_nominal_type().parameters[0];
+    }
+    else {
+        node.type = semantic::new_final_type_variable(context);
+    }
     return Ok {};
 }
 

@@ -34,7 +34,11 @@ bool ast::Interface::is_compatible_with(ast::Type type) {
     else if (this->name == "Float") {
         return type.is_float();
     }
+    else if (this->name == "pointer") {
+        return type.is_pointer() || type.is_boxed();
+    }
     else {
+        std::cout << this->name << " :: " << type.to_str() << "\n";
         assert(false);
         return false;
     }
@@ -535,9 +539,6 @@ bool ast::could_be_expression(Node* node) {
         }
         case Function: return false;
         case Assignment: return false;
-        case FieldAssignment: return false;
-        case DereferenceAssignment: return false;
-        case IndexAssignment: return false;
         case Return: return false;
         case Break: return false;
         case Continue: return false;
@@ -610,7 +611,6 @@ bool ast::is_expression(Node* node) {
         case Block: return false;
         case Function: return false;
         case Assignment: return false;
-        case FieldAssignment: return false;
         case Return: return false;
         case Break: return false;
         case Continue: return false;
@@ -891,46 +891,7 @@ void ast::print(Node* node, PrintContext context) {
             std::cout << ":=" << '\n';
             context.indent_level += 1;
             context.last.push_back(false);
-            print((ast::Node*) assignment.identifier, context);
-            context.last[context.last.size() - 1] = true;
-            print(assignment.expression, context);
-            break;
-        }
-
-        case FieldAssignment: {
-            auto& assignment = std::get<FieldAssignmentNode>(*node);
-
-            put_indent_level(context.indent_level, context.last);
-            std::cout << "=\n";
-            context.indent_level += 1;
-            context.last.push_back(false);
-            print((ast::Node*) assignment.identifier, context);
-            context.last[context.last.size() - 1] = true;
-            print(assignment.expression, context);
-            break;
-        }
-
-        case DereferenceAssignment: {
-            auto& assignment = std::get<DereferenceAssignmentNode>(*node);
-
-            put_indent_level(context.indent_level, context.last);
-            std::cout << "=\n";
-            context.indent_level += 1;
-            context.last.push_back(false);
-            print((ast::Node*) assignment.identifier, context);
-            context.last[context.last.size() - 1] = true;
-            print(assignment.expression, context);
-            break;
-        }
-
-        case IndexAssignment: {
-            auto& assignment = std::get<IndexAssignmentNode>(*node);
-
-            put_indent_level(context.indent_level, context.last);
-            std::cout << "=\n";
-            context.indent_level += 1;
-            context.last.push_back(false);
-            print((ast::Node*) assignment.index_access, context);
+            print(assignment.assignable, context);
             context.last[context.last.size() - 1] = true;
             print(assignment.expression, context);
             break;

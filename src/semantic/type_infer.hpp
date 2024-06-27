@@ -12,9 +12,6 @@ namespace semantic {
     Result<Ok, Error> type_infer_and_analyze(Context& context, ast::TypeNode& node); 
     Result<Ok, Error> type_infer_and_analyze(Context& context, ast::DeclarationNode& node);
     Result<Ok, Error> type_infer_and_analyze(Context& context, ast::AssignmentNode& node);
-    Result<Ok, Error> type_infer_and_analyze(Context& context, ast::FieldAssignmentNode& node);
-    Result<Ok, Error> type_infer_and_analyze(Context& context, ast::DereferenceAssignmentNode& node);
-    Result<Ok, Error> type_infer_and_analyze(Context& context, ast::IndexAssignmentNode& node);
     Result<Ok, Error> type_infer_and_analyze(Context& context, ast::ReturnNode& node);
     Result<Ok, Error> type_infer_and_analyze(Context& context, ast::BreakNode& node);
     Result<Ok, Error> type_infer_and_analyze(Context& context, ast::ContinueNode& node);
