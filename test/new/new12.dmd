@@ -1,0 +1,10 @@
+a = new 20
+print(*a)
+p = &a
+*p = new 30
+print(*a)
+
+--- Output
+20
+30
+---

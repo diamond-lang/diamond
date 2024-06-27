@@ -399,6 +399,9 @@ void codegen::Context::delete_binding(llvm::Value* pointer, ast::Type type) {
             current_function->getBasicBlockList().push_back(then_block);
             this->builder->SetInsertPoint(then_block);
         }
+        else if (type.is_pointer()) {
+            // do nothing
+        }
         else {
             assert(false);
         }
@@ -1230,6 +1233,12 @@ void codegen::Context::codegen_function_bodies(std::filesystem::path module_path
 }
 
 llvm::Value* codegen::Context::codegen(ast::DeclarationNode& node) {
+    // Delete binding if already exists
+    if (this->current_scope().find(node.identifier->value) != this->current_scope().end()) {
+        llvm::Value* pointer = this->current_scope()[node.identifier->value].pointer;
+        this->delete_binding(pointer, ast::get_concrete_type(ast::get_type(this->current_scope()[node.identifier->value].node), this->type_bindings));
+    }
+
     if (this->has_collection_type(node.expression)) {
         // Create binding and allocation
         this->current_scope()[node.identifier->value] = Binding(node.expression, this->create_allocation("", this->as_llvm_type(ast::get_concrete_type(node.expression, this->type_bindings))));
@@ -1247,10 +1256,6 @@ llvm::Value* codegen::Context::codegen(ast::DeclarationNode& node) {
         if (this->current_scope().find(node.identifier->value) == this->current_scope().end()
         ||  ast::get_concrete_type(ast::get_type(this->current_scope()[node.identifier->value].node), this->type_bindings) != ast::get_concrete_type(ast::get_type(node.expression), this->type_bindings)) {
             this->current_scope()[node.identifier->value] = Binding(node.expression, this->create_allocation(node.identifier->value, this->as_llvm_type(type)));
-        }
-        else {
-            llvm::Value* pointer = this->current_scope()[node.identifier->value].pointer;
-            this->delete_binding(pointer, ast::get_concrete_type(ast::get_type(this->current_scope()[node.identifier->value].node), this->type_bindings));
         }
 
         // Create heap allocation
@@ -1275,10 +1280,6 @@ llvm::Value* codegen::Context::codegen(ast::DeclarationNode& node) {
         ||  this->current_scope()[node.identifier->value].pointer->getType() != expr->getType()) {
             this->current_scope()[node.identifier->value] = Binding(node.expression, this->create_allocation(node.identifier->value, expr->getType()));
         }
-        else {
-            llvm::Value* pointer = this->current_scope()[node.identifier->value].pointer;
-            this->delete_binding(pointer, ast::get_concrete_type(ast::get_type(this->current_scope()[node.identifier->value].node), this->type_bindings));
-        }
 
         // Store value
         this->builder->CreateStore(expr, this->current_scope()[node.identifier->value].pointer);
@@ -1289,7 +1290,25 @@ llvm::Value* codegen::Context::codegen(ast::DeclarationNode& node) {
 }
 
 llvm::Value* codegen::Context::codegen(ast::AssignmentNode& node) {
-    auto pointer = this->get_pointer_to(node.assignable);    
+    auto pointer = this->get_pointer_to(node.assignable);
+
+    // Delete previous value
+    if (node.assignable->index() == ast::Identifier) {
+        // do nothing
+    }
+    else if (node.assignable->index() == ast::Dereference) {
+        this->delete_binding(pointer, ast::get_concrete_type(node.assignable, this->type_bindings));
+    }
+    else if (node.assignable->index() == ast::FieldAccess) {
+        this->delete_binding(pointer, ast::get_concrete_type(node.assignable, this->type_bindings));
+    }
+    else if (node.assignable->index() == ast::Call) {
+        this->delete_binding(pointer, ast::get_concrete_type(node.assignable, this->type_bindings));   
+    }
+    else {
+        assert(false);
+    }
+
     this->copy_expression_to_memory(pointer, node.expression);
     return nullptr;
 }
