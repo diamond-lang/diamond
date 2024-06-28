@@ -55,7 +55,7 @@ def get_all_files(folder):
     return files
 
 def read_file_and_test(file, max_file_path_len):
-    with open(file, encoding='utf-8') as content:
+    with open(file, encoding=os.device_encoding(1)) as content:
         content = content.read()
 
         try:
@@ -99,7 +99,6 @@ def main():
             
             for result in results:
                 if result == False:
-                    print("FAILURE (exit 1)")
                     sys.exit(1)
     else:
         read_file_and_test(folder, get_max_path_len([folder]))
