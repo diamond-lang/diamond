@@ -61,7 +61,7 @@ a package manager.
 
 ### Building on Windows
 
-To have Clang availaible in the PATH you must run the commands from a *x64 Native Tools Developer Command Prompt for VS 2022*.
+To have Clang availaible in the PATH you must run the commands on a *x64 Native Tools Developer Command Prompt for VS 2022* command prompt.
 
 The you can run commands:
 ```
