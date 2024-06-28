@@ -41,11 +41,6 @@ def test(file, expected, max_file_path_len):
         return True
     else:
         print('\u001b[31mFailed\u001b[0m')
-        print()
-        print(result)
-        print("EXPECTED")
-        print("========")
-        print(expected)
         return False
 
 def get_all_files(folder):
@@ -103,7 +98,9 @@ def main():
             results = pool.map(functools.partial(read_file_and_test, max_file_path_len=max_file_path_len), file_paths)
             
             for result in results:
-                if result == False: sys.exit(1)
+                if result == False:
+                    print("FAILURE (exit 1)")
+                    sys.exit(1)
     else:
         read_file_and_test(folder, get_max_path_len([folder]))
 
