@@ -33,9 +33,13 @@ diamond uses the following dependencies:
 - Python 3 (for build.py and test.py)
 - clang (for compiling)
 
-The only dependencies that must be installed are Clang and Python. And generally Python is already installed on most Linux distros.
+The only dependencies that must be installed are Clang and Python.
 
-## Building on Linux and macOS
+### Windows
+
+To install Clang on Windows you must install Visual Studio, follow this [steps](https://learn.microsoft.com/en-us/cpp/build/vscpp-step-0-installation?view=msvc-170), and when choosing components also select Clang.
+
+## Building
 
 To get LLVM you can run `get_llvm.py`. This script download LLVM prebuilt binaries, extract them and save them in `deps` inside `llvm`.
 
@@ -55,6 +59,16 @@ Optionally you can pass to `build.py` a path to a `llvm-config` binary. This way
 can use a LLVM installation build from source, or a LLVM installation installed with
 a package manager.
 
-## Building on Windows
+### Building on Windows
 
-Support for Windows have being removed for the time being. It was too much work to keep the Windows version working.
+To have Clang availaible in the PATH you must run the commands from a *x64 Native Tools Developer Command Prompt for VS 2022*.
+
+The you can run commands:
+```
+python get_llvm.py
+```
+
+And to build diamond:
+```
+python build.py
+```

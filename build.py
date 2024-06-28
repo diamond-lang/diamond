@@ -31,25 +31,25 @@ source_files = [
 def get_name():
     if   platform.system() == 'Linux': return name
     if   platform.system() == 'Darwin': return name
-    elif platform.system() == 'Windows': assert False
+    elif platform.system() == 'Windows': return name + '.exe'
     else: assert False
 
 def get_object_file_extension():
     if   platform.system() == 'Linux': return '.o'
     if   platform.system() == 'Darwin': return '.o'
-    elif platform.system() == 'Windows': assert False
+    elif platform.system() == 'Windows': return '.obj'
     else: assert False
 
 def get_default_llvm_config_path():
     if   platform.system() == 'Linux': return 'deps/llvm/bin/llvm-config'
     if   platform.system() == 'Darwin': return 'deps/llvm/bin/llvm-config'
-    elif platform.system() == 'Windows': assert False
+    elif platform.system() == 'Windows': return 'deps/llvm/bin/llvm-config'
     else: assert False
 
 def get_lld_libraries():
     if   platform.system() == 'Linux': return '-llldELF -llldCommon'
     if   platform.system() == 'Darwin': return '-llldMachO -llldCommon'
-    elif platform.system() == 'Windows': assert False
+    elif platform.system() == 'Windows': return '-llldCOFF -llldCommon'
     else: assert False
 
 # Helper functions
@@ -110,6 +110,9 @@ def build_object_files(llvm_config):
 
 def build():
     llvm_config = get_default_llvm_config_path()
+    if platform.system() == 'Windows':
+        llvm_config += '.exe'
+
     if len(sys.argv) > 1:
         llvm_config = sys.argv[1]
 
@@ -128,17 +131,33 @@ def build():
     llvm_libs = subprocess.run(command.split(" "), capture_output=True, text=True).stdout.strip()
     llvm_libs = llvm_libs.strip()
 
+    if platform.system() == 'Windows':
+        llvm_libs = llvm_libs.split(" ")
+        llvm_libs = [lib.split("\\")[-1] for lib in llvm_libs]
+        llvm_libs = ["-l" + lib.split(".")[0] for lib in llvm_libs]
+        llvm_libs = " ".join(llvm_libs)
+
     # Get libs path
     command = f'{llvm_config} --link-static --ldflags'
     libpath = subprocess.run(command.split(" "), capture_output=True, text=True).stdout.strip()
 
     if platform.system() == "Linux" or platform.system() == "Darwin":
         libpath = libpath.split("-L")[1]
+    
+    elif platform.system() == 'Windows':
+        libpath = libpath.split("-LIBPATH:")[1]
 
     # Get system libs
     command = f'{llvm_config} --link-static --system-libs'
     system_libs = subprocess.run(command.split(" "), capture_output=True, text=True).stdout.strip()
-    system_libs = '-L/opt/homebrew/lib ' + system_libs
+
+    if platform.system() == "Darwin":
+        system_libs = '-L/opt/homebrew/lib ' + system_libs
+
+    elif platform.system() == 'Windows':
+        system_libs = system_libs.split(" ")
+        system_libs = ["-l" + lib.split(".")[0] for lib in system_libs]
+        system_libs = " ".join(system_libs)
 
     # Build diamond
     command = f'clang++ -std=c++17 {objects_files} -o {get_name()} -L {libpath} {get_lld_libraries()} {llvm_libs} {system_libs}'
