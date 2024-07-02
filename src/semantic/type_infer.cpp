@@ -308,7 +308,10 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
 
 Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, ast::InterpolatedStringNode& node) {
     node.type = ast::Type("string");
-    assert(false);
+    for (auto expression: node.expressions) {
+        auto result = semantic::type_infer_and_analyze(context, expression);
+        if (result.is_error()) return result;
+    }
     return Ok {};
 }
 

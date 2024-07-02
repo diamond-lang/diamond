@@ -133,7 +133,10 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::St
 }
 
 Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::InterpolatedStringNode& node) {
-    assert(false);
+    for (auto expression: node.expressions) {
+        auto result = semantic::unify_types_and_type_check(context, expression);
+        if (result.is_error()) return result;
+    }
     return Ok {};
 }
 

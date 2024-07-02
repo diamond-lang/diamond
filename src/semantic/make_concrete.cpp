@@ -379,7 +379,10 @@ Result<Ok, Error> semantic::make_concrete(Context& context, ast::StringNode& nod
 }
 
 Result<Ok, Error> semantic::make_concrete(Context& context, ast::InterpolatedStringNode& node, std::vector<ast::CallInCallStack> call_stack) {
-    assert(false);
+    for (auto expression: node.expressions) {
+        auto result = semantic::make_concrete(context, expression, call_stack);
+        if (result.is_error()) return result;
+    }
     return Ok {};
 }
 
@@ -818,6 +821,14 @@ void semantic::set_concrete_types(Context& context, ast::Node* node) {
         }
 
         case ast::String: {
+            break;
+        }
+
+        case ast::InterpolatedString: {
+            auto& string = std::get<ast::InterpolatedStringNode>(*node);
+            for (auto expression: string.expressions) {
+                semantic::set_concrete_types(context, expression);
+            }
             break;
         }
 

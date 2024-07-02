@@ -1629,6 +1629,81 @@ llvm::Value* codegen::Context::codegen_size_function(llvm::Value* pointer, ast::
     }
 }
 
+llvm::Value* codegen::Context::codegen_print_function(ast::Node* expression, bool end_with_new_line) {
+    if (expression->index() == ast::InterpolatedString) {
+        auto& string = std::get<ast::InterpolatedString>(*expression);
+        for (size_t i = 0; i < string.strings.size(); i++) {
+            std::vector<llvm::Value*> printArgs;
+            printArgs.push_back(this->get_global_string(string.strings[i]));
+            this->builder->CreateCall(this->module->getFunction("printf"), printArgs);
+
+            if (i + 1 != string.strings.size()) {
+                this->codegen_print_function(string.expressions[i], false);
+            }
+        }
+        return nullptr;
+    }
+    else {
+        llvm::Value* arg = this->codegen(expression);
+
+        if (arg->getType()->isIntegerTy(1)) {
+            std::vector<llvm::Value*> printArgs;
+            llvm::Function *current_function = this->builder->GetInsertBlock()->getParent();
+            llvm::BasicBlock *then_block = llvm::BasicBlock::Create(*(this->context), "then", current_function);
+            llvm::BasicBlock *else_block = llvm::BasicBlock::Create(*(this->context), "else");
+            llvm::BasicBlock *merge = llvm::BasicBlock::Create(*(this->context), "ifcont");
+            this->builder->CreateCondBr(arg, then_block, else_block);
+
+            // Create then branch
+            this->builder->SetInsertPoint(then_block);
+            printArgs.push_back(this->get_global_string("true"));
+            this->builder->CreateCall(this->module->getFunction("printf"), printArgs);
+            this->builder->CreateBr(merge);
+            then_block = this->builder->GetInsertBlock();
+
+            printArgs.clear();
+
+            // Create else branch
+            current_function->getBasicBlockList().push_back(else_block);
+            this->builder->SetInsertPoint(else_block);
+            printArgs.push_back(this->get_global_string("false"));
+            this->builder->CreateCall(this->module->getFunction("printf"), printArgs);
+            this->builder->CreateBr(merge);
+            else_block = this->builder->GetInsertBlock();
+
+            // Merge  block
+            current_function->getBasicBlockList().push_back(merge);
+            this->builder->SetInsertPoint(merge);
+        }
+        else if (arg->getType()->isDoubleTy()) {
+            std::vector<llvm::Value*> printArgs;
+            printArgs.push_back(this->get_global_string("%g"));
+            printArgs.push_back(arg);
+            this->builder->CreateCall(this->module->getFunction("printf"), printArgs);
+        }
+        else if (arg->getType()->isIntegerTy()) {
+            std::vector<llvm::Value*> printArgs;
+            printArgs.push_back(this->get_global_string("%d"));
+            printArgs.push_back(arg);
+            this->builder->CreateCall(this->module->getFunction("printf"), printArgs);
+        }
+        else if (ast::get_concrete_type(expression, this->type_bindings) == ast::Type("string")) {
+            std::vector<llvm::Value*> printArgs;
+            printArgs.push_back(arg);
+            this->builder->CreateCall(this->module->getFunction("printf"), printArgs);
+            return nullptr;
+        }
+    }
+
+    if (end_with_new_line) {
+        std::vector<llvm::Value*> printArgs;
+        printArgs.push_back(this->get_global_string("\n"));
+        this->builder->CreateCall(this->module->getFunction("printf"), printArgs);
+    }
+
+    return nullptr;
+}
+
 llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
     // If type is a collection
     if (node.type.is_collection()) {
@@ -1647,7 +1722,9 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
 
     // Codegen args
     std::vector<llvm::Value*> args; 
-    if (node.identifier->value != "[]" && node.identifier->value != "size") {
+    if (node.identifier->value != "[]"
+    && node.identifier->value != "size"
+    && node.identifier->value != "print") {
         args = this->codegen_args(function, node.args);
     }
   
@@ -1749,56 +1826,7 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
         }
     }
     if (node.identifier->value == "print") {
-        if (args[0]->getType()->isIntegerTy(1)) {
-            std::vector<llvm::Value*> printArgs;
-            llvm::Function *current_function = this->builder->GetInsertBlock()->getParent();
-            llvm::BasicBlock *then_block = llvm::BasicBlock::Create(*(this->context), "then", current_function);
-            llvm::BasicBlock *else_block = llvm::BasicBlock::Create(*(this->context), "else");
-            llvm::BasicBlock *merge = llvm::BasicBlock::Create(*(this->context), "ifcont");
-            this->builder->CreateCondBr(args[0], then_block, else_block);
-
-            // Create then branch
-            this->builder->SetInsertPoint(then_block);
-            printArgs.push_back(this->get_global_string("true\n"));
-            this->builder->CreateCall(this->module->getFunction("printf"), printArgs);
-            this->builder->CreateBr(merge);
-            then_block = this->builder->GetInsertBlock();
-
-            printArgs.clear();
-
-            // Create else branch
-            current_function->getBasicBlockList().push_back(else_block);
-            this->builder->SetInsertPoint(else_block);
-            printArgs.push_back(this->get_global_string("false\n"));
-            this->builder->CreateCall(this->module->getFunction("printf"), printArgs);
-            this->builder->CreateBr(merge);
-            else_block = this->builder->GetInsertBlock();
-
-            // Merge  block
-            current_function->getBasicBlockList().push_back(merge);
-            this->builder->SetInsertPoint(merge);
-            return nullptr;
-        }
-        if (args[0]->getType()->isDoubleTy()) {
-            std::vector<llvm::Value*> printArgs;
-            printArgs.push_back(this->get_global_string("%g\n"));
-            printArgs.push_back(args[0]);
-            this->builder->CreateCall(this->module->getFunction("printf"), printArgs);
-            return nullptr;
-        }
-        if (args[0]->getType()->isIntegerTy()) {
-            std::vector<llvm::Value*> printArgs;
-            printArgs.push_back(this->get_global_string("%d\n"));
-            printArgs.push_back(args[0]);
-            this->builder->CreateCall(this->module->getFunction("printf"), printArgs);
-            return nullptr;
-        }
-        if (ast::get_concrete_type(node.args[0]->expression, this->type_bindings) == ast::Type("string")) {
-            std::vector<llvm::Value*> printArgs;
-            printArgs.push_back(args[0]);
-            this->builder->CreateCall(this->module->getFunction("printf"), printArgs);
-            return nullptr;
-        }
+        return this->codegen_print_function(node.args[0]->expression);
     }
     if (node.identifier->value == "[]") {
         if (node.args.size() == 2) {
