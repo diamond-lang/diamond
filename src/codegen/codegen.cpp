@@ -1875,6 +1875,11 @@ llvm::Value* codegen::Context::codegen(ast::StringNode& node) {
     return this->get_global_string(node.value);
 }
 
+llvm::Value* codegen::Context::codegen(ast::InterpolatedStringNode& node) {
+    assert(false);
+    return nullptr;
+}
+
 llvm::Value* codegen::Context::codegen(ast::ArrayNode& node) {
     assert(false);
     return nullptr;

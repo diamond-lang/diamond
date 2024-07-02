@@ -62,6 +62,7 @@ struct Parser {
     Result<ast::Node*, Error> parse_identifier();
     Result<ast::Node*, Error> parse_identifier(token::TokenVariant token);
     Result<ast::Node*, Error> parse_string();
+    Result<ast::Node*, Error> parse_interpolated_string();
     Result<ast::Node*, Error> parse_array();
     Result<ast::Node*, Error> parse_field_access(ast::Node* accessed);
     Result<ast::Node*, Error> parse_index_access(ast::Node* expression);
@@ -1280,6 +1281,7 @@ Result<ast::Node*, Error> Parser::parse_binary(int precedence) {
 //         | integer
 //         | boolean
 //         | string
+//         | interpolated_string
 //         | call
 //         | struct
 //         | grouping_or_assignable
@@ -1295,6 +1297,7 @@ Result<ast::Node*, Error> Parser::parse_primary() {
         case token::True:        return this->parse_boolean();
         case token::False:       return this->parse_boolean();
         case token::String:      return this->parse_string();
+        case token::StringLeft:  return this->parse_interpolated_string();
         case token::Identifier: {           
             if (this->match({token::Identifier, token::LeftCurly})) {
                 return this->parse_struct();
@@ -1500,6 +1503,41 @@ Result<ast::Node*, Error> Parser::parse_string() {
     auto result = this->parse_token(token::String);
     if (result.is_error()) return Error {};
     string.value = result.get_value().get_literal();
+
+    this->ast.push_back(string);
+    return this->ast.last_element();
+}
+
+// interpolated_string → STRING_LEFT expression (STRING_MIDDLE expression)* STRING_RIGHT
+Result<ast::Node*, Error> Parser::parse_interpolated_string() {
+    // Create node
+    auto string = ast::InterpolatedStringNode {this->current().line, this->current().column};
+
+    // Parse string
+    auto result = this->parse_token(token::StringLeft);
+    if (result.is_error()) return Error {};
+    string.strings.push_back(result.get_value().get_literal());
+
+    while (true) {
+        // Parse expression
+        auto expression = this->parse_expression();
+        if (expression.is_error()) return expression;
+        string.expressions.push_back(expression.get_value());
+
+        if (this->current() == token::StringMiddle) {
+            auto result = this->parse_token(token::StringMiddle);
+            if (result.is_error()) return Error {};
+            string.strings.push_back(result.get_value().get_literal());
+        }
+        else {
+            break;
+        }
+    }
+
+    // Parse string
+    result = this->parse_token(token::StringRight);
+    if (result.is_error()) return Error {};
+    string.strings.push_back(result.get_value().get_literal());
 
     this->ast.push_back(string);
     return this->ast.last_element();

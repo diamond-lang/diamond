@@ -137,6 +137,7 @@ namespace codegen {
         llvm::Value* codegen(ast::IdentifierNode& node);
         llvm::Value* codegen(ast::BooleanNode& node);
         llvm::Value* codegen(ast::StringNode& node);
+        llvm::Value* codegen(ast::InterpolatedStringNode& node);
         llvm::Value* codegen(ast::ArrayNode& node);
         llvm::Value* codegen(ast::FieldAccessNode& node);
         llvm::Value* codegen(ast::AddressOfNode& node);

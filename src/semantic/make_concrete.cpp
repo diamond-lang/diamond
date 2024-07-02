@@ -378,6 +378,11 @@ Result<Ok, Error> semantic::make_concrete(Context& context, ast::StringNode& nod
     return Ok {};
 }
 
+Result<Ok, Error> semantic::make_concrete(Context& context, ast::InterpolatedStringNode& node, std::vector<ast::CallInCallStack> call_stack) {
+    assert(false);
+    return Ok {};
+}
+
 Result<Ok, Error> semantic::make_concrete(Context& context, ast::ArrayNode& node, std::vector<ast::CallInCallStack> call_stack) {
     for (auto element: node.elements) {
         auto result = make_concrete(context, element, call_stack);

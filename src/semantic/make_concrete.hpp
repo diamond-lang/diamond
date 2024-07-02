@@ -33,6 +33,7 @@ namespace semantic {
     Result<Ok, Error> make_concrete(Context& context, ast::IdentifierNode& node, std::vector<ast::CallInCallStack> call_stack);
     Result<Ok, Error> make_concrete(Context& context, ast::BooleanNode& node, std::vector<ast::CallInCallStack> call_stack);
     Result<Ok, Error> make_concrete(Context& context, ast::StringNode& node, std::vector<ast::CallInCallStack> call_stack);
+    Result<Ok, Error> make_concrete(Context& context, ast::InterpolatedStringNode& node, std::vector<ast::CallInCallStack> call_stack);
     Result<Ok, Error> make_concrete(Context& context, ast::ArrayNode& node, std::vector<ast::CallInCallStack> call_stack);
     Result<Ok, Error> make_concrete(Context& context, ast::FieldAccessNode& node, std::vector<ast::CallInCallStack> call_stack);
     Result<Ok, Error> make_concrete(Context& context, ast::AddressOfNode& node, std::vector<ast::CallInCallStack> call_stack);

@@ -306,6 +306,12 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
     return Ok {};
 }
 
+Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, ast::InterpolatedStringNode& node) {
+    node.type = ast::Type("string");
+    assert(false);
+    return Ok {};
+}
+
 Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, ast::ArrayNode& node) {
     // Type infer and analyze elements
     for (size_t i = 0; i < node.elements.size(); i++) {
