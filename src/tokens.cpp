@@ -122,6 +122,18 @@ void token::print(std::vector<Token> token) {
                 std::cout << "token::String(\"" << token[i].get_literal() << "\")";
                 break;
             }
+            case StringLeft: {
+                std::cout << "token::StringLeft(\"" << token[i].get_literal() << "\")";
+                break;
+            }
+            case StringMiddle: {
+                std::cout << "token::StringMiddle(\"" << token[i].get_literal() << "\")";
+                break;
+            }
+            case StringRight: {
+                std::cout << "token::StringRight(\"" << token[i].get_literal() << "\")";
+                break;
+            }
             case If: {
                 std::cout << "token::If";
                 break;

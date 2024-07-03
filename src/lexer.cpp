@@ -1,6 +1,7 @@
 #include <cctype>
 #include <iostream>
 #include <cassert>
+#include <stack>
 
 #include "tokens.hpp"
 #include "lexer.hpp"
@@ -9,12 +10,18 @@
 // Prototypes and definitions
 // --------------------------
 namespace lexer {
+    struct OnString {
+        char character;
+        bool onString;
+    };
+
     struct Source {
         size_t line;
         size_t column;
         size_t index;
         std::filesystem::path path;
         FILE* file_pointer;
+        std::stack<OnString> onString;
 
         Source() {}
         Source(std::filesystem::path path, FILE* file_pointer) : line(1), column(1), index(0), path(path), file_pointer(file_pointer) {}
@@ -143,8 +150,26 @@ Result<token::Token, Error> lexer::get_token(Source& source) {
     if (match(source, ")"))  return advance(token::Token(token::RightParen, ")", source.line, source.column), source, 1);
     if (match(source, "["))  return advance(token::Token(token::LeftBracket, "[", source.line, source.column), source, 1);
     if (match(source, "]"))  return advance(token::Token(token::RightBracket, "]", source.line, source.column), source, 1);
-    if (match(source, "{"))  return advance(token::Token(token::LeftCurly, "{", source.line, source.column), source, 1);
-    if (match(source, "}"))  return advance(token::Token(token::RightCurly, "}", source.line, source.column), source, 1);
+    if (match(source, "{"))  {
+        if (!source.onString.empty()) {
+            source.onString.push(OnString{'{', false});
+        }
+        return advance(token::Token(token::LeftCurly, "{", source.line, source.column), source, 1);
+    }
+    if (match(source, "}")) {
+        if (!source.onString.empty()
+        && source.onString.top().character == '{') {
+            if (source.onString.top().onString) {
+                return get_string(source);
+            }
+            else {
+                source.onString.pop();
+                return advance(token::Token(token::RightCurly, "}", source.line, source.column), source, 1);
+            }
+        }
+
+        return advance(token::Token(token::RightCurly, "}", source.line, source.column), source, 1);
+    }
     if (match(source, "+"))  return advance(token::Token(token::Plus, "+", source.line, source.column), source, 1);
     if (match(source, "*"))  return advance(token::Token(token::Star, "*", source.line, source.column), source, 1);
     if (match(source, "/"))  return advance(token::Token(token::Slash, "/", source.line, source.column), source, 1);
@@ -218,12 +243,37 @@ Result<token::Token, Error> lexer::get_string(Source& source) {
     std::string literal = "";
     size_t line = source.line;
     size_t column = source.column;
+    bool isRight = false;
+
+    if (current(source) == '\"') {
+        source.onString.push(OnString{current(source), true});
+    }
+    else if (current(source) == '}') {
+        source.onString.pop();
+        isRight = true;
+    }
+    else {
+        assert(false);
+    }
 
     advance(source);
-    while (!(at_end(source) || match(source, "\n") || match(source, "\""))) {
+    while (!(at_end(source) || match(source, "\n"))) {
         if (match(source, "\\n")) {
             literal += "\n";
             advance(source);
+        }
+        else if (match(source, "\\\"")) {
+            literal += "\"";
+            advance(source);
+        }
+        else if (match(source, "\"")) {
+            break;
+        }
+        else if (match(source, "\\{")) {
+            literal += "{";
+        }
+        else if (match(source, "{")) {
+            break;
         }
         else {
             literal += current(source);
@@ -235,8 +285,29 @@ Result<token::Token, Error> lexer::get_string(Source& source) {
         return Result<token::Token, Error>(std::string("Error: Unclosed string\n"));
     }
     else {
-        advance(source);
-        return Result<token::Token, Error>(token::Token(token::String, literal, line, column));
+        if (match(source, "{")) {
+            source.onString.push(OnString{current(source), true});
+            advance(source);
+            if (isRight) {
+                return Result<token::Token, Error>(token::Token(token::StringMiddle, literal, line, column));
+            }
+            else {
+                return Result<token::Token, Error>(token::Token(token::StringLeft, literal, line, column));
+            }
+        }
+        else if (match(source, "\"")) {
+            source.onString.pop();
+            advance(source);
+            if (isRight) {
+                return Result<token::Token, Error>(token::Token(token::StringRight, literal, line, column));
+            }
+            else {
+                return Result<token::Token, Error>(token::Token(token::String, literal, line, column));
+            }
+        }
+        else {
+            assert(false);
+        }
     }
 }
 

@@ -27,6 +27,7 @@ namespace semantic {
     Result<Ok, Error> type_infer_and_analyze(Context& context, ast::IdentifierNode& node);
     Result<Ok, Error> type_infer_and_analyze(Context& context, ast::BooleanNode& node);
     Result<Ok, Error> type_infer_and_analyze(Context& context, ast::StringNode& node);
+    Result<Ok, Error> type_infer_and_analyze(Context& context, ast::InterpolatedStringNode& node);
     Result<Ok, Error> type_infer_and_analyze(Context& context, ast::ArrayNode& node);
     Result<Ok, Error> type_infer_and_analyze(Context& context, ast::FieldAccessNode& node);
     Result<Ok, Error> type_infer_and_analyze(Context& context, ast::AddressOfNode& node);

@@ -1,0 +1,10 @@
+fruit = "Watermelon"
+print("Hello, {fruit}!\n")
+
+number = 3
+print("{number} times 4 is {number * 4}\n")
+
+--- Output
+Hello, Watermelon!
+3 times 4 is 12
+---

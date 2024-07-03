@@ -26,6 +26,7 @@ namespace semantic {
     Result<Ok, Error> unify_types_and_type_check(Context& context, ast::IdentifierNode& node);
     Result<Ok, Error> unify_types_and_type_check(Context& context, ast::BooleanNode& node);
     Result<Ok, Error> unify_types_and_type_check(Context& context, ast::StringNode& node);
+    Result<Ok, Error> unify_types_and_type_check(Context& context, ast::InterpolatedStringNode& node);
     Result<Ok, Error> unify_types_and_type_check(Context& context, ast::ArrayNode& node);
     Result<Ok, Error> unify_types_and_type_check(Context& context, ast::FieldAccessNode& node);
     Result<Ok, Error> unify_types_and_type_check(Context& context, ast::AddressOfNode& node);

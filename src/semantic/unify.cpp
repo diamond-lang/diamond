@@ -132,6 +132,14 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::St
     return Ok {};
 }
 
+Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::InterpolatedStringNode& node) {
+    for (auto expression: node.expressions) {
+        auto result = semantic::unify_types_and_type_check(context, expression);
+        if (result.is_error()) return result;
+    }
+    return Ok {};
+}
+
 Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::ArrayNode& node) {
     for (auto element: node.elements) {
         auto result = semantic::unify_types_and_type_check(context, element);

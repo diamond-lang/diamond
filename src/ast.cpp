@@ -1099,6 +1099,38 @@ void ast::print(Node* node, PrintContext context) {
             break;
         }
 
+        case InterpolatedString: {
+            auto& string = std::get<InterpolatedStringNode>(*node);
+
+            put_indent_level(context.indent_level, context.last);
+            std::cout << "InterpolatedString";
+            if (string.type != Type(ast::NoType{})) std::cout << ": " << get_concrete_type_or_type_variable(string.type, context).to_str();
+            std::cout << "\n";
+
+            for (size_t i = 0; i < string.strings.size(); i++) {
+                bool is_last = i + 1 == string.strings.size();
+                put_indent_level(context.indent_level + 1, append(context.last, is_last));
+                std::cout << "\"";
+                for (size_t j = 0; j < string.strings[i].size(); j++) {
+                    if (string.strings[i][j] == '\n') {
+                        std::cout << "\\n";
+                    }
+                    else {
+                        std::cout << string.strings[i][j];
+                    }
+                }
+                std::cout << "\"\n";
+
+                if (!is_last) {
+                    auto newContext = context;
+                    newContext.indent_level += 1;
+                    newContext.last = append(context.last, false);
+                    print(string.expressions[i], newContext);
+                }
+            }
+            break;
+        }
+
         case Array: {
             auto& array = std::get<ArrayNode>(*node);
             bool is_last = context.last[context.last.size()];
