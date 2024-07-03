@@ -128,15 +128,15 @@ void codegen::generate_executable(ast::Ast& ast, std::string program_name) {
     remove(get_object_file_name(program_name).c_str());
 }
 
-static std::string get_object_file_name(std::string executable_name) {
-    return executable_name + ".o";
-}
-
 static std::string get_folder_of_executable() {
     return std::filesystem::canonical("/proc/self/exe").parent_path().string();
 }
 
 #ifdef __linux__
+static std::string get_object_file_name(std::string executable_name) {
+    return executable_name + ".o";
+}
+
 static void link(std::string executable_name, std::string object_file_name, std::vector<std::string> link_directives) {
     std::string name = "-o" + executable_name;
 
@@ -188,6 +188,10 @@ static void link(std::string executable_name, std::string object_file_name, std:
 
 #include <stdio.h>
 #include <sys/sysctl.h>
+
+static std::string get_object_file_name(std::string executable_name) {
+    return executable_name + ".o";
+}
 
 static void link(std::string executable_name, std::string object_file_name, std::vector<std::string> link_directives) {
     // Link using a native C compiler
@@ -286,6 +290,38 @@ static void link(std::string executable_name, std::string object_file_name, std:
         if (result == false) {
             std::cout << errors;
         } 
+    }
+}
+#endif
+
+#ifdef _WIN32
+static std::string get_object_file_name(std::string executable_name) {
+    return executable_name + ".obj";
+}
+
+static void link(std::string executable_name, std::string object_file_name, std::vector<std::string> link_directives) {
+    std::string name = "-out:" + executable_name;
+    std::vector<const char*> args = {
+        "lld",
+        object_file_name.c_str(),
+        "-defaultlib:libcmt",
+        "-defaultlib:oldnames",
+        "-nologo",
+        name.c_str()
+    };
+    
+    if (link_directives.size() > 0) {
+        assert(false);
+    }
+
+    std::string output = "";
+    std::string errors = "";
+    llvm::raw_string_ostream output_stream(output);
+    llvm::raw_string_ostream errors_stream(errors);
+
+    bool result = lld::coff::link(args, output_stream, errors_stream, false, false);
+    if (errors != "") {
+        std::cout << errors;
     }
 }
 #endif
@@ -1684,6 +1720,10 @@ llvm::Value* codegen::Context::codegen_print_function(ast::Node* expression, boo
         else if (arg->getType()->isIntegerTy()) {
             std::vector<llvm::Value*> printArgs;
             printArgs.push_back(this->get_global_string("%d"));
+            if (arg->getType()->isIntegerTy(8)
+            ||  arg->getType()->isIntegerTy(16)) {
+                arg = this->builder->CreateSExt(arg, llvm::Type::getInt32Ty(*this->context));
+            }
             printArgs.push_back(arg);
             this->builder->CreateCall(this->module->getFunction("printf"), printArgs);
         }

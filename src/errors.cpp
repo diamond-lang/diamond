@@ -249,6 +249,14 @@ std::string get_call_stack(std::vector<ast::CallInCallStack> call_stack) {
             result += " ";
         }
 
+        #ifdef _WIN32
+        for (size_t i = 0; i < relative_path.size(); i++) {
+            if (relative_path[i] == '\\') {
+                relative_path[i] = '/';
+            }
+        }
+        #endif
+
         result += relative_path + ": ";
 
         size_t digits = number_of_digits(call.call->line);

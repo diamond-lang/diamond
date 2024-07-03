@@ -92,3 +92,45 @@ jobs:
 
     - name: Run tests
       run: ./test.py
+  
+  build_windows:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up LLVM
+      run: python get_llvm.py
+
+    - name: Build
+      run: python build.py
+
+    - name: Create folder for diamond executable
+      run: mkdir build && move diamond.exe build/diamond.exe
+
+    - name: Archive build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: diamond-windows
+        path: build
+
+  test_windows:
+    runs-on: windows-latest
+    needs: build_windows
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Download build artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: diamond-windows
+        path: diamond-windows
+    
+    - name: Get diamond out of folder and make executable
+      run: move diamond-windows/diamond.exe diamond.exe
+
+    - name: Run tests
+      run: python test.py
