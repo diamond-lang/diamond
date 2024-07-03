@@ -22,26 +22,14 @@ def get_command():
 
 # Helper functions
 # ----------------
-def test(file, expected, max_file_path_len):
-    print(f"testing {file}", end='')
-    if not os.path.exists(file):
-        print("File not found :(")
-        return
-    result = subprocess.run([get_command(), 'run', file], stdout=subprocess.PIPE, text=True, encoding=os.device_encoding(1))
-    result = result.stdout
-    result = re.sub("\\x1b\\[.+?m", "", result) # Remove escape sequences for colored text
+def get_max_path_len(files):
+    max_len = 0
     
-    # Print result
-    # for _ in range(0, max_file_path_len - len(file), 1):
-    #    print(" ", end="")
-    print(" ", end="")
+    for file in files:
+        if len(file) > max_len:
+            max_len = len(file)
 
-    if result == expected:
-        print('\u001b[32mOK\u001b[0m')
-        return True
-    else:
-        print('\u001b[31mFailed\u001b[0m')
-        return False
+    return max_len
 
 def get_all_files(folder):
     files = []
@@ -54,6 +42,21 @@ def get_all_files(folder):
 
     return files
 
+def test(file, expected, max_file_path_len):
+    # Run program and check output
+    result = subprocess.run([get_command(), 'run', file], stdout=subprocess.PIPE, text=True, encoding=os.device_encoding(1))
+    result = result.stdout
+    result = re.sub("\\x1b\\[.+?m", "", result) # Remove escape sequences for colored text
+    result = result == expected
+
+    # Print result
+    status = '\u001b[32mOK\u001b[0m' if result == True else '\u001b[31mFailed\u001b[0m'
+    spacing = " " * (max_file_path_len - len(file) + 1)
+    print(f"{file}{spacing}{status}", flush=True)
+
+    # Return result
+    return result
+
 def read_file_and_test(file, max_file_path_len):
     with open(file, encoding=os.device_encoding(1)) as content:
         content = content.read()
@@ -64,15 +67,6 @@ def read_file_and_test(file, max_file_path_len):
         
         except:
             return True
-        
-def get_max_path_len(files):
-    max_len = 0
-    
-    for file in files:
-        if len(file) > max_len:
-            max_len = len(file)
-
-    return max_len
 
 # Main
 # ----
@@ -93,13 +87,15 @@ def main():
     if os.path.isdir(folder):
         file_paths = get_all_files(folder)
         max_file_path_len = get_max_path_len(file_paths)
+
         num_cores = multiprocessing.cpu_count()
         with multiprocessing.Pool(num_cores) as pool:
             results = pool.map(functools.partial(read_file_and_test, max_file_path_len=max_file_path_len), file_paths)
-            
+    
             for result in results:
                 if result == False:
                     sys.exit(1)
+
     else:
         read_file_and_test(folder, get_max_path_len([folder]))
 
