@@ -19,6 +19,6 @@ print(a.x)
 print(a.y)
 
 --- Output
-50
+70
 20
 ---
