@@ -1,8 +1,12 @@
-# diamond
+<p align="center">
+  <img src="assets/diamond.png" width=200px />
+</p>
+
+# Diamond
 
 [![Build and test](https://github.com/diamond-lang/diamond/actions/workflows/build-and-test.yaml/badge.svg)](https://github.com/diamond-lang/diamond/actions/workflows/build-and-test.yaml)
 
-A programming language that aims to make programming easier.
+A programming language to make programming easier.
 
 ## Usage
 ```
@@ -27,7 +31,7 @@ diamond emit [options] [program file]
 
 ## Dependencies
 
-diamond uses the following dependencies:
+Diamond uses the following dependencies:
 - LLD 15
 - LLVM 15
 - Python 3 (for build.py and test.py)
@@ -43,14 +47,14 @@ To install Clang on Windows you must install Visual Studio, follow this [steps](
 
 To get LLVM you can run `get_llvm.py`. This script download LLVM prebuilt binaries, extract them and save them in `deps` inside `llvm`.
 
-Then to build diamond you can use `build.py`.
+Then to build Diamond you can use `build.py`.
 
 So to get llvm you would run:
 ```
 ./get_llvm.py
 ```
 
-And to build diamond:
+And to build Diamond:
 ```
 ./build.py
 ```
@@ -68,7 +72,7 @@ The you can run commands:
 python get_llvm.py
 ```
 
-And to build diamond:
+And to build Diamond:
 ```
 python build.py
 ```
