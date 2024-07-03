@@ -21,7 +21,7 @@ rectangle = Rectangle{
 
 print_rectangle(rectangle)
 
----
+--- Output
 10
 10
 110

@@ -32,8 +32,8 @@ def test(file, expected, max_file_path_len):
     result = re.sub("\\x1b\\[.+?m", "", result) # Remove escape sequences for colored text
     
     # Print result
-    for _ in range(0, max_file_path_len - len(file), 1):
-        print(" ", end="")
+    # for _ in range(0, max_file_path_len - len(file), 1):
+    #    print(" ", end="")
     print(" ", end="")
 
     if result == expected:
