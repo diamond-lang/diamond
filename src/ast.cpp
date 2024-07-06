@@ -538,6 +538,7 @@ bool ast::could_be_expression(Node* node) {
             return false;
         }
         case Function: return false;
+        case Declaration: return false;
         case Assignment: return false;
         case Return: return false;
         case Break: return false;
@@ -829,6 +830,11 @@ void ast::print(Node* node, PrintContext context) {
 
                 if (i != function.args.size() - 1) std::cout << ", ";
             }
+
+            if (function.is_extern_and_variadic) {
+                std::cout << ", ...";
+            }
+
             std::cout << ")";
             if (function.return_type != Type(ast::NoType{})) {
                 std::cout << ": " << get_concrete_type_or_type_variable(function.return_type, context).to_str();

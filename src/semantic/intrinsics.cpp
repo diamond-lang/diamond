@@ -91,14 +91,6 @@ std::unordered_map<std::string, std::vector<intrinsics::Prototype>> intrinsic_fu
     {"or", {
         {{ast::Type("bool"), ast::Type("bool")}, ast::Type("bool")}
     }},
-    {"print", {
-        {{ast::Type("float64")}, ast::Type("void")},
-        {{ast::Type("int64")}, ast::Type("void")},
-        {{ast::Type("int32")}, ast::Type("void")},
-        {{ast::Type("int8")}, ast::Type("void")},
-        {{ast::Type("bool")}, ast::Type("void")},
-        {{ast::Type("string")}, ast::Type("void")}
-    }},
     {"[]", {
         {{ast::Type("array", {ast::Type(ast::FinalTypeVariable("t"))}), ast::Type("int64")}, ast::Type(ast::FinalTypeVariable("t"))},
         {{intrinsics::Type(ast::Type("array", {ast::Type(ast::FinalTypeVariable("t"))}), true), ast::Type("int64")}, intrinsics::Type(ast::Type(ast::FinalTypeVariable("t")), true)}

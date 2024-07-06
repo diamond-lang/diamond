@@ -7,6 +7,7 @@
 
 #include "../codegen.hpp"
 #include "codegen.hpp"
+#include "../utilities.hpp"
 
 // Print LLVM IR
 // -------------
@@ -128,10 +129,6 @@ void codegen::generate_executable(ast::Ast& ast, std::string program_name) {
     remove(get_object_file_name(program_name).c_str());
 }
 
-static std::string get_folder_of_executable() {
-    return std::filesystem::canonical("/proc/self/exe").parent_path().string();
-}
-
 #ifdef __linux__
 static std::string get_object_file_name(std::string executable_name) {
     return executable_name + ".o";
@@ -163,10 +160,10 @@ static void link(std::string executable_name, std::string object_file_name, std:
             "lld",
             object_file_name,
             name,
-            get_folder_of_executable() + "/deps/musl/libc.a",
-            get_folder_of_executable() + "/deps/musl/crt1.o",
-            get_folder_of_executable() + "/deps/musl/crti.o",
-            get_folder_of_executable() + "/deps/musl/crtn.o"
+            utilities::get_folder_of_executable() + "/deps/musl/libc.a",
+            utilities::get_folder_of_executable() + "/deps/musl/crt1.o",
+            utilities::get_folder_of_executable() + "/deps/musl/crti.o",
+            utilities::get_folder_of_executable() + "/deps/musl/crtn.o"
         };
 
         std::string output = "";
@@ -607,7 +604,7 @@ codegen::CollectionAsArguments codegen::Context::get_struct_type_as_argument(llv
     return result;
 }
 
-llvm::FunctionType* codegen::Context::get_function_type(std::vector<ast::FunctionArgumentNode*> args, std::vector<ast::Type> args_types, ast::Type return_type) {
+llvm::FunctionType* codegen::Context::get_function_type(std::vector<ast::FunctionArgumentNode*> args, std::vector<ast::Type> args_types, ast::Type return_type, bool is_extern_and_variadic) {
     // Get args types
     std::vector<llvm::Type*> llvm_args_types;
 
@@ -661,7 +658,7 @@ llvm::FunctionType* codegen::Context::get_function_type(std::vector<ast::Functio
         llvm_return_type = llvm::Type::getVoidTy(*this->context);
     }
 
-    return llvm::FunctionType::get(llvm_return_type, llvm::ArrayRef(llvm_args_types), false);
+    return llvm::FunctionType::get(llvm_return_type, llvm::ArrayRef(llvm_args_types), is_extern_and_variadic);
 }
 
 std::vector<llvm::Type*> codegen::Context::as_llvm_types(std::vector<ast::Type> types) {
@@ -971,14 +968,8 @@ llvm::Value* codegen::Context::create_heap_allocation(ast::Type type) {
 void codegen::Context::codegen(ast::Ast& ast) {
     ast::BlockNode* node = (ast::BlockNode*) ast.program;
 
-    // Declare printf
-    std::vector<llvm::Type*> args;
-    args.push_back(llvm::Type::getInt8PtrTy(*(this->context)));
-    llvm::FunctionType *printfType = llvm::FunctionType::get(this->builder->getInt32Ty(), args, true); // `true` specifies the function as variadic
-    llvm::Function::Create(printfType, llvm::Function::ExternalLinkage, "printf", this->module);
-
     // Declare malloc
-    args = {};
+    std::vector<llvm::Type*> args = {};
     args.push_back(llvm::Type::getInt64Ty(*this->context));
     llvm::FunctionType* mallocType = llvm::FunctionType::get(llvm::Type::getVoidTy(*(this->context))->getPointerTo(), args, false);
     llvm::Function::Create(mallocType, llvm::Function::ExternalLinkage, "malloc", this->module);
@@ -1078,7 +1069,8 @@ void codegen::Context::codegen_function_prototypes(std::vector<ast::FunctionNode
                     function->args,
                     specialization.args,
                     specialization.return_type,
-                    function->is_extern
+                    function->is_extern,
+                    function->is_extern_and_variadic
                 );
 
                 this->type_bindings = {};
@@ -1091,15 +1083,16 @@ void codegen::Context::codegen_function_prototypes(std::vector<ast::FunctionNode
                 function->args,
                 ast::get_types(function->args),
                 function->return_type,
-                function->is_extern
+                function->is_extern,
+                function->is_extern_and_variadic
             );
         }
     }
 }
 
-void codegen::Context::codegen_function_prototypes(std::filesystem::path module_path, std::string identifier, std::vector<ast::FunctionArgumentNode*> args, std::vector<ast::Type> args_types, ast::Type return_type, bool is_extern) {
+void codegen::Context::codegen_function_prototypes(std::filesystem::path module_path, std::string identifier, std::vector<ast::FunctionArgumentNode*> args, std::vector<ast::Type> args_types, ast::Type return_type, bool is_extern, bool is_extern_and_variadic) {
     // Make function type
-    llvm::FunctionType* function_type = this->get_function_type(args, args_types, return_type);
+    llvm::FunctionType* function_type = this->get_function_type(args, args_types, return_type, is_extern_and_variadic);
 
     // Create function
     std::string name = this->get_mangled_function_name(module_path, identifier, ast::get_concrete_types(args_types, this->type_bindings), ast::get_concrete_type(return_type, this->type_bindings), is_extern);
@@ -1665,7 +1658,7 @@ llvm::Value* codegen::Context::codegen_size_function(llvm::Value* pointer, ast::
     }
 }
 
-llvm::Value* codegen::Context::codegen_print_function(ast::Node* expression, bool end_with_new_line) {
+llvm::Value* codegen::Context::codegen_print_function(ast::FunctionNode* print_function, ast::Node* expression) {
     if (expression->index() == ast::InterpolatedString) {
         auto& string = std::get<ast::InterpolatedString>(*expression);
         for (size_t i = 0; i < string.strings.size(); i++) {
@@ -1674,74 +1667,25 @@ llvm::Value* codegen::Context::codegen_print_function(ast::Node* expression, boo
             this->builder->CreateCall(this->module->getFunction("printf"), printArgs);
 
             if (i + 1 != string.strings.size()) {
-                this->codegen_print_function(string.expressions[i], false);
+                this->codegen_print_function(print_function, string.expressions[i]);
             }
         }
         return nullptr;
     }
     else {
-        llvm::Value* arg = this->codegen(expression);
+        // Get function
+        std::string name = this->get_mangled_function_name(print_function->module_path, print_function->identifier->value, {ast::get_concrete_type(expression, this->type_bindings), ast::Type("bool")}, ast::Type("void"), print_function->is_extern);
+        llvm::Function* llvm_function = this->module->getFunction(name);
+        assert(llvm_function);
 
-        if (arg->getType()->isIntegerTy(1)) {
-            std::vector<llvm::Value*> printArgs;
-            llvm::Function *current_function = this->builder->GetInsertBlock()->getParent();
-            llvm::BasicBlock *then_block = llvm::BasicBlock::Create(*(this->context), "then", current_function);
-            llvm::BasicBlock *else_block = llvm::BasicBlock::Create(*(this->context), "else");
-            llvm::BasicBlock *merge = llvm::BasicBlock::Create(*(this->context), "ifcont");
-            this->builder->CreateCondBr(arg, then_block, else_block);
-
-            // Create then branch
-            this->builder->SetInsertPoint(then_block);
-            printArgs.push_back(this->get_global_string("true"));
-            this->builder->CreateCall(this->module->getFunction("printf"), printArgs);
-            this->builder->CreateBr(merge);
-            then_block = this->builder->GetInsertBlock();
-
-            printArgs.clear();
-
-            // Create else branch
-            current_function->getBasicBlockList().push_back(else_block);
-            this->builder->SetInsertPoint(else_block);
-            printArgs.push_back(this->get_global_string("false"));
-            this->builder->CreateCall(this->module->getFunction("printf"), printArgs);
-            this->builder->CreateBr(merge);
-            else_block = this->builder->GetInsertBlock();
-
-            // Merge  block
-            current_function->getBasicBlockList().push_back(merge);
-            this->builder->SetInsertPoint(merge);
-        }
-        else if (arg->getType()->isDoubleTy()) {
-            std::vector<llvm::Value*> printArgs;
-            printArgs.push_back(this->get_global_string("%g"));
-            printArgs.push_back(arg);
-            this->builder->CreateCall(this->module->getFunction("printf"), printArgs);
-        }
-        else if (arg->getType()->isIntegerTy()) {
-            std::vector<llvm::Value*> printArgs;
-            printArgs.push_back(this->get_global_string("%d"));
-            if (arg->getType()->isIntegerTy(8)
-            ||  arg->getType()->isIntegerTy(16)) {
-                arg = this->builder->CreateSExt(arg, llvm::Type::getInt32Ty(*this->context));
-            }
-            printArgs.push_back(arg);
-            this->builder->CreateCall(this->module->getFunction("printf"), printArgs);
-        }
-        else if (ast::get_concrete_type(expression, this->type_bindings) == ast::Type("string")) {
-            std::vector<llvm::Value*> printArgs;
-            printArgs.push_back(arg);
-            this->builder->CreateCall(this->module->getFunction("printf"), printArgs);
-            return nullptr;
-        }
+        // Codegen args
+        std::vector<llvm::Value*> args;
+        args.push_back(this->codegen(expression));
+        args.push_back(llvm::ConstantInt::getBool(*(this->context), false));
+        
+        // Make call
+        return this->builder->CreateCall(llvm_function, args, "calltmp");
     }
-
-    if (end_with_new_line) {
-        std::vector<llvm::Value*> printArgs;
-        printArgs.push_back(this->get_global_string("\n"));
-        this->builder->CreateCall(this->module->getFunction("printf"), printArgs);
-    }
-
-    return nullptr;
 }
 
 llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
@@ -1866,7 +1810,21 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
         }
     }
     if (node.identifier->value == "print") {
-        return this->codegen_print_function(node.args[0]->expression);
+        if (node.args[0]->expression->index() == ast::InterpolatedString) {
+            return this->codegen_print_function(function, node.args[0]->expression);
+        }
+        else {
+            // Get function
+            std::string name = this->get_mangled_function_name(function->module_path, node.identifier->value, this->get_types(node.args), ast::get_concrete_type((ast::Node*) &node, this->type_bindings), function->is_extern);
+            llvm::Function* llvm_function = this->module->getFunction(name);
+            assert(llvm_function);
+
+            // Codegen args
+            args = this->codegen_args(function, node.args);
+            
+            // Make call
+            return this->builder->CreateCall(llvm_function, args, "calltmp");
+        }
     }
     if (node.identifier->value == "[]") {
         if (node.args.size() == 2) {

@@ -74,3 +74,7 @@ std::string utilities::to_str(Set<ast::Type> set) {
     output += "}";
     return output;
 }
+
+std::string utilities::get_folder_of_executable() {
+    return std::filesystem::weakly_canonical(std::filesystem::path("./diamond")).parent_path().string();
+}

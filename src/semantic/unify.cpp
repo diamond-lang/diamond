@@ -183,7 +183,12 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::Ca
 
     // Remove functions whose number of arguments dont match with the call
     functions_that_can_be_called.erase(std::remove_if(functions_that_can_be_called.begin(), functions_that_can_be_called.end(), [&node](ast::FunctionNode* function) {
-        return node.args.size() != function->args.size();
+        if (function->is_extern_and_variadic) {
+            return node.args.size() < function->args.size();
+        }
+        else {
+            return node.args.size() != function->args.size();
+        }
     }), functions_that_can_be_called.end());
 
     // Analyze functions that still have not been analyzed

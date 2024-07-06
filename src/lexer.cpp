@@ -210,6 +210,9 @@ Result<token::Token, Error> lexer::get_token(Source& source) {
     if (match(source, "-")) {
         return advance(token::Token(token::Minus, "-", source.line, source.column), source, 1);
     }
+    if (match(source, "_")) {
+        return get_identifier(source);
+    }
     if (match(source, " "))  {
         advance(source);
         return get_token(source);
@@ -218,7 +221,7 @@ Result<token::Token, Error> lexer::get_token(Source& source) {
         advance(source);
         return get_token(source);
     }
-    if (match(source, "\r\n"))      return advance(token::Token(token::NewLine, "\\n", source.line, source.column), source, 2);
+    if (match(source, "\r\n"))    return advance(token::Token(token::NewLine, "\\n", source.line, source.column), source, 2);
     if (match(source, "\n"))      return advance(token::Token(token::NewLine, "\\n", source.line, source.column), source, 1);
     if (match(source, "\""))      return get_string(source);
     if (isdigit(current(source))) return get_number(source);

@@ -209,7 +209,7 @@ Result<Ok, Error> semantic::make_concrete(Context& context, ast::CallArgumentNod
 
 Result<Ok, Error> set_expected_types_of_arguments_and_check(semantic::Context& context, ast::CallNode* call, ast::FunctionNode* called_function, size_t from_argument, std::vector<ast::CallInCallStack> call_stack) {
     // Set and check expected types
-    for (size_t i = from_argument; i < call->args.size(); i++) {
+    for (size_t i = from_argument; i < called_function->args.size(); i++) {
         auto arg_type = semantic::get_type(context, call->args[i]->type);
         if (!called_function->args[i]->type.is_concrete()) {
             if (arg_type.is_final_type_variable()

@@ -128,6 +128,9 @@ void semantic::Context::init_with(ast::Ast* ast) {
         }
         scope[identifier] = semantic::Binding(overloaded_functions);
     }
+
+    // Add std
+
 }
 
 // Manage scopes
@@ -395,7 +398,12 @@ std::vector<ast::FunctionNode*> semantic::remove_incompatible_functions_with_arg
     assert(argument_type.is_concrete());
     
     functions.erase(std::remove_if(functions.begin(), functions.end(), [&argument_position, &argument_type, &is_mutable](ast::FunctionNode* function) {
-        return semantic::are_types_compatible(*function, function->args[argument_position]->type, argument_type) == false || function->args[argument_position]->is_mutable != is_mutable;
+        if (function->is_extern_and_variadic) {
+            return false;
+        }
+        else {
+            return semantic::are_types_compatible(*function, function->args[argument_position]->type, argument_type) == false || function->args[argument_position]->is_mutable != is_mutable;
+        }
     }), functions.end());
 
     return functions;

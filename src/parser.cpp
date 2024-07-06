@@ -7,6 +7,7 @@
 #include "errors.hpp"
 #include "parser.hpp"
 #include "ast.hpp"
+#include  "utilities.hpp"
 
 // Prototypes and definitions
 // --------------------------
@@ -116,6 +117,22 @@ Location Parser::location() {
     return Location(this->current().line, this->current().column, this->file);
 }
 
+static void add_std_lib(ast::Ast& ast, ast::BlockNode* block) {
+    ast::StringNode std_lib_path;
+    std_lib_path.line = ast.program->line;
+    std_lib_path.column = ast.program->column;
+    std_lib_path.value = utilities::get_folder_of_executable() + "/std/io";
+    ast.push_back(std_lib_path);
+
+    ast::UseNode std_lib;
+    std_lib.line = ast.program->line;
+    std_lib.column = ast.program->column;
+    std_lib.path = (ast::StringNode*) ast.last_element();
+    ast.push_back(std_lib);
+
+    block->use_statements.insert(block->use_statements.begin() + 0, (ast::UseNode*) ast.last_element());
+}
+
 // Parsing
 // -------
 Result<ast::Ast, Errors> parse::program(const std::vector<token::Token>& tokens, const std::filesystem::path& file) {
@@ -129,6 +146,9 @@ Result<ast::Ast, Errors> parse::program(const std::vector<token::Token>& tokens,
     ast.module_path = module_path;
     ast.program = (ast::BlockNode*) parsing_result.get_value();
     ast.modules[module_path.string()] = (ast::BlockNode*) parsing_result.get_value();
+
+    add_std_lib(ast, ast.program);
+
     return ast;
 }
 
@@ -138,6 +158,9 @@ Result<Ok, Errors> parse::module(ast::Ast& ast, const std::vector<token::Token>&
     if (parsing_result.is_error()) return parser.errors;
 
     ast.modules[file.string()] = (ast::BlockNode*) parsing_result.get_value();
+
+    add_std_lib(ast, ast.modules[file.string()]);
+
     return Ok {};
 }
 
@@ -490,7 +513,7 @@ Result<ast::Node*, Error> Parser::parse_function() {
     return this->ast.last_element();
 }
 
-// extern → "extern" IDENTIFIER "(" (IDENTIFIER (":" type)? ",")* ")" (":" type)?
+// extern → "extern" IDENTIFIER "(" (IDENTIFIER ":" type "..."? ("," IDENTIFIER ":" type "..."?)*)? ")" ":" type
 Result<ast::Node*, Error> Parser::parse_extern() {
     // Create node
     auto function = ast::FunctionNode {this->current().line, this->current().column};
@@ -512,8 +535,26 @@ Result<ast::Node*, Error> Parser::parse_extern() {
 
     // Parse args
     while (this->current() != token::RightParen && !this->at_end()) {
+        // Parse variadic
+        if (this->current() == token::Dot) {
+            auto result = this->parse_token(token::Dot);
+            if (result.is_error()) return result.get_error();
+            result = this->parse_token(token::Dot);
+            if (result.is_error()) return result.get_error();
+            result = this->parse_token(token::Dot);
+            if (result.is_error()) return result.get_error();
+
+            function.is_extern_and_variadic = true;
+            break;
+        }
+
+        // Create node
+        auto function_argument = ast::FunctionArgumentNode {this->current().line, this->current().column};
+
+        // Parse identifier
         auto arg = this->parse_identifier();
         if (arg.is_error()) return arg;
+        function_argument.identifier = (ast::IdentifierNode*) arg.get_value();
 
         // Parse type annotation
         auto colon = this->parse_token(token::Colon);
@@ -521,9 +562,11 @@ Result<ast::Node*, Error> Parser::parse_extern() {
 
         auto type = this->parse_type();
         if (type.is_error()) return Error {};
+        function_argument.type = type.get_value();
 
-        ast::set_type(arg.get_value(), type.get_value());
-        function.args.push_back((ast::FunctionArgumentNode*) arg.get_value());
+        // Store function argument on ast
+        this->ast.push_back(function_argument);
+        function.args.push_back((ast::FunctionArgumentNode*) this->ast.last_element());
 
         // Parse comma
         if (this->current() == token::Comma) this->advance();
