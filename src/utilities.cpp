@@ -76,5 +76,5 @@ std::string utilities::to_str(Set<ast::Type> set) {
 }
 
 std::string utilities::get_folder_of_executable() {
-    return std::filesystem::weakly_canonical(std::filesystem::path("./diamond")).parent_path().string();
+    return std::filesystem::weakly_canonical(std::filesystem::path(get_run_command("diamond"))).parent_path().string();
 }

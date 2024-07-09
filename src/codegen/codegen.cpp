@@ -1624,6 +1624,14 @@ std::vector<llvm::Value*> codegen::Context::codegen_args(ast::FunctionNode* func
 
                 result.push_back(heap_allocation);
             }
+            else if (function->is_extern_and_variadic && i >= function->args.size()) {
+                auto arg = this->codegen(args[i]->expression);
+                if (arg->getType()->isIntegerTy(8)
+                ||  arg->getType()->isIntegerTy(16)) {
+                    arg = this->builder->CreateSExt(arg, llvm::Type::getInt32Ty(*this->context));
+                }
+                result.push_back(arg);
+            }
             else {
                 result.push_back(this->codegen(args[i]->expression));
             }
