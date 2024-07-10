@@ -120,19 +120,31 @@ Location Parser::location() {
 }
 
 static void add_std_lib(ast::Ast& ast, ast::BlockNode* block) {
-    ast::StringNode std_lib_path;
-    std_lib_path.line = ast.program->line;
-    std_lib_path.column = ast.program->column;
-    std_lib_path.value = utilities::get_folder_of_executable() + "/std/io";
-    ast.push_back(std_lib_path);
+    // ast::StringNode std_lib_path;
+    // std_lib_path.line = ast.program->line;
+    // std_lib_path.column = ast.program->column;
+    // std_lib_path.value = utilities::get_folder_of_executable() + "/std/core";
+    // ast.push_back(std_lib_path);
 
-    ast::UseNode std_lib;
-    std_lib.line = ast.program->line;
-    std_lib.column = ast.program->column;
-    std_lib.path = (ast::StringNode*) ast.last_element();
-    ast.push_back(std_lib);
+    // ast::UseNode std_lib;
+    // std_lib.line = ast.program->line;
+    // std_lib.column = ast.program->column;
+    // std_lib.path = (ast::StringNode*) ast.last_element();
+    // ast.push_back(std_lib);
+    // block->use_statements.insert(block->use_statements.begin() + 0, (ast::UseNode*) ast.last_element());
 
-    block->use_statements.insert(block->use_statements.begin() + 0, (ast::UseNode*) ast.last_element());
+    // //ast::StringNode std_lib_path;
+    // std_lib_path.line = ast.program->line;
+    // std_lib_path.column = ast.program->column;
+    // std_lib_path.value = utilities::get_folder_of_executable() + "/std/io";
+    // ast.push_back(std_lib_path);
+
+    // //ast::UseNode std_lib;
+    // std_lib.line = ast.program->line;
+    // std_lib.column = ast.program->column;
+    // std_lib.path = (ast::StringNode*) ast.last_element();
+    // ast.push_back(std_lib);
+    // block->use_statements.insert(block->use_statements.begin() + 0, (ast::UseNode*) ast.last_element());
 }
 
 // Parsing
@@ -219,6 +231,10 @@ Result<ast::Node*, Error> Parser::parse_block() {
             switch (result.get_value()->index()) {
                 case ast::Function:
                     block.functions.push_back((ast::FunctionNode*) result.get_value());
+                    break;
+                
+                case ast::Interface:
+                    block.interfaces.push_back((ast::InterfaceNode*) result.get_value());
                     break;
 
                 case ast::TypeDef:

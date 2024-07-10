@@ -17,28 +17,30 @@ namespace semantic {
         VariableBinding,
         FunctionArgumentBinding,
         FunctionBinding,
+        InterfaceBinding,
         TypeBinding
     };
 
     struct Binding {
         BindingType type;
-        std::vector<ast::Node*> value;
+        ast::Node* value;
 
         Binding() {}
         ~Binding() {}
         Binding(ast::DeclarationNode* variable);
         Binding(ast::Node* function_argument);
-        Binding(std::vector<ast::FunctionNode*> functions);
+        Binding(ast::FunctionNode* function);
+        Binding(ast::InterfaceNode* interface);
         Binding(ast::TypeNode* type);
     };
 
     ast::DeclarationNode* get_variable(Binding binding);
     ast::Node* get_function_argument(Binding binding);
-    std::vector<ast::FunctionNode*> get_functions(Binding binding);
+    ast::FunctionNode* get_function(Binding binding);
+    ast::InterfaceNode* get_interface(Binding binding);
     ast::TypeNode* get_type_definition(Binding binding);
     ast::Type get_binding_type(Binding& binding);
     std::string get_binding_identifier(Binding& binding);
-    bool is_function(Binding& binding);
 
     // Scopes
     using Scopes = std::vector<std::unordered_map<std::string, Binding>>;
@@ -72,6 +74,7 @@ namespace semantic {
     Binding* get_binding(Context& context, std::string identifier);
 
     // Work with modules
+    Result<Ok, Error> add_definitions_to_current_scope(Context& context, std::vector<ast::FunctionNode*>& functions, std::vector<ast::InterfaceNode*>& interfaces, std::vector<ast::TypeNode*>& types);
     Result<Ok, Error> add_definitions_to_current_scope(Context& context, ast::BlockNode& block);
     Result<Ok, Error> add_module_functions(Context& context, std::filesystem::path module_path, std::set<std::filesystem::path>& already_included_modules);
     std::vector<std::unordered_map<std::string, Binding>> get_definitions(Context& context);

@@ -12,8 +12,9 @@ interface negate[t](number: t): t
 
 interface multiply[t](left: t, right: t): t
 interface divide[t](left: t, right: t): t
+interface modulo[t](left: t, right: t): t
 
-interface print[t](object: t): void
+--interface print[t](object: t): void
 
 builtin equal(left: float64, right: float64): float64
 builtin equal(left: int64, right: int64): int64
@@ -54,6 +55,11 @@ builtin subtract(left: float64, right: float64): float64
 builtin subtract(left: int64, right: int64): int64
 builtin subtract(left: int32, right: int32): int32
 builtin subtract(left: int8, right: int8): int8
+
+builtin negate(operand: float64): float64
+builtin negate(operand: int64): int64
+builtin negate(operand: int32): int32
+builtin negate(operand: int8): int8
 
 builtin multiply(left: float64, right: float64): float64
 builtin multiply(left: int64, right: int64): int64

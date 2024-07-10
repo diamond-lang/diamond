@@ -201,7 +201,8 @@ Result<Ok, Error> semantic::analyze(semantic::Context& context, ast::BlockNode& 
 }
 
 Result<Ok, Error> semantic::analyze(semantic::Context& context, ast::FunctionNode& node) {
-    if (node.is_extern) {
+    if (node.is_extern
+    ||  node.is_builtin) {
         for (auto arg: node.args) {
             auto result = semantic::analyze(context, arg->type);
             if (result.is_error()) return Error {};

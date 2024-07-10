@@ -251,6 +251,7 @@ namespace ast {
         std::vector<Node*> statements;
         std::vector<UseNode*> use_statements;
         std::vector<FunctionNode*> functions;
+        std::vector<InterfaceNode*> interfaces;
         std::vector<TypeNode*> types;
     };
 
@@ -325,9 +326,11 @@ namespace ast {
         Type return_type = Type(ast::NoType{});
         bool return_type_is_mutable = false;
         std::filesystem::path module_path; // Used in to tell from which module the function comes from
+        std::vector<ast::FunctionNode*> functions;
     
         bool typed_parameter_aready_added(ast::Type type);
         std::optional<ast::TypeParameter*> get_type_parameter(ast::Type type);
+        std::vector<ast::Type> get_prototype();
     };
 
     struct TypeNode {

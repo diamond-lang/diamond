@@ -257,7 +257,7 @@ Result<Ok, Error> semantic::make_concrete(Context& context, ast::CallNode& node,
     // Get binding
     semantic::Binding* binding = semantic::get_binding(context, node.identifier->value);
     assert(binding);
-    assert(binding->type == semantic::FunctionBinding);
+    assert(binding->type == semantic::FunctionBinding || binding->type == semantic::InterfaceBinding);
 
     assert(node.functions.size() != 0);
     auto functions_that_can_be_called = node.functions;

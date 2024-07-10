@@ -1313,3 +1313,12 @@ std::optional<ast::TypeParameter*> ast::InterfaceNode::get_type_parameter(ast::T
     }
     return std::nullopt;
 }
+
+std::vector<ast::Type> ast::InterfaceNode::get_prototype() {
+    std::vector<ast::Type> results;
+    for (auto arg: this->args) {
+        results.push_back(ast::get_type((ast::Node*) arg));
+    }
+    results.push_back(this->return_type);
+    return results;
+}

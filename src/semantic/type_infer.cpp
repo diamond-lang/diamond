@@ -17,7 +17,7 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
     auto result = semantic::add_definitions_to_current_scope(context, node);
     if (result.is_error()) return result;
 
-    // Analyze functions and types in current scope
+    // Analyze types in current scope
     auto scope = semantic::current_scope(context);
     for (auto& it: scope) {
         auto& binding = it.second;
@@ -26,10 +26,18 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
             if (result.is_error()) return result;
         }
     }
+
+    // Analyze functions in current scope
     for (auto& it: scope) {
         auto& binding = it.second;
         if (binding.type == semantic::FunctionBinding) {
-            auto functions = semantic::get_functions(binding);
+            if (semantic::get_function(binding)->state == ast::FunctionAnalyzed) continue;
+
+            auto result = semantic::analyze(context, *semantic::get_function(binding));
+            if (result.is_error()) return result;
+        }
+        else if (binding.type == semantic::InterfaceBinding) {
+            auto functions = semantic::get_interface(binding)->functions;
             for (size_t i = 0; i < functions.size(); i++) {
                 if (functions[i]->state == ast::FunctionAnalyzed) continue;
 
@@ -377,17 +385,45 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
         context.errors.push_back(errors::undefined_function(node, get_default_types(context, ast::get_types(node.args)), context.current_module));
         return Error {};
     }
-
-    assert(is_function(*binding));
     
     if (!node.type.is_concrete()) {
         node.type = semantic::new_type_variable(context);
     }
 
-    if (binding->type == semantic::FunctionBinding) {
+    if (binding->type == semantic::InterfaceBinding) {
+        // Create vector for the prototype of the call
+        std::vector<ast::Type> prototype = ast::get_types(node.args);
+        prototype.push_back(node.type);
+
+        // Create vector for the prototype of the interface
+        std::vector<ast::Type> interface_prototype = semantic::get_interface(*binding)->get_prototype();
+
+        // Infer stuff, basically is loop trough the each type of the interface prototype
+        std::unordered_map<ast::Type, Set<ast::Type>> sets;
+        for (size_t i = 0; i < interface_prototype.size(); i++) {
+            if (sets.find(interface_prototype[i]) == sets.end()) {
+                sets[interface_prototype[i]] = Set<ast::Type>();
+            }
+
+            sets[interface_prototype[i]].insert(prototype[i]);
+
+            if (!interface_prototype[i].is_type_variable()) {
+                sets[interface_prototype[i]].insert(interface_prototype[i]);
+            }
+        }
+
+        // Add constraints found
+        for (auto it = sets.begin(); it != sets.end(); it++) {
+            semantic::add_constraint(context, it->second);
+        }
+
+        return Ok {};
+    }
+    else if (binding->type == semantic::FunctionBinding) {
         // do nothing
     }
     else {
+        std::cout << "Error: Binding is not a function or interface\n";
         assert(false);
     }
 
