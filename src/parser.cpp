@@ -25,6 +25,7 @@ struct Parser {
     Result<ast::Node*, Error> parse_block();
     Result<ast::Node*, Error> parse_function_argument();
     Result<ast::Node*, Error> parse_function();
+    Result<ast::Node*, Error> parse_interface();
     Result<ast::Node*, Error> parse_extern();
     Result<ast::Node*, Error> parse_link_with();
     Result<ast::Node*, Error> parse_type_definition();
@@ -277,18 +278,19 @@ Result<ast::Node*, Error> Parser::parse_block() {
 //           | index_assignment
 Result<ast::Node*, Error> Parser::parse_statement() {
     switch (this->current().variant) {
-        case token::Function: return this->parse_function();
-        case token::Extern:   return this->parse_extern();
-        case token::LinkWith: return this->parse_link_with();
-        case token::Type:     return this->parse_type_definition();;
-        case token::Return:   return this->parse_return_stmt();
-        case token::If:       return this->parse_if_else();
-        case token::While:    return this->parse_while_stmt();
-        case token::Break:    return this->parse_break_stmt();
-        case token::Continue: return this->parse_continue_stmt();
-        case token::Use:      return this->parse_use_stmt();
-        case token::Include:  return this->parse_use_stmt();
-        case token::Star:     return this->parse_dereference_assignment();
+        case token::Function:  return this->parse_function();
+        case token::Interface: return this->parse_interface();
+        case token::Extern:    return this->parse_extern();
+        case token::LinkWith:  return this->parse_link_with();
+        case token::Type:      return this->parse_type_definition();;
+        case token::Return:    return this->parse_return_stmt();
+        case token::If:        return this->parse_if_else();
+        case token::While:     return this->parse_while_stmt();
+        case token::Break:     return this->parse_break_stmt();
+        case token::Continue:  return this->parse_continue_stmt();
+        case token::Use:       return this->parse_use_stmt();
+        case token::Include:   return this->parse_use_stmt();
+        case token::Star:      return this->parse_dereference_assignment();
         case token::Identifier:
         case token::LeftParen:
             if (this->match({token::Identifier, token::Equal})) {
@@ -510,6 +512,88 @@ Result<ast::Node*, Error> Parser::parse_function() {
     }
 
     this->ast.push_back(function);
+    return this->ast.last_element();
+}
+
+// interface → "interface" IDENTIFIER ("[" IDENTIFIER ("," IDENTIFIER)* "]")? "(" (function_argument ":" type) ",")* ")" ":" type
+Result<ast::Node*, Error> Parser::parse_interface() {
+    // Create node
+    auto interface = ast::InterfaceNode {this->current().line, this->current().column};
+    interface.module_path = this->file;
+
+    // Parse keyword
+    auto keyword = this->parse_token(token::Interface);
+    if (keyword.is_error()) return Error {};
+
+    // Parse indentifier
+    auto identifier = this->parse_identifier();
+    if (identifier.is_error()) return identifier;
+    interface.identifier = (ast::IdentifierNode*) identifier.get_value();
+
+    // Parse possible type parameter
+    if (this->current() == token::LeftBracket) {
+        this->advance();
+
+        // Parse type parameters
+        size_t i = 0;
+        while (this->current() != token::RightBracket && !this->at_end()) {
+            auto parameter = this->parse_type();
+            if (parameter.is_error()) return parameter.get_error();
+
+            assert(parameter.get_value().is_final_type_variable());
+
+            ast::TypeParameter type_parameter;
+            type_parameter.type = parameter.get_value();
+            interface.type_parameters.push_back(type_parameter);
+            i += 1;
+
+            if (this->current() == token::Comma) this->advance();
+            else                                 break;
+        }
+
+        // Parse right bracket
+        auto right_bracket = this->parse_token(token::RightBracket);
+        if (right_bracket.is_error()) return Error {};
+    }
+
+    // Parse left paren
+    auto left_paren = this->parse_token(token::LeftParen);
+    if (left_paren.is_error()) return Error {};
+
+    // Parse args
+    while (this->current() != token::RightParen && !this->at_end()) {
+        auto arg = this->parse_function_argument();
+        if (arg.is_error()) return arg;
+
+        // Parse type annotation
+        if (this->current() == token::Colon) {
+            this->advance();
+
+            auto type = this->parse_type();
+            if (type.is_error()) return Error {};
+
+            ast::set_type(arg.get_value(), type.get_value());
+        }
+        interface.args.push_back((ast::FunctionArgumentNode*) arg.get_value());
+
+        if (this->current() == token::Comma) this->advance();
+        else                                 break;
+    }
+
+    // Parse right paren
+    auto right_paren = this->parse_token(token::RightParen);
+    if (right_paren.is_error()) return Error {};
+
+    // Parse type annotation
+    auto colon = this->parse_token(token::Colon);
+    if (colon.is_error()) return Error {};
+
+    auto type = this->parse_type();
+    if (type.is_error()) return Error {};
+
+    interface.return_type = type.get_value();
+
+    this->ast.push_back(interface);
     return this->ast.last_element();
 }
 

@@ -16,6 +16,7 @@ namespace ast {
     struct BlockNode;
     struct FunctionArgumentNode;
     struct FunctionNode;
+    struct InterfaceNode;
     struct TypeNode;
     struct DeclarationNode;
     struct AssignmentNode;
@@ -45,6 +46,7 @@ namespace ast {
         Block,
         FunctionArgument,
         Function,
+        Interface,
         TypeDef,
         Declaration,
         Assignment,
@@ -75,6 +77,7 @@ namespace ast {
         BlockNode,
         FunctionArgumentNode,
         FunctionNode,
+        InterfaceNode,
         TypeNode,
         DeclarationNode,
         AssignmentNode,
@@ -116,13 +119,13 @@ namespace ast {
         std::string to_str() const;
     };
 
-    struct Interface {
+    struct InterfaceType {
         std::string name;
         
-        Interface() {}
-        Interface(std::string name) : name(name) {}
-        bool operator==(const Interface &interface) const;
-        bool operator!=(const Interface &interface) const;
+        InterfaceType() {}
+        InterfaceType(std::string name) : name(name) {}
+        bool operator==(const InterfaceType &interface) const;
+        bool operator!=(const InterfaceType &interface) const;
 
         ast::Type get_default_type();
         bool is_compatible_with(ast::Type type);
@@ -235,7 +238,7 @@ namespace ast {
     struct TypeParameter {
         ast::Type type;
         FieldTypes field_constraints;
-        std::optional<Interface> interface = std::nullopt;
+        std::optional<InterfaceType> interface = std::nullopt;
 
         std::string to_str();
     };
@@ -301,6 +304,23 @@ namespace ast {
         bool is_extern = false;
         bool is_extern_and_variadic = false;
         std::vector<FunctionSpecialization> specializations;
+        Type return_type = Type(ast::NoType{});
+        bool return_type_is_mutable = false;
+        std::filesystem::path module_path; // Used in to tell from which module the function comes from
+    
+        bool typed_parameter_aready_added(ast::Type type);
+        std::optional<ast::TypeParameter*> get_type_parameter(ast::Type type);
+    };
+
+    struct InterfaceNode {
+        size_t line;
+        size_t column;
+        Type type = Type(ast::NoType{});
+
+        IdentifierNode* identifier;
+        std::vector<ast::TypeParameter> type_parameters;
+        std::vector<FunctionArgumentNode*> args;
+
         Type return_type = Type(ast::NoType{});
         bool return_type_is_mutable = false;
         std::filesystem::path module_path; // Used in to tell from which module the function comes from

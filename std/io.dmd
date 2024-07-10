@@ -54,8 +54,3 @@ function print(value: string, endWithNewLine: bool): void
 
     if endWithNewLine
         _ = printf("\n")
-
-print(30)
-print(30.5)
-print("Hello, World!\n")
-print(false)

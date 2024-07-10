@@ -99,6 +99,10 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
     return Ok {};
 }
 
+Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, ast::InterfaceNode& node) {
+    return Ok {};
+}
+
 Result<Ok, Error> semantic::type_infer_and_analyze(Context& context, ast::Type& type) {
     return Ok {};
 }
@@ -273,7 +277,7 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
 Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, ast::IntegerNode& node) {
     if (node.type == ast::Type(ast::NoType{})) {   
         node.type = semantic::new_type_variable(context);
-        semantic::add_interface_constraint(context, node.type,  ast::Interface("Number"));
+        semantic::add_interface_constraint(context, node.type,  ast::InterfaceType("Number"));
     }
     else if (!node.type.is_type_variable() && !node.type.is_integer() && !node.type.is_float()) {
         context.errors.push_back(Error("Error: Type mismatch between type annotation and expression"));
@@ -286,7 +290,7 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
 Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, ast::FloatNode& node) {
     if (node.type == ast::Type(ast::NoType{})) {  
         node.type = semantic::new_type_variable(context);
-        semantic::add_interface_constraint(context, node.type,  ast::Interface("Float"));
+        semantic::add_interface_constraint(context, node.type,  ast::InterfaceType("Float"));
     }
     else if (!node.type.is_type_variable() && !node.type.is_float()) {
         context.errors.push_back(Error("Error: Type mismatch between type annotation and expression"));
@@ -547,7 +551,7 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
         }
         else {
             node.type = semantic::new_type_variable(context);
-            semantic::add_interface_constraint(context, ast::get_type(node.expression),  ast::Interface("pointer"));
+            semantic::add_interface_constraint(context, ast::get_type(node.expression),  ast::InterfaceType("pointer"));
         }
     }
 

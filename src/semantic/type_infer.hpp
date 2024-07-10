@@ -8,6 +8,7 @@ namespace semantic {
     Result<Ok, Error> type_infer_and_analyze(Context& context, ast::BlockNode& node);
     Result<Ok, Error> type_infer_and_analyze(Context& context, ast::FunctionArgumentNode& node);
     Result<Ok, Error> type_infer_and_analyze(Context& context, ast::FunctionNode& node);
+    Result<Ok, Error> type_infer_and_analyze(Context& context, ast::InterfaceNode& node);
     Result<Ok, Error> type_infer_and_analyze(Context& context, ast::Type& type);
     Result<Ok, Error> type_infer_and_analyze(Context& context, ast::TypeNode& node); 
     Result<Ok, Error> type_infer_and_analyze(Context& context, ast::DeclarationNode& node);

@@ -1261,6 +1261,12 @@ void codegen::Context::codegen_function_bodies(std::filesystem::path module_path
     this->function_pass_manager->run(*f);
 }
 
+
+llvm::Value* codegen::Context::codegen(ast::InterfaceNode& node) {
+    assert(false);
+    return nullptr;
+}
+
 llvm::Value* codegen::Context::codegen(ast::DeclarationNode& node) {
     // Delete binding if already exists
     if (this->current_scope().find(node.identifier->value) != this->current_scope().end()) {

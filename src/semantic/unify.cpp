@@ -41,6 +41,10 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::Fu
     return Ok {};
 }
 
+Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::InterfaceNode& node) {
+    return Ok {};
+}
+
 Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::TypeNode& node) {
     return Ok {};
 }

@@ -150,6 +150,10 @@ void token::print(std::vector<Token> token) {
                 std::cout << "token::Function";
                 break;
             }
+            case Interface: {
+                std::cout << "token::Interface";
+                break;
+            }
             case Type: {
                 std::cout << "token::Type";
                 break;

@@ -304,7 +304,7 @@ void semantic::add_constraint(Context& context, Set<ast::Type> constraint) {
     context.type_inference.type_constraints.push_back(constraint);
 }
 
-void semantic::add_interface_constraint(Context& context, ast::Type type, ast::Interface interface) {
+void semantic::add_interface_constraint(Context& context, ast::Type type, ast::InterfaceType interface) {
     if (context.type_inference.interface_constraints.find(type) == context.type_inference.interface_constraints.end()) {
         context.type_inference.interface_constraints[type] = interface;
     }

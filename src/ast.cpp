@@ -6,15 +6,15 @@
 
 // Interface
 // ---------
-bool ast::Interface::operator==(const Interface &interface) const {
+bool ast::InterfaceType::operator==(const InterfaceType &interface) const {
     return interface.name == this->name;
 }
 
-bool ast::Interface::operator!=(const Interface &interface) const {
+bool ast::InterfaceType::operator!=(const InterfaceType &interface) const {
     return !(interface == *this);
 }
 
-ast::Type ast::Interface::get_default_type() {
+ast::Type ast::InterfaceType::get_default_type() {
     if (this->name== "Number") {
         return ast::Type("int64");
     }
@@ -27,7 +27,7 @@ ast::Type ast::Interface::get_default_type() {
     }
 }
 
-bool ast::Interface::is_compatible_with(ast::Type type) {
+bool ast::InterfaceType::is_compatible_with(ast::Type type) {
     if (this->name== "Number") {
         return type.is_integer() || type.is_float();
     }
@@ -863,6 +863,52 @@ void ast::print(Node* node, PrintContext context) {
             break;
         }
 
+        case Interface: {
+            auto& interface = std::get<InterfaceNode>(*node);
+            bool last = true;
+            if (context.last.size() != 0) {
+                last = context.last[context.last.size() - 1];
+                context.last.pop_back();
+            }
+
+            put_indent_level(context.indent_level, append(context.last, last));
+            std::cout << "interface " << interface.identifier->value;
+
+            if (interface.type_parameters.size() > 0 && !context.concrete) {
+                std::cout << '[';
+                for (size_t i = 0; i < interface.type_parameters.size(); i++) {
+                    std::cout << interface.type_parameters[i].to_str();
+                    if (i + 1 != interface.type_parameters.size()) std::cout << ", ";
+                }
+                std::cout << ']';
+            }
+
+            std::cout << '(';
+            for (size_t i = 0; i < interface.args.size(); i++) {
+                auto& arg_name = interface.args[i]->identifier->value;
+                if (interface.args[i]->is_mutable) {
+                    std::cout << "mut ";
+                }
+                std::cout << arg_name;
+
+                auto& arg_type = interface.args[i]->type;
+
+                if (arg_type != Type(ast::NoType{})) {
+                    std::cout << ": " << get_concrete_type_or_type_variable(arg_type, context).to_str();
+                }
+
+                if (i != interface.args.size() - 1) std::cout << ", ";
+            }
+
+            std::cout << ")";
+            if (interface.return_type != Type(ast::NoType{})) {
+                std::cout << ": " << get_concrete_type_or_type_variable(interface.return_type, context).to_str();
+            }
+            std::cout << "\n";
+
+            break;
+        }
+
         case TypeDef: {
             auto& type = std::get<TypeNode>(*node);
 
@@ -1233,6 +1279,25 @@ bool ast::FunctionNode::typed_parameter_aready_added(ast::Type type) {
 }
 
 std::optional<ast::TypeParameter*> ast::FunctionNode::get_type_parameter(ast::Type type) {
+    for (auto& type_parameter: this->type_parameters) {
+        if (type_parameter.type == type) {
+            return &type_parameter;
+        }
+    }
+    return std::nullopt;
+}
+
+
+bool ast::InterfaceNode::typed_parameter_aready_added(ast::Type type) {
+    for (auto type_parameter: this->type_parameters) {
+        if (type_parameter.type == type) {
+            return true;
+        }
+    }
+    return false;
+}
+
+std::optional<ast::TypeParameter*> ast::InterfaceNode::get_type_parameter(ast::Type type) {
     for (auto& type_parameter: this->type_parameters) {
         if (type_parameter.type == type) {
             return &type_parameter;

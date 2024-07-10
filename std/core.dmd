@@ -1,0 +1,16 @@
+interface equals[t](lhs: t, rhs: t): bool
+interface notEquals[t](lhs: t, rhs: t): bool
+
+interface less[t](lhs: t, rhs: t): bool
+interface greater[t](lhs: t, rhs: t): bool
+interface lessEqual[t](lhs: t, rhs: t): bool
+interface greaterEqual[t](lhs: t, rhs: t): bool
+
+interface add[t](lhs: t, rhs: t): t
+interface subtract[t](lhs: t, rhs: t): t
+interface negate[t](operand: t): t
+
+interface multiply[t](lhs: t, rhs: t): t
+interface divide[t](lhs: t, rhs: t): t
+
+interface print[t](object: t): void

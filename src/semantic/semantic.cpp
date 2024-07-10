@@ -6,7 +6,7 @@
 
 // Helper functions
 // ----------------
-void add_type_parameters(semantic::Context& context, ast::FunctionNode& node, ast::Type type,  std::unordered_map<ast::Type, ast::FieldTypes>& unified_fields_constraints, std::unordered_map<ast::Type, ast::Interface>& unified_interface_constraints) {
+void add_type_parameters(semantic::Context& context, ast::FunctionNode& node, ast::Type type,  std::unordered_map<ast::Type, ast::FieldTypes>& unified_fields_constraints, std::unordered_map<ast::Type, ast::InterfaceType>& unified_interface_constraints) {
     if (type.is_final_type_variable()) {
         ast::TypeParameter parameter;
         parameter.type = type;
@@ -157,7 +157,7 @@ Result<Ok, Error> semantic::analyze_block_or_expression(semantic::Context& conte
     }
 
     // Unify interface constraints
-    std::unordered_map<ast::Type, ast::Interface> unified_interface_constraints;
+    std::unordered_map<ast::Type, ast::InterfaceType> unified_interface_constraints;
     for (auto it: context.type_inference.interface_constraints) {
         auto unified_type = semantic::get_unified_type(context, it.first);
         unified_interface_constraints[unified_type] = it.second;

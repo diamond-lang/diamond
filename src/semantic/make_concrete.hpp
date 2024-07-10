@@ -15,6 +15,7 @@ namespace semantic {
     Result<Ok, Error> make_concrete(Context& context, ast::BlockNode& node, std::vector<ast::CallInCallStack> call_stack);
     Result<Ok, Error> make_concrete(Context& context, ast::FunctionArgumentNode& node, std::vector<ast::CallInCallStack> call_stack);
     Result<Ok, Error> make_concrete(Context& context, ast::FunctionNode& node, std::vector<ast::CallInCallStack> call_stack);
+    Result<Ok, Error> make_concrete(Context& context, ast::InterfaceNode& node, std::vector<ast::CallInCallStack> call_stack);
     Result<Ok, Error> make_concrete(Context& context, ast::TypeNode& node, std::vector<ast::CallInCallStack> call_stack);
     Result<Ok, Error> make_concrete(Context& context, ast::DeclarationNode& node, std::vector<ast::CallInCallStack> call_stack);
     Result<Ok, Error> make_concrete(Context& context, ast::AssignmentNode& node, std::vector<ast::CallInCallStack> call_stack);

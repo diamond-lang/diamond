@@ -133,6 +133,11 @@ Result<Ok, Error> semantic::make_concrete(Context& context, ast::FunctionNode& n
     return Ok {};
 }
 
+Result<Ok, Error> semantic::make_concrete(Context& context, ast::InterfaceNode& node, std::vector<ast::CallInCallStack> call_stack) {
+    assert(false);
+    return Ok {};
+}
+
 Result<Ok, Error> semantic::make_concrete(Context& context, ast::TypeNode& node, std::vector<ast::CallInCallStack> call_stack) {
     return Ok {};
 }
