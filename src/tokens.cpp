@@ -154,6 +154,10 @@ void token::print(std::vector<Token> token) {
                 std::cout << "token::Interface";
                 break;
             }
+            case Builtin: {
+                std::cout << "token::Builtin";
+                break;
+            }
             case Type: {
                 std::cout << "token::Type";
                 break;

@@ -801,6 +801,9 @@ void ast::print(Node* node, PrintContext context) {
             if (function.is_extern) {
                 std::cout << "extern " << function.identifier->value << '(';
             }
+            else if (function.is_builtin) {
+                std::cout << "builtin " << function.identifier->value << '(';
+            }
             else {
                 std::cout << "function " << function.identifier->value;
 
@@ -837,11 +840,14 @@ void ast::print(Node* node, PrintContext context) {
 
             std::cout << ")";
             if (function.return_type != Type(ast::NoType{})) {
-                std::cout << ": " << get_concrete_type_or_type_variable(function.return_type, context).to_str();
+                std::cout << ": ";
+                if (function.return_type_is_mutable) std::cout << "mut ";
+                std::cout << get_concrete_type_or_type_variable(function.return_type, context).to_str();
             }
             std::cout << "\n";
 
-            if (function.is_extern) {
+            if (function.is_extern
+            ||  function.is_builtin) {
                 return;
             }
 
@@ -902,7 +908,9 @@ void ast::print(Node* node, PrintContext context) {
 
             std::cout << ")";
             if (interface.return_type != Type(ast::NoType{})) {
-                std::cout << ": " << get_concrete_type_or_type_variable(interface.return_type, context).to_str();
+                std::cout << ": ";
+                if (interface.return_type_is_mutable) std::cout << "mut ";
+                std::cout << get_concrete_type_or_type_variable(interface.return_type, context).to_str();
             }
             std::cout << "\n";
 

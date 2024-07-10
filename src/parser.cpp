@@ -26,6 +26,7 @@ struct Parser {
     Result<ast::Node*, Error> parse_function_argument();
     Result<ast::Node*, Error> parse_function();
     Result<ast::Node*, Error> parse_interface();
+    Result<ast::Node*, Error> parse_builtin();
     Result<ast::Node*, Error> parse_extern();
     Result<ast::Node*, Error> parse_link_with();
     Result<ast::Node*, Error> parse_type_definition();
@@ -261,6 +262,8 @@ Result<ast::Node*, Error> Parser::parse_block() {
 }
 
 // statement → function
+//           | interface
+//           | builtin
 //           | extern
 //           | link_with
 //           | type_definition
@@ -280,6 +283,7 @@ Result<ast::Node*, Error> Parser::parse_statement() {
     switch (this->current().variant) {
         case token::Function:  return this->parse_function();
         case token::Interface: return this->parse_interface();
+        case token::Builtin:   return this->parse_builtin();
         case token::Extern:    return this->parse_extern();
         case token::LinkWith:  return this->parse_link_with();
         case token::Type:      return this->parse_type_definition();;
@@ -479,6 +483,12 @@ Result<ast::Node*, Error> Parser::parse_function() {
     if (this->current() == token::Colon) {
         this->advance();
 
+        // Parse mut
+        if (this->current() == token::Mut) {
+            function.return_type_is_mutable = true;
+            this->advance();
+        }
+
         auto type = this->parse_type();
         if (type.is_error()) return Error {};
 
@@ -530,6 +540,95 @@ Result<ast::Node*, Error> Parser::parse_interface() {
     if (identifier.is_error()) return identifier;
     interface.identifier = (ast::IdentifierNode*) identifier.get_value();
 
+    // Parse left bracket
+    auto left_bracket = this->parse_token(token::LeftBracket);
+    if (left_bracket.is_error()) return Error {};
+
+    // Parse type parameters
+    size_t i = 0;
+    while (this->current() != token::RightBracket && !this->at_end()) {
+        auto parameter = this->parse_type();
+        if (parameter.is_error()) return parameter.get_error();
+
+        assert(parameter.get_value().is_final_type_variable());
+
+        ast::TypeParameter type_parameter;
+        type_parameter.type = parameter.get_value();
+        interface.type_parameters.push_back(type_parameter);
+        i += 1;
+
+        if (this->current() == token::Comma) this->advance();
+        else                                 break;
+    }
+
+    // Parse right bracket
+    auto right_bracket = this->parse_token(token::RightBracket);
+    if (right_bracket.is_error()) return Error {};
+
+    // Parse left paren
+    auto left_paren = this->parse_token(token::LeftParen);
+    if (left_paren.is_error()) return Error {};
+
+    // Parse args
+    while (this->current() != token::RightParen && !this->at_end()) {
+        auto arg = this->parse_function_argument();
+        if (arg.is_error()) return arg;
+
+        // Parse type annotation
+        auto colon = this->parse_token(token::Colon);
+        if (colon.is_error()) return Error {};
+
+        auto type = this->parse_type();
+        if (type.is_error()) return Error {};
+
+        ast::set_type(arg.get_value(), type.get_value());
+        
+        // Add argument
+        interface.args.push_back((ast::FunctionArgumentNode*) arg.get_value());
+
+        if (this->current() == token::Comma) this->advance();
+        else                                 break;
+    }
+
+    // Parse right paren
+    auto right_paren = this->parse_token(token::RightParen);
+    if (right_paren.is_error()) return Error {};
+
+    // Parse type annotation
+    auto colon = this->parse_token(token::Colon);
+    if (colon.is_error()) return Error {};
+
+    // Parse mut
+    if (this->current() == token::Mut) {
+        interface.return_type_is_mutable = true;
+        this->advance();
+    }
+
+    auto type = this->parse_type();
+    if (type.is_error()) return Error {};
+
+    interface.return_type = type.get_value();
+
+    this->ast.push_back(interface);
+    return this->ast.last_element();
+}
+
+// builtin → "builtin" IDENTIFIER "(" (function_argument ":" type) ",")* ")" ":" type
+Result<ast::Node*, Error> Parser::parse_builtin() {
+    // Create node
+    auto builtin = ast::FunctionNode {this->current().line, this->current().column};
+    builtin.module_path = this->file;
+    builtin.is_builtin = true;
+
+    // Parse keyword
+    auto keyword = this->parse_token(token::Builtin);
+    if (keyword.is_error()) return Error {};
+
+    // Parse indentifier
+    auto identifier = this->parse_identifier();
+    if (identifier.is_error()) return identifier;
+    builtin.identifier = (ast::IdentifierNode*) identifier.get_value();
+
     // Parse possible type parameter
     if (this->current() == token::LeftBracket) {
         this->advance();
@@ -544,7 +643,7 @@ Result<ast::Node*, Error> Parser::parse_interface() {
 
             ast::TypeParameter type_parameter;
             type_parameter.type = parameter.get_value();
-            interface.type_parameters.push_back(type_parameter);
+            builtin.type_parameters.push_back(type_parameter);
             i += 1;
 
             if (this->current() == token::Comma) this->advance();
@@ -566,15 +665,16 @@ Result<ast::Node*, Error> Parser::parse_interface() {
         if (arg.is_error()) return arg;
 
         // Parse type annotation
-        if (this->current() == token::Colon) {
-            this->advance();
+        auto colon = this->parse_token(token::Colon);
+        if (colon.is_error()) return Error {};
 
-            auto type = this->parse_type();
-            if (type.is_error()) return Error {};
+        auto type = this->parse_type();
+        if (type.is_error()) return Error {};
 
-            ast::set_type(arg.get_value(), type.get_value());
-        }
-        interface.args.push_back((ast::FunctionArgumentNode*) arg.get_value());
+        ast::set_type(arg.get_value(), type.get_value());
+        
+        // Add argument
+        builtin.args.push_back((ast::FunctionArgumentNode*) arg.get_value());
 
         if (this->current() == token::Comma) this->advance();
         else                                 break;
@@ -588,12 +688,18 @@ Result<ast::Node*, Error> Parser::parse_interface() {
     auto colon = this->parse_token(token::Colon);
     if (colon.is_error()) return Error {};
 
+    // Parse mut
+    if (this->current() == token::Mut) {
+        builtin.return_type_is_mutable = true;
+        this->advance();
+    }
+
     auto type = this->parse_type();
     if (type.is_error()) return Error {};
 
-    interface.return_type = type.get_value();
+    builtin.return_type = type.get_value();
 
-    this->ast.push_back(interface);
+    this->ast.push_back(builtin);
     return this->ast.last_element();
 }
 
@@ -1604,7 +1710,13 @@ Result<ast::Node*, Error> Parser::parse_boolean() {
 }
 
 // identifier → IDENTIFIER
+//            | AND
+//            | OR
+//            | NOT
 Result<ast::Node*, Error> Parser::parse_identifier() {
+    if (this->current() == token::And) return this->parse_identifier(token::And);
+    if (this->current() == token::Or) return this->parse_identifier(token::Or);
+    if (this->current() == token::Not) return this->parse_identifier(token::Not);
     return this->parse_identifier(token::Identifier);
 }
 

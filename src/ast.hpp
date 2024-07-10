@@ -303,6 +303,7 @@ namespace ast {
         FunctionState state = FunctionCompletelyTyped;
         bool is_extern = false;
         bool is_extern_and_variadic = false;
+        bool is_builtin = false;
         std::vector<FunctionSpecialization> specializations;
         Type return_type = Type(ast::NoType{});
         bool return_type_is_mutable = false;
