@@ -14,37 +14,36 @@ interface multiply[t](left: t, right: t): t
 interface divide[t](left: t, right: t): t
 interface modulo[t](left: t, right: t): t
 
-interface print[t](object: t): void
+builtin equal(left: float64, right: float64): bool
+builtin equal(left: int64, right: int64): bool
+builtin equal(left: int32, right: int32): bool
+builtin equal(left: int8, right: int8): bool
+builtin equal(left: bool, right: bool): bool
 
-builtin equal(left: float64, right: float64): float64
-builtin equal(left: int64, right: int64): int64
-builtin equal(left: int32, right: int32): int32
-builtin equal(left: int8, right: int8): int8
+builtin notEqual(left: float64, right: float64): bool
+builtin notEqual(left: int64, right: int64): bool
+builtin notEqual(left: int32, right: int32): bool
+builtin notEqual(left: int8, right: int8): bool
 
-builtin notEqual(left: float64, right: float64): float64
-builtin notEqual(left: int64, right: int64): int64
-builtin notEqual(left: int32, right: int32): int32
-builtin notEqual(left: int8, right: int8): int8
+builtin less(left: float64, right: float64): bool
+builtin less(left: int64, right: int64): bool
+builtin less(left: int32, right: int32): bool
+builtin less(left: int8, right: int8): bool
 
-builtin less(left: float64, right: float64): float64
-builtin less(left: int64, right: int64): int64
-builtin less(left: int32, right: int32): int32
-builtin less(left: int8, right: int8): int8
+builtin lessEqual(left: float64, right: float64): bool
+builtin lessEqual(left: int64, right: int64): bool
+builtin lessEqual(left: int32, right: int32): bool
+builtin lessEqual(left: int8, right: int8): bool
 
-builtin lessEqual(left: float64, right: float64): float64
-builtin lessEqual(left: int64, right: int64): int64
-builtin lessEqual(left: int32, right: int32): int32
-builtin lessEqual(left: int8, right: int8): int8
+builtin greater(left: float64, right: float64): bool
+builtin greater(left: int64, right: int64): bool
+builtin greater(left: int32, right: int32): bool
+builtin greater(left: int8, right: int8): bool
 
-builtin greater(left: float64, right: float64): float64
-builtin greater(left: int64, right: int64): int64
-builtin greater(left: int32, right: int32): int32
-builtin greater(left: int8, right: int8): int8
-
-builtin greaterEqual(left: float64, right: float64): float64
-builtin greaterEqual(left: int64, right: int64): int64
-builtin greaterEqual(left: int32, right: int32): int32
-builtin greaterEqual(left: int8, right: int8): int8
+builtin greaterEqual(left: float64, right: float64): bool
+builtin greaterEqual(left: int64, right: int64): bool
+builtin greaterEqual(left: int32, right: int32): bool
+builtin greaterEqual(left: int8, right: int8): bool
 
 builtin add(left: float64, right: float64): float64
 builtin add(left: int64, right: int64): int64

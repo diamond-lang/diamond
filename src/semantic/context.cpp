@@ -148,7 +148,16 @@ Result<Ok, Error> semantic::add_definitions_to_current_scope(Context& context, s
             scope[identifier] = semantic::Binding(function);
         }
         else if (scope[identifier].type == InterfaceBinding) {
-            get_interface(scope[identifier])->functions.push_back(function);
+            bool alreadyAdded = false;
+            for (auto function2: get_interface(scope[identifier])->functions) {
+                if (function2 == function) {
+                    alreadyAdded = true;
+                    break;
+                }
+            }
+            if (!alreadyAdded) {
+                get_interface(scope[identifier])->functions.push_back(function);
+            }
         }
         else if (scope[identifier].type == FunctionBinding) {
             std::cout << "Multiple definitions for function " << function->identifier->value << "\n";
@@ -180,6 +189,9 @@ Result<Ok, Error> semantic::add_definitions_to_current_scope(Context& context, a
     // Add functions from modules
     auto current_directory = context.current_module.parent_path();
     std::set<std::filesystem::path> already_included_modules = {context.current_module};
+    for (auto path: std_libs.elements) {
+        already_included_modules.insert(path);
+    }
 
     for (auto& use_stmt: block.use_statements) {
         auto module_path = std::filesystem::canonical(current_directory / (use_stmt->path->value + ".dmd"));

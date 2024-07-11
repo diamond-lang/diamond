@@ -1,4 +1,5 @@
 #include "intrinsics.hpp"
+#include "../utilities.hpp"
 
 Set<std::string> primitive_types = Set<std::string>({
     "int8",
@@ -8,4 +9,9 @@ Set<std::string> primitive_types = Set<std::string>({
     "bool",
     "string",
     "void"
+});
+
+extern Set<std::filesystem::path> std_libs = Set<std::filesystem::path>({
+    utilities::get_folder_of_executable() + "/std/core" + ".dmd",
+    utilities::get_folder_of_executable() + "/std/io" + ".dmd"
 });

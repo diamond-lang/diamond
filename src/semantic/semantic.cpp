@@ -4,6 +4,7 @@
 #include "unify.hpp"
 #include "make_concrete.hpp"
 #include "../utilities.hpp"
+#include "intrinsics.hpp"
 
 // Helper functions
 // ----------------
@@ -41,8 +42,36 @@ Result<Ok, Errors> semantic::analyze(ast::Ast& ast) {
     semantic::Context context;
     context.init_with(&ast);
 
+    // Add std and analyze
+    std::set<std::filesystem::path> already_include_modules = {ast.module_path};
+    for (auto path: std_libs.elements) {
+        add_module_functions(context, path, already_include_modules);
+    }
+    
+    // Analyze functions in current scope
+    for (auto& it: semantic::current_scope(context)) {
+        auto& binding = it.second;
+        if (binding.type == semantic::FunctionBinding) {
+            if (semantic::get_function(binding)->state == ast::FunctionAnalyzed) continue;
+
+            auto result = semantic::analyze(context, *semantic::get_function(binding));
+            if (result.is_error()) return context.errors;
+        }
+        else if (binding.type == semantic::InterfaceBinding) {
+            auto functions = semantic::get_interface(binding)->functions;
+            for (size_t i = 0; i < functions.size(); i++) {
+                if (functions[i]->state == ast::FunctionAnalyzed) continue;
+
+                auto result = semantic::analyze(context, *functions[i]);
+                if (result.is_error()) return context.errors;
+            }
+        }
+    }
+
+    // Analyze program
     semantic::analyze(context, *ast.program);
 
+    // Return
     if (context.errors.size() > 0) return context.errors;
     else                           return Ok {};
 }

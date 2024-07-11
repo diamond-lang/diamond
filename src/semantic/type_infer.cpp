@@ -420,7 +420,15 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
         return Ok {};
     }
     else if (binding->type == semantic::FunctionBinding) {
-        // do nothing
+        for (size_t i = 0; i < semantic::get_function(*binding)->args.size(); i++) {
+            semantic::add_constraint(context, Set<ast::Type>({node.args[i]->type, semantic::get_function(*binding)->args[i]->type}));
+        }
+        if (semantic::get_function(*binding)->return_type.is_concrete()) {
+            semantic::add_constraint(context, Set<ast::Type>({node.type, semantic::get_function(*binding)->return_type}));
+        }
+        else if (!semantic::get_function(*binding)->return_type.is_final_type_variable()) {
+            assert(false);
+        }
     }
     else {
         std::cout << "Error: Binding is not a function or interface\n";

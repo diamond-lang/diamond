@@ -119,34 +119,6 @@ Location Parser::location() {
     return Location(this->current().line, this->current().column, this->file);
 }
 
-static void add_std_lib(ast::Ast& ast, ast::BlockNode* block) {
-    // ast::StringNode std_lib_path;
-    // std_lib_path.line = ast.program->line;
-    // std_lib_path.column = ast.program->column;
-    // std_lib_path.value = utilities::get_folder_of_executable() + "/std/core";
-    // ast.push_back(std_lib_path);
-
-    // ast::UseNode std_lib;
-    // std_lib.line = ast.program->line;
-    // std_lib.column = ast.program->column;
-    // std_lib.path = (ast::StringNode*) ast.last_element();
-    // ast.push_back(std_lib);
-    // block->use_statements.insert(block->use_statements.begin() + 0, (ast::UseNode*) ast.last_element());
-
-    // //ast::StringNode std_lib_path;
-    // std_lib_path.line = ast.program->line;
-    // std_lib_path.column = ast.program->column;
-    // std_lib_path.value = utilities::get_folder_of_executable() + "/std/io";
-    // ast.push_back(std_lib_path);
-
-    // //ast::UseNode std_lib;
-    // std_lib.line = ast.program->line;
-    // std_lib.column = ast.program->column;
-    // std_lib.path = (ast::StringNode*) ast.last_element();
-    // ast.push_back(std_lib);
-    // block->use_statements.insert(block->use_statements.begin() + 0, (ast::UseNode*) ast.last_element());
-}
-
 // Parsing
 // -------
 Result<ast::Ast, Errors> parse::program(const std::vector<token::Token>& tokens, const std::filesystem::path& file) {
@@ -161,8 +133,6 @@ Result<ast::Ast, Errors> parse::program(const std::vector<token::Token>& tokens,
     ast.program = (ast::BlockNode*) parsing_result.get_value();
     ast.modules[module_path.string()] = (ast::BlockNode*) parsing_result.get_value();
 
-    add_std_lib(ast, ast.program);
-
     return ast;
 }
 
@@ -172,9 +142,6 @@ Result<Ok, Errors> parse::module(ast::Ast& ast, const std::vector<token::Token>&
     if (parsing_result.is_error()) return parser.errors;
 
     ast.modules[file.string()] = (ast::BlockNode*) parsing_result.get_value();
-
-    add_std_lib(ast, ast.modules[file.string()]);
-
     return Ok {};
 }
 
@@ -1501,6 +1468,16 @@ Result<ast::Node*, Error> Parser::parse_binary(int precedence) {
 
             // Add identifier to call
             call.identifier = (ast::IdentifierNode*) identifier.get_value();
+            if (call.identifier->value == "==") call.identifier->value = "equal";
+            else if (call.identifier->value == "<") call.identifier->value = "less";
+            else if (call.identifier->value == "<=") call.identifier->value = "lessEqual";
+            else if (call.identifier->value == ">") call.identifier->value = "greater";
+            else if (call.identifier->value == ">=") call.identifier->value = "greaterEqual";
+            else if (call.identifier->value == "+") call.identifier->value = "add";
+            else if (call.identifier->value == "-") call.identifier->value = "subtract";
+            else if (call.identifier->value == "*") call.identifier->value = "multiply";
+            else if (call.identifier->value == "/") call.identifier->value = "divide";
+            else if (call.identifier->value == "%") call.identifier->value = "modulo";
 
             // Add left node to call
             this->ast.push_back(left_node);
@@ -1610,6 +1587,7 @@ Result<ast::Node*, Error> Parser::parse_negation() {
     auto identifier = this->parse_identifier(token::Minus);
     if (identifier.is_error()) return identifier;
     call.identifier = (ast::IdentifierNode*) identifier.get_value();
+    call.identifier->value = "negate";
 
     // Parse expression
     auto arg = ast::CallArgumentNode {this->current().line, this->current().column};

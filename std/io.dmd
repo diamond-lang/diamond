@@ -1,56 +1,22 @@
+interface print[t](object: t): void
+
 extern printf(format: string, ...): int32
 
 function print(value: float64): void
-    print(value, true)
-
-function print(value: float64, endWithNewLine: bool): void
-    _ = printf("%g", value)
-    
-    if endWithNewLine
-        _ = printf("\n")
+    _ = printf("%g\n", value)
 
 function print(value: int64): void
-    print(value, true)
-
-function print(value: int64, endWithNewLine: bool): void
-    _ = printf("%d", value)
-    
-    if endWithNewLine
-        _ = printf("\n")
+    _ = printf("%d\n", value)
 
 function print(value: int32): void
-    print(value, true)
-
-function print(value: int32, endWithNewLine: bool): void
-    _ = printf("%d", value)
-    
-    if endWithNewLine
-        _ = printf("\n")
+    _ = printf("%d\n", value)
 
 function print(value: int8): void
-    print(value, true)
-
-function print(value: int8, endWithNewLine: bool): void
-    _ = printf("%d", value)
-
-    if endWithNewLine
-        _ = printf("\n")
+    _ = printf("%d\n", value)
 
 function print(value: bool): void
-    print(value, true)
-
-function print(value: bool, endWithNewLine: bool): void
-    if value _ = printf("true")
-    else     _ = printf("false")
-
-    if endWithNewLine
-        _ = printf("\n")
+    if value _ = printf("true\n")
+    else     _ = printf("false\n")
 
 function print(value: string): void
     _ = printf(value)
-
-function print(value: string, endWithNewLine: bool): void
-    _ = printf(value)
-
-    if endWithNewLine
-        _ = printf("\n")

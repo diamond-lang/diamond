@@ -1,7 +1,7 @@
-function add(a: float64, b: float64): float64
+function myAdd(a: float64, b: float64): float64
     return a + b
 
-print(add(2 + 2, 4))
+print(myAdd(2 + 2, 4))
 
 --- Output
 8
