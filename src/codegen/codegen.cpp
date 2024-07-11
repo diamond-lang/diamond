@@ -1059,6 +1059,8 @@ void codegen::Context::codegen_types_bodies(std::vector<ast::TypeNode*> types) {
 
 void codegen::Context::codegen_function_prototypes(std::vector<ast::FunctionNode*> functions) {
     for (auto& function: functions) {
+        if (function->is_builtin) continue;
+
         if (function->state != ast::FunctionCompletelyTyped) {
             for (auto& specialization: function->specializations) {
                 this->type_bindings = specialization.type_bindings;
@@ -1130,7 +1132,7 @@ void codegen::Context::codegen_function_prototypes(std::filesystem::path module_
 
 void codegen::Context::codegen_function_bodies(std::vector<ast::FunctionNode*> functions) {
     for (auto& function: functions) {
-        if (function->is_extern) continue;
+        if (function->is_extern || function->is_builtin) continue;
 
         if (function->state != ast::FunctionCompletelyTyped) {
             for (auto& specialization: function->specializations) {
@@ -1728,7 +1730,7 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
   
     // Intrinsics
     if (node.args.size() == 2) {
-        if (node.identifier->value == "+") {
+        if (node.identifier->value == "add") {
             if (args[0]->getType()->isDoubleTy() && args[1]->getType()->isDoubleTy()) {
                 return this->builder->CreateFAdd(args[0], args[1], "addtmp");
             }
@@ -1736,7 +1738,7 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
                 return this->builder->CreateAdd(args[0], args[1], "addtmp");
             }
         }
-        if (node.identifier->value == "-") {
+        if (node.identifier->value == "subtract") {
             if (args[0]->getType()->isDoubleTy() && args[1]->getType()->isDoubleTy()) {
                 return this->builder->CreateFSub(args[0], args[1], "subtmp");
             }
@@ -1744,7 +1746,7 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
                 return this->builder->CreateSub(args[0], args[1], "addtmp");
             }
         }
-        if (node.identifier->value == "*") {
+        if (node.identifier->value == "multiply") {
             if (args[0]->getType()->isDoubleTy() && args[1]->getType()->isDoubleTy()) {
                 return this->builder->CreateFMul(args[0], args[1], "multmp");
             }
@@ -1752,7 +1754,7 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
                 return this->builder->CreateMul(args[0], args[1], "addtmp");
             }
         }
-        if (node.identifier->value == "/") {
+        if (node.identifier->value == "divide") {
             if (args[0]->getType()->isDoubleTy() && args[1]->getType()->isDoubleTy()) {
                 return this->builder->CreateFDiv(args[0], args[1], "divtmp");
             }
@@ -1760,10 +1762,10 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
                 return this->builder->CreateSDiv(args[0], args[1], "divtmp");
             }
         }
-        if (node.identifier->value == "%") {
+        if (node.identifier->value == "modulo") {
             return this->builder->CreateSRem(args[0], args[1], "remtmp");
         }
-        if (node.identifier->value == "<") {
+        if (node.identifier->value == "less") {
             if (args[0]->getType()->isDoubleTy() && args[1]->getType()->isDoubleTy()) {
                 return this->builder->CreateFCmpULT(args[0], args[1], "cmptmp");
             }
@@ -1771,7 +1773,7 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
                 return this->builder->CreateICmpULT(args[0], args[1], "addtmp");
             }
         }
-        if (node.identifier->value == "<=") {
+        if (node.identifier->value == "lessEqual") {
             if (args[0]->getType()->isDoubleTy() && args[1]->getType()->isDoubleTy()) {
                 return this->builder->CreateFCmpULE(args[0], args[1], "cmptmp");
             }
@@ -1779,7 +1781,7 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
                 return this->builder->CreateICmpULE(args[0], args[1], "addtmp");
             }
         }
-        if (node.identifier->value == ">") {
+        if (node.identifier->value == "greater") {
             if (args[0]->getType()->isDoubleTy() && args[1]->getType()->isDoubleTy()) {
                 return this->builder->CreateFCmpUGT(args[0], args[1], "cmptmp");
             }
@@ -1787,7 +1789,7 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
                 return this->builder->CreateICmpUGT(args[0], args[1], "addtmp");
             }
         }
-        if (node.identifier->value == ">=") {
+        if (node.identifier->value == "greaterEqual") {
             if (args[0]->getType()->isDoubleTy() && args[1]->getType()->isDoubleTy()) {
                 return this->builder->CreateFCmpUGE(args[0], args[1], "cmptmp");
             }
@@ -1795,7 +1797,7 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
                 return this->builder->CreateICmpUGE(args[0], args[1], "addtmp");
             }
         }
-        if (node.identifier->value == "==") {
+        if (node.identifier->value == "equal") {
             if (args[0]->getType()->isDoubleTy() && args[1]->getType()->isDoubleTy()) {
                 return this->builder->CreateFCmpUEQ(args[0], args[1], "eqtmp");
             }
@@ -1811,7 +1813,7 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
         }
     }
     if (node.args.size() == 1) {
-        if (node.identifier->value == "-") {
+        if (node.identifier->value == "negate") {
             if (args[0]->getType()->isDoubleTy()) {
                 return this->builder->CreateFNeg(args[0], "negation");
             }

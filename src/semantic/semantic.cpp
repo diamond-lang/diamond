@@ -3,6 +3,7 @@
 #include "type_infer.hpp"
 #include "unify.hpp"
 #include "make_concrete.hpp"
+#include "../utilities.hpp"
 
 // Helper functions
 // ----------------
@@ -160,8 +161,25 @@ Result<Ok, Error> semantic::analyze_block_or_expression(semantic::Context& conte
     std::unordered_map<ast::Type, ast::InterfaceType> unified_interface_constraints;
     for (auto it: context.type_inference.interface_constraints) {
         auto unified_type = semantic::get_unified_type(context, it.first);
-        unified_interface_constraints[unified_type] = it.second;
+        if (unified_interface_constraints.find(unified_type) == unified_interface_constraints.end()) {
+            unified_interface_constraints[unified_type] = it.second;
+        }
+        else if (unified_interface_constraints[unified_type] != it.second) {
+            if (unified_interface_constraints[unified_type].name == "Float"
+            &&  it.second.name == "Number") {
+                // do nothing
+            }
+            else if (unified_interface_constraints[unified_type].name == "Float"
+            &&       it.second.name == "Number") {
+                unified_interface_constraints[unified_type] = it.second;
+            }
+        }
+        else {
+            // do nothing
+        }
     }
+
+    context.type_inference.interface_constraints = unified_interface_constraints;
     
     // Unify args and return type if we are in funciton being analyzed
     if (context.current_function.has_value()

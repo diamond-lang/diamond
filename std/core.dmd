@@ -14,7 +14,7 @@ interface multiply[t](left: t, right: t): t
 interface divide[t](left: t, right: t): t
 interface modulo[t](left: t, right: t): t
 
---interface print[t](object: t): void
+interface print[t](object: t): void
 
 builtin equal(left: float64, right: float64): float64
 builtin equal(left: int64, right: int64): int64

@@ -407,7 +407,7 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
 
             sets[interface_prototype[i]].insert(prototype[i]);
 
-            if (!interface_prototype[i].is_type_variable()) {
+            if (!interface_prototype[i].is_final_type_variable()) {
                 sets[interface_prototype[i]].insert(interface_prototype[i]);
             }
         }
