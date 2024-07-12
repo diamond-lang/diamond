@@ -939,7 +939,9 @@ llvm::Value* codegen::Context::get_pointer_to(ast::Node* expression) {
         auto pointer = this->get_field_pointer(node);
         return pointer;
     }
-    else if (expression->index() == ast::Call && std::get<ast::CallNode>(*expression).identifier->value == "[]") {
+    else if (expression->index() == ast::Call
+    &&       (std::get<ast::CallNode>(*expression).identifier->value == "subscript"
+           || std::get<ast::CallNode>(*expression).identifier->value == "subscript_mut")) {
         auto& node = std::get<ast::CallNode>(*expression);
         auto pointer = this->get_index_access_pointer(node);
         return pointer;
@@ -1722,7 +1724,7 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
 
     // Codegen args
     std::vector<llvm::Value*> args; 
-    if (node.identifier->value != "[]"
+    if (node.identifier->value != "subscript"
     && node.identifier->value != "size"
     && node.identifier->value != "print") {
         args = this->codegen_args(function, node.args);
@@ -1842,7 +1844,8 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
             return this->builder->CreateCall(llvm_function, args, "calltmp");
         }
     }
-    if (node.identifier->value == "[]") {
+    if (node.identifier->value == "subscript"
+    ||  node.identifier->value == "subscript_mut") {
         if (node.args.size() == 2) {
             return this->builder->CreateLoad(
                 this->as_llvm_type(ast::get_concrete_type((ast::Node*)&node, this->type_bindings)),

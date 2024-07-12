@@ -294,7 +294,7 @@ Result<ast::Node*, Error> Parser::parse_statement() {
                 if (result.is_error()) return result;
 
                 if (result.get_value()->index() == ast::Call) {
-                    if (std::get<ast::CallNode>(*result.get_value()).identifier->value == "[]") {
+                    if (std::get<ast::CallNode>(*result.get_value()).identifier->value == "subscript") {
                         return this->parse_index_assignment(result.get_value());
                     }
                     else {
@@ -1045,6 +1045,7 @@ Result<ast::Node*, Error> Parser::parse_index_assignment(ast::Node* index_access
     // Parse index access
     assignment.assignable = index_access;
     ((ast::CallNode*) index_access)->args[0]->is_mutable = true;
+    ((ast::CallNode*) index_access)->identifier->value = "subscript_mut";
 
     // Parse equal
     auto equal = this->parse_token(token::Equal);

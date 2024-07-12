@@ -78,6 +78,6 @@ builtin modulo(left: int8, right: int8): int8
 builtin not(boolean: bool): bool
 builtin and(left: bool, right: bool): bool
 builtin or(left: bool, right: bool): bool
---builtin subscript[t](array: array[t], index: int64): t
-builtin subscript[t](mut array: array[t], index: int64): mut t
+builtin subscript[t](array: array[t], index: int64): t
+builtin subscript_mut[t](mut array: array[t], index: int64): mut t
 builtin size[t](array: array[t]): int64

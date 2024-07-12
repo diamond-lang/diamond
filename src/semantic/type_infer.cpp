@@ -1,5 +1,6 @@
 #include "type_infer.hpp"
 #include "semantic.hpp"
+#include "../semantic.hpp"
 
 Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, ast::Node* node) {
     return std::visit(
@@ -356,6 +357,26 @@ static std::vector<ast::Type> get_default_types(semantic::Context& context, std:
     return result;
 }
 
+static void add_type_variable_and_call_type(semantic::Context& context, std::unordered_map<ast::Type, Set<ast::Type>> sets, ast::Type interface_type, ast::Type call_type) {
+    if (interface_type.is_final_type_variable()) {
+        if (sets.find(interface_type) == sets.end()) {
+            sets[interface_type] = Set<ast::Type>();
+        }
+
+        sets[interface_type].insert(call_type);
+    }
+    else if (interface_type.is_concrete()) {
+        semantic::add_constraint(context, Set<ast::Type>({interface_type, call_type}));
+    }
+    else {
+        if (call_type.is_nominal_type() && call_type.as_nominal_type().parameters.size() != 0) {
+            for (size_t i = 0; i  < interface_type.as_nominal_type().parameters.size(); i++) {
+                assert(interface_type.as_nominal_type().parameters.size() == call_type.as_nominal_type().parameters.size());
+                add_type_variable_and_call_type(context, sets, interface_type.as_nominal_type().parameters[i], call_type.as_nominal_type().parameters[i]);
+            }
+        }
+    }
+}
 
 Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, ast::CallNode& node) {
     auto& identifier = node.identifier->value;
@@ -378,26 +399,43 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
         node.type = semantic::new_type_variable(context);
     }
 
-    if (binding->type == semantic::InterfaceBinding) {
+    if (binding->type == semantic::InterfaceBinding
+    ||  binding->type == semantic::FunctionBinding) {
         // Create vector for the prototype of the call
         std::vector<ast::Type> prototype = ast::get_types(node.args);
         prototype.push_back(node.type);
 
         // Create vector for the prototype of the interface
-        std::vector<ast::Type> interface_prototype = semantic::get_interface(*binding)->get_prototype();
+        std::vector<ast::Type> interface_prototype;
+        if (binding->type == semantic::InterfaceBinding) {
+            interface_prototype = semantic::get_interface(*binding)->get_prototype();
+        }
+        else if (binding->type == semantic::FunctionBinding) {
+            auto function = semantic::get_function(*binding);
+            for (auto arg: function->args) {
+                interface_prototype.push_back(arg->type);
+            }
 
-        // Infer stuff, basically is loop trough the each type of the interface prototype
+            if (function->is_extern_and_variadic) {
+                for (int i = 0; i < node.args.size() - function->args.size(); i++) {
+                    interface_prototype.push_back(ast::Type(ast::NoType{}));
+                }
+            }
+
+            interface_prototype.push_back(function->return_type);
+        }
+        else {
+            assert(false);
+        }
+
+        // Infer stuff
         std::unordered_map<ast::Type, Set<ast::Type>> sets;
         for (size_t i = 0; i < interface_prototype.size(); i++) {
-            if (sets.find(interface_prototype[i]) == sets.end()) {
-                sets[interface_prototype[i]] = Set<ast::Type>();
+            if (interface_prototype[i].is_no_type()) {
+                continue;
             }
 
-            sets[interface_prototype[i]].insert(prototype[i]);
-
-            if (!interface_prototype[i].is_final_type_variable()) {
-                sets[interface_prototype[i]].insert(interface_prototype[i]);
-            }
+            add_type_variable_and_call_type(context, sets, interface_prototype[i], prototype[i]);
         }
 
         // Add constraints found
@@ -406,22 +444,6 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
         }
 
         return Ok {};
-    }
-    else if (binding->type == semantic::FunctionBinding) {
-        for (size_t i = 0; i < semantic::get_function(*binding)->args.size(); i++) {
-            if (semantic::get_function(*binding)->args[i]->type.is_concrete()) {
-                semantic::add_constraint(context, Set<ast::Type>({node.args[i]->type, semantic::get_function(*binding)->args[i]->type}));
-            }
-            else if (!semantic::get_function(*binding)->args[i]->type.is_final_type_variable()) {
-                assert(false);
-            }
-        }
-        if (semantic::get_function(*binding)->return_type.is_concrete()) {
-            semantic::add_constraint(context, Set<ast::Type>({node.type, semantic::get_function(*binding)->return_type}));
-        }
-        else if (!semantic::get_function(*binding)->return_type.is_final_type_variable()) {
-            assert(false);
-        }
     }
     else {
         std::cout << "Error: Binding is not a function or interface\n";
