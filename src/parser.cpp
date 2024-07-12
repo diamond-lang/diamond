@@ -1836,7 +1836,7 @@ Result<ast::Node*, Error> Parser::parse_index_access(ast::Node* expression) {
 
     // Create identifier node
     auto identifier = ast::IdentifierNode {this->current().line, this->current().column};
-    identifier.value = "[]";
+    identifier.value = "subscript";
     this->ast.push_back(identifier);
     index_access.identifier = (ast::IdentifierNode*) this->ast.last_element();
 

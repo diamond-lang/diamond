@@ -127,15 +127,18 @@ Result<Ok, Error> semantic::add_definitions_to_current_scope(Context& context, s
     for (auto& interface: interfaces) {
         auto& identifier = interface->identifier->value;
 
-        if (scope.find(identifier) == scope.end()) {
+        if (semantic::get_binding(context,identifier) == nullptr) {
             scope[identifier] = semantic::Binding(interface);
         }
-        else if (scope[identifier].type == FunctionBinding) {
+        else if (semantic::get_binding(context,identifier)->type == FunctionBinding) {
             std::cout << "Function \"" << identifier << "\" defined before interface" << "\n";
             assert(false);
         }
-        else {
+        else if (semantic::get_binding(context,identifier)->type == InterfaceBinding) {
             std::cout << "Multiple definitions for interface " << interface->identifier->value << "\n";
+            assert(false);
+        }
+        else {
             assert(false);
         }
     }
@@ -144,22 +147,22 @@ Result<Ok, Error> semantic::add_definitions_to_current_scope(Context& context, s
     for (auto& function: functions) {
         auto& identifier = function->identifier->value;
 
-        if (scope.find(identifier) == scope.end()) {
+        if (semantic::get_binding(context,identifier) == nullptr) {
             scope[identifier] = semantic::Binding(function);
         }
-        else if (scope[identifier].type == InterfaceBinding) {
+        else if (semantic::get_binding(context,identifier)->type == InterfaceBinding) {
             bool alreadyAdded = false;
-            for (auto function2: get_interface(scope[identifier])->functions) {
+            for (auto function2: get_interface(*semantic::get_binding(context,identifier))->functions) {
                 if (function2 == function) {
                     alreadyAdded = true;
                     break;
                 }
             }
             if (!alreadyAdded) {
-                get_interface(scope[identifier])->functions.push_back(function);
+                get_interface(*semantic::get_binding(context,identifier))->functions.push_back(function);
             }
         }
-        else if (scope[identifier].type == FunctionBinding) {
+        else if (semantic::get_binding(context,identifier)->type == FunctionBinding) {
             std::cout << "Multiple definitions for function " << function->identifier->value << "\n";
             assert(false);
         }

@@ -27,24 +27,11 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
         }
     }
 
-    // Analyze functions in current scope
-    for (auto& it: scope) {
-        auto& binding = it.second;
-        if (binding.type == semantic::FunctionBinding) {
-            if (semantic::get_function(binding)->state == ast::FunctionAnalyzed) continue;
-
-            auto result = semantic::analyze(context, *semantic::get_function(binding));
-            if (result.is_error()) return result;
-        }
-        else if (binding.type == semantic::InterfaceBinding) {
-            auto functions = semantic::get_interface(binding)->functions;
-            for (size_t i = 0; i < functions.size(); i++) {
-                if (functions[i]->state == ast::FunctionAnalyzed) continue;
-
-                auto result = semantic::analyze(context, *functions[i]);
-                if (result.is_error()) return result;
-            }
-        }
+    // Analyze functions of block
+    for (auto function: node.functions) {
+        if (function->state == ast::FunctionAnalyzed) continue;
+        auto result = semantic::analyze(context, *function);
+        if (result.is_error()) return result;
     }
 
     size_t number_of_errors = context.errors.size();
@@ -382,7 +369,8 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
     // Check binding exists
     semantic::Binding* binding = semantic::get_binding(context, identifier);
     if (!binding) {
-        context.errors.push_back(errors::undefined_function(node, get_default_types(context, ast::get_types(node.args)), context.current_module));
+        std::cout << "Undefined function \"" << identifier << "\"\n";
+        //context.errors.push_back(errors::undefined_function(node, get_default_types(context, ast::get_types(node.args)), context.current_module));
         return Error {};
     }
     
@@ -421,7 +409,12 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
     }
     else if (binding->type == semantic::FunctionBinding) {
         for (size_t i = 0; i < semantic::get_function(*binding)->args.size(); i++) {
-            semantic::add_constraint(context, Set<ast::Type>({node.args[i]->type, semantic::get_function(*binding)->args[i]->type}));
+            if (semantic::get_function(*binding)->args[i]->type.is_concrete()) {
+                semantic::add_constraint(context, Set<ast::Type>({node.args[i]->type, semantic::get_function(*binding)->args[i]->type}));
+            }
+            else if (!semantic::get_function(*binding)->args[i]->type.is_final_type_variable()) {
+                assert(false);
+            }
         }
         if (semantic::get_function(*binding)->return_type.is_concrete()) {
             semantic::add_constraint(context, Set<ast::Type>({node.type, semantic::get_function(*binding)->return_type}));
