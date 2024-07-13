@@ -204,7 +204,8 @@ Result<Ok, Error> semantic::add_definitions_to_current_scope(Context& context, a
     }
 
     // Add functions from current scope
-    add_definitions_to_current_scope(context, block.functions, block.interfaces, block.types);
+    auto result = add_definitions_to_current_scope(context, block.functions, block.interfaces, block.types);
+    if (result.is_error()) return result;
 
     return Ok {};
 }

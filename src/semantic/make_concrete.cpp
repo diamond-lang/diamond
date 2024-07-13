@@ -1,4 +1,6 @@
 #include "make_concrete.hpp"
+#include "intrinsics.hpp"
+#include "semantic.hpp"
 
 // Helper functions
 // ----------------
@@ -366,14 +368,14 @@ Result<Ok, Error> semantic::make_concrete(Context& context, ast::StructLiteralNo
 
 Result<Ok, Error> semantic::make_concrete(Context& context, ast::FloatNode& node, std::vector<ast::CallInCallStack> call_stack) {
     if (semantic::get_type(context, node.type).is_final_type_variable()) {
-        context.type_inference.type_bindings[node.type.as_final_type_variable().id] = context.type_inference.interface_constraints[semantic::get_type(context, node.type)].get_default_type();
+        context.type_inference.type_bindings[node.type.as_final_type_variable().id] = ast::Type("float64");
     }
     return Ok {};
 }
 
 Result<Ok, Error> semantic::make_concrete(Context& context, ast::IntegerNode& node, std::vector<ast::CallInCallStack> call_stack) {
     if (semantic::get_type(context, node.type).is_final_type_variable()) {
-        context.type_inference.type_bindings[node.type.as_final_type_variable().id] = context.type_inference.interface_constraints[semantic::get_type(context, node.type)].get_default_type();
+        context.type_inference.type_bindings[node.type.as_final_type_variable().id] = ast::Type("int64");
     }
     return Ok {};
 }
@@ -653,7 +655,23 @@ Result<ast::Type, Error> semantic::get_function_type(Context& context, ast::Call
     }
     else {
         new_context.current_module = function->module_path;
+        
+        // Add std libs
+        std::set<std::filesystem::path> already_include_modules = {context.ast->module_path};
+        for (auto path: std_libs.elements) {
+            add_module_functions(new_context, path, already_include_modules);
+        }
+
+        // Add defintions from new module
         auto result = semantic::add_definitions_to_current_scope(new_context, *(context.ast->modules[function->module_path.string()]));
+        
+        // Analyze functions in new module
+        for (auto function: context.ast->modules[function->module_path.string()]->functions) {
+            if (function->state == ast::FunctionAnalyzed) continue;
+            auto result = semantic::analyze(new_context, *function);
+            if (result.is_error()) return result.get_error();
+        }
+
         assert(result.is_ok());
     }
 

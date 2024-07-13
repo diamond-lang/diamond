@@ -357,7 +357,7 @@ static std::vector<ast::Type> get_default_types(semantic::Context& context, std:
     return result;
 }
 
-static void add_type_variable_and_call_type(semantic::Context& context, std::unordered_map<ast::Type, Set<ast::Type>> sets, ast::Type interface_type, ast::Type call_type) {
+static void add_type_variable_and_call_type(semantic::Context& context, std::unordered_map<ast::Type, Set<ast::Type>>& sets, ast::Type interface_type, ast::Type call_type) {
     if (interface_type.is_final_type_variable()) {
         if (sets.find(interface_type) == sets.end()) {
             sets[interface_type] = Set<ast::Type>();
@@ -438,7 +438,7 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
             add_type_variable_and_call_type(context, sets, interface_prototype[i], prototype[i]);
         }
 
-        // Add constraints found
+        // Add constraints found        
         for (auto it = sets.begin(); it != sets.end(); it++) {
             semantic::add_constraint(context, it->second);
         }
