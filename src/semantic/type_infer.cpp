@@ -273,7 +273,7 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
 Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, ast::IntegerNode& node) {
     if (node.type == ast::Type(ast::NoType{})) {   
         node.type = semantic::new_type_variable(context);
-        semantic::add_interface_constraint(context, node.type,  ast::InterfaceType("Number"));
+        semantic::add_interface_constraint(context, node.type,  ast::InterfaceType("number"));
     }
     else if (!node.type.is_type_variable() && !node.type.is_integer() && !node.type.is_float()) {
         context.errors.push_back(Error("Error: Type mismatch between type annotation and expression"));
@@ -286,7 +286,7 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
 Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, ast::FloatNode& node) {
     if (node.type == ast::Type(ast::NoType{})) {  
         node.type = semantic::new_type_variable(context);
-        semantic::add_interface_constraint(context, node.type,  ast::InterfaceType("Float"));
+        semantic::add_interface_constraint(context, node.type,  ast::InterfaceType("float"));
     }
     else if (!node.type.is_type_variable() && !node.type.is_float()) {
         context.errors.push_back(Error("Error: Type mismatch between type annotation and expression"));
@@ -350,9 +350,11 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
 static std::vector<ast::Type> get_default_types(semantic::Context& context, std::vector<ast::Type> types) {
     std::vector<ast::Type> result;
     for (size_t i = 0; i < types.size(); i++) {
-        assert(types[i].is_type_variable());
-        assert(context.type_inference.interface_constraints.find(types[i]) != context.type_inference.interface_constraints.end());
-        result.push_back(context.type_inference.interface_constraints[types[i]].get_default_type());
+        std::cout << "Get default types\n";
+        assert(false);
+        // assert(types[i].is_type_variable());
+        // assert(context.type_inference.interface_constraints.find(types[i]) != context.type_inference.interface_constraints.end());
+        // result.push_back(context.type_inference.interface_constraints[types[i]].get_default_type());
     }
     return result;
 }
@@ -441,6 +443,17 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
         // Add constraints found        
         for (auto it = sets.begin(); it != sets.end(); it++) {
             semantic::add_constraint(context, it->second);
+
+            if (binding->type == InterfaceBinding
+            && semantic::get_interface(*binding)->type_parameters.size() > 0
+            && semantic::get_interface(*binding)->type_parameters[0].type == it->first) {
+                semantic::add_interface_constraint(context, it->second.elements[0], ast::InterfaceType(node.identifier->value));
+            }
+            else if (binding->type == FunctionBinding) {
+                for (auto interface: semantic::get_function(*binding)->get_type_parameter(it->first).value()->interface.elements) {
+                    semantic::add_interface_constraint(context, it->second.elements[0], interface);
+                }
+            }
         }
 
         return Ok {};

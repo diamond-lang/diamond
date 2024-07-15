@@ -157,19 +157,35 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::Ar
 Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::IntegerNode& node) {
     node.type = semantic::get_unified_type(context, node.type);
 
+    if (!context.current_function.has_value()
+    ||   context.current_function.value()->typed_parameter_aready_added(node.type)) {
+        node.type = ast::Type("int64");
+    }
+    
+
     return Ok {};
 }
 
 Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::FloatNode& node) {
     node.type = semantic::get_unified_type(context, node.type);
+
+    if (!context.current_function.has_value()
+    ||   context.current_function.value()->typed_parameter_aready_added(node.type)) {
+        node.type = ast::Type("float64");
+    }
     
     return Ok {};
 }
 
 Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::CallNode& node) {
+    bool all_args_typed = true;
     for (size_t i = 0; i < node.args.size(); i++) {
         auto result = semantic::unify_types_and_type_check(context, *node.args[i]); 
         if (result.is_error()) return result;
+
+        if (!node.args[i]->type.is_concrete()) {
+            all_args_typed = false;
+        }
     }
 
     node.type = semantic::get_unified_type(context, node.type);
@@ -177,6 +193,10 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::Ca
     // Get binding
     semantic::Binding* binding = semantic::get_binding(context, node.identifier->value);
     assert(binding);
+
+    if (all_args_typed) {
+        node.type = get_function_type(context, binding->value, ast::get_types(node.args), node.type).get_value();
+    }
 
     // Set functions that can be called
     std::vector<ast::FunctionNode*> functions_that_can_be_called;

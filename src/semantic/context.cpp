@@ -290,15 +290,12 @@ void semantic::add_constraint(Context& context, Set<ast::Type> constraint) {
 }
 
 void semantic::add_interface_constraint(Context& context, ast::Type type, ast::InterfaceType interface) {
+    assert(type.to_str() != "t");
     if (context.type_inference.interface_constraints.find(type) == context.type_inference.interface_constraints.end()) {
-        context.type_inference.interface_constraints[type] = interface;
+        context.type_inference.interface_constraints[type] = Set<ast::InterfaceType>();
     }
-    else if (context.type_inference.interface_constraints[type] == interface) {
-        // do nothing
-    }
-    else {
-        assert(false);
-    }
+
+    context.type_inference.interface_constraints[type].insert(interface);
 }
 
 // For unify and analyze

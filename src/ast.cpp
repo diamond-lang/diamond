@@ -15,23 +15,32 @@ bool ast::InterfaceType::operator!=(const InterfaceType &interface) const {
 }
 
 ast::Type ast::InterfaceType::get_default_type() {
-    if (this->name== "Number") {
+    if (this->name== "number") {
         return ast::Type("int64");
     }
-    else if (this->name == "Float") {
+    else if (this->name == "float") {
         return ast::Type("float64");
     }
     else {
-        assert(false);
         return ast::Type(ast::NoType{});
     }
 }
 
+ast::Type ast::get_default_type(Set<ast::InterfaceType> interface) {
+    for (auto it: interface.elements) {
+        if (!it.get_default_type().is_no_type()) {
+            return it.get_default_type();
+        }
+    }
+    assert(false);
+    return ast::Type(ast::NoType{});
+}
+
 bool ast::InterfaceType::is_compatible_with(ast::Type type) {
-    if (this->name== "Number") {
+    if (this->name== "number") {
         return type.is_integer() || type.is_float();
     }
-    else if (this->name == "Float") {
+    else if (this->name == "float") {
         return type.is_float();
     }
     else if (this->name == "pointer") {
@@ -253,13 +262,18 @@ std::string ast::TypeParameter::to_str() {
     assert(this->type.is_final_type_variable());
     std::string output = this->type.to_str();
 
-    if (this->interface.has_value()
+    if (this->interface.size() > 0
     ||  this->field_constraints.size() > 0) {
         output += ": ";
     }
 
-    if (this->interface.has_value()) {
-        output += this->interface.value().name;
+    if (this->interface.size() > 0) {
+        for (size_t i = 0; i < this->interface.elements.size(); i++) {
+            output += this->interface.elements[i].name;
+            if (i + 1 != this->interface.elements.size()) {
+                output += " and ";
+            }
+        }
     }
     else if (this->field_constraints.size() > 0) {
         output += "{";
@@ -1321,4 +1335,17 @@ std::vector<ast::Type> ast::InterfaceNode::get_prototype() {
     }
     results.push_back(this->return_type);
     return results;
+}
+
+bool ast::InterfaceNode::is_compatible_with(ast::Type type) {
+    assert(false);
+}
+
+std::optional<ast::TypeParameter*> ast::get_type_parameter(std::vector<ast::TypeParameter> type_parameters, ast::Type type) {
+    for (auto& type_parameter: type_parameters) {
+        if (type_parameter.type == type) {
+            return &type_parameter;
+        }
+    }
+    return std::nullopt;
 }

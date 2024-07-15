@@ -50,7 +50,7 @@ namespace semantic {
         size_t current_type_variable_number = 1;
         std::vector<Set<ast::Type>> type_constraints;
         std::unordered_map<ast::Type, Set<ast::Type>> labeled_type_constraints;
-        std::unordered_map<ast::Type, ast::InterfaceType> interface_constraints;
+        std::unordered_map<ast::Type, Set<ast::InterfaceType>> interface_constraints;
         std::unordered_map<ast::Type, ast::FieldTypes> field_constraints;
         std::unordered_map<std::string, ast::Type> type_bindings;
     };

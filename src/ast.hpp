@@ -131,6 +131,8 @@ namespace ast {
         bool is_compatible_with(ast::Type type);
     };
 
+    ast::Type get_default_type(Set<ast::InterfaceType> interface);
+
     struct NoType {
 
     };
@@ -238,7 +240,7 @@ namespace ast {
     struct TypeParameter {
         ast::Type type;
         FieldTypes field_constraints;
-        std::optional<InterfaceType> interface = std::nullopt;
+        Set<InterfaceType> interface;
 
         std::string to_str();
     };
@@ -331,7 +333,11 @@ namespace ast {
         bool typed_parameter_aready_added(ast::Type type);
         std::optional<ast::TypeParameter*> get_type_parameter(ast::Type type);
         std::vector<ast::Type> get_prototype();
+
+        bool is_compatible_with(ast::Type type);
     };
+
+    std::optional<ast::TypeParameter*> get_type_parameter(std::vector<ast::TypeParameter> type_parameters, ast::Type type);
 
     struct TypeNode {
         size_t line;
