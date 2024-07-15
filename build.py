@@ -19,7 +19,6 @@ source_files = [
     'src/parser.cpp',
     'src/semantic/context.cpp',
     'src/semantic/intrinsics.cpp',
-    'src/semantic/make_concrete.cpp',
     'src/semantic/semantic.cpp',
     'src/semantic/type_infer.cpp',
     'src/semantic/unify.cpp',

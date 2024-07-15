@@ -21,7 +21,6 @@ std::string current_line(size_t line, std::filesystem::path file_path);
 std::string underline_current_char(Location location);
 std::string underline_current_line(Location location);
 std::string underline_identifier(ast::IdentifierNode& identifier, std::filesystem::path file);
-std::string get_call_stack(std::vector<ast::CallInCallStack> call_stack);
 
 // Implementantions
 // ----------------
@@ -121,18 +120,6 @@ static std::string list_functions(std::vector<ast::FunctionNode*> functions) {
     return result;
 }
 
-std::string errors::ambiguous_what_function_to_call(ast::CallNode& call, std::filesystem::path file, std::vector<ast::FunctionNode*> functions, std::vector<ast::CallInCallStack> call_stack) {
-    std::string result = make_header("Ambiguous call\n\n");
-    result += std::to_string(call.line) + "| " + current_line(call.line, file) + "\n";
-    result += underline_identifier(*call.identifier, file) + "\n";
-    result +=  "Here '" + call.identifier->value + "' could refer to:\n";
-    result += list_functions(functions);
-    if (call_stack.size() > 0) {
-        result += get_call_stack(call_stack);
-    }
-    return result;
-}
-
 std::string ordinal(size_t number) {
     std::string suffix = "th";
     if (number % 100 < 11 || number % 100 > 13) {
@@ -141,64 +128,6 @@ std::string ordinal(size_t number) {
         else if (number % 10 == 3) {suffix = "rd";}
     }
     return  std::to_string(number) + suffix;
-}
-
-std::string errors::unexpected_argument_type(ast::CallNode& call, std::filesystem::path file, size_t arg_index, ast::Type type_received, std::vector<ast::Type> expected_types, std::vector<ast::CallInCallStack> call_stack) {
-    std::string result = make_header("Type mismatch\n\n");
-    result += "The type of the " + ordinal(arg_index + 1) + " argument of '" + call.identifier->value + "' doesn't match with what I expect." + "\n\n";
-    result += get_lines(call.line, call.end_line, file) + "\n";
-    result += "The type received is:\n\n";
-    result +=  type_received.to_str() + "\n\n";
-    result += "But possible types are:\n\n";
-    for (size_t i = 0; i < expected_types.size(); i++) {
-        result += expected_types[i].to_str();
-        if (i + 1 != expected_types.size()) result += " or ";
-    }
-    result += "\n";
-    if (call_stack.size() > 0) {
-        result += get_call_stack(call_stack);
-    }
-    return result;
-}
-
-std::string errors::unexpected_return_type(ast::CallNode& call, std::filesystem::path file, ast::Type type_received, std::vector<ast::Type> expected_types, std::vector<ast::CallInCallStack> call_stack) {
-    std::string result = make_header("Type mismatch\n\n");
-    result += "The return type of '" + call.identifier->value + "' doesn't match with what I expect." + "\n\n";
-    result += get_lines(call.line, call.end_line, file) + "\n";
-    result += "The specified type is:\n\n";
-    result +=  type_received.to_str() + "\n\n";
-    result += "But possible types are:\n\n";
-    for (size_t i = 0; i < expected_types.size(); i++) {
-        result += expected_types[i].to_str();
-        if (i + 1 != expected_types.size()) result += " or ";
-    }
-    result += "\n";
-    if (call_stack.size() > 0) {
-        result += get_call_stack(call_stack);
-    }
-    return result;
-}
-
-std::string errors::unexpected_argument_types(ast::CallNode& call, std::filesystem::path file, size_t arg_index, std::vector<ast::Type> types_received, std::vector<ast::Type> expected_types, std::vector<ast::CallInCallStack> call_stack) {
-    std::string result = make_header("Type mismatch\n\n");
-    result += "The type of the " + ordinal(arg_index + 1) + " argument of '" + call.identifier->value + "' doesn't match with what I expect." + "\n\n";
-    result += get_lines(call.line, call.end_line, file) + "\n";
-    result += "The type received is:\n\n";
-    for (size_t i = 0; i < types_received.size(); i++) {
-        result += types_received[i].to_str();
-        if (i + 1 != types_received.size()) result += " or ";
-    }
-    result += "\n\n";
-    result += "But possible types are:\n\n";
-    for (size_t i = 0; i < expected_types.size(); i++) {
-        result += expected_types[i].to_str();
-        if (i + 1 != expected_types.size()) result += " or ";
-    }
-    result += "\n";
-    if (call_stack.size() > 0) {
-        result += get_call_stack(call_stack);
-    }
-    return result;
 }
 
 std::string errors::unhandled_return_value(ast::CallNode& call, std::filesystem::path file) {
@@ -219,60 +148,6 @@ int number_of_digits(size_t number) {
         digits++;
     }
     return digits;
-}
-
-std::string get_call_stack(std::vector<ast::CallInCallStack> call_stack) {
-    std::string result = "";
-    result += "\nCalled from:\n";
-
-    size_t max_number_of_digits = 1;
-    size_t max_path_length = 1;
-
-    for (auto call: call_stack) {
-        if (number_of_digits(call.call->line) > max_number_of_digits) {
-            max_number_of_digits = number_of_digits(call.call->line);
-        }
-
-        auto relative_path_length = call.file.lexically_relative(std::filesystem::current_path()).string().size();
-        if (call.file.string().size() > max_path_length) {
-            max_path_length = relative_path_length;
-        }
-    }
-
-    for (auto call_it = call_stack.rbegin(); call_it != call_stack.rend(); call_it++) {
-        auto& call = *call_it;
-        result += "    ";
-
-        auto relative_path = call.file.lexically_relative(std::filesystem::current_path()).string();
-        size_t relative_path_length = relative_path.size();
-        for (size_t i = 0; i < max_path_length - relative_path_length; i++) {
-            result += " ";
-        }
-
-        #ifdef _WIN32
-        for (size_t i = 0; i < relative_path.size(); i++) {
-            if (relative_path[i] == '\\') {
-                relative_path[i] = '/';
-            }
-        }
-        #endif
-
-        result += relative_path + ": ";
-
-        size_t digits = number_of_digits(call.call->line);
-        for (size_t i = 0; i < max_number_of_digits - digits; i++) {
-            result += " ";
-        }
-        result += std::to_string(call.call->line) + "| " + call.identifier + "(";
-        for (size_t i = 0; i < call.args.size(); i++) {
-            result += call.function->args[i]->identifier->value + ": ";
-            result += call.args[i].to_str();
-            if (i + 1 != call.args.size()) result += ", ";
-        }
-        result += ")\n";
-    }
-
-    return result;
 }
 
 std::string get_lines(size_t start_line, size_t end_line, std::filesystem::path file_path) {

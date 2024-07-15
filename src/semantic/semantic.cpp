@@ -2,7 +2,6 @@
 #include "semantic.hpp"
 #include "type_infer.hpp"
 #include "unify.hpp"
-#include "make_concrete.hpp"
 #include "../utilities.hpp"
 #include "intrinsics.hpp"
 
@@ -252,15 +251,6 @@ Result<Ok, Error> semantic::analyze_block_or_expression(semantic::Context& conte
     // Unify current program or body of function
     result = semantic::unify_types_and_type_check(context, node);
     if(result.is_error()) return Error {};
-
-    // Make concrete
-    // -------------
-    if (!context.current_function.has_value()
-    ||   context.current_function.value()->state == ast::FunctionCompletelyTyped) {
-        result = semantic::make_concrete(context, node, {});
-        if (result.is_error()) return result;
-        semantic::set_concrete_types(context, node);
-    }
 
     return Ok {};
 }
@@ -534,7 +524,7 @@ Result<ast::Type, Error> semantic::get_function_type(Context& context, ast::Node
         }
 
         for (auto& specialization: function.specializations) {
-            if (specialization.args == semantic::get_types_or_default(context, call_args)) {
+            if (specialization.args == call_args) {
                 return specialization.return_type;
             }
         }

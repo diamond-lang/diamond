@@ -266,19 +266,6 @@ namespace ast {
         ast::IdentifierNode* identifier;
     };
 
-    struct CallInCallStack {
-        std::string identifier;
-        std::vector<Type> args;
-        Type return_type;
-        CallNode* call;
-        FunctionNode* function;
-        std::filesystem::path file;
-
-        CallInCallStack(std::string identifier, std::vector<Type> args, CallNode* call, FunctionNode* function, std::filesystem::path file) : identifier(identifier), args(args), call(call), function(function), file(file) {}
-        bool operator==(const CallInCallStack &t) const;
-        bool operator!=(const CallInCallStack &t) const;
-    };
-
     struct FunctionSpecialization {
         std::vector<Type> args;
         Type return_type;
