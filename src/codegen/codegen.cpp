@@ -1081,6 +1081,8 @@ void codegen::Context::codegen_function_prototypes(std::vector<ast::FunctionNode
             }
         }
         else {
+            if (!function->is_used) continue;
+
             this->codegen_function_prototypes(
                 function->module_path,
                 function->identifier->value,
@@ -1153,6 +1155,8 @@ void codegen::Context::codegen_function_bodies(std::vector<ast::FunctionNode*> f
             }
         }
         else {
+            if (!function->is_used) continue;
+
             this->codegen_function_bodies(
                 function->module_path,
                 function->identifier->value,

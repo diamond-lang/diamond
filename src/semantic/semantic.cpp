@@ -4,6 +4,7 @@
 #include "unify.hpp"
 #include "../utilities.hpp"
 #include "intrinsics.hpp"
+#include "check_functions_used.hpp"
 
 // Helper functions
 // ----------------
@@ -515,15 +516,63 @@ void add_argument_type_to_specialization(ast::FunctionSpecialization& specializa
     }
 }
 
-Result<ast::Type, Error> semantic::get_function_type(Context& context, ast::Node* function_or_interface, std::vector<ast::Type> call_args, ast::Type call_type) {
-    if (function_or_interface->index() == ast::Function) {
-        auto& function = std::get<ast::FunctionNode>(*function_or_interface);
+Result<ast::Type, Error> semantic::get_function_type(Context& context, ast::Node* function_or_interface, ast::CallNode* call, std::vector<ast::Type> call_args, ast::Type call_type) {
+    // Get function called
+    ast::FunctionNode* function = nullptr;
 
-        if (function.type_parameters.size() == 0) {
-            return function.return_type;
+    if (function_or_interface->index() == ast::Function) {
+        function = &std::get<ast::FunctionNode>(*function_or_interface);
+    }
+    else if (function_or_interface->index() == ast::Interface) {
+        auto interface = std::get<ast::InterfaceNode>(*function_or_interface);
+
+        // Get function called
+        for (auto it: interface.functions) {
+            if (semantic::are_arguments_compatible(*it, *call, ast::get_types(it->args), call_args)) {
+                assert(function == nullptr);
+                function = it;
+            }
+        }
+        
+        assert(function != nullptr);
+    }
+    else {
+        assert(false);
+    }
+
+    // If is not generic
+    if (function->type_parameters.size() == 0) {
+        if (!function->is_used) {
+            if (!function->is_builtin
+            &&  !function->is_extern) {
+                // Create new context to check functions used
+                Context new_context;
+                new_context.init_with(context.ast);
+                new_context.current_function = function;
+
+                if (context.current_module == function->module_path) {
+                    new_context.scopes = semantic::get_definitions(context);
+                }
+                else {
+                    new_context.current_module = function->module_path;
+                    auto result = semantic::add_definitions_to_current_scope(new_context, *(context.ast->modules[function->module_path.string()]));
+                    assert(result.is_ok());
+                }
+
+                semantic::add_scope(new_context);
+
+                // Check functions used in function
+                semantic::check_functions_used(new_context, function->body);
+            }
+
+            function->is_used = true;
         }
 
-        for (auto& specialization: function.specializations) {
+        return function->return_type;
+    }
+    // If is generic
+    else {
+        for (auto& specialization: function->specializations) {
             if (specialization.args == call_args) {
                 return specialization.return_type;
             }
@@ -531,35 +580,39 @@ Result<ast::Type, Error> semantic::get_function_type(Context& context, ast::Node
 
         // Add arguments to specialization
         ast::FunctionSpecialization specialization;
-        for (size_t i = 0; i < function.args.size(); i++) {
+        for (size_t i = 0; i < function->args.size(); i++) {
             ast::Type call_type = call_args[i];
-            ast::Type function_type = function.args[i]->type;
-            add_argument_type_to_specialization(specialization, function.type_parameters, function_type, call_type);
+            ast::Type function_type = function->args[i]->type;
+            add_argument_type_to_specialization(specialization, function->type_parameters, function_type, call_type);
             specialization.args.push_back(call_type);
         }
 
-        specialization.return_type = ast::get_concrete_type(function.return_type, specialization.type_bindings);
+        specialization.return_type = ast::get_concrete_type(function->return_type, specialization.type_bindings);
 
-        function.specializations.push_back(specialization);
+        function->specializations.push_back(specialization);
 
-        return specialization.return_type;
+        // Create new context to check functions used
+        Context new_context;
+        new_context.init_with(context.ast);
+        new_context.current_function = function;
+        new_context.type_inference.type_bindings = specialization.type_bindings;
 
-    }
-    else if (function_or_interface->index() == ast::Interface) {
-        auto interface = std::get<ast::InterfaceNode>(*function_or_interface);
-        
-        // Add arguments to specialization
-        ast::FunctionSpecialization specialization;
-        for (size_t i = 0; i < interface.args.size(); i++) {
-            ast::Type call_type = call_args[i];
-            ast::Type function_type = interface.args[i]->type;
-            add_argument_type_to_specialization(specialization, interface.type_parameters, function_type, call_type);
+        if (context.current_module == function->module_path) {
+            new_context.scopes = semantic::get_definitions(context);
+        }
+        else {
+            new_context.current_module = function->module_path;
+            auto result = semantic::add_definitions_to_current_scope(new_context, *(context.ast->modules[function->module_path.string()]));
+            assert(result.is_ok());
         }
 
-        return ast::get_concrete_type(interface.return_type, specialization.type_bindings);
-    }
-    else {
-        assert(false);
+        semantic::add_scope(new_context);
+
+        // Check functions used in function
+        semantic::check_functions_used(new_context, function->body);
+
+        // Return specialization return type
+        return specialization.return_type;
     }
 
     assert(false);

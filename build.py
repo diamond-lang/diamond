@@ -22,6 +22,7 @@ source_files = [
     'src/semantic/semantic.cpp',
     'src/semantic/type_infer.cpp',
     'src/semantic/unify.cpp',
+    'src/semantic/check_functions_used.cpp',
     'src/codegen/codegen.cpp'
 ]
 

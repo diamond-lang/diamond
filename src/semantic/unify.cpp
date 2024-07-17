@@ -195,7 +195,7 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::Ca
     assert(binding);
 
     if (all_args_typed) {
-        node.type = get_function_type(context, binding->value, ast::get_types(node.args), node.type).get_value();
+        node.type = get_function_type(context, binding->value, &node, ast::get_types(node.args), node.type).get_value();
     }
 
     // Set functions that can be called
