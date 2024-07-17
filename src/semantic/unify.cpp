@@ -83,16 +83,20 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::Co
 }
 
 Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::IfElseNode& node) {
-    if (ast::is_expression((ast::Node*) &node)) {
-        node.type = semantic::get_unified_type(context, node.type);
-    }
     auto result = semantic::unify_types_and_type_check(context, node.condition);
     if (result.is_error()) return result;
 
     result = semantic::unify_types_and_type_check(context, node.if_branch);
     if (result.is_error()) return result;
 
-    if (node.else_branch.has_value()) return semantic::unify_types_and_type_check(context, node.else_branch.value());
+    if (node.else_branch.has_value()) {
+        result = semantic::unify_types_and_type_check(context, node.else_branch.value());
+        if (result.is_error()) return result;
+    }
+
+    if (ast::is_expression((ast::Node*) &node)) {
+        node.type = semantic::get_unified_type(context, node.type);
+    }
 
     return Ok {};
 }
@@ -157,8 +161,10 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::Ar
 Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::IntegerNode& node) {
     node.type = semantic::get_unified_type(context, node.type);
 
-    if (!context.current_function.has_value()
-    ||   context.current_function.value()->typed_parameter_aready_added(node.type)) {
+    if (node.type.is_final_type_variable() && (
+       !context.current_function.has_value()
+    ||  context.current_function.value()->typed_parameter_aready_added(node.type))) {
+        semantic::set_unified_type(context, node.type, ast::Type("int64"));
         node.type = ast::Type("int64");
     }
     
@@ -169,8 +175,10 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::In
 Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::FloatNode& node) {
     node.type = semantic::get_unified_type(context, node.type);
 
-    if (!context.current_function.has_value()
-    ||   context.current_function.value()->typed_parameter_aready_added(node.type)) {
+    if (node.type.is_final_type_variable() && (
+       !context.current_function.has_value()
+    ||  context.current_function.value()->typed_parameter_aready_added(node.type))) {
+        semantic::set_unified_type(context, node.type, ast::Type("float64"));
         node.type = ast::Type("float64");
     }
     

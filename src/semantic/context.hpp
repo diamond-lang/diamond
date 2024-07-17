@@ -87,6 +87,7 @@ namespace semantic {
     // For unify and analyze
     ast::Type new_final_type_variable(Context& context);
     ast::Type get_unified_type(Context& context, ast::Type type_var);
+    void set_unified_type(Context& context, ast::Type type_var, ast::Type new_type);
 
     // For unify and make concrete
     std::vector<ast::FunctionNode*> remove_incompatible_functions_with_argument_type(std::vector<ast::FunctionNode*> functions, size_t argument_position, ast::Type argument_type, bool is_mutable);
