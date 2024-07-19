@@ -341,16 +341,22 @@ ast::Type semantic::get_unified_type(Context& context, ast::Type type_var) {
 
 void semantic::set_unified_type(Context& context, ast::Type type_var, ast::Type new_type) {
     auto it = context.type_inference.labeled_type_constraints.find(type_var);
-    assert(it != context.type_inference.labeled_type_constraints.end());
-    Set<ast::Type> set = context.type_inference.labeled_type_constraints[type_var];
-    context.type_inference.labeled_type_constraints.erase(it);
 
-    if (context.type_inference.labeled_type_constraints.find(new_type) == context.type_inference.labeled_type_constraints.end()) {
-        context.type_inference.labeled_type_constraints[new_type] = set;
+    if (it == context.type_inference.labeled_type_constraints.end()) {
+        context.type_inference.labeled_type_constraints[new_type] = Set<ast::Type>();
+        context.type_inference.labeled_type_constraints[new_type].insert(type_var);
     }
     else {
-        for (auto type: set.elements) {
-            context.type_inference.labeled_type_constraints[new_type].insert(type);
+        Set<ast::Type> set = context.type_inference.labeled_type_constraints[type_var];
+        context.type_inference.labeled_type_constraints.erase(it);
+
+        if (context.type_inference.labeled_type_constraints.find(new_type) == context.type_inference.labeled_type_constraints.end()) {
+            context.type_inference.labeled_type_constraints[new_type] = set;
+        }
+        else {
+            for (auto type: set.elements) {
+                context.type_inference.labeled_type_constraints[new_type].insert(type);
+            }
         }
     }
 }

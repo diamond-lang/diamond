@@ -245,16 +245,48 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::Fi
         auto result = semantic::unify_types_and_type_check(context, node.accessed);
         if (result.is_error()) return result;
 
-        for (size_t i = 0; i < node.fields_accessed.size(); i++) {
-            std::string field = node.fields_accessed[i]->value;
-            ast::Type current_type = node.fields_accessed[i]->type;
+        if (ast::get_type(node.accessed).is_concrete()) {
+            ast::Type struct_type = ast::get_type(node.accessed);
 
-            // Get unified type
-            node.fields_accessed[i]->type = semantic::get_unified_type(context, (*field_constraints)[field]);
+            for (size_t i = 0; i < node.fields_accessed.size(); i++) {
+                auto field = node.fields_accessed[i]->value;
+                assert(struct_type.is_nominal_type());
 
-            // Iterate
-            if (i != node.fields_accessed.size() - 1) {
-                field_constraints = &context.type_inference.field_constraints[current_type];
+                bool field_founded = false;
+                for (auto field_in_definition: struct_type.as_nominal_type().type_definition->fields) {
+                    if (field == field_in_definition->value) {
+                        field_founded = true;
+                        node.fields_accessed[i]->type = semantic::get_unified_type(context, (*field_constraints)[field]);
+                        
+                        if (node.fields_accessed[i]->type.is_final_type_variable() && (
+                          !context.current_function.has_value()
+                        || context.current_function.value()->typed_parameter_aready_added(node.type))) {
+                            semantic::set_unified_type(context, node.type, field_in_definition->type);
+                            node.fields_accessed[i]->type = field_in_definition->type;
+                        }
+                        break;
+                    }
+                }
+                assert(field_founded);
+
+                // Iterate over struct type
+                if (i + 1 != node.fields_accessed.size()) {
+                    struct_type = node.fields_accessed[i]->type;
+                }
+            }
+        }
+        else {
+            for (size_t i = 0; i < node.fields_accessed.size(); i++) {
+                std::string field = node.fields_accessed[i]->value;
+                ast::Type current_type = node.fields_accessed[i]->type;
+
+                // Get unified type
+                node.fields_accessed[i]->type = semantic::get_unified_type(context, (*field_constraints)[field]);
+
+                // Iterate
+                if (i != node.fields_accessed.size() - 1) {
+                    field_constraints = &context.type_inference.field_constraints[current_type];
+                }
             }
         }
 
