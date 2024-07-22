@@ -145,6 +145,7 @@ namespace ast {
 
     struct FinalTypeVariable {
         std::string id;
+        std::vector<ast::FieldConstraint> parameter_constraints;
 
         FinalTypeVariable(std::string id) : id(id) {}
     };
@@ -239,7 +240,6 @@ namespace ast {
 
     struct TypeParameter {
         ast::Type type;
-        FieldTypes field_constraints;
         Set<InterfaceType> interface;
 
         std::string to_str();

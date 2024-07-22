@@ -17,7 +17,9 @@ void add_type_parameters(semantic::Context& context, ast::FunctionNode& node, as
             parameter.interface = unified_interface_constraints[type];
         }
         if (unified_fields_constraints.find(type) != unified_fields_constraints.end()) {
-            parameter.field_constraints = unified_fields_constraints[type];
+            for (auto field_constraint: unified_fields_constraints[type]) {
+                parameter.type.as_final_type_variable().parameter_constraints.push_back(field_constraint);
+            }
         }
 
         if (!node.typed_parameter_aready_added(type)) {
@@ -232,7 +234,8 @@ Result<Ok, Error> semantic::analyze_block_or_expression(semantic::Context& conte
 
     context.type_inference.interface_constraints = unified_interface_constraints;
     
-    // Unify args and return type if we are in funciton being analyzed
+    // Unify args and return type if we are in function being analyzed
+    // and add type parameters
     if (context.current_function.has_value()
     && context.current_function.value()->state == ast::FunctionBeingAnalyzed) {
         // Unify args and return type and add type parameters
@@ -246,6 +249,13 @@ Result<Ok, Error> semantic::analyze_block_or_expression(semantic::Context& conte
         context.current_function.value()->return_type = semantic::get_unified_type(context, context.current_function.value()->return_type);
         if (!context.current_function.value()->return_type.is_concrete()) {
             add_type_parameters(context, *context.current_function.value(), context.current_function.value()->return_type, unified_field_constraints, unified_interface_constraints);
+        }
+
+        // Add missing field constraints
+        for (auto it: unified_field_constraints) {
+            if (!context.current_function.value()->typed_parameter_aready_added(it.first)) {
+                add_type_parameters(context, *context.current_function.value(), it.first, unified_field_constraints, unified_interface_constraints);
+            }
         }
     }
 
@@ -486,10 +496,10 @@ void add_argument_type_to_specialization(ast::FunctionSpecialization& specializa
 
         // If function argument has field constraints
         if (ast::get_type_parameter(type_parameters, function_type).has_value()) {
-            if (ast::get_type_parameter(type_parameters, function_type).value()->field_constraints.size() > 0) {
-                for (auto field: ast::get_type_parameter(type_parameters, function_type).value()->field_constraints) {
-                    add_argument_type_to_specialization(specialization, type_parameters, field.type, get_field_type(field.name, argument_type).get_value());
-                }
+            auto parameter_constraints = ast::get_type_parameter(type_parameters, function_type).value()->type.as_final_type_variable().parameter_constraints;
+
+            for (size_t i = 0; i < parameter_constraints.size(); i++) {
+                add_argument_type_to_specialization(specialization, type_parameters, parameter_constraints[i].type, get_field_type(parameter_constraints[i].name, argument_type).get_value());
             }
         }
     }
@@ -541,7 +551,7 @@ Result<ast::Type, Error> semantic::get_function_type(Context& context, ast::Node
     }
 
     // If is not generic
-    if (function->type_parameters.size() == 0) {
+    if (function->state == ast::FunctionCompletelyTyped) {
         if (!function->is_used) {
             if (!function->is_builtin
             &&  !function->is_extern) {

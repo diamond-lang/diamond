@@ -1064,6 +1064,8 @@ void codegen::Context::codegen_function_prototypes(std::vector<ast::FunctionNode
         if (function->is_builtin) continue;
 
         if (function->state != ast::FunctionCompletelyTyped) {
+            assert(function->specializations.size() > 0);
+
             for (auto& specialization: function->specializations) {
                 this->type_bindings = specialization.type_bindings;
                 
