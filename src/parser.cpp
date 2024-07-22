@@ -682,6 +682,10 @@ Result<ast::Node*, Error> Parser::parse_builtin() {
 
     builtin.return_type = type.get_value();
 
+    if (builtin.type_parameters.size() > 0) {
+        builtin.state = ast::FunctionGenericCompletelyTyped;
+    }
+
     this->ast.push_back(builtin);
     return this->ast.last_element();
 }
