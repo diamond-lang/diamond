@@ -359,24 +359,39 @@ static std::vector<ast::Type> get_default_types(semantic::Context& context, std:
     return result;
 }
 
-static void add_type_variable_and_call_type(semantic::Context& context, std::unordered_map<ast::Type, Set<ast::Type>>& sets, ast::Type interface_type, ast::Type call_type) {
-    if (interface_type.is_final_type_variable()) {
-        if (sets.find(interface_type) == sets.end()) {
-            sets[interface_type] = Set<ast::Type>();
+static void instantiate_function_with_type(ast::FunctionSpecialization& specialization, std::vector<ast::TypeParameter>& type_parameters, ast::Type function_type, ast::Type argument_type) {
+    if (function_type.is_final_type_variable()) {
+        // If it was no already included
+        if (specialization.type_bindings.find(function_type.as_final_type_variable().id) == specialization.type_bindings.end()) {
+            specialization.type_bindings[function_type.as_final_type_variable().id] = argument_type;
+        }
+        // Else compare with previous type founded for it
+        else if (specialization.type_bindings[function_type.as_final_type_variable().id] != argument_type) {
+            // do nothing
         }
 
-        sets[interface_type].insert(call_type);
-    }
-    else if (interface_type.is_concrete()) {
-        semantic::add_constraint(context, Set<ast::Type>({interface_type, call_type}));
-    }
-    else {
-        if (call_type.is_nominal_type() && call_type.as_nominal_type().parameters.size() != 0) {
-            for (size_t i = 0; i  < interface_type.as_nominal_type().parameters.size(); i++) {
-                assert(interface_type.as_nominal_type().parameters.size() == call_type.as_nominal_type().parameters.size());
-                add_type_variable_and_call_type(context, sets, interface_type.as_nominal_type().parameters[i], call_type.as_nominal_type().parameters[i]);
+        // If function argument has field constraints
+        if (ast::get_type_parameter(type_parameters, function_type).has_value()) {
+            if (ast::get_type_parameter(type_parameters, function_type).value()->type.as_final_type_variable().parameter_constraints.size() > 0) {
+                // todo
             }
         }
+    }
+    else if (function_type.is_concrete()) {
+        // do nothing
+    }
+    else if (function_type.is_array()) {
+        if (argument_type.is_array()) {
+            for (size_t i = 0; i < function_type.as_nominal_type().parameters.size(); i++) {
+                instantiate_function_with_type(specialization, type_parameters, function_type.as_nominal_type().parameters[i], argument_type.as_nominal_type().parameters[i]);
+            }
+        }
+        else {
+            assert(argument_type.is_type_variable() || argument_type.is_final_type_variable());
+        }
+    }
+    else if (function_type.is_nominal_type()) {
+        assert(false);
     }
 }
 
@@ -409,8 +424,10 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
 
         // Create vector for the prototype of the interface
         std::vector<ast::Type> interface_prototype;
+        std::vector<ast::TypeParameter> type_parameters;
         if (binding->type == semantic::InterfaceBinding) {
             interface_prototype = semantic::get_interface(*binding)->get_prototype();
+            type_parameters = semantic::get_interface(*binding)->type_parameters;
         }
         else if (binding->type == semantic::FunctionBinding) {
             auto function = semantic::get_function(*binding);
@@ -425,34 +442,52 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
             }
 
             interface_prototype.push_back(function->return_type);
+            type_parameters = semantic::get_function(*binding)->type_parameters;
         }
         else {
             assert(false);
         }
 
-        // Infer stuff
-        std::unordered_map<ast::Type, Set<ast::Type>> sets;
+        // Instantiate function specialization
+        ast::FunctionSpecialization specialization;
         for (size_t i = 0; i < interface_prototype.size(); i++) {
             if (interface_prototype[i].is_no_type()) {
                 continue;
             }
 
-            add_type_variable_and_call_type(context, sets, interface_prototype[i], prototype[i]);
+            instantiate_function_with_type(specialization, type_parameters, interface_prototype[i], prototype[i]);
         }
+        for (size_t i = 0; i < node.args.size(); i++) {
+              specialization.args.push_back(ast::get_concrete_type(interface_prototype[i], specialization.type_bindings));
+        }
+        specialization.return_type = ast::get_concrete_type(interface_prototype[interface_prototype.size() - 1], specialization.type_bindings);
 
-        // Add constraints found        
-        for (auto it = sets.begin(); it != sets.end(); it++) {
-            semantic::add_constraint(context, it->second);
+        // Infer stuff
+        std::unordered_map<ast::Type, Set<ast::Type>> sets;
+        for (size_t i = 0; i < node.args.size(); i++) {
+            if (interface_prototype[i].is_no_type()) {
+                continue;
+            }
+
+            semantic::add_constraint(context, Set<ast::Type>({specialization.args[i], prototype[i]}));
+        }
+        semantic::add_constraint(context, Set<ast::Type>({specialization.return_type, prototype[prototype.size() - 1]}));
+
+        // Add interface constraints
+        for (auto it: specialization.type_bindings) {
+            if (!it.second.is_type_variable()) continue;
 
             if (binding->type == InterfaceBinding
             && semantic::get_interface(*binding)->type_parameters.size() > 0
-            && semantic::get_interface(*binding)->type_parameters[0].type == it->first) {
-                semantic::add_interface_constraint(context, it->second.elements[0], ast::InterfaceType(node.identifier->value));
+            && semantic::get_interface(*binding)->type_parameters[0].type.as_final_type_variable().id == it.first) {
+                semantic::add_interface_constraint(context, it.second, ast::InterfaceType(node.identifier->value));
             }
             else if (binding->type == FunctionBinding) {
-                for (auto interface: semantic::get_function(*binding)->get_type_parameter(it->first).value()->interface.elements) {
-                    semantic::add_interface_constraint(context, it->second.elements[0], interface);
+                for (auto interface: semantic::get_function(*binding)->get_type_parameter(ast::Type(ast::FinalTypeVariable(it.first))).value()->interface.elements) {
+                    semantic::add_interface_constraint(context, it.second, interface);
                 }
+
+                semantic::add_interface_constraint(context, it.second, ast::InterfaceType(node.identifier->value));
             }
         }
 

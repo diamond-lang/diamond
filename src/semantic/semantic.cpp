@@ -174,6 +174,17 @@ Result<Ok, Error> semantic::analyze_block_or_expression(semantic::Context& conte
                     &&  (representative.as_nominal_type().name == "pointer" || representatives[i].as_nominal_type().name == "pointer")) {
                         representative = representative.as_nominal_type().name == "boxed" ?  representative : representatives[i];
                     }
+                    else if (representative.is_array() || representatives[i].is_array()) {
+                        if (representative.array_size_known() && representatives[i].array_size_known()) {
+                            assert(representative.get_array_size() == representatives[i].get_array_size());
+                        }
+                        else if (representatives[i].array_size_known()) {
+                            representative = representatives[i];
+                        }
+                        else {
+                            // do nothing
+                        }
+                    } 
                     else if (representative.as_nominal_type().name != representatives[i].as_nominal_type().name) {
                         std::cout << representative.to_str() << " <> " << representatives[i].to_str() << "\n";
                         assert(false);
@@ -543,7 +554,7 @@ Result<ast::Type, Error> semantic::get_function_type(Context& context, ast::Node
                 function = it;
             }
         }
-        
+    
         assert(function != nullptr);
     }
     else {
