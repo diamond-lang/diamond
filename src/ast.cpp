@@ -220,6 +220,16 @@ std::string ast::Type::to_str() const {
     }
     else if (this->is_final_type_variable()) {
         output += std::get<ast::FinalTypeVariable>(this->type).id;
+        if (this->as_final_type_variable().parameter_constraints.size() > 0) {
+            output += "[";
+            for (size_t i = 0; i < this->as_final_type_variable().parameter_constraints.size(); i++) {
+                output += this->as_final_type_variable().parameter_constraints[i].to_str();
+                if (i + 1 != this->as_final_type_variable().parameter_constraints.size()) {
+                    output += ", ";
+                }
+                output += "]";
+            }
+        }
     }
     else if (this->is_nominal_type()) {
         if (std::get<ast::NominalType>(this->type).parameters.size() == 0) {
@@ -263,7 +273,7 @@ std::string ast::TypeParameter::to_str() {
     std::string output = this->type.to_str();
 
     if (this->interface.size() > 0
-    ||  this->type.as_final_type_variable().parameter_constraints.size() > 0) {
+    ||  this->type.as_final_type_variable().field_constraints.size() > 0) {
         output += ": ";
     }
 
@@ -275,9 +285,9 @@ std::string ast::TypeParameter::to_str() {
             }
         }
     }
-    else if (this->type.as_final_type_variable().parameter_constraints.size() > 0) {
+    else if (this->type.as_final_type_variable().field_constraints.size() > 0) {
         output += "{";
-        auto fields = this->type.as_final_type_variable().parameter_constraints;
+        auto fields = this->type.as_final_type_variable().field_constraints;
         for(auto field = fields.begin(); field != fields.end(); field++) {
             output += field->name + ": " + field->type.to_str() + ", ";
 

@@ -145,7 +145,8 @@ namespace ast {
 
     struct FinalTypeVariable {
         std::string id;
-        std::vector<ast::FieldConstraint> parameter_constraints;
+        std::vector<ast::FieldConstraint> field_constraints;
+        std::vector<ast::Type> parameter_constraints;
 
         FinalTypeVariable(std::string id) : id(id) {}
     };

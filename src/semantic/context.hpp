@@ -52,6 +52,7 @@ namespace semantic {
         std::unordered_map<ast::Type, Set<ast::Type>> labeled_type_constraints;
         std::unordered_map<ast::Type, Set<ast::InterfaceType>> interface_constraints;
         std::unordered_map<ast::Type, ast::FieldTypes> field_constraints;
+        std::unordered_map<ast::Type, std::vector<ast::Type>> parameter_constraints;
         std::unordered_map<std::string, ast::Type> type_bindings;
     };
 
@@ -83,6 +84,7 @@ namespace semantic {
     ast::Type new_type_variable(Context& context);
     void add_constraint(Context& context, Set<ast::Type> constraint);
     void add_interface_constraint(Context& context, ast::Type type, ast::InterfaceType interface);
+    void add_parameter_constraint(Context& context, ast::Type type, ast::Type parameter);
 
     // For unify and analyze
     ast::Type new_final_type_variable(Context& context);

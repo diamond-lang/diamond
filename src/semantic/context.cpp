@@ -298,6 +298,15 @@ void semantic::add_interface_constraint(Context& context, ast::Type type, ast::I
     context.type_inference.interface_constraints[type].insert(interface);
 }
 
+void semantic::add_parameter_constraint(Context& context, ast::Type type, ast::Type parameter) {
+    if (context.type_inference.parameter_constraints[type].size() == 0) {
+        context.type_inference.parameter_constraints[type] = {parameter};
+    }
+    else {
+        semantic::add_constraint(context, Set<ast::Type>({context.type_inference.parameter_constraints[type][0], parameter}));
+    }
+}
+
 // For unify and analyze
 ast::Type semantic::get_unified_type(Context& context, ast::Type type_var) {
     for (auto it = context.type_inference.labeled_type_constraints.begin(); it != context.type_inference.labeled_type_constraints.end(); it++) {

@@ -18,7 +18,7 @@ void add_type_parameters(semantic::Context& context, ast::FunctionNode& node, as
         }
         if (unified_fields_constraints.find(type) != unified_fields_constraints.end()) {
             for (auto field_constraint: unified_fields_constraints[type]) {
-                parameter.type.as_final_type_variable().parameter_constraints.push_back(field_constraint);
+                parameter.type.as_final_type_variable().field_constraints.push_back(field_constraint);
             }
         }
 
@@ -94,6 +94,14 @@ static void print_results_phase_1(semantic::Context& context, ast::Node* node) {
             }
         }
         std::cout << "\n";
+    }
+    std::cout << "Parameter constraints\n";
+    for (auto it: context.type_inference.parameter_constraints) {
+        std::cout << "    " << it.first.to_str() << ": " << it.second[0].to_str() << "\n";
+    }
+    std::cout << "Field constraints\n";
+    for (auto it: context.type_inference.field_constraints) {
+        std::cout << "    " << it.first.to_str() << ": " << it.second.to_str() << "\n";
     }
 }
 
@@ -207,6 +215,18 @@ Result<Ok, Error> semantic::analyze_block_or_expression(semantic::Context& conte
 
     // Unify
     // -----
+
+    // Unify parameter constraints
+    std::unordered_map<ast::Type, std::vector<ast::Type>> unified_parameter_constraints;
+    for (auto type: context.type_inference.parameter_constraints) {
+        auto unified_type = semantic::get_unified_type(context, type.first);
+        for (auto parameter: type.second) {
+            unified_parameter_constraints[unified_type].push_back(semantic::get_unified_type(context, parameter.type));
+            unified_type.as_final_type_variable().parameter_constraints.push_back(semantic::get_unified_type(context, parameter.type));
+        }
+
+        semantic::set_unified_type(context, semantic::get_unified_type(context, type.first), unified_type);
+    }
 
     // Unify field constraints
     std::unordered_map<ast::Type, ast::FieldTypes> unified_field_constraints;
@@ -494,7 +514,7 @@ Result<ast::Type, Error> get_field_type(std::string field, ast::Type struct_type
     return Error{};
 }
 
-void add_argument_type_to_specialization(ast::FunctionSpecialization& specialization, std::vector<ast::TypeParameter>& type_parameters, ast::Type function_type, ast::Type argument_type) {
+void add_argument_type_to_specialization(ast::FunctionSpecialization& specialization, std::vector<ast::TypeParameter>& type_parameters, ast::Type function_type, ast::Type argument_type) { 
     if (function_type.is_final_type_variable()) {
         // If it was no already included
         if (specialization.type_bindings.find(function_type.as_final_type_variable().id) == specialization.type_bindings.end()) {
@@ -505,13 +525,22 @@ void add_argument_type_to_specialization(ast::FunctionSpecialization& specializa
             assert(false);
         }
 
-        // If function argument has field constraints
-        if (ast::get_type_parameter(type_parameters, function_type).has_value()) {
-            auto parameter_constraints = ast::get_type_parameter(type_parameters, function_type).value()->type.as_final_type_variable().parameter_constraints;
 
-            for (size_t i = 0; i < parameter_constraints.size(); i++) {
-                add_argument_type_to_specialization(specialization, type_parameters, parameter_constraints[i].type, get_field_type(parameter_constraints[i].name, argument_type).get_value());
+
+        // If function argument constraints
+        if (ast::get_type_parameter(type_parameters, function_type).has_value()) {
+            auto field_constraints = ast::get_type_parameter(type_parameters, function_type).value()->type.as_final_type_variable().field_constraints;
+            
+            // If the parameter has field constraints
+            for (size_t i = 0; i < field_constraints.size(); i++) {
+                add_argument_type_to_specialization(specialization, type_parameters, field_constraints[i].type, get_field_type(field_constraints[i].name, argument_type).get_value());
             }
+        }
+
+        // If the parameter has parameter constraints
+        auto parameter_constraints = function_type.as_final_type_variable().parameter_constraints;
+        for (size_t i = 0; i < parameter_constraints.size(); i++) {
+            add_argument_type_to_specialization(specialization, type_parameters, parameter_constraints[i], argument_type.as_nominal_type().parameters[i]);
         }
     }
     else if (function_type.is_concrete()

@@ -315,12 +315,7 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::De
         node.type = ast::get_type(node.expression).as_nominal_type().parameters[0];
     }
     else {
-        if (node.type.is_pointer() || node.type.is_boxed()) {
-            node.type = ast::get_type(node.expression).as_nominal_type().parameters[0];
-        }
-        else {
-            node.type = semantic::new_final_type_variable(context);
-        }
+        node.type = semantic::get_unified_type(context, node.type);
     }
     return Ok {};
 }
