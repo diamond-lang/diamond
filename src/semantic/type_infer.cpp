@@ -431,6 +431,15 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
         }
         else if (binding->type == semantic::FunctionBinding) {
             auto function = semantic::get_function(*binding);
+            if (function->state == ast::FunctionNotAnalyzed) {
+                auto result = semantic::analyze(context, *function);
+                if (result.is_error()) return result;
+            }
+
+            if (function->state == ast::FunctionBeingAnalyzed) {
+                return Ok {};
+            }
+
             for (auto arg: function->args) {
                 interface_prototype.push_back(arg->type);
             }

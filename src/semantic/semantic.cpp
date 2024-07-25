@@ -526,7 +526,8 @@ Result<ast::Type, Error> get_field_type(std::string field, ast::Type struct_type
 }
 
 void add_argument_type_to_specialization(ast::FunctionSpecialization& specialization, std::vector<ast::TypeParameter>& type_parameters, ast::Type function_type, ast::Type argument_type) { 
-    if (function_type.is_final_type_variable()) {
+    if (function_type.is_final_type_variable()
+    &&  !argument_type.is_final_type_variable()) {
         // If it was no already included
         if (specialization.type_bindings.find(function_type.as_final_type_variable().id) == specialization.type_bindings.end()) {
             specialization.type_bindings[function_type.as_final_type_variable().id] = argument_type;
