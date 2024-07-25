@@ -80,28 +80,36 @@ Result<Ok, Errors> semantic::analyze(ast::Ast& ast) {
 
 static void print_results_phase_1(semantic::Context& context, ast::Node* node) {
     ast::print(node);
-    std::cout << "Type constraints\n";
-    for (auto it: context.type_inference.labeled_type_constraints) {
-        std::cout << "    " << it.first.to_str() << ": " <<  utilities::to_str(it.second) << "\n";
-    }
-    std::cout << "Interface constraints\n";
-    for (auto it: context.type_inference.interface_constraints) {
-        std::cout << "    " << it.first.to_str() << ": ";
-        for (size_t i = 0; i < it.second.elements.size(); i++) {
-            std::cout << it.second.elements[i].name;
-            if (i + 1 != it.second.elements.size()) {
-                std::cout << " and ";
-            }
+    if (context.type_inference.labeled_type_constraints.size() > 0) {
+        std::cout << "Type constraints\n";
+        for (auto it: context.type_inference.labeled_type_constraints) {
+            std::cout << "    " << it.first.to_str() << ": " <<  utilities::to_str(it.second) << "\n";
         }
-        std::cout << "\n";
     }
-    std::cout << "Parameter constraints\n";
-    for (auto it: context.type_inference.parameter_constraints) {
-        std::cout << "    " << it.first.to_str() << ": " << it.second[0].to_str() << "\n";
+    if (context.type_inference.interface_constraints.size() > 0) {
+        std::cout << "Interface constraints\n";
+        for (auto it: context.type_inference.interface_constraints) {
+            std::cout << "    " << it.first.to_str() << ": ";
+            for (size_t i = 0; i < it.second.elements.size(); i++) {
+                std::cout << it.second.elements[i].name;
+                if (i + 1 != it.second.elements.size()) {
+                    std::cout << " and ";
+                }
+            }
+            std::cout << "\n";
+        }
     }
-    std::cout << "Field constraints\n";
-    for (auto it: context.type_inference.field_constraints) {
-        std::cout << "    " << it.first.to_str() << ": " << it.second.to_str() << "\n";
+    if (context.type_inference.parameter_constraints.size() > 0) {
+        std::cout << "Parameter constraints\n";
+        for (auto it: context.type_inference.parameter_constraints) {
+            std::cout << "    " << it.first.to_str() << ": " << it.second[0].to_str() << "\n";
+        }
+    }
+    if (context.type_inference.field_constraints.size() > 0) {
+        std::cout << "Field constraints\n";
+        for (auto it: context.type_inference.field_constraints) {
+            std::cout << "    " << it.first.to_str() << ": " << it.second.to_str() << "\n";
+        }
     }
 }
 
@@ -492,11 +500,14 @@ bool semantic::are_types_compatible(ast::FunctionNode& function, std::vector<ast
 }
 
 bool semantic::are_arguments_compatible(ast::FunctionNode& function, ast::CallNode& call, std::vector<ast::Type> function_types, std::vector<ast::Type> argument_types) {
-    for (size_t i = 0; i < function_types.size(); i++) {
+    for (size_t i = 0; i < function_types.size() - 1; i++) {
         if (!semantic::are_types_compatible(function, function_types[i], argument_types[i])
         ||  function.args[i]->is_mutable != call.args[i]->is_mutable) {
             return false;
         }
+    }
+    if (!semantic::are_types_compatible(function, function_types[function_types.size() - 1], argument_types[argument_types.size() - 1])) {
+        return false;
     }
     return true;
 }
@@ -524,8 +535,6 @@ void add_argument_type_to_specialization(ast::FunctionSpecialization& specializa
         else if (specialization.type_bindings[function_type.as_final_type_variable().id] != argument_type) {
             assert(false);
         }
-
-
 
         // If function argument constraints
         if (ast::get_type_parameter(type_parameters, function_type).has_value()) {
@@ -578,7 +587,11 @@ Result<ast::Type, Error> semantic::get_function_type(Context& context, ast::Node
 
         // Get function called
         for (auto it: interface.functions) {
-            if (semantic::are_arguments_compatible(*it, *call, ast::get_types(it->args), call_args)) {
+            std::vector<ast::Type> function_types = ast::get_types(it->args);
+            function_types.push_back(it->return_type);
+            std::vector<ast::Type> call_types = call_args;
+            call_types.push_back(call_type);
+            if (semantic::are_arguments_compatible(*it, *call, function_types, call_types)) {
                 assert(function == nullptr);
                 function = it;
             }
@@ -624,7 +637,14 @@ Result<ast::Type, Error> semantic::get_function_type(Context& context, ast::Node
     else {
         for (auto& specialization: function->specializations) {
             if (specialization.args == call_args) {
-                return specialization.return_type;
+                if (call_type.is_concrete()) {
+                    if (specialization.return_type == call_type) {
+                        return specialization.return_type;
+                    }
+                }
+                else {
+                    return specialization.return_type;
+                }
             }
         }
 
@@ -636,9 +656,14 @@ Result<ast::Type, Error> semantic::get_function_type(Context& context, ast::Node
             add_argument_type_to_specialization(specialization, function->type_parameters, function_type, call_type);
             specialization.args.push_back(call_type);
         }
+        add_argument_type_to_specialization(specialization, function->type_parameters, function->return_type, call_type);
 
-        specialization.return_type = ast::get_concrete_type(function->return_type, specialization.type_bindings);
-
+        specialization.return_type = ast::try_to_get_concrete_type(function->return_type, specialization.type_bindings);
+        if (specialization.return_type.is_final_type_variable()) {
+            specialization.type_bindings[specialization.return_type.as_final_type_variable().id] = ast::get_default_type(function->get_type_parameter(specialization.return_type).value()->interface);
+            specialization.return_type = specialization.type_bindings[specialization.return_type.as_final_type_variable().id];
+        }
+        assert(specialization.return_type.is_concrete());
         function->specializations.push_back(specialization);
 
         if (!function->is_builtin) {

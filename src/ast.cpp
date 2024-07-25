@@ -499,6 +499,22 @@ ast::Type ast::get_concrete_type(Type type, std::unordered_map<std::string, Type
     return type;
 }
 
+ast::Type ast::try_to_get_concrete_type(Type type, std::unordered_map<std::string, Type>& type_bindings) {
+    if (type.is_final_type_variable()) {
+        if (type_bindings.find(type.as_final_type_variable().id) != type_bindings.end()) {
+            type = type_bindings[type.as_final_type_variable().id];
+        }
+    }
+    if (!type.is_concrete()) {
+        if (type.is_nominal_type()) {
+            for (size_t i = 0; i < type.as_nominal_type().parameters.size(); i++) {
+                type.as_nominal_type().parameters[i] = ast::try_to_get_concrete_type(type.as_nominal_type().parameters[i], type_bindings);
+            }
+        }
+    }
+    return type;
+}
+
 void ast::set_type(Node* node, Type type) {
     std::visit([type](auto& variant) {variant.type = type;}, *node);
 }

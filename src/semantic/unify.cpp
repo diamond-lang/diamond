@@ -163,7 +163,7 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::In
 
     if (node.type.is_final_type_variable() && (
        !context.current_function.has_value()
-    ||  context.current_function.value()->typed_parameter_aready_added(node.type))) {
+    || !context.current_function.value()->typed_parameter_aready_added(node.type))) {
         semantic::set_unified_type(context, node.type, ast::Type("int64"));
         node.type = ast::Type("int64");
     }
@@ -177,7 +177,7 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::Fl
 
     if (node.type.is_final_type_variable() && (
        !context.current_function.has_value()
-    ||  context.current_function.value()->typed_parameter_aready_added(node.type))) {
+    || !context.current_function.value()->typed_parameter_aready_added(node.type))) {
         semantic::set_unified_type(context, node.type, ast::Type("float64"));
         node.type = ast::Type("float64");
     }
@@ -201,9 +201,18 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::Ca
     // Get binding
     semantic::Binding* binding = semantic::get_binding(context, node.identifier->value);
     assert(binding);
-
+    
     if (all_args_typed) {
-        node.type = get_function_type(context, binding->value, &node, ast::get_types(node.args), node.type).get_value();
+        auto call_type = get_function_type(context, binding->value, &node, ast::get_types(node.args), node.type).get_value();
+        node.type = call_type;
+
+        if (node.type.is_final_type_variable() && (
+           !context.current_function.has_value()
+        || !context.current_function.value()->typed_parameter_aready_added(node.type))) {
+            assert(context.type_inference.interface_constraints.find(node.type) != context.type_inference.interface_constraints.end());
+            semantic::set_unified_type(context, node.type, call_type);
+            node.type = call_type;
+        }
     }
 
     // Set functions that can be called

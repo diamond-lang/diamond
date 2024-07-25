@@ -687,7 +687,11 @@ llvm::TypeSize codegen::Context::get_type_size(llvm::Type* type) {
 ast::FunctionNode* codegen::Context::get_function(ast::CallNode* call) {
     ast::FunctionNode* result = nullptr;
     for (auto function: call->functions) {
-        if (semantic::are_arguments_compatible(*function, *call, ast::get_types(function->args), this->get_types(call->args))) {
+        std::vector<ast::Type> function_types = ast::get_types(function->args);
+        function_types.push_back(function->return_type);
+        std::vector<ast::Type> call_types = this->get_types(call->args);
+        call_types.push_back(ast::get_concrete_type(call->type, this->type_bindings));
+        if (semantic::are_arguments_compatible(*function, *call, function_types, call_types)) {
             result = function;
             break;
         }
