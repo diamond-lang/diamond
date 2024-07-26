@@ -304,6 +304,7 @@ namespace ast {
 
         bool typed_parameter_aready_added(ast::Type type);
         std::optional<ast::TypeParameter*> get_type_parameter(ast::Type type);
+        bool is_in_type_parameter(ast::Type type);
     };
 
     struct InterfaceNode {
@@ -323,6 +324,7 @@ namespace ast {
         bool typed_parameter_aready_added(ast::Type type);
         std::optional<ast::TypeParameter*> get_type_parameter(ast::Type type);
         std::vector<ast::Type> get_prototype();
+        bool is_in_type_parameter(ast::Type type);
 
         bool is_compatible_with(ast::Type type);
     };

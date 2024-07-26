@@ -1318,6 +1318,36 @@ std::optional<ast::TypeParameter*> ast::FunctionNode::get_type_parameter(ast::Ty
     return std::nullopt;
 }
 
+static bool _is_in_type_parameter(ast::Type type_parameter, ast::Type type) {
+    if (type_parameter == type) {
+        return true;
+    }
+
+    for (auto field: type_parameter.as_final_type_variable().field_constraints) {
+        if (_is_in_type_parameter(field.type, type)) {
+            return true;
+        }
+    }
+
+    for (auto parameter: type_parameter.as_final_type_variable().parameter_constraints) {
+        if (_is_in_type_parameter(parameter, type)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool ast::FunctionNode::is_in_type_parameter(ast::Type type) {
+    for (auto type_parameter: this->type_parameters) {
+        if (_is_in_type_parameter(type_parameter.type, type)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 
 bool ast::InterfaceNode::typed_parameter_aready_added(ast::Type type) {
     for (auto type_parameter: this->type_parameters) {
@@ -1335,6 +1365,16 @@ std::optional<ast::TypeParameter*> ast::InterfaceNode::get_type_parameter(ast::T
         }
     }
     return std::nullopt;
+}
+
+bool ast::InterfaceNode::is_in_type_parameter(ast::Type type) {
+    for (auto type_parameter: this->type_parameters) {
+        if (_is_in_type_parameter(type_parameter.type, type)) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 std::vector<ast::Type> ast::InterfaceNode::get_prototype() {

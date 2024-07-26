@@ -171,7 +171,7 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::In
 
     if (node.type.is_final_type_variable() && (
        !context.current_function.has_value()
-    || !context.current_function.value()->typed_parameter_aready_added(node.type))) {
+    || !context.current_function.value()->is_in_type_parameter(node.type))) {
         semantic::set_unified_type(context, node.type, ast::Type("int64"));
         node.type = ast::Type("int64");
     }
@@ -185,7 +185,7 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::Fl
 
     if (node.type.is_final_type_variable() && (
        !context.current_function.has_value()
-    || !context.current_function.value()->typed_parameter_aready_added(node.type))) {
+    || !context.current_function.value()->is_in_type_parameter(node.type))) {
         semantic::set_unified_type(context, node.type, ast::Type("float64"));
         node.type = ast::Type("float64");
     }
@@ -216,7 +216,7 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::Ca
 
         if (node.type.is_final_type_variable() && (
            !context.current_function.has_value()
-        || !context.current_function.value()->typed_parameter_aready_added(node.type))) {
+        || !context.current_function.value()->is_in_type_parameter(node.type))) {
             assert(context.type_inference.interface_constraints.find(node.type) != context.type_inference.interface_constraints.end());
             semantic::set_unified_type(context, node.type, call_type);
             node.type = call_type;
