@@ -510,7 +510,7 @@ llvm::Type* codegen::Context::as_llvm_type(ast::Type type) {
         return this->get_struct_type(type.as_nominal_type().type_definition);
     }
     else {
-        std::cout <<"type: " << type.to_str() << "\n";
+        std::cout << "type: " << type.to_str() << "\n";
         assert(false);
     }
 }

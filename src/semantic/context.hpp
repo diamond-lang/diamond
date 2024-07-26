@@ -76,7 +76,7 @@ namespace semantic {
 
     // Work with modules
     Result<Ok, Error> add_definitions_to_current_scope(Context& context, std::vector<ast::FunctionNode*>& functions, std::vector<ast::InterfaceNode*>& interfaces, std::vector<ast::TypeNode*>& types);
-    Result<Ok, Error> add_definitions_to_current_scope(Context& context, ast::BlockNode& block);
+    Result<Ok, Error> add_definitions_from_block_to_scope(Context& context, ast::BlockNode& block);
     Result<Ok, Error> add_module_functions(Context& context, std::filesystem::path module_path, std::set<std::filesystem::path>& already_included_modules);
     std::vector<std::unordered_map<std::string, Binding>> get_definitions(Context& context);
 

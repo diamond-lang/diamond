@@ -13,7 +13,7 @@ void semantic::check_functions_used(Context& context, ast::BlockNode& node) {
     semantic::add_scope(context);
 
     // Add functions to the current scope
-    semantic::add_definitions_to_current_scope(context, node);
+    semantic::add_definitions_from_block_to_scope(context, node);
 
     // Make statements concrete
     size_t number_of_errors = context.errors.size();

@@ -44,32 +44,6 @@ Result<Ok, Errors> semantic::analyze(ast::Ast& ast) {
     semantic::Context context;
     context.init_with(&ast);
 
-    // Add std and analyze
-    std::set<std::filesystem::path> already_include_modules = {ast.module_path};
-    for (auto path: std_libs.elements) {
-        add_module_functions(context, path, already_include_modules);
-    }
-    
-    // Analyze functions in current scope
-    for (auto& it: semantic::current_scope(context)) {
-        auto& binding = it.second;
-        if (binding.type == semantic::FunctionBinding) {
-            if (semantic::get_function(binding)->state == ast::FunctionAnalyzed) continue;
-
-            auto result = semantic::analyze(context, *semantic::get_function(binding));
-            if (result.is_error()) return context.errors;
-        }
-        else if (binding.type == semantic::InterfaceBinding) {
-            auto functions = semantic::get_interface(binding)->functions;
-            for (size_t i = 0; i < functions.size(); i++) {
-                if (functions[i]->state == ast::FunctionAnalyzed) continue;
-
-                auto result = semantic::analyze(context, *functions[i]);
-                if (result.is_error()) return context.errors;
-            }
-        }
-    }
-
     // Analyze program
     semantic::analyze(context, *ast.program);
 
@@ -310,6 +284,7 @@ Result<Ok, Error> semantic::analyze(semantic::Context& context, ast::BlockNode& 
 }
 
 Result<Ok, Error> semantic::analyze(semantic::Context& context, ast::FunctionNode& node) {
+    assert(node.module_path == context.current_module);
     if (node.is_extern
     ||  node.is_builtin) {
         for (auto arg: node.args) {
@@ -330,16 +305,7 @@ Result<Ok, Error> semantic::analyze(semantic::Context& context, ast::FunctionNod
     Context new_context;
     new_context.init_with(context.ast);
     new_context.current_function = &node;
-
-    if (context.current_module == node.module_path) {
-        new_context.scopes = semantic::get_definitions(context);
-    }
-    else {
-        new_context.current_module = node.module_path;
-        auto result = semantic::add_definitions_to_current_scope(new_context, *(context.ast->modules[node.module_path.string()]));
-        assert(result.is_ok());
-    }
-
+    new_context.scopes = semantic::get_definitions(context);
     semantic::add_scope(new_context);
 
     // Analyze function
@@ -619,7 +585,7 @@ Result<ast::Type, Error> semantic::get_function_type(Context& context, ast::Node
                 }
                 else {
                     new_context.current_module = function->module_path;
-                    auto result = semantic::add_definitions_to_current_scope(new_context, *(context.ast->modules[function->module_path.string()]));
+                    auto result = semantic::add_definitions_from_block_to_scope(new_context, *(context.ast->modules[function->module_path.string()]));
                     assert(result.is_ok());
                 }
 
@@ -679,7 +645,7 @@ Result<ast::Type, Error> semantic::get_function_type(Context& context, ast::Node
             }
             else {
                 new_context.current_module = function->module_path;
-                auto result = semantic::add_definitions_to_current_scope(new_context, *(context.ast->modules[function->module_path.string()]));
+                auto result = semantic::add_definitions_from_block_to_scope(new_context, *(context.ast->modules[function->module_path.string()]));
                 assert(result.is_ok());
             }
 

@@ -4,6 +4,7 @@
 #include "../lexer.hpp"
 #include "../parser.hpp"
 #include  "../semantic.hpp"
+#include "semantic.hpp"
 
 // Bindings
 // --------
@@ -86,8 +87,6 @@ std::string semantic::get_binding_identifier(semantic::Binding& binding) {
 void semantic::Context::init_with(ast::Ast* ast) {
     this->current_module = ast->module_path;
     this->ast = ast;
-
-    semantic::add_scope(*this);
 }
 
 // Manage scopes
@@ -188,14 +187,24 @@ Result<Ok, Error> semantic::add_definitions_to_current_scope(Context& context, s
     return Ok {};
 }
 
-Result<Ok, Error> semantic::add_definitions_to_current_scope(Context& context, ast::BlockNode& block) {
-    // Add functions from modules
-    auto current_directory = context.current_module.parent_path();
+Result<Ok, Error> semantic::add_definitions_from_block_to_scope(Context& context, ast::BlockNode& block) {
     std::set<std::filesystem::path> already_included_modules = {context.current_module};
-    for (auto path: std_libs.elements) {
-        already_included_modules.insert(path);
+
+    // Add std libs
+    if (context.scopes.size() == 0) {
+        semantic::add_scope(context);
+        if (std::find(std_libs.elements.begin(), std_libs.elements.end(), context.current_module) == std_libs.elements.end()) {
+            for (auto path: std_libs.elements) {
+                add_module_functions(context, path, already_included_modules);
+            }
+        }
     }
 
+    // Add scope for block definitions
+    semantic::add_scope(context);
+
+    // Add functions from modules
+    auto current_directory = context.current_module.parent_path();
     for (auto& use_stmt: block.use_statements) {
         auto module_path = std::filesystem::canonical(current_directory / (use_stmt->path->value + ".dmd"));
         assert(std::filesystem::exists(module_path));
@@ -237,6 +246,16 @@ Result<Ok, Error> semantic::add_module_functions(Context& context, std::filesyst
                 std::cout << errors[i].value << '\n';
             }
             exit(EXIT_FAILURE);
+        }
+
+        // Analyze new module added
+        semantic::Context new_context;
+        new_context.init_with(context.ast);
+        new_context.current_module = module_path;
+        semantic::analyze(new_context, *context.ast->modules[module_path]);
+
+        if (context.errors.size() > 0) {
+            context.errors.insert(context.errors.end(), new_context.errors.begin(), new_context.errors.end());
         }
     }
 

@@ -12,7 +12,7 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::Bl
     semantic::add_scope(context);
 
     // Add functions and types to the current scope
-    auto result = semantic::add_definitions_to_current_scope(context, block);
+    auto result = semantic::add_definitions_from_block_to_scope(context, block);
     assert(result.is_ok());
 
     for (auto statement: block.statements) {

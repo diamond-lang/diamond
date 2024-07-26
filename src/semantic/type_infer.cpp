@@ -12,10 +12,8 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
 }
 
 Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, ast::BlockNode& node) {
-    semantic::add_scope(context);
-
     // Add functions to the current scope
-    auto result = semantic::add_definitions_to_current_scope(context, node);
+    auto result = semantic::add_definitions_from_block_to_scope(context, node);
     if (result.is_error()) return result;
 
     // Analyze types in current scope
@@ -31,6 +29,7 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
     // Analyze functions of block
     for (auto function: node.functions) {
         if (function->state == ast::FunctionAnalyzed) continue;
+        if (function->module_path != context.current_module) continue;
         auto result = semantic::analyze(context, *function);
         if (result.is_error()) return result;
     }
@@ -407,7 +406,8 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
     // Check binding exists
     semantic::Binding* binding = semantic::get_binding(context, identifier);
     if (!binding) {
-        std::cout << "Undefined function \"" << identifier << "\"\n";
+        assert(false);
+        std::cout << "Undefined function \"" << identifier << "\" in module " << context.current_module << "\n";
         //context.errors.push_back(errors::undefined_function(node, get_default_types(context, ast::get_types(node.args)), context.current_module));
         return Error {};
     }
