@@ -18,6 +18,14 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::Bl
     for (auto statement: block.statements) {
         auto result = semantic::unify_types_and_type_check(context, statement);
         if (result.is_error()) return result;
+
+        if (statement->index() == ast::Call
+        && !ast::get_type(statement).is_final_type_variable()) {
+            if (ast::get_type(statement) != ast::Type("void")) {
+                context.errors.push_back(errors::unhandled_return_value(std::get<ast::CallNode>(*statement), context.current_module));
+                return Error{};
+            }
+        }
     }
 
     // Remove scope
