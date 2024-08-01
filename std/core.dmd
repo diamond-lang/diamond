@@ -12,38 +12,38 @@ interface negate[t](number: t): t
 
 interface multiply[t](left: t, right: t): t
 interface divide[t](left: t, right: t): t
+interface modulo[t](left: t, right: t): t
 
-interface print[t](object: t): void
+builtin equal(left: float64, right: float64): bool
+builtin equal(left: int64, right: int64): bool
+builtin equal(left: int32, right: int32): bool
+builtin equal(left: int8, right: int8): bool
+builtin equal(left: bool, right: bool): bool
 
-builtin equal(left: float64, right: float64): float64
-builtin equal(left: int64, right: int64): int64
-builtin equal(left: int32, right: int32): int32
-builtin equal(left: int8, right: int8): int8
+builtin notEqual(left: float64, right: float64): bool
+builtin notEqual(left: int64, right: int64): bool
+builtin notEqual(left: int32, right: int32): bool
+builtin notEqual(left: int8, right: int8): bool
 
-builtin notEqual(left: float64, right: float64): float64
-builtin notEqual(left: int64, right: int64): int64
-builtin notEqual(left: int32, right: int32): int32
-builtin notEqual(left: int8, right: int8): int8
+builtin less(left: float64, right: float64): bool
+builtin less(left: int64, right: int64): bool
+builtin less(left: int32, right: int32): bool
+builtin less(left: int8, right: int8): bool
 
-builtin less(left: float64, right: float64): float64
-builtin less(left: int64, right: int64): int64
-builtin less(left: int32, right: int32): int32
-builtin less(left: int8, right: int8): int8
+builtin lessEqual(left: float64, right: float64): bool
+builtin lessEqual(left: int64, right: int64): bool
+builtin lessEqual(left: int32, right: int32): bool
+builtin lessEqual(left: int8, right: int8): bool
 
-builtin lessEqual(left: float64, right: float64): float64
-builtin lessEqual(left: int64, right: int64): int64
-builtin lessEqual(left: int32, right: int32): int32
-builtin lessEqual(left: int8, right: int8): int8
+builtin greater(left: float64, right: float64): bool
+builtin greater(left: int64, right: int64): bool
+builtin greater(left: int32, right: int32): bool
+builtin greater(left: int8, right: int8): bool
 
-builtin greater(left: float64, right: float64): float64
-builtin greater(left: int64, right: int64): int64
-builtin greater(left: int32, right: int32): int32
-builtin greater(left: int8, right: int8): int8
-
-builtin greaterEqual(left: float64, right: float64): float64
-builtin greaterEqual(left: int64, right: int64): int64
-builtin greaterEqual(left: int32, right: int32): int32
-builtin greaterEqual(left: int8, right: int8): int8
+builtin greaterEqual(left: float64, right: float64): bool
+builtin greaterEqual(left: int64, right: int64): bool
+builtin greaterEqual(left: int32, right: int32): bool
+builtin greaterEqual(left: int8, right: int8): bool
 
 builtin add(left: float64, right: float64): float64
 builtin add(left: int64, right: int64): int64
@@ -54,6 +54,11 @@ builtin subtract(left: float64, right: float64): float64
 builtin subtract(left: int64, right: int64): int64
 builtin subtract(left: int32, right: int32): int32
 builtin subtract(left: int8, right: int8): int8
+
+builtin negate(operand: float64): float64
+builtin negate(operand: int64): int64
+builtin negate(operand: int32): int32
+builtin negate(operand: int8): int8
 
 builtin multiply(left: float64, right: float64): float64
 builtin multiply(left: int64, right: int64): int64
@@ -73,6 +78,6 @@ builtin modulo(left: int8, right: int8): int8
 builtin not(boolean: bool): bool
 builtin and(left: bool, right: bool): bool
 builtin or(left: bool, right: bool): bool
---builtin subscript[t](array: array[t], index: int64): t
-builtin subscript[t](mut array: array[t], index: int64): mut t
+builtin subscript[t](array: array[t], index: int64): t
+builtin subscript_mut[t](mut array: array[t], index: int64): mut t
 builtin size[t](array: array[t]): int64

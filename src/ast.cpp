@@ -15,23 +15,32 @@ bool ast::InterfaceType::operator!=(const InterfaceType &interface) const {
 }
 
 ast::Type ast::InterfaceType::get_default_type() {
-    if (this->name== "Number") {
+    if (this->name== "number") {
         return ast::Type("int64");
     }
-    else if (this->name == "Float") {
+    else if (this->name == "float") {
         return ast::Type("float64");
     }
     else {
-        assert(false);
         return ast::Type(ast::NoType{});
     }
 }
 
+ast::Type ast::get_default_type(Set<ast::InterfaceType> interface) {
+    for (auto it: interface.elements) {
+        if (!it.get_default_type().is_no_type()) {
+            return it.get_default_type();
+        }
+    }
+    assert(false);
+    return ast::Type(ast::NoType{});
+}
+
 bool ast::InterfaceType::is_compatible_with(ast::Type type) {
-    if (this->name== "Number") {
+    if (this->name== "number") {
         return type.is_integer() || type.is_float();
     }
-    else if (this->name == "Float") {
+    else if (this->name == "float") {
         return type.is_float();
     }
     else if (this->name == "pointer") {
@@ -211,6 +220,16 @@ std::string ast::Type::to_str() const {
     }
     else if (this->is_final_type_variable()) {
         output += std::get<ast::FinalTypeVariable>(this->type).id;
+        if (this->as_final_type_variable().parameter_constraints.size() > 0) {
+            output += "[";
+            for (size_t i = 0; i < this->as_final_type_variable().parameter_constraints.size(); i++) {
+                output += this->as_final_type_variable().parameter_constraints[i].to_str();
+                if (i + 1 != this->as_final_type_variable().parameter_constraints.size()) {
+                    output += ", ";
+                }
+                output += "]";
+            }
+        }
     }
     else if (this->is_nominal_type()) {
         if (std::get<ast::NominalType>(this->type).parameters.size() == 0) {
@@ -253,17 +272,22 @@ std::string ast::TypeParameter::to_str() {
     assert(this->type.is_final_type_variable());
     std::string output = this->type.to_str();
 
-    if (this->interface.has_value()
-    ||  this->field_constraints.size() > 0) {
+    if (this->interface.size() > 0
+    ||  this->type.as_final_type_variable().field_constraints.size() > 0) {
         output += ": ";
     }
 
-    if (this->interface.has_value()) {
-        output += this->interface.value().name;
+    if (this->interface.size() > 0) {
+        for (size_t i = 0; i < this->interface.elements.size(); i++) {
+            output += this->interface.elements[i].name;
+            if (i + 1 != this->interface.elements.size()) {
+                output += " and ";
+            }
+        }
     }
-    else if (this->field_constraints.size() > 0) {
+    else if (this->type.as_final_type_variable().field_constraints.size() > 0) {
         output += "{";
-        auto fields = this->field_constraints;
+        auto fields = this->type.as_final_type_variable().field_constraints;
         for(auto field = fields.begin(); field != fields.end(); field++) {
             output += field->name + ": " + field->type.to_str() + ", ";
 
@@ -439,23 +463,6 @@ std::size_t std::hash<ast::Type>::operator()(const ast::Type& type) const {
     return std::hash<std::string>()(type.to_str());
 }
 
-// CallInCallStack
-bool ast::CallInCallStack::operator==(const CallInCallStack &t) const {
-    if (this->identifier == t.identifier && this->args.size() == t.args.size()) {
-        for (size_t i = 0; i < this->args.size(); i++) {
-            if (this->args[i] != t.args[i]) return false;
-        }
-        return this->return_type == t.return_type;
-    }
-    else {
-        return false;
-    }
-}
-
-bool ast::CallInCallStack::operator!=(const CallInCallStack &t) const {
-    return !(t == *this);
-}
-
 // Node
 // ----
 ast::Type ast::get_type(Node* node) {
@@ -487,6 +494,22 @@ ast::Type ast::get_concrete_type(Type type, std::unordered_map<std::string, Type
         else if (type.is_struct_type()) {
             std::cout << "WAHT ? " << type.to_str() << "\n";
             assert(false);
+        }
+    }
+    return type;
+}
+
+ast::Type ast::try_to_get_concrete_type(Type type, std::unordered_map<std::string, Type>& type_bindings) {
+    if (type.is_final_type_variable()) {
+        if (type_bindings.find(type.as_final_type_variable().id) != type_bindings.end()) {
+            type = type_bindings[type.as_final_type_variable().id];
+        }
+    }
+    if (!type.is_concrete()) {
+        if (type.is_nominal_type()) {
+            for (size_t i = 0; i < type.as_nominal_type().parameters.size(); i++) {
+                type.as_nominal_type().parameters[i] = ast::try_to_get_concrete_type(type.as_nominal_type().parameters[i], type_bindings);
+            }
         }
     }
     return type;
@@ -1295,6 +1318,36 @@ std::optional<ast::TypeParameter*> ast::FunctionNode::get_type_parameter(ast::Ty
     return std::nullopt;
 }
 
+static bool _is_in_type_parameter(ast::Type type_parameter, ast::Type type) {
+    if (type_parameter == type) {
+        return true;
+    }
+
+    for (auto field: type_parameter.as_final_type_variable().field_constraints) {
+        if (_is_in_type_parameter(field.type, type)) {
+            return true;
+        }
+    }
+
+    for (auto parameter: type_parameter.as_final_type_variable().parameter_constraints) {
+        if (_is_in_type_parameter(parameter, type)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool ast::FunctionNode::is_in_type_parameter(ast::Type type) {
+    for (auto type_parameter: this->type_parameters) {
+        if (_is_in_type_parameter(type_parameter.type, type)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 
 bool ast::InterfaceNode::typed_parameter_aready_added(ast::Type type) {
     for (auto type_parameter: this->type_parameters) {
@@ -1307,6 +1360,38 @@ bool ast::InterfaceNode::typed_parameter_aready_added(ast::Type type) {
 
 std::optional<ast::TypeParameter*> ast::InterfaceNode::get_type_parameter(ast::Type type) {
     for (auto& type_parameter: this->type_parameters) {
+        if (type_parameter.type == type) {
+            return &type_parameter;
+        }
+    }
+    return std::nullopt;
+}
+
+bool ast::InterfaceNode::is_in_type_parameter(ast::Type type) {
+    for (auto type_parameter: this->type_parameters) {
+        if (_is_in_type_parameter(type_parameter.type, type)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+std::vector<ast::Type> ast::InterfaceNode::get_prototype() {
+    std::vector<ast::Type> results;
+    for (auto arg: this->args) {
+        results.push_back(ast::get_type((ast::Node*) arg));
+    }
+    results.push_back(this->return_type);
+    return results;
+}
+
+bool ast::InterfaceNode::is_compatible_with(ast::Type type) {
+    assert(false);
+}
+
+std::optional<ast::TypeParameter*> ast::get_type_parameter(std::vector<ast::TypeParameter> type_parameters, ast::Type type) {
+    for (auto& type_parameter: type_parameters) {
         if (type_parameter.type == type) {
             return &type_parameter;
         }

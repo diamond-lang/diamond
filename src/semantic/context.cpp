@@ -4,60 +4,66 @@
 #include "../lexer.hpp"
 #include "../parser.hpp"
 #include  "../semantic.hpp"
+#include "semantic.hpp"
 
 // Bindings
 // --------
 semantic::Binding::Binding(ast::DeclarationNode* variable) {
     this->type = semantic::VariableBinding;
-    this->value.push_back((ast::Node*) variable);
+    this->value = (ast::Node*) variable;
 }
 
 semantic::Binding::Binding(ast::Node* function_argument) {
     this->type = semantic::FunctionArgumentBinding;
-    this->value.push_back((ast::Node*) function_argument);
+    this->value = (ast::Node*) function_argument;
 }
 
-semantic::Binding::Binding(std::vector<ast::FunctionNode*> functions) {
+semantic::Binding::Binding(ast::FunctionNode* function) {
     this->type = semantic::FunctionBinding;
-    for (size_t i = 0; i < functions.size(); i++) {
-        this->value.push_back((ast::Node*) functions[i]);
-    }
+    this->value = (ast::Node*) function;
+}
+
+semantic::Binding::Binding(ast::InterfaceNode* interface) {
+    this->type = semantic::InterfaceBinding;
+    this->value = (ast::Node*) interface;
 }
 
 semantic::Binding::Binding(ast::TypeNode* type) {
     this->type = semantic::TypeBinding;
-    this->value.push_back((ast::Node*) type);
+    this->value = (ast::Node*) type;
 }
 
 ast::DeclarationNode* semantic::get_variable(semantic::Binding binding) {
     assert(binding.type == semantic::VariableBinding);
-    return (ast::DeclarationNode*)binding.value[0];
+    return (ast::DeclarationNode*) binding.value;
 }
 
 ast::Node* semantic::get_function_argument(semantic::Binding binding) {
     assert(binding.type == semantic::FunctionArgumentBinding);
-    return binding.value[0];
+    return binding.value;
 }
 
-std::vector<ast::FunctionNode*> semantic::get_functions(semantic::Binding binding) {
+ast::FunctionNode* semantic::get_function(semantic::Binding binding) {
     assert(binding.type == semantic::FunctionBinding);
-    std::vector<ast::FunctionNode*> functions;
-    for (auto& function: binding.value) {
-        functions.push_back((ast::FunctionNode*)function);
-    }
-    return functions;
+    return (ast::FunctionNode*) binding.value;
+}
+
+ast::InterfaceNode* semantic::get_interface(semantic::Binding binding) {
+    assert(binding.type == semantic::InterfaceBinding);
+    return (ast::InterfaceNode*) binding.value;
 }
 
 ast::TypeNode* semantic::get_type_definition(semantic::Binding binding) {
     assert(binding.type == semantic::TypeBinding);
-    return (ast::TypeNode*) binding.value[0];
+    return (ast::TypeNode*) binding.value;
 }
 
 ast::Type semantic::get_binding_type(semantic::Binding& binding) {
     switch (binding.type) {
-        case semantic::VariableBinding: return ast::get_type(((ast::DeclarationNode*)binding.value[0])->expression);
-        case semantic::FunctionArgumentBinding: return ast::get_type(binding.value[0]);
+        case semantic::VariableBinding: return ast::get_type(((ast::DeclarationNode*) binding.value)->expression);
+        case semantic::FunctionArgumentBinding: return ast::get_type(binding.value);
         case semantic::FunctionBinding: return ast::Type("function");
+        case semantic::InterfaceBinding: return ast::Type("interface");
         case semantic::TypeBinding: return ast::Type("type");
     }
     assert(false);
@@ -66,24 +72,14 @@ ast::Type semantic::get_binding_type(semantic::Binding& binding) {
 
 std::string semantic::get_binding_identifier(semantic::Binding& binding) {
     switch (binding.type) {
-        case semantic::VariableBinding: return ((ast::DeclarationNode*)binding.value[0])->identifier->value;
-        case semantic::FunctionArgumentBinding: return ((ast::IdentifierNode*)binding.value[0])->value;
-        case semantic::FunctionBinding: return ((ast::FunctionNode*)binding.value[0])->identifier->value;
-        case semantic::TypeBinding: return ((ast::TypeNode*)binding.value[0])->identifier->value;
+        case semantic::VariableBinding: return ((ast::DeclarationNode*) binding.value)->identifier->value;
+        case semantic::FunctionArgumentBinding: return ((ast::IdentifierNode*) binding.value)->value;
+        case semantic::FunctionBinding: return ((ast::FunctionNode*) binding.value)->identifier->value;
+        case semantic::InterfaceBinding: return ((ast::InterfaceNode*) binding.value)->identifier->value;
+        case semantic::TypeBinding: return ((ast::TypeNode*) binding.value)->identifier->value;
     }
     assert(false);
     return "";
-}
-
-bool semantic::is_function(semantic::Binding& binding) {
-    switch (binding.type) {
-        case semantic::VariableBinding: return false;
-        case semantic::FunctionArgumentBinding: return false;
-        case semantic::FunctionBinding: return true;
-        case semantic::TypeBinding: return false;
-    }
-    assert(false);
-    return false;
 }
 
 // Context
@@ -91,46 +87,6 @@ bool semantic::is_function(semantic::Binding& binding) {
 void semantic::Context::init_with(ast::Ast* ast) {
     this->current_module = ast->module_path;
     this->ast = ast;
-
-    // Add intrinsic functions
-    semantic::add_scope(*this);
-
-    for (auto it = intrinsic_functions.begin(); it != intrinsic_functions.end(); it++) {
-        auto& identifier = it->first;
-        auto& scope = current_scope(*this);
-        std::vector<ast::FunctionNode*> overloaded_functions;
-        for (auto& prototype: it->second) {
-            // Create function node
-            auto function_node = ast::FunctionNode {};
-            function_node.state = ast::FunctionCompletelyTyped;
-
-            // Create identifier node
-            auto identifier_node = ast::IdentifierNode {};
-            identifier_node.value = identifier;
-            ast->push_back(identifier_node);
-
-            function_node.identifier = (ast::IdentifierNode*) ast->last_element();
-
-            // Create args nodes
-            for (auto& arg: prototype.arguments) {
-                auto arg_node = ast::FunctionArgumentNode {};
-                arg_node.type = arg.type;
-                arg_node.is_mutable = arg.is_mutable;
-
-                ast->push_back(arg_node);
-                function_node.args.push_back((ast::FunctionArgumentNode*) ast->last_element());
-            }
-
-            function_node.return_type = prototype.return_type.type;
-            function_node.return_type_is_mutable = prototype.return_type.is_mutable;
-            ast->push_back(function_node);
-            overloaded_functions.push_back((ast::FunctionNode*) ast->last_element());
-        }
-        scope[identifier] = semantic::Binding(overloaded_functions);
-    }
-
-    // Add std
-
 }
 
 // Manage scopes
@@ -139,10 +95,17 @@ void semantic::add_scope(Context& context) {
 }
 
 void semantic::remove_scope(Context& context) {
+    for (auto binding: semantic::current_scope(context)) {
+        if (binding.second.type == semantic::InterfaceBinding) {
+            semantic::get_interface(binding.second)->functions = {};
+        }
+    }
+
     context.scopes.pop_back();
 }
 
 std::unordered_map<std::string, semantic::Binding>& semantic::current_scope(Context& context) {
+    assert(context.scopes.size() != 0);
     return context.scopes[context.scopes.size() - 1];
 }
 
@@ -156,27 +119,61 @@ semantic::Binding* semantic::get_binding(Context& context, std::string identifie
 }
 
 // Work with modules
-Result<Ok, Error> semantic::add_definitions_to_current_scope(Context& context, ast::BlockNode& block) {
-    // Add functions from block to current scope
-    for (auto& function: block.functions) {
-        auto& identifier = function->identifier->value;
-        auto& scope = semantic::current_scope(context);
+Result<Ok, Error> semantic::add_definitions_to_current_scope(Context& context, std::vector<ast::FunctionNode*>& functions, std::vector<ast::InterfaceNode*>& interfaces, std::vector<ast::TypeNode*>& types) {
+    auto& scope = semantic::current_scope(context);
 
-        if (scope.find(identifier) == scope.end()) {
-            scope[identifier] = semantic::Binding(std::vector{function});
+    // Add interfaces from block to current scope
+    for (auto& interface: interfaces) {
+        auto& identifier = interface->identifier->value;
+
+        if (semantic::get_binding(context,identifier) == nullptr) {
+            scope[identifier] = semantic::Binding(interface);
         }
-        else if (is_function(scope[identifier])) {
-            scope[identifier].value.push_back((ast::Node*) function);
+        else if (semantic::get_binding(context,identifier)->type == FunctionBinding) {
+            std::cout << "Function \"" << identifier << "\" defined before interface" << "\n";
+            assert(false);
+        }
+        else if (semantic::get_binding(context,identifier)->type == InterfaceBinding) {
+            std::cout << "Multiple definitions for interface " << interface->identifier->value << "\n";
+            assert(false);
         }
         else {
             assert(false);
         }
     }
 
+    // Add functions from block to current scope
+    for (auto& function: functions) {
+        auto& identifier = function->identifier->value;
+
+        if (semantic::get_binding(context,identifier) == nullptr) {
+            scope[identifier] = semantic::Binding(function);
+        }
+        else if (semantic::get_binding(context,identifier)->type == InterfaceBinding) {
+            bool alreadyAdded = false;
+            for (auto function2: get_interface(*semantic::get_binding(context,identifier))->functions) {
+                if (function2 == function) {
+                    alreadyAdded = true;
+                    break;
+                }
+            }
+            if (!alreadyAdded) {
+                get_interface(*semantic::get_binding(context,identifier))->functions.push_back(function);
+            }
+        }
+        else if (semantic::get_binding(context,identifier)->type == FunctionBinding) {
+            std::cout << "Multiple definitions for function " << function->identifier->value << "\n";
+            assert(false);
+        }
+        else {
+            std::cout << scope[identifier].type << "\n";
+            assert(false);
+        }
+    }
+
     // Add types from current block to current scope
-    for (auto& type: block.types) {
+    for (auto& type: types) {
         auto& identifier = type->identifier->value;
-        auto& scope = semantic::current_scope(context);
 
         if (scope.find(identifier) == scope.end()) {
             scope[identifier] = semantic::Binding(type);
@@ -187,16 +184,37 @@ Result<Ok, Error> semantic::add_definitions_to_current_scope(Context& context, a
         }
     }
 
-    // Add functions from modules
-    auto current_directory = context.current_module.parent_path();
+    return Ok {};
+}
+
+Result<Ok, Error> semantic::add_definitions_from_block_to_scope(Context& context, ast::BlockNode& block) {
     std::set<std::filesystem::path> already_included_modules = {context.current_module};
 
+    // Add std libs
+    if (context.scopes.size() == 0) {
+        semantic::add_scope(context);
+        if (std::find(std_libs.elements.begin(), std_libs.elements.end(), context.current_module) == std_libs.elements.end()) {
+            for (auto path: std_libs.elements) {
+                add_module_functions(context, path, already_included_modules);
+            }
+        }
+    }
+
+    // Add scope for block definitions
+    semantic::add_scope(context);
+
+    // Add functions from modules
+    auto current_directory = context.current_module.parent_path();
     for (auto& use_stmt: block.use_statements) {
         auto module_path = std::filesystem::canonical(current_directory / (use_stmt->path->value + ".dmd"));
         assert(std::filesystem::exists(module_path));
         auto result = semantic::add_module_functions(context, module_path, already_included_modules);
         if (result.is_error()) return result;
     }
+
+    // Add functions from current scope
+    auto result = add_definitions_to_current_scope(context, block.functions, block.interfaces, block.types);
+    if (result.is_error()) return result;
 
     return Ok {};
 }
@@ -229,38 +247,25 @@ Result<Ok, Error> semantic::add_module_functions(Context& context, std::filesyst
             }
             exit(EXIT_FAILURE);
         }
+
+        // Analyze new module added
+        semantic::Context new_context;
+        new_context.init_with(context.ast);
+        new_context.current_module = module_path;
+        semantic::analyze(new_context, *context.ast->modules[module_path]);
+
+        if (context.errors.size() > 0) {
+            context.errors.insert(context.errors.end(), new_context.errors.begin(), new_context.errors.end());
+        }
     }
 
     if (already_included_modules.find(module_path) == already_included_modules.end()) {
-        // Add functions from current module to current context
-        for (auto& function: context.ast->modules[module_path.string()]->functions) {
-            auto& identifier = function->identifier->value;
-            auto& scope = semantic::current_scope(context);
-
-            if (scope.find(identifier) == scope.end()) {
-                scope[identifier] = semantic::Binding(std::vector{function});
-            }
-            else if (is_function(scope[identifier])) {
-                scope[identifier].value.push_back((ast::Node*) function);
-            }
-            else {
-                assert(false);
-            }
-        }
-
-        // Add types from current block to current scope
-        for (auto& type: context.ast->modules[module_path.string()]->types) {
-            auto& identifier = type->identifier->value;
-            auto& scope = semantic::current_scope(context);
-
-            if (scope.find(identifier) == scope.end()) {
-                scope[identifier] = semantic::Binding(type);
-            }
-            else {
-                context.errors.push_back(errors::generic_error(Location{type->line, type->column, type->module_path}, "This type is already defined in current parseModule."));
-                return Error {};
-            }
-        }
+        add_definitions_to_current_scope(
+            context,
+            context.ast->modules[module_path.string()]->functions,
+            context.ast->modules[module_path.string()]->interfaces,
+            context.ast->modules[module_path.string()]->types
+        );
 
         already_included_modules.insert(module_path);
 
@@ -282,10 +287,9 @@ std::vector<std::unordered_map<std::string, semantic::Binding>> semantic::get_de
     for (size_t i = 0; i < context.scopes.size(); i++) {
         scopes.push_back(std::unordered_map<std::string, Binding>());
         for (auto it = context.scopes[i].begin(); it != context.scopes[i].end(); it++) {
-            if (semantic::is_function(it->second)) {
-                scopes[i][it->first] = it->second;
-            }
-            else if (it->second.type == semantic::TypeBinding) {
+            if (it->second.type == semantic::FunctionBinding
+            ||  it->second.type == semantic::InterfaceBinding
+            ||  it->second.type == semantic::TypeBinding) {
                 scopes[i][it->first] = it->second;
             }
         }
@@ -305,14 +309,20 @@ void semantic::add_constraint(Context& context, Set<ast::Type> constraint) {
 }
 
 void semantic::add_interface_constraint(Context& context, ast::Type type, ast::InterfaceType interface) {
+    assert(type.to_str() != "t");
     if (context.type_inference.interface_constraints.find(type) == context.type_inference.interface_constraints.end()) {
-        context.type_inference.interface_constraints[type] = interface;
+        context.type_inference.interface_constraints[type] = Set<ast::InterfaceType>();
     }
-    else if (context.type_inference.interface_constraints[type] == interface) {
-        // do nothing
+
+    context.type_inference.interface_constraints[type].insert(interface);
+}
+
+void semantic::add_parameter_constraint(Context& context, ast::Type type, ast::Type parameter) {
+    if (context.type_inference.parameter_constraints[type].size() == 0) {
+        context.type_inference.parameter_constraints[type] = {parameter};
     }
     else {
-        assert(false);
+        semantic::add_constraint(context, Set<ast::Type>({context.type_inference.parameter_constraints[type][0], parameter}));
     }
 }
 
@@ -354,6 +364,28 @@ ast::Type semantic::get_unified_type(Context& context, ast::Type type_var) {
     else {
         assert(false);
         return type_var;
+    }
+}
+
+void semantic::set_unified_type(Context& context, ast::Type type_var, ast::Type new_type) {
+    auto it = context.type_inference.labeled_type_constraints.find(type_var);
+
+    if (it == context.type_inference.labeled_type_constraints.end()) {
+        context.type_inference.labeled_type_constraints[new_type] = Set<ast::Type>();
+        context.type_inference.labeled_type_constraints[new_type].insert(type_var);
+    }
+    else {
+        Set<ast::Type> set = context.type_inference.labeled_type_constraints[type_var];
+        context.type_inference.labeled_type_constraints.erase(it);
+
+        if (context.type_inference.labeled_type_constraints.find(new_type) == context.type_inference.labeled_type_constraints.end()) {
+            context.type_inference.labeled_type_constraints[new_type] = set;
+        }
+        else {
+            for (auto type: set.elements) {
+                context.type_inference.labeled_type_constraints[new_type].insert(type);
+            }
+        }
     }
 }
 

@@ -131,6 +131,8 @@ namespace ast {
         bool is_compatible_with(ast::Type type);
     };
 
+    ast::Type get_default_type(Set<ast::InterfaceType> interface);
+
     struct NoType {
 
     };
@@ -143,6 +145,8 @@ namespace ast {
 
     struct FinalTypeVariable {
         std::string id;
+        std::vector<ast::FieldConstraint> field_constraints;
+        std::vector<ast::Type> parameter_constraints;
 
         FinalTypeVariable(std::string id) : id(id) {}
     };
@@ -219,6 +223,7 @@ namespace ast {
     Type get_type(Node* node);
     Type get_concrete_type(Node* node, std::unordered_map<std::string, Type>& type_bindings);
     Type get_concrete_type(Type type_variable, std::unordered_map<std::string, Type>& type_bindings);
+    Type try_to_get_concrete_type(Type type_variable, std::unordered_map<std::string, Type>& type_bindings);
     void set_type(Node* node, Type type);
     std::vector<Type> get_types(std::vector<CallArgumentNode*> nodes);
     std::vector<Type> get_types(std::vector<FunctionArgumentNode*> nodes);  
@@ -237,8 +242,7 @@ namespace ast {
 
     struct TypeParameter {
         ast::Type type;
-        FieldTypes field_constraints;
-        std::optional<InterfaceType> interface = std::nullopt;
+        Set<InterfaceType> interface;
 
         std::string to_str();
     };
@@ -251,6 +255,7 @@ namespace ast {
         std::vector<Node*> statements;
         std::vector<UseNode*> use_statements;
         std::vector<FunctionNode*> functions;
+        std::vector<InterfaceNode*> interfaces;
         std::vector<TypeNode*> types;
     };
 
@@ -261,19 +266,6 @@ namespace ast {
 
         bool is_mutable = false;
         ast::IdentifierNode* identifier;
-    };
-
-    struct CallInCallStack {
-        std::string identifier;
-        std::vector<Type> args;
-        Type return_type;
-        CallNode* call;
-        FunctionNode* function;
-        std::filesystem::path file;
-
-        CallInCallStack(std::string identifier, std::vector<Type> args, CallNode* call, FunctionNode* function, std::filesystem::path file) : identifier(identifier), args(args), call(call), function(function), file(file) {}
-        bool operator==(const CallInCallStack &t) const;
-        bool operator!=(const CallInCallStack &t) const;
     };
 
     struct FunctionSpecialization {
@@ -308,9 +300,11 @@ namespace ast {
         Type return_type = Type(ast::NoType{});
         bool return_type_is_mutable = false;
         std::filesystem::path module_path; // Used in to tell from which module the function comes from
-    
+        bool is_used = false;
+
         bool typed_parameter_aready_added(ast::Type type);
         std::optional<ast::TypeParameter*> get_type_parameter(ast::Type type);
+        bool is_in_type_parameter(ast::Type type);
     };
 
     struct InterfaceNode {
@@ -325,10 +319,17 @@ namespace ast {
         Type return_type = Type(ast::NoType{});
         bool return_type_is_mutable = false;
         std::filesystem::path module_path; // Used in to tell from which module the function comes from
+        std::vector<ast::FunctionNode*> functions;
     
         bool typed_parameter_aready_added(ast::Type type);
         std::optional<ast::TypeParameter*> get_type_parameter(ast::Type type);
+        std::vector<ast::Type> get_prototype();
+        bool is_in_type_parameter(ast::Type type);
+
+        bool is_compatible_with(ast::Type type);
     };
+
+    std::optional<ast::TypeParameter*> get_type_parameter(std::vector<ast::TypeParameter> type_parameters, ast::Type type);
 
     struct TypeNode {
         size_t line;

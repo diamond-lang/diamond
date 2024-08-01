@@ -1,22 +1,32 @@
--- Passing structs by value
-
+-- Assigning struct as field
 type Point
     x: float64
     y: float64
-    z: float64
-    w: float64
 
-function awesome(point: Point): void
-    point.x = 100
-    print(point.x)
+type Rectangle
+    p1: Point
+    p2: Point
 
-point = Point{x: 10, y: 10, z: 10, w: 10}
-print(point.x)
-awesome(point)
-print(point.x)
+rectangle = Rectangle{
+    p1: Point{x: 10, y: 10}
+    p2: Point{x: 110, y: 60}
+}
+
+rectangle2 = Rectangle{
+    p1: Point{x: 20, y: 20}
+    p2: Point{x: 210, y: 260}
+}
+
+rectangle.p1 = rectangle2.p1
+
+print(rectangle.p1.x)
+print(rectangle.p1.y)
+print(rectangle.p2.x)
+print(rectangle.p2.y)
 
 --- Output
-10
-100
-10
+20
+20
+110
+60
 ---

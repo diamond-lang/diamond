@@ -1,18 +1,22 @@
--- Copying structs by value
+-- Passing structs by value
 
 type Point
     x: float64
     y: float64
+    z: float64
+    w: float64
 
-point = Point{x: 2, y: 4}
-point2 = point
+function awesome(point: Point): void
+    point.x = 100
+    print(point.x)
+
+point = Point{x: 10, y: 10, z: 10, w: 10}
 print(point.x)
-point2.x = 66
+awesome(point)
 print(point.x)
-print(point2.x)
 
 --- Output
-2
-2
-66
+10
+100
+10
 ---

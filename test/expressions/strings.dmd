@@ -1,4 +1,4 @@
-print("Hello, World!\n")
+print("Hello, World!")
 
 --- Output
 Hello, World!

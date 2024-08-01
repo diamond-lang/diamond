@@ -2,11 +2,13 @@
 #include "semantic.hpp"
 #include "type_infer.hpp"
 #include "unify.hpp"
-#include "make_concrete.hpp"
+#include "../utilities.hpp"
+#include "intrinsics.hpp"
+#include "check_functions_used.hpp"
 
 // Helper functions
 // ----------------
-void add_type_parameters(semantic::Context& context, ast::FunctionNode& node, ast::Type type,  std::unordered_map<ast::Type, ast::FieldTypes>& unified_fields_constraints, std::unordered_map<ast::Type, ast::InterfaceType>& unified_interface_constraints) {
+void add_type_parameters(semantic::Context& context, ast::FunctionNode& node, ast::Type type,  std::unordered_map<ast::Type, ast::FieldTypes>& unified_fields_constraints, std::unordered_map<ast::Type, Set<ast::InterfaceType>>& unified_interface_constraints) {
     if (type.is_final_type_variable()) {
         ast::TypeParameter parameter;
         parameter.type = type;
@@ -15,7 +17,9 @@ void add_type_parameters(semantic::Context& context, ast::FunctionNode& node, as
             parameter.interface = unified_interface_constraints[type];
         }
         if (unified_fields_constraints.find(type) != unified_fields_constraints.end()) {
-            parameter.field_constraints = unified_fields_constraints[type];
+            for (auto field_constraint: unified_fields_constraints[type]) {
+                parameter.type.as_final_type_variable().field_constraints.push_back(field_constraint);
+            }
         }
 
         if (!node.typed_parameter_aready_added(type)) {
@@ -40,10 +44,47 @@ Result<Ok, Errors> semantic::analyze(ast::Ast& ast) {
     semantic::Context context;
     context.init_with(&ast);
 
+    // Analyze program
     semantic::analyze(context, *ast.program);
 
+    // Return
     if (context.errors.size() > 0) return context.errors;
     else                           return Ok {};
+}
+
+static void print_results_phase_1(semantic::Context& context, ast::Node* node) {
+    ast::print(node);
+    if (context.type_inference.labeled_type_constraints.size() > 0) {
+        std::cout << "Type constraints\n";
+        for (auto it: context.type_inference.labeled_type_constraints) {
+            std::cout << "    " << it.first.to_str() << ": " <<  utilities::to_str(it.second) << "\n";
+        }
+    }
+    if (context.type_inference.interface_constraints.size() > 0) {
+        std::cout << "Interface constraints\n";
+        for (auto it: context.type_inference.interface_constraints) {
+            std::cout << "    " << it.first.to_str() << ": ";
+            for (size_t i = 0; i < it.second.elements.size(); i++) {
+                std::cout << it.second.elements[i].name;
+                if (i + 1 != it.second.elements.size()) {
+                    std::cout << " and ";
+                }
+            }
+            std::cout << "\n";
+        }
+    }
+    if (context.type_inference.parameter_constraints.size() > 0) {
+        std::cout << "Parameter constraints\n";
+        for (auto it: context.type_inference.parameter_constraints) {
+            std::cout << "    " << it.first.to_str() << ": " << it.second[0].to_str() << "\n";
+        }
+    }
+    if (context.type_inference.field_constraints.size() > 0) {
+        std::cout << "Field constraints\n";
+        for (auto it: context.type_inference.field_constraints) {
+            std::cout << "    " << it.first.to_str() << ": " << it.second.to_str() << "\n";
+        }
+    }
 }
 
 Result<Ok, Error> semantic::analyze_block_or_expression(semantic::Context& context, ast::Node* node) {
@@ -123,6 +164,17 @@ Result<Ok, Error> semantic::analyze_block_or_expression(semantic::Context& conte
                     &&  (representative.as_nominal_type().name == "pointer" || representatives[i].as_nominal_type().name == "pointer")) {
                         representative = representative.as_nominal_type().name == "boxed" ?  representative : representatives[i];
                     }
+                    else if (representative.is_array() || representatives[i].is_array()) {
+                        if (representative.array_size_known() && representatives[i].array_size_known()) {
+                            assert(representative.get_array_size() == representatives[i].get_array_size());
+                        }
+                        else if (representatives[i].array_size_known()) {
+                            representative = representatives[i];
+                        }
+                        else {
+                            // do nothing
+                        }
+                    } 
                     else if (representative.as_nominal_type().name != representatives[i].as_nominal_type().name) {
                         std::cout << representative.to_str() << " <> " << representatives[i].to_str() << "\n";
                         assert(false);
@@ -146,6 +198,18 @@ Result<Ok, Error> semantic::analyze_block_or_expression(semantic::Context& conte
     // Unify
     // -----
 
+    // Unify parameter constraints
+    std::unordered_map<ast::Type, std::vector<ast::Type>> unified_parameter_constraints;
+    for (auto type: context.type_inference.parameter_constraints) {
+        auto unified_type = semantic::get_unified_type(context, type.first);
+        for (auto parameter: type.second) {
+            unified_parameter_constraints[unified_type].push_back(semantic::get_unified_type(context, parameter.type));
+            unified_type.as_final_type_variable().parameter_constraints.push_back(semantic::get_unified_type(context, parameter.type));
+        }
+
+        semantic::set_unified_type(context, semantic::get_unified_type(context, type.first), unified_type);
+    }
+
     // Unify field constraints
     std::unordered_map<ast::Type, ast::FieldTypes> unified_field_constraints;
     for (auto type: context.type_inference.field_constraints) {
@@ -157,13 +221,34 @@ Result<Ok, Error> semantic::analyze_block_or_expression(semantic::Context& conte
     }
 
     // Unify interface constraints
-    std::unordered_map<ast::Type, ast::InterfaceType> unified_interface_constraints;
+    std::unordered_map<ast::Type, Set<ast::InterfaceType>> unified_interface_constraints;
     for (auto it: context.type_inference.interface_constraints) {
         auto unified_type = semantic::get_unified_type(context, it.first);
-        unified_interface_constraints[unified_type] = it.second;
+        if (unified_interface_constraints.find(unified_type) == unified_interface_constraints.end()) {
+            unified_interface_constraints[unified_type] = it.second;
+        }
+        else {
+            for (auto& interface: it.second.elements) {
+                if (unified_interface_constraints[unified_type].contains(ast::InterfaceType("number"))
+                &&  interface.name == "float") {
+                    unified_interface_constraints[unified_type].remove(ast::InterfaceType("number"));
+                    unified_interface_constraints[unified_type].insert(interface.name);
+                }
+                else if (unified_interface_constraints[unified_type].contains(ast::InterfaceType("float"))
+                &&  interface.name == "number") {
+                    // do nothing
+                }
+                else {
+                    unified_interface_constraints[unified_type].insert(interface);
+                }
+            }
+        }
     }
+
+    context.type_inference.interface_constraints = unified_interface_constraints;
     
-    // Unify args and return type if we are in funciton being analyzed
+    // Unify args and return type if we are in function being analyzed
+    // and add type parameters
     if (context.current_function.has_value()
     && context.current_function.value()->state == ast::FunctionBeingAnalyzed) {
         // Unify args and return type and add type parameters
@@ -178,20 +263,18 @@ Result<Ok, Error> semantic::analyze_block_or_expression(semantic::Context& conte
         if (!context.current_function.value()->return_type.is_concrete()) {
             add_type_parameters(context, *context.current_function.value(), context.current_function.value()->return_type, unified_field_constraints, unified_interface_constraints);
         }
+
+        // Add missing field constraints
+        for (auto it: unified_field_constraints) {
+            if (!context.current_function.value()->typed_parameter_aready_added(it.first)) {
+                add_type_parameters(context, *context.current_function.value(), it.first, unified_field_constraints, unified_interface_constraints);
+            }
+        }
     }
 
     // Unify current program or body of function
     result = semantic::unify_types_and_type_check(context, node);
     if(result.is_error()) return Error {};
-
-    // Make concrete
-    // -------------
-    if (!context.current_function.has_value()
-    ||   context.current_function.value()->state == ast::FunctionCompletelyTyped) {
-        result = semantic::make_concrete(context, node, {});
-        if (result.is_error()) return result;
-        semantic::set_concrete_types(context, node);
-    }
 
     return Ok {};
 }
@@ -201,7 +284,9 @@ Result<Ok, Error> semantic::analyze(semantic::Context& context, ast::BlockNode& 
 }
 
 Result<Ok, Error> semantic::analyze(semantic::Context& context, ast::FunctionNode& node) {
-    if (node.is_extern) {
+    assert(node.module_path == context.current_module);
+    if (node.is_extern
+    ||  node.is_builtin) {
         for (auto arg: node.args) {
             auto result = semantic::analyze(context, arg->type);
             if (result.is_error()) return Error {};
@@ -220,16 +305,7 @@ Result<Ok, Error> semantic::analyze(semantic::Context& context, ast::FunctionNod
     Context new_context;
     new_context.init_with(context.ast);
     new_context.current_function = &node;
-
-    if (context.current_module == node.module_path) {
-        new_context.scopes = semantic::get_definitions(context);
-    }
-    else {
-        new_context.current_module = node.module_path;
-        auto result = semantic::add_definitions_to_current_scope(new_context, *(context.ast->modules[node.module_path.string()]));
-        assert(result.is_ok());
-    }
-
+    new_context.scopes = semantic::get_definitions(context);
     semantic::add_scope(new_context);
 
     // Analyze function
@@ -352,11 +428,11 @@ bool semantic::are_types_compatible(ast::FunctionNode& function, ast::Type funct
     if (function_type.is_concrete()) {
         return argument_type == function_type;
     }
-    else if (function_type.is_final_type_variable()
-    &&       function.get_type_parameter(function_type).has_value()
-    &&       function.get_type_parameter(function_type).value()->interface.has_value()) {
-        return function.get_type_parameter(function_type).value()->interface.value().is_compatible_with(argument_type);
-    }
+    // else if (function_type.is_final_type_variable()
+    // &&       function.get_type_parameter(function_type).has_value()
+    // &&       function.get_type_parameter(function_type).value()->interface.has_value()) {
+    //     return function.get_type_parameter(function_type).value()->interface.value().is_compatible_with(argument_type);
+    // }
     else if (function_type.is_nominal_type()) {
         if (function_type.as_nominal_type().name == argument_type.as_nominal_type().name
         &&  function_type.as_nominal_type().parameters.size() == argument_type.as_nominal_type().parameters.size()) {
@@ -390,11 +466,199 @@ bool semantic::are_types_compatible(ast::FunctionNode& function, std::vector<ast
 }
 
 bool semantic::are_arguments_compatible(ast::FunctionNode& function, ast::CallNode& call, std::vector<ast::Type> function_types, std::vector<ast::Type> argument_types) {
-    for (size_t i = 0; i < function_types.size(); i++) {
+    for (size_t i = 0; i < function_types.size() - 1; i++) {
         if (!semantic::are_types_compatible(function, function_types[i], argument_types[i])
         ||  function.args[i]->is_mutable != call.args[i]->is_mutable) {
             return false;
         }
     }
+    if (!semantic::are_types_compatible(function, function_types[function_types.size() - 1], argument_types[argument_types.size() - 1])) {
+        return false;
+    }
     return true;
+}
+
+Result<ast::Type, Error> get_field_type(std::string field, ast::Type struct_type) {
+    assert(struct_type.is_nominal_type() && struct_type.as_nominal_type().type_definition);
+
+    for (size_t i = 0; i < struct_type.as_nominal_type().type_definition->fields.size(); i++) {
+        if (field == struct_type.as_nominal_type().type_definition->fields[i]->value) {
+            return struct_type.as_nominal_type().type_definition->fields[i]->type;
+        }
+    }
+
+    assert(false);
+    return Error{};
+}
+
+void add_argument_type_to_specialization(ast::FunctionSpecialization& specialization, std::vector<ast::TypeParameter>& type_parameters, ast::Type function_type, ast::Type argument_type) { 
+    if (function_type.is_final_type_variable()
+    &&  !argument_type.is_final_type_variable()) {
+        // If it was no already included
+        if (specialization.type_bindings.find(function_type.as_final_type_variable().id) == specialization.type_bindings.end()) {
+            specialization.type_bindings[function_type.as_final_type_variable().id] = argument_type;
+        }
+        // Else compare with previous type founded for it
+        else if (specialization.type_bindings[function_type.as_final_type_variable().id] != argument_type) {
+            assert(false);
+        }
+
+        // If function argument constraints
+        if (ast::get_type_parameter(type_parameters, function_type).has_value()) {
+            auto field_constraints = ast::get_type_parameter(type_parameters, function_type).value()->type.as_final_type_variable().field_constraints;
+            
+            // If the parameter has field constraints
+            for (size_t i = 0; i < field_constraints.size(); i++) {
+                add_argument_type_to_specialization(specialization, type_parameters, field_constraints[i].type, get_field_type(field_constraints[i].name, argument_type).get_value());
+            }
+        }
+
+        // If the parameter has parameter constraints
+        auto parameter_constraints = function_type.as_final_type_variable().parameter_constraints;
+        for (size_t i = 0; i < parameter_constraints.size(); i++) {
+            add_argument_type_to_specialization(specialization, type_parameters, parameter_constraints[i], argument_type.as_nominal_type().parameters[i]);
+        }
+    }
+    else if (function_type.is_concrete()
+    &&       function_type != argument_type) {
+        assert(false);
+    }
+    else if (function_type.is_array()) {
+        assert(argument_type.is_array());
+
+        for (size_t i = 0; i < function_type.as_nominal_type().parameters.size(); i++) {
+            add_argument_type_to_specialization(specialization, type_parameters, function_type.as_nominal_type().parameters[i], argument_type.as_nominal_type().parameters[i]);
+        }
+    }
+    else if (function_type.is_nominal_type()) {
+        assert(argument_type.is_nominal_type());
+        assert(function_type.as_nominal_type().name == argument_type.as_nominal_type().name);
+        assert(function_type.as_nominal_type().parameters.size() == argument_type.as_nominal_type().parameters.size());
+        assert(argument_type.is_concrete());
+
+        for (size_t i = 0; i < function_type.as_nominal_type().parameters.size(); i++) {
+            add_argument_type_to_specialization(specialization, type_parameters, function_type.as_nominal_type().parameters[i], argument_type.as_nominal_type().parameters[i]);
+        }
+    }
+}
+
+Result<ast::Type, Error> semantic::get_function_type(Context& context, ast::Node* function_or_interface, ast::CallNode* call, std::vector<ast::Type> call_args, ast::Type call_type) {
+    // Get function called
+    ast::FunctionNode* function = nullptr;
+
+    if (function_or_interface->index() == ast::Function) {
+        function = &std::get<ast::FunctionNode>(*function_or_interface);
+    }
+    else if (function_or_interface->index() == ast::Interface) {
+        auto interface = std::get<ast::InterfaceNode>(*function_or_interface);
+
+        // Get function called
+        for (auto it: interface.functions) {
+            std::vector<ast::Type> function_types = ast::get_types(it->args);
+            function_types.push_back(it->return_type);
+            std::vector<ast::Type> call_types = call_args;
+            call_types.push_back(call_type);
+            if (semantic::are_arguments_compatible(*it, *call, function_types, call_types)) {
+                assert(function == nullptr);
+                function = it;
+            }
+        }
+    
+        assert(function != nullptr);
+    }
+    else {
+        assert(false);
+    }
+
+    // If is not generic
+    if (function->state == ast::FunctionCompletelyTyped) {
+        if (!function->is_used) {
+            if (!function->is_builtin
+            &&  !function->is_extern) {
+                // Create new context to check functions used
+                Context new_context;
+                new_context.init_with(context.ast);
+                new_context.current_function = function;
+
+                if (context.current_module == function->module_path) {
+                    new_context.scopes = semantic::get_definitions(context);
+                }
+                else {
+                    new_context.current_module = function->module_path;
+                    auto result = semantic::add_definitions_from_block_to_scope(new_context, *(context.ast->modules[function->module_path.string()]));
+                    assert(result.is_ok());
+                }
+
+                semantic::add_scope(new_context);
+
+                // Check functions used in function
+                semantic::check_functions_used(new_context, function->body);
+            }
+
+            function->is_used = true;
+        }
+
+        return function->return_type;
+    }
+    // If is generic
+    else {
+        for (auto& specialization: function->specializations) {
+            if (specialization.args == call_args) {
+                if (call_type.is_concrete()) {
+                    if (specialization.return_type == call_type) {
+                        return specialization.return_type;
+                    }
+                }
+                else {
+                    return specialization.return_type;
+                }
+            }
+        }
+
+        // Add arguments to specialization
+        ast::FunctionSpecialization specialization;
+        for (size_t i = 0; i < function->args.size(); i++) {
+            ast::Type call_type = call_args[i];
+            ast::Type function_type = function->args[i]->type;
+            add_argument_type_to_specialization(specialization, function->type_parameters, function_type, call_type);
+            specialization.args.push_back(call_type);
+        }
+        add_argument_type_to_specialization(specialization, function->type_parameters, function->return_type, call_type);
+
+        specialization.return_type = ast::try_to_get_concrete_type(function->return_type, specialization.type_bindings);
+        if (specialization.return_type.is_final_type_variable()) {
+            specialization.type_bindings[specialization.return_type.as_final_type_variable().id] = ast::get_default_type(function->get_type_parameter(specialization.return_type).value()->interface);
+            specialization.return_type = specialization.type_bindings[specialization.return_type.as_final_type_variable().id];
+        }
+        assert(specialization.return_type.is_concrete());
+        function->specializations.push_back(specialization);
+
+        if (!function->is_builtin) {
+            // Create new context to check functions used
+            Context new_context;
+            new_context.init_with(context.ast);
+            new_context.current_function = function;
+            new_context.type_inference.type_bindings = specialization.type_bindings;
+
+            if (context.current_module == function->module_path) {
+                new_context.scopes = semantic::get_definitions(context);
+            }
+            else {
+                new_context.current_module = function->module_path;
+                auto result = semantic::add_definitions_from_block_to_scope(new_context, *(context.ast->modules[function->module_path.string()]));
+                assert(result.is_ok());
+            }
+
+            semantic::add_scope(new_context);
+
+            // Check functions used in function
+            semantic::check_functions_used(new_context, function->body);
+        }
+
+        // Return specialization return type
+        return specialization.return_type;
+    }
+
+    assert(false);
+    return Error{};
 }

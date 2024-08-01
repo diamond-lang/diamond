@@ -510,7 +510,7 @@ llvm::Type* codegen::Context::as_llvm_type(ast::Type type) {
         return this->get_struct_type(type.as_nominal_type().type_definition);
     }
     else {
-        std::cout <<"type: " << type.to_str() << "\n";
+        std::cout << "type: " << type.to_str() << "\n";
         assert(false);
     }
 }
@@ -687,7 +687,11 @@ llvm::TypeSize codegen::Context::get_type_size(llvm::Type* type) {
 ast::FunctionNode* codegen::Context::get_function(ast::CallNode* call) {
     ast::FunctionNode* result = nullptr;
     for (auto function: call->functions) {
-        if (semantic::are_arguments_compatible(*function, *call, ast::get_types(function->args), this->get_types(call->args))) {
+        std::vector<ast::Type> function_types = ast::get_types(function->args);
+        function_types.push_back(function->return_type);
+        std::vector<ast::Type> call_types = this->get_types(call->args);
+        call_types.push_back(ast::get_concrete_type(call->type, this->type_bindings));
+        if (semantic::are_arguments_compatible(*function, *call, function_types, call_types)) {
             result = function;
             break;
         }
@@ -939,7 +943,9 @@ llvm::Value* codegen::Context::get_pointer_to(ast::Node* expression) {
         auto pointer = this->get_field_pointer(node);
         return pointer;
     }
-    else if (expression->index() == ast::Call && std::get<ast::CallNode>(*expression).identifier->value == "[]") {
+    else if (expression->index() == ast::Call
+    &&       (std::get<ast::CallNode>(*expression).identifier->value == "subscript"
+           || std::get<ast::CallNode>(*expression).identifier->value == "subscript_mut")) {
         auto& node = std::get<ast::CallNode>(*expression);
         auto pointer = this->get_index_access_pointer(node);
         return pointer;
@@ -1059,6 +1065,8 @@ void codegen::Context::codegen_types_bodies(std::vector<ast::TypeNode*> types) {
 
 void codegen::Context::codegen_function_prototypes(std::vector<ast::FunctionNode*> functions) {
     for (auto& function: functions) {
+        if (function->is_builtin) continue;
+
         if (function->state != ast::FunctionCompletelyTyped) {
             for (auto& specialization: function->specializations) {
                 this->type_bindings = specialization.type_bindings;
@@ -1077,6 +1085,8 @@ void codegen::Context::codegen_function_prototypes(std::vector<ast::FunctionNode
             }
         }
         else {
+            if (!function->is_used) continue;
+
             this->codegen_function_prototypes(
                 function->module_path,
                 function->identifier->value,
@@ -1130,7 +1140,7 @@ void codegen::Context::codegen_function_prototypes(std::filesystem::path module_
 
 void codegen::Context::codegen_function_bodies(std::vector<ast::FunctionNode*> functions) {
     for (auto& function: functions) {
-        if (function->is_extern) continue;
+        if (function->is_extern || function->is_builtin) continue;
 
         if (function->state != ast::FunctionCompletelyTyped) {
             for (auto& specialization: function->specializations) {
@@ -1149,6 +1159,8 @@ void codegen::Context::codegen_function_bodies(std::vector<ast::FunctionNode*> f
             }
         }
         else {
+            if (!function->is_used) continue;
+
             this->codegen_function_bodies(
                 function->module_path,
                 function->identifier->value,
@@ -1683,12 +1695,17 @@ llvm::Value* codegen::Context::codegen_print_function(ast::FunctionNode* print_f
             if (i + 1 != string.strings.size()) {
                 this->codegen_print_function(print_function, string.expressions[i]);
             }
+            else {
+                printArgs = {};
+                printArgs.push_back(this->get_global_string("\n"));
+                this->builder->CreateCall(this->module->getFunction("printf"), printArgs);
+            }
         }
         return nullptr;
     }
     else {
         // Get function
-        std::string name = this->get_mangled_function_name(print_function->module_path, print_function->identifier->value, {ast::get_concrete_type(expression, this->type_bindings), ast::Type("bool")}, ast::Type("void"), print_function->is_extern);
+        std::string name = this->get_mangled_function_name(print_function->module_path, "printWithoutLineEnding", {ast::get_concrete_type(expression, this->type_bindings)}, ast::Type("void"), print_function->is_extern);
         llvm::Function* llvm_function = this->module->getFunction(name);
         assert(llvm_function);
 
@@ -1720,7 +1737,7 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
 
     // Codegen args
     std::vector<llvm::Value*> args; 
-    if (node.identifier->value != "[]"
+    if (node.identifier->value != "subscript"
     && node.identifier->value != "size"
     && node.identifier->value != "print") {
         args = this->codegen_args(function, node.args);
@@ -1728,7 +1745,7 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
   
     // Intrinsics
     if (node.args.size() == 2) {
-        if (node.identifier->value == "+") {
+        if (node.identifier->value == "add") {
             if (args[0]->getType()->isDoubleTy() && args[1]->getType()->isDoubleTy()) {
                 return this->builder->CreateFAdd(args[0], args[1], "addtmp");
             }
@@ -1736,7 +1753,7 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
                 return this->builder->CreateAdd(args[0], args[1], "addtmp");
             }
         }
-        if (node.identifier->value == "-") {
+        if (node.identifier->value == "subtract") {
             if (args[0]->getType()->isDoubleTy() && args[1]->getType()->isDoubleTy()) {
                 return this->builder->CreateFSub(args[0], args[1], "subtmp");
             }
@@ -1744,7 +1761,7 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
                 return this->builder->CreateSub(args[0], args[1], "addtmp");
             }
         }
-        if (node.identifier->value == "*") {
+        if (node.identifier->value == "multiply") {
             if (args[0]->getType()->isDoubleTy() && args[1]->getType()->isDoubleTy()) {
                 return this->builder->CreateFMul(args[0], args[1], "multmp");
             }
@@ -1752,7 +1769,7 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
                 return this->builder->CreateMul(args[0], args[1], "addtmp");
             }
         }
-        if (node.identifier->value == "/") {
+        if (node.identifier->value == "divide") {
             if (args[0]->getType()->isDoubleTy() && args[1]->getType()->isDoubleTy()) {
                 return this->builder->CreateFDiv(args[0], args[1], "divtmp");
             }
@@ -1760,10 +1777,10 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
                 return this->builder->CreateSDiv(args[0], args[1], "divtmp");
             }
         }
-        if (node.identifier->value == "%") {
+        if (node.identifier->value == "modulo") {
             return this->builder->CreateSRem(args[0], args[1], "remtmp");
         }
-        if (node.identifier->value == "<") {
+        if (node.identifier->value == "less") {
             if (args[0]->getType()->isDoubleTy() && args[1]->getType()->isDoubleTy()) {
                 return this->builder->CreateFCmpULT(args[0], args[1], "cmptmp");
             }
@@ -1771,7 +1788,7 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
                 return this->builder->CreateICmpULT(args[0], args[1], "addtmp");
             }
         }
-        if (node.identifier->value == "<=") {
+        if (node.identifier->value == "lessEqual") {
             if (args[0]->getType()->isDoubleTy() && args[1]->getType()->isDoubleTy()) {
                 return this->builder->CreateFCmpULE(args[0], args[1], "cmptmp");
             }
@@ -1779,7 +1796,7 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
                 return this->builder->CreateICmpULE(args[0], args[1], "addtmp");
             }
         }
-        if (node.identifier->value == ">") {
+        if (node.identifier->value == "greater") {
             if (args[0]->getType()->isDoubleTy() && args[1]->getType()->isDoubleTy()) {
                 return this->builder->CreateFCmpUGT(args[0], args[1], "cmptmp");
             }
@@ -1787,7 +1804,7 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
                 return this->builder->CreateICmpUGT(args[0], args[1], "addtmp");
             }
         }
-        if (node.identifier->value == ">=") {
+        if (node.identifier->value == "greaterEqual") {
             if (args[0]->getType()->isDoubleTy() && args[1]->getType()->isDoubleTy()) {
                 return this->builder->CreateFCmpUGE(args[0], args[1], "cmptmp");
             }
@@ -1795,7 +1812,7 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
                 return this->builder->CreateICmpUGE(args[0], args[1], "addtmp");
             }
         }
-        if (node.identifier->value == "==") {
+        if (node.identifier->value == "equal") {
             if (args[0]->getType()->isDoubleTy() && args[1]->getType()->isDoubleTy()) {
                 return this->builder->CreateFCmpUEQ(args[0], args[1], "eqtmp");
             }
@@ -1811,7 +1828,7 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
         }
     }
     if (node.args.size() == 1) {
-        if (node.identifier->value == "-") {
+        if (node.identifier->value == "negate") {
             if (args[0]->getType()->isDoubleTy()) {
                 return this->builder->CreateFNeg(args[0], "negation");
             }
@@ -1840,7 +1857,8 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
             return this->builder->CreateCall(llvm_function, args, "calltmp");
         }
     }
-    if (node.identifier->value == "[]") {
+    if (node.identifier->value == "subscript"
+    ||  node.identifier->value == "subscript_mut") {
         if (node.args.size() == 2) {
             return this->builder->CreateLoad(
                 this->as_llvm_type(ast::get_concrete_type((ast::Node*)&node, this->type_bindings)),
