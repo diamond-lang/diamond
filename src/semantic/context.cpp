@@ -252,7 +252,7 @@ Result<Ok, Error> semantic::add_module_functions(Context& context, std::filesyst
         semantic::Context new_context;
         new_context.init_with(context.ast);
         new_context.current_module = module_path;
-        semantic::analyze(new_context, *context.ast->modules[module_path]);
+        semantic::analyze(new_context, *context.ast->modules[module_path.string()]);
 
         if (context.errors.size() > 0) {
             context.errors.insert(context.errors.end(), new_context.errors.begin(), new_context.errors.end());
