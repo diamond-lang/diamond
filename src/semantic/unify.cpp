@@ -1,5 +1,6 @@
 #include "unify.hpp"
 #include "semantic.hpp"
+#include "check_functions_used.hpp"
 
 Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::Node* node) {
     return std::visit([&context, node](auto& variant) {return semantic::unify_types_and_type_check(context, variant);}, *node);
@@ -230,6 +231,23 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::Ca
     }
     else if (binding->type == InterfaceBinding) {
         node.functions = semantic::get_interface(*binding)->functions;
+    }
+
+    if (node.identifier->value == "print" && node.args[0]->expression->index() == ast::InterpolatedString) {
+        ast::InterpolatedStringNode& interpolated_string = std::get<ast::InterpolatedStringNode>(*node.args[0]->expression);
+        for (auto expression: interpolated_string.expressions) {
+            if (!ast::get_type(expression).is_final_type_variable()) {
+                auto binding = semantic::get_binding(context, "printWithoutLineEnding");
+                assert(binding);
+
+                auto interface = semantic::get_interface(*binding);
+                for (auto function: interface->functions) {
+                    if (function->args[0]->type == ast::get_type(expression)) {
+                        semantic::mark_function_as_used(context, function);
+                    }
+                }
+            }
+        }
     }
 
     return Ok {};

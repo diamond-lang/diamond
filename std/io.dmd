@@ -1,22 +1,26 @@
-interface print[t](object: t): void
+interface printWithoutLineEnding[t](object: t): void
 
 extern printf(format: string, ...): int32
 
-function print(value: float64): void
-    _ = printf("%g\n", value)
+function print[t](value: t): void
+    printWithoutLineEnding(value)
+    _ = printf("\n")
 
-function print(value: int64): void
-    _ = printf("%d\n", value)
+function printWithoutLineEnding(value: float64): void
+    _ = printf("%g", value)
 
-function print(value: int32): void
-    _ = printf("%d\n", value)
+function printWithoutLineEnding(value: int64): void
+    _ = printf("%d", value)
 
-function print(value: int8): void
-    _ = printf("%d\n", value)
+function printWithoutLineEnding(value: int32): void
+    _ = printf("%d", value)
 
-function print(value: bool): void
-    if value _ = printf("true\n")
-    else     _ = printf("false\n")
+function printWithoutLineEnding(value: int8): void
+    _ = printf("%d", value)
 
-function print(value: string): void
+function printWithoutLineEnding(value: bool): void
+    if value _ = printf("true")
+    else     _ = printf("false")
+
+function printWithoutLineEnding(value: string): void
     _ = printf(value)

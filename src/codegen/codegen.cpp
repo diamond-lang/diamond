@@ -1068,8 +1068,6 @@ void codegen::Context::codegen_function_prototypes(std::vector<ast::FunctionNode
         if (function->is_builtin) continue;
 
         if (function->state != ast::FunctionCompletelyTyped) {
-            assert(function->specializations.size() > 0);
-
             for (auto& specialization: function->specializations) {
                 this->type_bindings = specialization.type_bindings;
                 
@@ -1697,12 +1695,17 @@ llvm::Value* codegen::Context::codegen_print_function(ast::FunctionNode* print_f
             if (i + 1 != string.strings.size()) {
                 this->codegen_print_function(print_function, string.expressions[i]);
             }
+            else {
+                printArgs = {};
+                printArgs.push_back(this->get_global_string("\n"));
+                this->builder->CreateCall(this->module->getFunction("printf"), printArgs);
+            }
         }
         return nullptr;
     }
     else {
         // Get function
-        std::string name = this->get_mangled_function_name(print_function->module_path, print_function->identifier->value, {ast::get_concrete_type(expression, this->type_bindings), ast::Type("bool")}, ast::Type("void"), print_function->is_extern);
+        std::string name = this->get_mangled_function_name(print_function->module_path, "printWithoutLineEnding", {ast::get_concrete_type(expression, this->type_bindings)}, ast::Type("void"), print_function->is_extern);
         llvm::Function* llvm_function = this->module->getFunction(name);
         assert(llvm_function);
 

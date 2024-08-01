@@ -2,10 +2,10 @@
 
 function printArray[t](array: array[t]): void
     i = 1
-    print("[]:\n")
+    print("[]:")
     
     while i <= size(array)
-        print("    ")
+        printWithoutLineEnding("    ")
         print(array[i])
         i := i + 1
 

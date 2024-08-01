@@ -1,6 +1,31 @@
 #include "check_functions_used.hpp"
 #include "semantic.hpp"
 
+void semantic::mark_function_as_used(Context& context, ast::FunctionNode* function) {
+    if (!function->is_used) {
+        // Create new context to check functions used
+        Context new_context;
+        new_context.init_with(context.ast);
+        new_context.current_function = function;
+
+        if (context.current_module == function->module_path) {
+            new_context.scopes = semantic::get_definitions(context);
+        }
+        else {
+            new_context.current_module = function->module_path;
+            auto result = semantic::add_definitions_from_block_to_scope(new_context, *(context.ast->modules[function->module_path.string()]));
+            assert(result.is_ok());
+        }
+
+        semantic::add_scope(new_context);
+
+        // Check functions used in function
+        semantic::check_functions_used(new_context, function->body);
+
+        function->is_used = true;
+    }
+}
+
 void semantic::check_functions_used(Context& context, ast::Node* node) {
     assert(node);
     std::visit([&context, node](auto& variant) {
@@ -101,6 +126,21 @@ void semantic::check_functions_used(Context& context, ast::CallNode& node) {
     auto args_types = ast::get_concrete_types(ast::get_types(node.args), context.type_inference.type_bindings);
     auto call_type = ast::get_concrete_type(node.type, context.type_inference.type_bindings);
     auto function_type = semantic::get_function_type(context, binding->value, &node, args_types, call_type);
+
+    if (node.identifier->value == "print" && node.args[0]->expression->index() == ast::InterpolatedString) {
+        ast::InterpolatedStringNode& interpolated_string = std::get<ast::InterpolatedStringNode>(*node.args[0]->expression);
+        for (auto expression: interpolated_string.expressions) {
+            auto binding = semantic::get_binding(context, "printWithoutLineEnding");
+            assert(binding);
+
+            auto interface = semantic::get_interface(*binding);
+            for (auto function: interface->functions) {
+                if (function->args[0]->type == ast::get_concrete_type(ast::get_type(expression), context.type_inference.type_bindings)) {
+                    semantic::mark_function_as_used(context, function);
+                }
+            }
+        }
+    }
 }
 
 
