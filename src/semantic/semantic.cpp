@@ -503,9 +503,10 @@ void add_argument_type_to_specialization(ast::FunctionSpecialization& specializa
             assert(false);
         }
 
-        // If function argument constraints
+        // If function argument has constraints
         if (ast::get_type_parameter(type_parameters, function_type).has_value()) {
-            auto field_constraints = ast::get_type_parameter(type_parameters, function_type).value()->type.as_final_type_variable().field_constraints;
+            ast::TypeParameter* type_parameter = ast::get_type_parameter(type_parameters, function_type).value();
+            auto& field_constraints = type_parameter->type.as_final_type_variable().field_constraints;
             
             // If the parameter has field constraints
             for (size_t i = 0; i < field_constraints.size(); i++) {

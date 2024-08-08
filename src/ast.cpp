@@ -1390,7 +1390,7 @@ bool ast::InterfaceNode::is_compatible_with(ast::Type type) {
     assert(false);
 }
 
-std::optional<ast::TypeParameter*> ast::get_type_parameter(std::vector<ast::TypeParameter> type_parameters, ast::Type type) {
+std::optional<ast::TypeParameter*> ast::get_type_parameter(std::vector<ast::TypeParameter>& type_parameters, ast::Type type) {
     for (auto& type_parameter: type_parameters) {
         if (type_parameter.type == type) {
             return &type_parameter;

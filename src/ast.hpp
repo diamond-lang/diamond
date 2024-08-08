@@ -329,7 +329,7 @@ namespace ast {
         bool is_compatible_with(ast::Type type);
     };
 
-    std::optional<ast::TypeParameter*> get_type_parameter(std::vector<ast::TypeParameter> type_parameters, ast::Type type);
+    std::optional<ast::TypeParameter*> get_type_parameter(std::vector<ast::TypeParameter>& type_parameters, ast::Type type);
 
     struct TypeNode {
         size_t line;
