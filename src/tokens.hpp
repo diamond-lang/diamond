@@ -43,6 +43,8 @@ namespace token {
         Else,
         While,
         Function,
+        Interface,
+        Builtin,
         Type,
         True,
         False,

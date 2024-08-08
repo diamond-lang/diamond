@@ -1,10 +1,10 @@
-use "modules/subtract"
+use "modules/minus"
 
-function add(a, b)
+function plus(a, b)
     a * b
 
-print(add(5, 5))
-print(subtract(10, 5))
+print(plus(5, 5))
+print(minus(10, 5))
 
 --- Output
 25

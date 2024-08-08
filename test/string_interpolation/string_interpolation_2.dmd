@@ -1,0 +1,6 @@
+function printSomethingTwoTimes(something)
+    print("{something} {something}")
+
+printSomethingTwoTimes(54)
+printSomethingTwoTimes(false)
+printSomethingTwoTimes("YEAH!")

@@ -2,6 +2,7 @@
 #define DATA_STRUCTURES_HPP
 
 #include <vector>
+#include <cassert>
 
 // Set
 template <typename T>
@@ -23,6 +24,16 @@ struct Set {
             }
         }
         this->elements.push_back(element);
+    }
+
+    void remove(T element) {
+        for (size_t i = 0; i < this->elements.size(); i++) {
+            if (this->elements[i] == element) {
+                this->elements.erase(this->elements.begin() + i);
+                return;
+            }
+        }
+        assert(false);
     }
 
     bool contains(T element) {

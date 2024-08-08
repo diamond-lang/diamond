@@ -1,4 +1,0 @@
-use "add"
-
-function subtract(a, b)
-    return add(a, -b)

@@ -9,6 +9,7 @@ namespace semantic {
     Result<Ok, Error> analyze(Context& context, ast::FunctionNode& node);
     Result<Ok, Error> analyze(Context& context, ast::Type& type);
     Result<Ok, Error> analyze(Context& context, ast::TypeNode& node);
+    Result<ast::Type, Error> get_function_type(Context& context, ast::Node* function_or_interface, ast::CallNode* call, std::vector<ast::Type> call_args, ast::Type call_type);
 }
 
 #endif

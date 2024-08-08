@@ -1,6 +1,6 @@
-use "../functions/functions_with_expressions"
+use "../functions/functions1"
 
-print(add(4.0, 6.0))
+print(plus(4.0, 6.0))
 print(div(7.0, 8.0))
 print(identity(5.0))
 print(identity(false))

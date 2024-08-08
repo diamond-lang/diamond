@@ -1,0 +1,14 @@
+function myAdd[t](a: t, b: t): t
+    c = 10
+    print(c)
+    return a + b
+
+print(myAdd(10, 20))
+print(myAdd(4.5, 1.3))
+
+--- Output
+10
+30
+10
+5.8
+---

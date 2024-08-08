@@ -14,6 +14,8 @@ namespace utilities {
     std::string get_executable_name(std::string program_name);
     std::string get_run_command(std::string path);
     std::string to_str(Set<ast::Type> set);
+    std::string get_program_name();
+    std::string get_folder_of_executable();
 }
 
 #endif
