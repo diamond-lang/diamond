@@ -217,7 +217,60 @@ Result<ast::Node*, Error> Parser::parse_block() {
                     break;
 
                 default:
-                    block.statements.push_back(result.get_value());
+                    // If we are printing an interpolated string desugares it
+                    if (result.get_value()->index() == ast::Call
+                    &&  std::get<ast::CallNode>(*result.get_value()).identifier->value == "print"
+                    &&  std::get<ast::CallNode>(*result.get_value()).args.size() == 1
+                    &&  std::get<ast::CallNode>(*result.get_value()).args[0]->expression->index() == ast::InterpolatedString) {
+                        ast::CallNode& print_call = std::get<ast::CallNode>(*result.get_value());
+                        ast::InterpolatedStringNode& interpolated_string = std::get<ast::InterpolatedStringNode>(*std::get<ast::CallNode>(*result.get_value()).args[0]->expression);
+                        for (size_t i = 0; i < interpolated_string.strings.size(); i++) {
+                            // print string
+                            auto call = ast::CallNode {print_call.line, print_call.column};
+
+                            auto identifier = ast::IdentifierNode{print_call.line, print_call.column};
+                            identifier.value = "printWithoutLineEnding";
+                            if (i + 1 == interpolated_string.strings.size()) {
+                                identifier.value = "print";
+                            }
+                            this->ast.push_back(identifier);
+                            call.identifier = (ast::IdentifierNode*) this->ast.last_element();
+                            
+                            auto string_node = ast::StringNode{interpolated_string.line, interpolated_string.column};
+                            string_node.value = interpolated_string.strings[i];
+                            this->ast.push_back(string_node);
+
+                            auto call_argument_node = ast::CallArgumentNode{interpolated_string.line, interpolated_string.column};
+                            call_argument_node.expression = this->ast.last_element();
+                            this->ast.push_back(call_argument_node);
+                            call.args.push_back((ast::CallArgumentNode*) this->ast.last_element());
+                            
+                            this->ast.push_back(call);
+                            block.statements.push_back(this->ast.last_element());
+
+                            // print expression
+                            if (i + 1 != interpolated_string.strings.size()) {
+                                call = ast::CallNode {print_call.line, print_call.column};
+
+                                identifier = ast::IdentifierNode{print_call.line, print_call.column};
+                                identifier.value = "printWithoutLineEnding";
+                                this->ast.push_back(identifier);
+                                call.identifier = (ast::IdentifierNode*) this->ast.last_element();
+
+                                call_argument_node = ast::CallArgumentNode{interpolated_string.line, interpolated_string.column};
+                                call_argument_node.expression = interpolated_string.expressions[i];
+                                this->ast.push_back(call_argument_node);
+                                call.args.push_back((ast::CallArgumentNode*) this->ast.last_element());
+                                
+                                this->ast.push_back(call);
+                                block.statements.push_back(this->ast.last_element());
+                            }
+                        }
+                    }
+                    // just push the statement
+                    else {
+                        block.statements.push_back(result.get_value());
+                    }
             }
 
             if (!this->at_end() && this->current() != token::NewLine) {

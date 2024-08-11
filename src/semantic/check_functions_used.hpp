@@ -4,8 +4,6 @@
 #include "context.hpp"
 
 namespace semantic {
-    void mark_function_as_used(Context& context, ast::FunctionNode* function);
-
     void check_functions_used(Context& context, ast::Node* node);
     void check_functions_used(Context& context, ast::BlockNode& node);
     void check_functions_used(Context& context, ast::FunctionArgumentNode& node);

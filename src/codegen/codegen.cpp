@@ -1684,41 +1684,6 @@ llvm::Value* codegen::Context::codegen_size_function(llvm::Value* pointer, ast::
     }
 }
 
-llvm::Value* codegen::Context::codegen_print_function(ast::FunctionNode* print_function, ast::Node* expression) {
-    if (expression->index() == ast::InterpolatedString) {
-        auto& string = std::get<ast::InterpolatedString>(*expression);
-        for (size_t i = 0; i < string.strings.size(); i++) {
-            std::vector<llvm::Value*> printArgs;
-            printArgs.push_back(this->get_global_string(string.strings[i]));
-            this->builder->CreateCall(this->module->getFunction("printf"), printArgs);
-
-            if (i + 1 != string.strings.size()) {
-                this->codegen_print_function(print_function, string.expressions[i]);
-            }
-            else {
-                printArgs = {};
-                printArgs.push_back(this->get_global_string("\n"));
-                this->builder->CreateCall(this->module->getFunction("printf"), printArgs);
-            }
-        }
-        return nullptr;
-    }
-    else {
-        // Get function
-        std::string name = this->get_mangled_function_name(print_function->module_path, "printWithoutLineEnding", {ast::get_concrete_type(expression, this->type_bindings)}, ast::Type("void"), print_function->is_extern);
-        llvm::Function* llvm_function = this->module->getFunction(name);
-        assert(llvm_function);
-
-        // Codegen args
-        std::vector<llvm::Value*> args;
-        args.push_back(this->codegen(expression));
-        args.push_back(llvm::ConstantInt::getBool(*(this->context), false));
-        
-        // Make call
-        return this->builder->CreateCall(llvm_function, args, "calltmp");
-    }
-}
-
 llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
     // If type is a collection
     if (node.type.is_collection()) {
@@ -1841,21 +1806,16 @@ llvm::Value* codegen::Context::codegen(ast::CallNode& node) {
         }
     }
     if (node.identifier->value == "print") {
-        if (node.args[0]->expression->index() == ast::InterpolatedString) {
-            return this->codegen_print_function(function, node.args[0]->expression);
-        }
-        else {
-            // Get function
-            std::string name = this->get_mangled_function_name(function->module_path, node.identifier->value, this->get_types(node.args), ast::get_concrete_type((ast::Node*) &node, this->type_bindings), function->is_extern);
-            llvm::Function* llvm_function = this->module->getFunction(name);
-            assert(llvm_function);
+        // Get function
+        std::string name = this->get_mangled_function_name(function->module_path, node.identifier->value, this->get_types(node.args), ast::get_concrete_type((ast::Node*) &node, this->type_bindings), function->is_extern);
+        llvm::Function* llvm_function = this->module->getFunction(name);
+        assert(llvm_function);
 
-            // Codegen args
-            args = this->codegen_args(function, node.args);
-            
-            // Make call
-            return this->builder->CreateCall(llvm_function, args, "calltmp");
-        }
+        // Codegen args
+        args = this->codegen_args(function, node.args);
+        
+        // Make call
+        return this->builder->CreateCall(llvm_function, args, "calltmp");
     }
     if (node.identifier->value == "subscript"
     ||  node.identifier->value == "subscript_mut") {
