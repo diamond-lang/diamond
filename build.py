@@ -18,6 +18,7 @@ source_files = [
     'src/utilities.cpp',
     'src/parser.cpp',
     'src/semantic/context.cpp',
+    'src/semantic/scopes.cpp',
     'src/semantic/intrinsics.cpp',
     'src/semantic/semantic.cpp',
     'src/semantic/type_infer.cpp',

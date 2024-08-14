@@ -52,6 +52,19 @@ Result<Ok, Errors> semantic::analyze(ast::Ast& ast) {
     else                           return Ok {};
 }
 
+Result<Ok, Errors> semantic::analyze_module(ast::Ast& ast, std::filesystem::path module_path) {
+    semantic::Context context;
+    context.init_with(&ast);
+    context.current_module = module_path;
+
+    // Analyze module
+    semantic::analyze(context, *context.ast->modules[module_path.string()]);
+
+    // Return
+    if (context.errors.size() > 0) return context.errors;
+    else                           return Ok {};
+}
+
 static void print_results_phase_1(semantic::Context& context, ast::Node* node) {
     ast::print(node);
     if (context.type_inference.labeled_type_constraints.size() > 0) {
@@ -325,7 +338,7 @@ Result<Ok, Error> semantic::analyze(semantic::Context& context, ast::FunctionNod
             }
 
             // Create binding
-            semantic::current_scope(new_context)[identifier] = semantic::Binding((ast::Node*) arg);
+            semantic::current_scope(new_context).variables_scope[identifier] = semantic::Binding((ast::Node*) arg);
         }
 
         // For return type
@@ -359,7 +372,7 @@ Result<Ok, Error> semantic::analyze(semantic::Context& context, ast::FunctionNod
                 context.errors.insert(context.errors.end(), new_context.errors.begin(), new_context.errors.end());
                 return Error {};
             }
-            semantic::current_scope(new_context)[identifier] = semantic::Binding((ast::Node*) arg);
+            semantic::current_scope(new_context).variables_scope[identifier] = semantic::Binding((ast::Node*) arg);
         }
 
         auto result = semantic::analyze(new_context, node.return_type);
@@ -394,17 +407,17 @@ Result<Ok, Error> semantic::analyze(semantic::Context& context, ast::Type& type)
     else if (type.is_boxed()) return semantic::analyze(context, type.as_nominal_type().parameters[0]);
     else if (type.is_array()) return semantic::analyze(context, type.as_nominal_type().parameters[0]);
     else {
-        Binding* type_binding = semantic::get_binding(context, type.to_str());
-        if (!type_binding) {
+        std::optional<Binding> type_binding = semantic::get_binding(context, type.to_str());
+        if (!type_binding.has_value()) {
             context.errors.push_back(Error{"Errors: Undefined type  \"" + type.to_str() + "\""});
             return Error {};
         }
-        if (type_binding->type != semantic::TypeBinding) {
+        if (type_binding.value().type != semantic::TypeBinding) {
             context.errors.push_back(Error{"Error: Binding is not a type\n"});
             return Error {};
         }
 
-        type.as_nominal_type().type_definition = semantic::get_type_definition(*type_binding);
+        type.as_nominal_type().type_definition = semantic::get_type_definition(type_binding.value());
         return Ok {};
     }
     assert(false);
@@ -428,11 +441,17 @@ bool semantic::are_types_compatible(ast::FunctionNode& function, ast::Type funct
     if (function_type.is_concrete()) {
         return argument_type == function_type;
     }
-    // else if (function_type.is_final_type_variable()
-    // &&       function.get_type_parameter(function_type).has_value()
-    // &&       function.get_type_parameter(function_type).value()->interface.has_value()) {
-    //     return function.get_type_parameter(function_type).value()->interface.value().is_compatible_with(argument_type);
-    // }
+    else if (function_type.is_final_type_variable()
+    &&       function.get_type_parameter(function_type).has_value()
+    &&       function.get_type_parameter(function_type).value()->interface.size() > 0) {
+        auto interfaces = function.get_type_parameter(function_type).value()->interface;
+        for (auto interface_type: interfaces.elements) {
+            if (!interface_type.is_compatible_with(argument_type)) {
+                return false;
+            }
+        }
+        return true;
+    }
     else if (function_type.is_nominal_type()) {
         if (function_type.as_nominal_type().name == argument_type.as_nominal_type().name
         &&  function_type.as_nominal_type().parameters.size() == argument_type.as_nominal_type().parameters.size()) {
@@ -586,11 +605,9 @@ Result<ast::Type, Error> semantic::get_function_type(Context& context, ast::Node
                 }
                 else {
                     new_context.current_module = function->module_path;
-                    auto result = semantic::add_definitions_from_block_to_scope(new_context, *(context.ast->modules[function->module_path.string()]));
+                    auto result = semantic::add_scope(new_context, *(context.ast->modules[function->module_path.string()]));
                     assert(result.is_ok());
                 }
-
-                semantic::add_scope(new_context);
 
                 // Check functions used in function
                 semantic::check_functions_used(new_context, function->body);
@@ -646,11 +663,9 @@ Result<ast::Type, Error> semantic::get_function_type(Context& context, ast::Node
             }
             else {
                 new_context.current_module = function->module_path;
-                auto result = semantic::add_definitions_from_block_to_scope(new_context, *(context.ast->modules[function->module_path.string()]));
+                auto result = semantic::add_scope(new_context, *(context.ast->modules[function->module_path.string()]));
                 assert(result.is_ok());
             }
-
-            semantic::add_scope(new_context);
 
             // Check functions used in function
             semantic::check_functions_used(new_context, function->body);

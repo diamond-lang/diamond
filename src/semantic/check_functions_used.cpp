@@ -9,11 +9,8 @@ void semantic::check_functions_used(Context& context, ast::Node* node) {
 }
 
 void semantic::check_functions_used(Context& context, ast::BlockNode& node) {
-    // Add scope
-    semantic::add_scope(context);
-
     // Add functions to the current scope
-    semantic::add_definitions_from_block_to_scope(context, node);
+    semantic::add_scope(context, node);
 
     // Make statements concrete
     size_t number_of_errors = context.errors.size();
@@ -91,23 +88,23 @@ void semantic::check_functions_used(Context& context, ast::CallArgumentNode& nod
 
 void semantic::check_functions_used(Context& context, ast::CallNode& node) {
     // Get binding
-    semantic::Binding* binding = semantic::get_binding(context, node.identifier->value);
-    assert(binding);
-    assert(binding->type == semantic::FunctionBinding || binding->type == semantic::InterfaceBinding); 
+    std::optional<semantic::Binding> binding = semantic::get_binding(context, node.identifier->value);
+    assert(binding.has_value());
+    assert(binding.value().type == semantic::FunctionBinding || binding.value().type == semantic::InterfaceBinding); 
     for (auto arg: node.args) {
         semantic::check_functions_used(context, *arg);
     }
 
     auto args_types = ast::get_concrete_types(ast::get_types(node.args), context.type_inference.type_bindings);
     auto call_type = ast::get_concrete_type(node.type, context.type_inference.type_bindings);
-    auto function_type = semantic::get_function_type(context, binding->value, &node, args_types, call_type);
+    auto function_type = semantic::get_function_type(context, binding.value().value, &node, args_types, call_type);
 }
 
 
 void semantic::check_functions_used(Context& context, ast::StructLiteralNode& node) {
     // Get binding
-    semantic::Binding* binding = semantic::get_binding(context, node.identifier->value);
-    assert(binding);
+    std::optional<semantic::Binding> binding = semantic::get_binding(context, node.identifier->value);
+    assert(binding.has_value());
 
     for (auto field: node.fields) {
         semantic::check_functions_used(context, field.second);

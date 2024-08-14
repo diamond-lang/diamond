@@ -46,7 +46,11 @@ bool ast::InterfaceType::is_compatible_with(ast::Type type) {
     else if (this->name == "pointer") {
         return type.is_pointer() || type.is_boxed();
     }
+    else if (this->name == "type") {
+        return type.is_struct_type();
+    }
     else {
+        return true;
         std::cout << this->name << " :: " << type.to_str() << "\n";
         assert(false);
         return false;

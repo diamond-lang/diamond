@@ -10,6 +10,7 @@
 
 #include "../ast.hpp"
 #include "../errors.hpp"
+#include "scopes.hpp"
 
 namespace semantic {
     // Bindings
@@ -43,7 +44,15 @@ namespace semantic {
     std::string get_binding_identifier(Binding& binding);
 
     // Scopes
-    using Scopes = std::vector<std::unordered_map<std::string, Binding>>;
+    struct Scope {
+        std::unordered_map<std::string, Binding>& variables_scope;
+        FunctionsAndTypesScope& functions_and_types_scope;
+    };
+
+    struct Scopes {
+        std::vector<std::unordered_map<std::string, Binding>> variables_scopes;
+        semantic::FunctionsAndTypesScopes functions_and_types_scopes;
+    };
 
     // Type inference
     struct TypeInference {
@@ -68,17 +77,15 @@ namespace semantic {
         void init_with(ast::Ast* ast);
     };
 
-    // Manage scope
+    // Manage scopes
     void add_scope(Context& context);
+    Result<Ok, Error> add_scope(Context& context, ast::BlockNode& block);
     void remove_scope(Context& context);
-    std::unordered_map<std::string, Binding>& current_scope(Context& context);
-    Binding* get_binding(Context& context, std::string identifier);
+    Scope current_scope(Context& context);
+    std::optional<Binding> get_binding(Context& context, std::string identifier);
 
     // Work with modules
-    Result<Ok, Error> add_definitions_to_current_scope(Context& context, std::vector<ast::FunctionNode*>& functions, std::vector<ast::InterfaceNode*>& interfaces, std::vector<ast::TypeNode*>& types);
-    Result<Ok, Error> add_definitions_from_block_to_scope(Context& context, ast::BlockNode& block);
-    Result<Ok, Error> add_module_functions(Context& context, std::filesystem::path module_path, std::set<std::filesystem::path>& already_included_modules);
-    std::vector<std::unordered_map<std::string, Binding>> get_definitions(Context& context);
+    Scopes get_definitions(Context& context);
 
     // For type infer and analyze
     ast::Type new_type_variable(Context& context);

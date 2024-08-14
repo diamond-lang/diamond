@@ -91,209 +91,59 @@ void semantic::Context::init_with(ast::Ast* ast) {
 
 // Manage scopes
 void semantic::add_scope(Context& context) {
-    context.scopes.push_back(std::unordered_map<std::string, semantic::Binding>());
+    context.scopes.variables_scopes.push_back({});
+}
+
+Result<Ok, Error> semantic::add_scope(Context& context, ast::BlockNode& block) {
+    context.scopes.variables_scopes.push_back({});
+    auto result = context.scopes.functions_and_types_scopes.add_definitions_from_block_to_scope(*context.ast, context.current_module, block);
+    if (result.is_error()) {
+        auto errors = result.get_error();
+        context.errors.insert(context.errors.end(), errors.begin(), errors.end());
+        return Error{};
+    }
+    return Ok{};
 }
 
 void semantic::remove_scope(Context& context) {
-    for (auto binding: semantic::current_scope(context)) {
-        if (binding.second.type == semantic::InterfaceBinding) {
-            semantic::get_interface(binding.second)->functions = {};
-        }
-    }
-
-    context.scopes.pop_back();
+    context.scopes.variables_scopes.pop_back();
+    context.scopes.functions_and_types_scopes.remove_scope();
 }
 
-std::unordered_map<std::string, semantic::Binding>& semantic::current_scope(Context& context) {
-    assert(context.scopes.size() != 0);
-    return context.scopes[context.scopes.size() - 1];
+semantic::Scope semantic::current_scope(Context& context) {
+    assert(context.scopes.variables_scopes.size() != 0);
+    return semantic::Scope{
+        context.scopes.variables_scopes[context.scopes.variables_scopes.size() - 1],
+        context.scopes.functions_and_types_scopes.scopes[context.scopes.functions_and_types_scopes.scopes.size() - 1]
+    };
 }
 
-semantic::Binding* semantic::get_binding(Context& context, std::string identifier) {
-    for (auto scope = context.scopes.rbegin(); scope != context.scopes.rend(); scope++) {
+std::optional<semantic::Binding> semantic::get_binding(Context& context, std::string identifier) {
+    for (auto scope = context.scopes.variables_scopes.rbegin(); scope != context.scopes.variables_scopes.rend(); scope++) {
         if (scope->find(identifier) != scope->end()) {
-            return &(*scope)[identifier];
+            return (*scope)[identifier];
         }
     }
-    return nullptr;
+    for (auto scope = context.scopes.functions_and_types_scopes.scopes.rbegin(); scope != context.scopes.functions_and_types_scopes.scopes.rend(); scope++) {
+        if (scope->find(identifier) != scope->end()) {
+            if ((*scope)[identifier]->index() == ast::Interface) {
+                return Binding((ast::InterfaceNode*) (*scope)[identifier]);
+            }
+            else if ((*scope)[identifier]->index() == ast::Function) {
+                return Binding((ast::FunctionNode*) (*scope)[identifier]);
+            }
+            else if ((*scope)[identifier]->index() == ast::TypeDef) {
+                return Binding((ast::TypeNode*) (*scope)[identifier]);
+            }
+        }
+    }
+    return std::nullopt;
 }
 
 // Work with modules
-Result<Ok, Error> semantic::add_definitions_to_current_scope(Context& context, std::vector<ast::FunctionNode*>& functions, std::vector<ast::InterfaceNode*>& interfaces, std::vector<ast::TypeNode*>& types) {
-    auto& scope = semantic::current_scope(context);
-
-    // Add interfaces from block to current scope
-    for (auto& interface: interfaces) {
-        auto& identifier = interface->identifier->value;
-
-        if (semantic::get_binding(context,identifier) == nullptr) {
-            scope[identifier] = semantic::Binding(interface);
-        }
-        else if (semantic::get_binding(context,identifier)->type == FunctionBinding) {
-            std::cout << "Function \"" << identifier << "\" defined before interface" << "\n";
-            assert(false);
-        }
-        else if (semantic::get_binding(context,identifier)->type == InterfaceBinding) {
-            std::cout << "Multiple definitions for interface " << interface->identifier->value << "\n";
-            assert(false);
-        }
-        else {
-            assert(false);
-        }
-    }
-
-    // Add functions from block to current scope
-    for (auto& function: functions) {
-        auto& identifier = function->identifier->value;
-
-        if (semantic::get_binding(context,identifier) == nullptr) {
-            scope[identifier] = semantic::Binding(function);
-        }
-        else if (semantic::get_binding(context,identifier)->type == InterfaceBinding) {
-            bool alreadyAdded = false;
-            for (auto function2: get_interface(*semantic::get_binding(context,identifier))->functions) {
-                if (function2 == function) {
-                    alreadyAdded = true;
-                    break;
-                }
-            }
-            if (!alreadyAdded) {
-                get_interface(*semantic::get_binding(context,identifier))->functions.push_back(function);
-            }
-        }
-        else if (semantic::get_binding(context,identifier)->type == FunctionBinding) {
-            std::cout << "Multiple definitions for function " << function->identifier->value << "\n";
-            assert(false);
-        }
-        else {
-            std::cout << scope[identifier].type << "\n";
-            assert(false);
-        }
-    }
-
-    // Add types from current block to current scope
-    for (auto& type: types) {
-        auto& identifier = type->identifier->value;
-
-        if (scope.find(identifier) == scope.end()) {
-            scope[identifier] = semantic::Binding(type);
-        }
-        else {
-            context.errors.push_back(errors::generic_error(Location{type->line, type->column, type->module_path}, "This type is already defined."));
-            return Error {};
-        }
-    }
-
-    return Ok {};
-}
-
-Result<Ok, Error> semantic::add_definitions_from_block_to_scope(Context& context, ast::BlockNode& block) {
-    std::set<std::filesystem::path> already_included_modules = {context.current_module};
-
-    // Add std libs
-    if (context.scopes.size() == 0) {
-        semantic::add_scope(context);
-        if (std::find(std_libs.elements.begin(), std_libs.elements.end(), context.current_module) == std_libs.elements.end()) {
-            for (auto path: std_libs.elements) {
-                add_module_functions(context, path, already_included_modules);
-            }
-        }
-    }
-
-    // Add scope for block definitions
-    semantic::add_scope(context);
-
-    // Add functions from modules
-    auto current_directory = context.current_module.parent_path();
-    for (auto& use_stmt: block.use_statements) {
-        auto module_path = std::filesystem::canonical(current_directory / (use_stmt->path->value + ".dmd"));
-        assert(std::filesystem::exists(module_path));
-        auto result = semantic::add_module_functions(context, module_path, already_included_modules);
-        if (result.is_error()) return result;
-    }
-
-    // Add functions from current scope
-    auto result = add_definitions_to_current_scope(context, block.functions, block.interfaces, block.types);
-    if (result.is_error()) return result;
-
-    return Ok {};
-}
-
-Result<Ok, Error> semantic::add_module_functions(Context& context, std::filesystem::path module_path, std::set<std::filesystem::path>& already_included_modules) {
-    if (context.ast->modules.find(module_path.string()) == context.ast->modules.end()) {
-        // Read file
-        Result<std::string, Error> result = utilities::read_file(module_path.string());
-        if (result.is_error()) {
-            std::cout << result.get_error().value;
-            exit(EXIT_FAILURE);
-        }
-        std::string file = result.get_value();
-
-        // Lex
-        auto tokens = lexer::lex(module_path);
-        if (tokens.is_error()) {
-            for (size_t i = 0; i < tokens.get_error().size(); i++) {
-                std::cout << tokens.get_error()[i].value << "\n";
-            }
-            exit(EXIT_FAILURE);
-        }
-
-        // Parse module and add it to the ast
-        auto parsing_result = parse::module(*context.ast, tokens.get_value(), module_path);
-        if (parsing_result.is_error()) {
-            std::vector<Error> errors = parsing_result.get_errors();
-            for (size_t i = 0; i < errors.size(); i++) {
-                std::cout << errors[i].value << '\n';
-            }
-            exit(EXIT_FAILURE);
-        }
-
-        // Analyze new module added
-        semantic::Context new_context;
-        new_context.init_with(context.ast);
-        new_context.current_module = module_path;
-        semantic::analyze(new_context, *context.ast->modules[module_path.string()]);
-
-        if (context.errors.size() > 0) {
-            context.errors.insert(context.errors.end(), new_context.errors.begin(), new_context.errors.end());
-        }
-    }
-
-    if (already_included_modules.find(module_path) == already_included_modules.end()) {
-        add_definitions_to_current_scope(
-            context,
-            context.ast->modules[module_path.string()]->functions,
-            context.ast->modules[module_path.string()]->interfaces,
-            context.ast->modules[module_path.string()]->types
-        );
-
-        already_included_modules.insert(module_path);
-
-        // Add includes
-        for (auto& use_stmt: context.ast->modules[module_path.string()]->use_statements) {
-            if (use_stmt->include) {
-                auto include_path = std::filesystem::canonical(module_path.parent_path() / (use_stmt->path->value + ".dmd"));
-                auto result = semantic::add_module_functions(context, include_path, already_included_modules);
-                if (result.is_error()) return result;
-            }
-        }
-    }
-
-    return Ok {};
-}
-
-std::vector<std::unordered_map<std::string, semantic::Binding>> semantic::get_definitions(Context& context) {
-    std::vector<std::unordered_map<std::string, Binding>> scopes;
-    for (size_t i = 0; i < context.scopes.size(); i++) {
-        scopes.push_back(std::unordered_map<std::string, Binding>());
-        for (auto it = context.scopes[i].begin(); it != context.scopes[i].end(); it++) {
-            if (it->second.type == semantic::FunctionBinding
-            ||  it->second.type == semantic::InterfaceBinding
-            ||  it->second.type == semantic::TypeBinding) {
-                scopes[i][it->first] = it->second;
-            }
-        }
-    }
+semantic::Scopes semantic::get_definitions(Context& context) {
+    Scopes scopes;
+    scopes.functions_and_types_scopes = context.scopes.functions_and_types_scopes;
     return scopes;
 }
 

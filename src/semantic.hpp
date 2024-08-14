@@ -6,6 +6,7 @@
 
 namespace semantic {
     Result<Ok, Errors> analyze(ast::Ast& ast);
+    Result<Ok, Errors> analyze_module(ast::Ast& ast, std::filesystem::path module_path);
     bool are_types_compatible(ast::FunctionNode& function, ast::Type function_type, ast::Type argument_type);
     bool are_types_compatible(ast::FunctionNode& function, std::vector<ast::Type> function_types, std::vector<ast::Type> argument_types);
     bool are_arguments_compatible(ast::FunctionNode& function, ast::CallNode& call, std::vector<ast::Type> function_types, std::vector<ast::Type> argument_types);

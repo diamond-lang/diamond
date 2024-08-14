@@ -11,10 +11,7 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::Bl
     size_t errors = context.errors.size();
 
     // Add scope
-    semantic::add_scope(context);
-
-    // Add functions and types to the current scope
-    auto result = semantic::add_definitions_from_block_to_scope(context, block);
+    auto result = semantic::add_scope(context, block);
     assert(result.is_ok());
 
     for (auto statement: block.statements) {
@@ -63,7 +60,7 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::De
     auto result = semantic::unify_types_and_type_check(context, node.expression);
     if (result.is_error()) return Error {};
 
-    semantic::current_scope(context)[node.identifier->value] = semantic::Binding(&node);
+    semantic::current_scope(context).variables_scope[node.identifier->value] = semantic::Binding(&node);
 
     return Ok{};
 }
@@ -209,11 +206,11 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::Ca
     node.type = semantic::get_unified_type(context, node.type);
 
     // Get binding
-    semantic::Binding* binding = semantic::get_binding(context, node.identifier->value);
-    assert(binding);
+    std::optional<semantic::Binding> binding = semantic::get_binding(context, node.identifier->value);
+    assert(binding.has_value());
     
     if (all_args_typed) {
-        auto call_type = get_function_type(context, binding->value, &node, ast::get_types(node.args), node.type).get_value();
+        auto call_type = get_function_type(context, binding.value().value, &node, ast::get_types(node.args), node.type).get_value();
         node.type = call_type;
 
         if (node.type.is_final_type_variable() && (
@@ -227,10 +224,10 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::Ca
 
     // Set functions that can be called
     std::vector<ast::FunctionNode*> functions_that_can_be_called;
-    if (binding->type == FunctionBinding) {
+    if (binding.value().type == FunctionBinding) {
         node.functions.push_back(semantic::get_function(*binding));
     }
-    else if (binding->type == InterfaceBinding) {
+    else if (binding.value().type == InterfaceBinding) {
         node.functions = semantic::get_interface(*binding)->functions;
     }
 
@@ -246,8 +243,8 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::St
     node.type = semantic::get_unified_type(context, node.type);
 
     // Get binding
-    semantic::Binding* binding = semantic::get_binding(context, node.identifier->value);
-    assert(binding);
+    std::optional<semantic::Binding> binding = semantic::get_binding(context, node.identifier->value);
+    assert(binding.has_value());
 
     return Ok {};
 }
