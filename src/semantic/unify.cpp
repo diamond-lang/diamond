@@ -222,15 +222,6 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::Ca
         }
     }
 
-    // Set functions that can be called
-    std::vector<ast::FunctionNode*> functions_that_can_be_called;
-    if (binding.value().type == FunctionBinding) {
-        node.functions.push_back(semantic::get_function(*binding));
-    }
-    else if (binding.value().type == InterfaceBinding) {
-        node.functions = semantic::get_interface(*binding)->functions;
-    }
-
     return Ok {};
 }
 

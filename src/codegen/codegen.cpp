@@ -328,6 +328,8 @@ static void link(std::string executable_name, std::string object_file_name, std:
 
 // Constructor
 codegen::Context::Context(ast::Ast& ast) : ast(ast) {
+    this->current_module = ast.module_path;
+
     // Create llvm context
     this->context = new llvm::LLVMContext();
     this->module = new llvm::Module("My cool jit", *(this->context));
@@ -346,11 +348,20 @@ codegen::Context::Context(ast::Ast& ast) : ast(ast) {
 
 // Scope management
 void codegen::Context::add_scope() {
-    this->scopes.push_back(std::unordered_map<std::string, Binding>());
+    this->scopes.variable_scopes.push_back(std::unordered_map<std::string, Binding>());
 }
 
-std::unordered_map<std::string, codegen::Context::Binding>& codegen::Context::current_scope() {
-    return this->scopes[this->scopes.size() - 1];
+void codegen::Context::add_scope(ast::BlockNode& block) {
+    this->scopes.variable_scopes.push_back(std::unordered_map<std::string, Binding>());
+    auto result = this->scopes.functions_and_types_scopes.add_definitions_from_block_to_scope(this->ast, this->current_module, block);
+    assert(result.is_ok());
+}
+
+codegen::Context::Scope codegen::Context::current_scope() {
+    return codegen::Context::Scope {
+        this->scopes.variable_scopes[this->scopes.variable_scopes.size() - 1],
+        this->scopes.functions_and_types_scopes.scopes[this->scopes.functions_and_types_scopes.scopes.size() - 1]
+    };
 }
 
 void codegen::Context::delete_binding(llvm::Value* pointer, ast::Type type) {
@@ -448,18 +459,19 @@ void codegen::Context::delete_binding(llvm::Value* pointer, ast::Type type) {
 }
 
 void codegen::Context::remove_scope() {
-    for (auto binding: this->current_scope()) {
+    for (auto binding: this->current_scope().variables_scope) {
         if (binding.second.node) {
             llvm::Value* pointer = binding.second.pointer;
             this->delete_binding(pointer, ast::get_concrete_type(ast::get_type(binding.second.node), this->type_bindings));
         }
     }
 
-    this->scopes.pop_back();
+    this->scopes.variable_scopes.pop_back();
+    this->scopes.functions_and_types_scopes.remove_scope();
 }
 
 codegen::Context::Binding codegen::Context::get_binding(std::string identifier) {
-    for (auto scope = this->scopes.rbegin(); scope != this->scopes.rend(); scope++) {
+    for (auto scope = this->scopes.variable_scopes.rbegin(); scope != this->scopes.variable_scopes.rend(); scope++) {
         if (scope->find(identifier) != scope->end()) {
             return (*scope)[identifier];
         }
@@ -685,8 +697,21 @@ llvm::TypeSize codegen::Context::get_type_size(llvm::Type* type) {
 
 // Codegen helpers
 ast::FunctionNode* codegen::Context::get_function(ast::CallNode* call) {
+    std::vector<ast::FunctionNode*> functions;
+    ast::Node* binding = this->scopes.functions_and_types_scopes.get_binding(call->identifier->value);
+    assert(binding);
+    if (binding->index() == ast::Interface) {
+        functions = ((ast::InterfaceNode*) binding)->functions;
+    }
+    else if (binding->index() == ast::Function) {
+        functions = {(ast::FunctionNode*) binding};
+    }
+    else {
+        assert(false);
+    }
+
     ast::FunctionNode* result = nullptr;
-    for (auto function: call->functions) {
+    for (auto function: functions) {
         std::vector<ast::Type> function_types = ast::get_types(function->args);
         function_types.push_back(function->return_type);
         std::vector<ast::Type> call_types = this->get_types(call->args);
@@ -1006,7 +1031,12 @@ void codegen::Context::codegen(ast::Ast& ast) {
         this->codegen_function_prototypes(it->second->functions);
     }
     for (auto it = ast.modules.begin(); it != ast.modules.end(); it++) {
+        this->current_module = it->first;
+        this->add_scope(*it->second);
         this->codegen_function_bodies(it->second->functions);
+        this->scopes.variable_scopes = {};
+        this->scopes.functions_and_types_scopes.scopes = {};
+        this->current_module = ast.module_path;
     }
 
     // Crate main function
@@ -1017,9 +1047,6 @@ void codegen::Context::codegen(ast::Ast& ast) {
 
     // Set current entry block
     this->current_entry_block = &main->getEntryBlock();
-
-    // Add new scope
-    this->add_scope();
 
     // Codegen statements
     this->codegen((ast::Node*) ast.program);
@@ -1033,7 +1060,7 @@ llvm::Value* codegen::Context::codegen(ast::Node* node) {
 }
 
 llvm::Value* codegen::Context::codegen(ast::BlockNode& node) {
-    this->add_scope();
+    this->add_scope(node);
 
     for (size_t i = 0; i < node.statements.size(); i++) {
         this->codegen(node.statements[i]);
@@ -1197,7 +1224,7 @@ void codegen::Context::codegen_function_bodies(std::filesystem::path module_path
         this->builder->CreateStore(f->getArg(0), allocation);
 
         // Add arguments to scope
-        this->current_scope()["$result"] = Binding(nullptr, allocation);
+        this->current_scope().variables_scope["$result"] = Binding(nullptr, allocation);
 
         offset += 1;
     }
@@ -1213,7 +1240,7 @@ void codegen::Context::codegen_function_bodies(std::filesystem::path module_path
             this->builder->CreateStore(f->getArg(i + offset), allocation);
 
             // Add arguments to scope
-            this->current_scope()[name] = Binding((ast::Node*) args[i], allocation, args[i]->is_mutable);
+            this->current_scope().variables_scope[name] = Binding((ast::Node*) args[i], allocation, args[i]->is_mutable);
         }
         else {
             if (args_types[i].is_collection() && this->get_collection_as_argument(args_types[i]).types.size() > 1) {
@@ -1235,7 +1262,7 @@ void codegen::Context::codegen_function_bodies(std::filesystem::path module_path
                 offset += new_args.types.size() - 1;
 
                 // Add struct to scope
-                this->current_scope()[name] = Binding((ast::Node*) args[i], allocation);
+                this->current_scope().variables_scope[name] = Binding((ast::Node*) args[i], allocation);
             }
             else {
                 // Create allocation for argument
@@ -1245,7 +1272,7 @@ void codegen::Context::codegen_function_bodies(std::filesystem::path module_path
                 this->builder->CreateStore(f->getArg(i + offset), allocation);
 
                 // Add arguments to scope
-                this->current_scope()[name] =  Binding((ast::Node*) args[i], allocation, args[i]->is_mutable);
+                this->current_scope().variables_scope[name] =  Binding((ast::Node*) args[i], allocation, args[i]->is_mutable);
             }
         }
     }
@@ -1253,14 +1280,12 @@ void codegen::Context::codegen_function_bodies(std::filesystem::path module_path
     // Codegen body
     if (ast::is_expression(function_body) && return_type != ast::Type("void")) {
         llvm::Value* result = this->codegen(function_body);
-        this->remove_scope();
         if (result) {
             this->builder->CreateRet(result);
         }
     }
     else {
         this->codegen(function_body);
-        this->remove_scope();
         if (return_type == ast::Type("void")) {
             this->builder->CreateRetVoid();
         }
@@ -1271,6 +1296,9 @@ void codegen::Context::codegen_function_bodies(std::filesystem::path module_path
 
     // Run optimizations
     this->function_pass_manager->run(*f);
+
+    // Remove arguments scope
+    this->scopes.variable_scopes.pop_back();
 }
 
 
@@ -1281,17 +1309,17 @@ llvm::Value* codegen::Context::codegen(ast::InterfaceNode& node) {
 
 llvm::Value* codegen::Context::codegen(ast::DeclarationNode& node) {
     // Delete binding if already exists
-    if (this->current_scope().find(node.identifier->value) != this->current_scope().end()) {
-        llvm::Value* pointer = this->current_scope()[node.identifier->value].pointer;
-        this->delete_binding(pointer, ast::get_concrete_type(ast::get_type(this->current_scope()[node.identifier->value].node), this->type_bindings));
+    if (this->current_scope().variables_scope.find(node.identifier->value) != this->current_scope().variables_scope.end()) {
+        llvm::Value* pointer = this->current_scope().variables_scope[node.identifier->value].pointer;
+        this->delete_binding(pointer, ast::get_concrete_type(ast::get_type(this->current_scope().variables_scope[node.identifier->value].node), this->type_bindings));
     }
 
     if (this->has_collection_type(node.expression)) {
         // Create binding and allocation
-        this->current_scope()[node.identifier->value] = Binding(node.expression, this->create_allocation("", this->as_llvm_type(ast::get_concrete_type(node.expression, this->type_bindings))));
+        this->current_scope().variables_scope[node.identifier->value] = Binding(node.expression, this->create_allocation("", this->as_llvm_type(ast::get_concrete_type(node.expression, this->type_bindings))));
 
         // Copy expression into memory
-        this->copy_expression_to_memory(this->current_scope()[node.identifier->value].pointer, node.expression);
+        this->copy_expression_to_memory(this->current_scope().variables_scope[node.identifier->value].pointer, node.expression);
 
         // Return
         return nullptr;
@@ -1300,9 +1328,9 @@ llvm::Value* codegen::Context::codegen(ast::DeclarationNode& node) {
         ast::Type type = ast::get_concrete_type(node.expression, this->type_bindings);
 
         // Create allocation if doesn't exists or if already exists, but it has a different type
-        if (this->current_scope().find(node.identifier->value) == this->current_scope().end()
-        ||  ast::get_concrete_type(ast::get_type(this->current_scope()[node.identifier->value].node), this->type_bindings) != ast::get_concrete_type(ast::get_type(node.expression), this->type_bindings)) {
-            this->current_scope()[node.identifier->value] = Binding(node.expression, this->create_allocation(node.identifier->value, this->as_llvm_type(type)));
+        if (this->current_scope().variables_scope.find(node.identifier->value) == this->current_scope().variables_scope.end()
+        ||  ast::get_concrete_type(ast::get_type(this->current_scope().variables_scope[node.identifier->value].node), this->type_bindings) != ast::get_concrete_type(ast::get_type(node.expression), this->type_bindings)) {
+            this->current_scope().variables_scope[node.identifier->value] = Binding(node.expression, this->create_allocation(node.identifier->value, this->as_llvm_type(type)));
         }
 
         // Create heap allocation
@@ -1313,7 +1341,7 @@ llvm::Value* codegen::Context::codegen(ast::DeclarationNode& node) {
         this->builder->CreateStore(value, heap_allocation);
 
         // Store pointer in binding
-        this->builder->CreateStore(heap_allocation, this->current_scope()[node.identifier->value].pointer);
+        this->builder->CreateStore(heap_allocation, this->current_scope().variables_scope[node.identifier->value].pointer);
 
         // Return
         return nullptr;
@@ -1323,13 +1351,13 @@ llvm::Value* codegen::Context::codegen(ast::DeclarationNode& node) {
         llvm::Value* expr = this->codegen(node.expression);
 
         // Create allocation if doesn't exists or if already exists, but it has a different type
-        if (this->current_scope().find(node.identifier->value) == this->current_scope().end()
-        ||  this->current_scope()[node.identifier->value].pointer->getType() != expr->getType()) {
-            this->current_scope()[node.identifier->value] = Binding(node.expression, this->create_allocation(node.identifier->value, expr->getType()));
+        if (this->current_scope().variables_scope.find(node.identifier->value) == this->current_scope().variables_scope.end()
+        ||  this->current_scope().variables_scope[node.identifier->value].pointer->getType() != expr->getType()) {
+            this->current_scope().variables_scope[node.identifier->value] = Binding(node.expression, this->create_allocation(node.identifier->value, expr->getType()));
         }
 
         // Store value
-        this->builder->CreateStore(expr, this->current_scope()[node.identifier->value].pointer);
+        this->builder->CreateStore(expr, this->current_scope().variables_scope[node.identifier->value].pointer);
 
         // Return
         return nullptr;

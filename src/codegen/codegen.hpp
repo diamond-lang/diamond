@@ -31,6 +31,7 @@
 #include "../ast.hpp"
 #include "../utilities.hpp"
 #include "../semantic.hpp"
+#include "../semantic/scopes.hpp"
 
 namespace codegen {
     struct CollectionAsArguments {
@@ -40,6 +41,7 @@ namespace codegen {
 
     struct Context {
         ast::Ast& ast;
+        std::filesystem::path current_module;
 
         llvm::LLVMContext* context;
         llvm::Module* module;
@@ -61,7 +63,17 @@ namespace codegen {
             ~Binding() {}
         };
 
-        std::vector<std::unordered_map<std::string, Binding>> scopes;
+        struct Scope {
+            std::unordered_map<std::string, Binding>& variables_scope;
+            semantic::FunctionsAndTypesScope& functions_and_types_scope;
+        };
+
+        struct Scopes {
+            std::vector<std::unordered_map<std::string, Binding>> variable_scopes;
+            semantic::FunctionsAndTypesScopes functions_and_types_scopes;
+        };
+
+        Scopes scopes;
         std::unordered_map<std::string, ast::Type> type_bindings;
         std::unordered_map<std::string, llvm::Constant*> globals;
 
@@ -70,7 +82,8 @@ namespace codegen {
 
         // Scope management
         void add_scope();
-        std::unordered_map<std::string, Binding>& current_scope();
+        void add_scope(ast::BlockNode& block);
+        Scope current_scope();
         void delete_binding(llvm::Value* pointer, ast::Type type);
         void remove_scope();
         Binding get_binding(std::string identifier);

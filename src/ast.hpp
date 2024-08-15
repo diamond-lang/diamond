@@ -437,7 +437,6 @@ namespace ast {
 
         IdentifierNode* identifier;
         std::vector<CallArgumentNode*> args;
-        std::vector<FunctionNode*> functions;
     };
 
     struct StructLiteralNode {
