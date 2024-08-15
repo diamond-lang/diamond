@@ -1,3 +1,5 @@
+#include <algorithm>
+
 #include "scopes.hpp"
 #include "intrinsics.hpp"
 #include "../lexer.hpp"
