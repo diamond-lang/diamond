@@ -128,7 +128,7 @@ namespace ast {
         bool operator!=(const InterfaceType &interface) const;
 
         ast::Type get_default_type();
-        bool is_compatible_with(ast::Type type);
+        bool is_compatible_with(ast::Type type, ast::InterfaceNode* interface);
     };
 
     ast::Type get_default_type(Set<ast::InterfaceType> interface);

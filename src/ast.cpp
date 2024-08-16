@@ -36,7 +36,7 @@ ast::Type ast::get_default_type(Set<ast::InterfaceType> interface) {
     return ast::Type(ast::NoType{});
 }
 
-bool ast::InterfaceType::is_compatible_with(ast::Type type) {
+bool ast::InterfaceType::is_compatible_with(ast::Type type, ast::InterfaceNode* interface) {
     if (this->name== "number") {
         return type.is_integer() || type.is_float();
     }
@@ -50,10 +50,8 @@ bool ast::InterfaceType::is_compatible_with(ast::Type type) {
         return type.is_struct_type();
     }
     else {
-        return true;
-        std::cout << this->name << " :: " << type.to_str() << "\n";
-        assert(false);
-        return false;
+        assert(interface != nullptr);
+        return interface->is_compatible_with(type);
     }
 }
 
@@ -780,6 +778,9 @@ void ast::print(Node* node, PrintContext context) {
             for (size_t i = 0; i < block.types.size(); i++) {
                 nodes.push_back((Node*) block.types[i]);
             }
+            for (size_t i = 0; i < block.interfaces.size(); i++) {
+                nodes.push_back((Node*) block.interfaces[i]);
+            }
             for (size_t i = 0; i < block.functions.size(); i++) {
                 nodes.push_back((Node*) block.functions[i]);
             }
@@ -1391,7 +1392,19 @@ std::vector<ast::Type> ast::InterfaceNode::get_prototype() {
 }
 
 bool ast::InterfaceNode::is_compatible_with(ast::Type type) {
+    for (auto function: this->functions) {
+        for (size_t i = 0; i < function->args.size(); i++) {
+            if (this->args[i]->type == this->type_parameters[0].type) {
+                if (type == function->args[i]->type) {
+                    return true;
+                }
+                break;
+            }
+        }
+    }
+    std::cout << "No implementation of " << this->identifier->value << " for " << type.to_str() << "\n";
     assert(false);
+    return false;
 }
 
 std::optional<ast::TypeParameter*> ast::get_type_parameter(std::vector<ast::TypeParameter>& type_parameters, ast::Type type) {

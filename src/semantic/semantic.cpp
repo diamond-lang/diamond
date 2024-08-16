@@ -435,7 +435,7 @@ Result<Ok, Error> semantic::analyze(semantic::Context& context, ast::TypeNode& n
 
 // Check two types are compatible
 // ------------------------------
-bool semantic::are_types_compatible(ast::FunctionNode& function, ast::Type function_type, ast::Type argument_type) {
+bool semantic::are_types_compatible(ast::FunctionNode& function, semantic::FunctionsAndTypesScopes& function_and_types_scopes, ast::Type function_type, ast::Type argument_type) {
     assert(argument_type.is_concrete());
 
     if (function_type.is_concrete()) {
@@ -446,7 +446,7 @@ bool semantic::are_types_compatible(ast::FunctionNode& function, ast::Type funct
     &&       function.get_type_parameter(function_type).value()->interface.size() > 0) {
         auto interfaces = function.get_type_parameter(function_type).value()->interface;
         for (auto interface_type: interfaces.elements) {
-            if (!interface_type.is_compatible_with(argument_type)) {
+            if (!interface_type.is_compatible_with(argument_type, (ast::InterfaceNode*)function_and_types_scopes.get_binding(interface_type.name))) {
                 return false;
             }
         }
@@ -456,7 +456,7 @@ bool semantic::are_types_compatible(ast::FunctionNode& function, ast::Type funct
         if (function_type.as_nominal_type().name == argument_type.as_nominal_type().name
         &&  function_type.as_nominal_type().parameters.size() == argument_type.as_nominal_type().parameters.size()) {
             for (size_t i = 0; i < function_type.as_nominal_type().parameters.size(); i++) {
-                if (!semantic::are_types_compatible(function, function_type.as_nominal_type().parameters[i], argument_type.as_nominal_type().parameters[i])) {
+                if (!semantic::are_types_compatible(function, function_and_types_scopes, function_type.as_nominal_type().parameters[i], argument_type.as_nominal_type().parameters[i])) {
                     return false;
                 }
             }
@@ -464,7 +464,7 @@ bool semantic::are_types_compatible(ast::FunctionNode& function, ast::Type funct
         }
         if (function_type.as_nominal_type().name == "array" && argument_type.is_array()) {
             for (size_t i = 0; i < function_type.as_nominal_type().parameters.size(); i++) {
-                if (!semantic::are_types_compatible(function, function_type.as_nominal_type().parameters[i], argument_type.as_nominal_type().parameters[i])) {
+                if (!semantic::are_types_compatible(function, function_and_types_scopes, function_type.as_nominal_type().parameters[i], argument_type.as_nominal_type().parameters[i])) {
                     return false;
                 }
             }
@@ -475,23 +475,23 @@ bool semantic::are_types_compatible(ast::FunctionNode& function, ast::Type funct
     return true;
 }
 
-bool semantic::are_types_compatible(ast::FunctionNode& function, std::vector<ast::Type> function_types, std::vector<ast::Type> argument_types) {
+bool semantic::are_types_compatible(ast::FunctionNode& function, semantic::FunctionsAndTypesScopes& function_and_types_scopes, std::vector<ast::Type> function_types, std::vector<ast::Type> argument_types) {
     for (size_t i = 0; i < function_types.size(); i++) {
-        if (!semantic::are_types_compatible(function, function_types[i], argument_types[i])) {
+        if (!semantic::are_types_compatible(function, function_and_types_scopes, function_types[i], argument_types[i])) {
             return false;
         }
     }
     return true;
 }
 
-bool semantic::are_arguments_compatible(ast::FunctionNode& function, ast::CallNode& call, std::vector<ast::Type> function_types, std::vector<ast::Type> argument_types) {
+bool semantic::are_arguments_compatible(ast::FunctionNode& function, semantic::FunctionsAndTypesScopes& function_and_types_scopes, ast::CallNode& call, std::vector<ast::Type> function_types, std::vector<ast::Type> argument_types) {
     for (size_t i = 0; i < function_types.size() - 1; i++) {
-        if (!semantic::are_types_compatible(function, function_types[i], argument_types[i])
+        if (!semantic::are_types_compatible(function, function_and_types_scopes, function_types[i], argument_types[i])
         ||  function.args[i]->is_mutable != call.args[i]->is_mutable) {
             return false;
         }
     }
-    if (!semantic::are_types_compatible(function, function_types[function_types.size() - 1], argument_types[argument_types.size() - 1])) {
+    if (!semantic::are_types_compatible(function, function_and_types_scopes, function_types[function_types.size() - 1], argument_types[argument_types.size() - 1])) {
         return false;
     }
     return true;
@@ -578,13 +578,16 @@ Result<ast::Type, Error> semantic::get_function_type(Context& context, ast::Node
             function_types.push_back(it->return_type);
             std::vector<ast::Type> call_types = call_args;
             call_types.push_back(call_type);
-            if (semantic::are_arguments_compatible(*it, *call, function_types, call_types)) {
+            if (semantic::are_arguments_compatible(*it, context.scopes.functions_and_types_scopes, *call, function_types, call_types)) {
                 assert(function == nullptr);
                 function = it;
             }
         }
-    
-        assert(function != nullptr);
+
+        if (function == nullptr) {
+            std::cout << "No implementation of " << interface.identifier->value << " for call types \n";
+            assert(false);
+        }
     }
     else {
         assert(false);

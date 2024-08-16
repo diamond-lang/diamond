@@ -716,9 +716,9 @@ ast::FunctionNode* codegen::Context::get_function(ast::CallNode* call) {
         function_types.push_back(function->return_type);
         std::vector<ast::Type> call_types = this->get_types(call->args);
         call_types.push_back(ast::get_concrete_type(call->type, this->type_bindings));
-        if (semantic::are_arguments_compatible(*function, *call, function_types, call_types)) {
+        if (semantic::are_arguments_compatible(*function, this->scopes.functions_and_types_scopes,  *call, function_types, call_types)) {
+            assert(result == nullptr);
             result = function;
-            break;
         }
     }
     assert(result != nullptr);
@@ -727,7 +727,7 @@ ast::FunctionNode* codegen::Context::get_function(ast::CallNode* call) {
 
 void codegen::Context::store_fields(ast::Node* expression, llvm::Value* struct_allocation) {
     // Get struct type
-    llvm::StructType* struct_type = this->get_struct_type(ast::get_type(expression).as_nominal_type().type_definition);
+    llvm::StructType* struct_type = this->get_struct_type(ast::get_concrete_type(expression, this->type_bindings).as_nominal_type().type_definition);
 
     if (expression->index() == ast::StructLiteral) {
         // Get call
@@ -739,7 +739,7 @@ void codegen::Context::store_fields(ast::Node* expression, llvm::Value* struct_a
             llvm::Value* ptr = this->builder->CreateStructGEP(
                 struct_type,
                 struct_allocation,
-                ast::get_type(expression).as_nominal_type().type_definition->get_index_of_field(field.first->value)
+                ast::get_concrete_type(expression, this->type_bindings).as_nominal_type().type_definition->get_index_of_field(field.first->value)
             );
 
             // If the field type has a struct type

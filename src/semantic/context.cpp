@@ -276,31 +276,6 @@ ast::Type semantic::new_final_type_variable(Context& context) {
     return new_type;
 }
 
-std::vector<ast::FunctionNode*> semantic::remove_incompatible_functions_with_argument_type(std::vector<ast::FunctionNode*> functions, size_t argument_position, ast::Type argument_type, bool is_mutable) {
-    assert(argument_type.is_concrete());
-    
-    functions.erase(std::remove_if(functions.begin(), functions.end(), [&argument_position, &argument_type, &is_mutable](ast::FunctionNode* function) {
-        if (function->is_extern_and_variadic) {
-            return false;
-        }
-        else {
-            return semantic::are_types_compatible(*function, function->args[argument_position]->type, argument_type) == false || function->args[argument_position]->is_mutable != is_mutable;
-        }
-    }), functions.end());
-
-    return functions;
-}
-
-std::vector<ast::FunctionNode*> semantic::remove_incompatible_functions_with_return_type(std::vector<ast::FunctionNode*> functions, ast::Type return_type) {
-    assert(return_type.is_concrete());
-    
-    functions.erase(std::remove_if(functions.begin(), functions.end(), [&return_type](ast::FunctionNode* function) {
-        return semantic::are_types_compatible(*function, function->return_type, return_type) == false;
-    }), functions.end());
-
-    return functions;
-}
-
 std::vector<ast::Type> semantic::get_possible_types_for_argument(std::vector<ast::FunctionNode*> functions, size_t argument_position) {
     std::vector<ast::Type> possible_types;
     for (auto function: functions) {

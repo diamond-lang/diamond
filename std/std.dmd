@@ -118,3 +118,7 @@ function printWithoutLineEnding[t](value: array[t]): void
             _ = printf(", ")
         i := i + 1
     _ = printf("]")
+
+function printWithoutLineEnding[t: type](value: t): void
+    _ = printf("[")
+    _ = printf("]")
