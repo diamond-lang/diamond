@@ -78,9 +78,12 @@ builtin modulo(left: int8, right: int8): int8
 builtin not(boolean: bool): bool
 builtin and(left: bool, right: bool): bool
 builtin or(left: bool, right: bool): bool
+
 builtin subscript[t](array: array[t], index: int64): t
 builtin subscript_mut[t](mut array: array[t], index: int64): mut t
 builtin size[t](array: array[t]): int64
+
+builtin fields[t: type](struct: t): array[string]
 
 interface printWithoutLineEnding[t](object: t): void
 
@@ -119,6 +122,7 @@ function printWithoutLineEnding[t](value: array[t]): void
         i := i + 1
     _ = printf("]")
 
-function printWithoutLineEnding[t: type](value: t): void
-    _ = printf("[")
-    _ = printf("]")
+function printWithoutLineEnding[t: type](struct: t): void
+    printStruct(struct)
+
+builtin printStruct[t: type](struct: t): void

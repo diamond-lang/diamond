@@ -1,0 +1,19 @@
+-- Printing nested structs
+type Point
+    x: float64
+    y: float64
+
+type Rectangle
+    p1: Point
+    p2: Point
+
+rectangle = Rectangle{
+    p1: Point{x: 10, y: 10}
+    p2: Point{x: 110, y: 60}
+}
+
+print(rectangle)
+
+--- Output
+Rectangle{p1: Point{x: 10, y: 10}, p2: Point{x: 110, y: 60}}
+---

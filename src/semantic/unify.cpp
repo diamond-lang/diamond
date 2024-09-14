@@ -1,6 +1,5 @@
 #include "unify.hpp"
 #include "semantic.hpp"
-#include "check_functions_used.hpp"
 #include "../semantic.hpp"
 
 Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::Node* node) {
@@ -210,7 +209,7 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::Ca
     assert(binding.has_value());
     
     if (all_args_typed) {
-        auto call_type = get_function_type(context, binding.value().value, &node, ast::get_types(node.args), node.type).get_value();
+        auto call_type = get_function_type(context, binding.value().value, node.get_args_mutability(), ast::get_types(node.args), node.type).get_value();
         node.type = call_type;
 
         if (node.type.is_final_type_variable() && (

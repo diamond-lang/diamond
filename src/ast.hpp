@@ -437,6 +437,14 @@ namespace ast {
 
         IdentifierNode* identifier;
         std::vector<CallArgumentNode*> args;
+
+        std::vector<bool> get_args_mutability() {
+            std::vector<bool> result;
+            for (auto arg: this->args) {
+                result.push_back(arg->is_mutable);
+            }
+            return result;
+        }
     };
 
     struct StructLiteralNode {

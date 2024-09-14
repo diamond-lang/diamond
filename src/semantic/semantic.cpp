@@ -484,10 +484,10 @@ bool semantic::are_types_compatible(ast::FunctionNode& function, semantic::Funct
     return true;
 }
 
-bool semantic::are_arguments_compatible(ast::FunctionNode& function, semantic::FunctionsAndTypesScopes& function_and_types_scopes, ast::CallNode& call, std::vector<ast::Type> function_types, std::vector<ast::Type> argument_types) {
+bool semantic::are_arguments_compatible(ast::FunctionNode& function, semantic::FunctionsAndTypesScopes& function_and_types_scopes, std::vector<bool> call_args_mutability, std::vector<ast::Type> function_types, std::vector<ast::Type> argument_types) {
     for (size_t i = 0; i < function_types.size() - 1; i++) {
         if (!semantic::are_types_compatible(function, function_and_types_scopes, function_types[i], argument_types[i])
-        ||  function.args[i]->is_mutable != call.args[i]->is_mutable) {
+        ||  function.args[i]->is_mutable != call_args_mutability[i]) {
             return false;
         }
     }
@@ -562,7 +562,7 @@ void add_argument_type_to_specialization(ast::FunctionSpecialization& specializa
     }
 }
 
-Result<ast::Type, Error> semantic::get_function_type(Context& context, ast::Node* function_or_interface, ast::CallNode* call, std::vector<ast::Type> call_args, ast::Type call_type) {
+Result<ast::Type, Error> semantic::get_function_type(Context& context, ast::Node* function_or_interface, std::vector<bool> call_args_mutability, std::vector<ast::Type> call_args, ast::Type call_type) {
     // Get function called
     ast::FunctionNode* function = nullptr;
 
@@ -578,7 +578,7 @@ Result<ast::Type, Error> semantic::get_function_type(Context& context, ast::Node
             function_types.push_back(it->return_type);
             std::vector<ast::Type> call_types = call_args;
             call_types.push_back(call_type);
-            if (semantic::are_arguments_compatible(*it, context.scopes.functions_and_types_scopes, *call, function_types, call_types)) {
+            if (semantic::are_arguments_compatible(*it, context.scopes.functions_and_types_scopes, call_args_mutability, function_types, call_types)) {
                 assert(function == nullptr);
                 function = it;
             }
@@ -672,6 +672,13 @@ Result<ast::Type, Error> semantic::get_function_type(Context& context, ast::Node
 
             // Check functions used in function
             semantic::check_functions_used(new_context, function->body);
+        }
+        else if (function->identifier->value == "printStruct") {
+            auto& struct_type = call_args[0];
+            for (auto field: struct_type.as_nominal_type().type_definition->fields) {
+                auto print_function = semantic::get_binding(context, "printWithoutLineEnding");
+                (void) semantic::get_function_type(context, print_function.value().value, {false}, {field->type}, ast::Type("void"));
+            }
         }
 
         // Return specialization return type

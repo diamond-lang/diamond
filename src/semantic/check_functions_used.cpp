@@ -97,7 +97,7 @@ void semantic::check_functions_used(Context& context, ast::CallNode& node) {
 
     auto args_types = ast::get_concrete_types(ast::get_types(node.args), context.type_inference.type_bindings);
     auto call_type = ast::get_concrete_type(node.type, context.type_inference.type_bindings);
-    auto function_type = semantic::get_function_type(context, binding.value().value, &node, args_types, call_type);
+    auto function_type = semantic::get_function_type(context, binding.value().value, node.get_args_mutability(), args_types, call_type);
 }
 
 
