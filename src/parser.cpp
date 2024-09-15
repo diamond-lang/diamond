@@ -7,6 +7,7 @@
 #include "errors.hpp"
 #include "parser.hpp"
 #include "ast.hpp"
+#include  "utilities.hpp"
 
 // Prototypes and definitions
 // --------------------------
@@ -22,12 +23,16 @@ struct Parser {
 
     Result<ast::Node*, Error> parse_program();
     Result<ast::Node*, Error> parse_block();
+    Result<std::vector<ast::TypeParameter>, Error> parse_type_parameters();
     Result<ast::Node*, Error> parse_function_argument();
     Result<ast::Node*, Error> parse_function();
+    Result<ast::InterfaceType, Error> parse_interface_type();
+    Result<ast::Node*, Error> parse_builtin();
     Result<ast::Node*, Error> parse_extern();
     Result<ast::Node*, Error> parse_link_with();
     Result<ast::Node*, Error> parse_type_definition();
     Result<ast::Type,  Error> parse_type();
+    Result<ast::Node*, Error> parse_interface();
     Result<ast::Node*, Error> parse_statement();
     Result<ast::Node*, Error> parse_block_or_statement();
     Result<ast::Node*, Error> parse_block_statement_or_expression();
@@ -129,6 +134,7 @@ Result<ast::Ast, Errors> parse::program(const std::vector<token::Token>& tokens,
     ast.module_path = module_path;
     ast.program = (ast::BlockNode*) parsing_result.get_value();
     ast.modules[module_path.string()] = (ast::BlockNode*) parsing_result.get_value();
+
     return ast;
 }
 
@@ -195,6 +201,10 @@ Result<ast::Node*, Error> Parser::parse_block() {
                 case ast::Function:
                     block.functions.push_back((ast::FunctionNode*) result.get_value());
                     break;
+                
+                case ast::Interface:
+                    block.interfaces.push_back((ast::InterfaceNode*) result.get_value());
+                    break;
 
                 case ast::TypeDef:
                     block.types.push_back((ast::TypeNode*) result.get_value());
@@ -209,7 +219,60 @@ Result<ast::Node*, Error> Parser::parse_block() {
                     break;
 
                 default:
-                    block.statements.push_back(result.get_value());
+                    // If we are printing an interpolated string desugares it
+                    if (result.get_value()->index() == ast::Call
+                    &&  std::get<ast::CallNode>(*result.get_value()).identifier->value == "print"
+                    &&  std::get<ast::CallNode>(*result.get_value()).args.size() == 1
+                    &&  std::get<ast::CallNode>(*result.get_value()).args[0]->expression->index() == ast::InterpolatedString) {
+                        ast::CallNode& print_call = std::get<ast::CallNode>(*result.get_value());
+                        ast::InterpolatedStringNode& interpolated_string = std::get<ast::InterpolatedStringNode>(*std::get<ast::CallNode>(*result.get_value()).args[0]->expression);
+                        for (size_t i = 0; i < interpolated_string.strings.size(); i++) {
+                            // print string
+                            auto call = ast::CallNode {print_call.line, print_call.column};
+
+                            auto identifier = ast::IdentifierNode{print_call.line, print_call.column};
+                            identifier.value = "printWithoutLineEnding";
+                            if (i + 1 == interpolated_string.strings.size()) {
+                                identifier.value = "print";
+                            }
+                            this->ast.push_back(identifier);
+                            call.identifier = (ast::IdentifierNode*) this->ast.last_element();
+                            
+                            auto string_node = ast::StringNode{interpolated_string.line, interpolated_string.column};
+                            string_node.value = interpolated_string.strings[i];
+                            this->ast.push_back(string_node);
+
+                            auto call_argument_node = ast::CallArgumentNode{interpolated_string.line, interpolated_string.column};
+                            call_argument_node.expression = this->ast.last_element();
+                            this->ast.push_back(call_argument_node);
+                            call.args.push_back((ast::CallArgumentNode*) this->ast.last_element());
+                            
+                            this->ast.push_back(call);
+                            block.statements.push_back(this->ast.last_element());
+
+                            // print expression
+                            if (i + 1 != interpolated_string.strings.size()) {
+                                call = ast::CallNode {print_call.line, print_call.column};
+
+                                identifier = ast::IdentifierNode{print_call.line, print_call.column};
+                                identifier.value = "printWithoutLineEnding";
+                                this->ast.push_back(identifier);
+                                call.identifier = (ast::IdentifierNode*) this->ast.last_element();
+
+                                call_argument_node = ast::CallArgumentNode{interpolated_string.line, interpolated_string.column};
+                                call_argument_node.expression = interpolated_string.expressions[i];
+                                this->ast.push_back(call_argument_node);
+                                call.args.push_back((ast::CallArgumentNode*) this->ast.last_element());
+                                
+                                this->ast.push_back(call);
+                                block.statements.push_back(this->ast.last_element());
+                            }
+                        }
+                    }
+                    // just push the statement
+                    else {
+                        block.statements.push_back(result.get_value());
+                    }
             }
 
             if (!this->at_end() && this->current() != token::NewLine) {
@@ -237,6 +300,8 @@ Result<ast::Node*, Error> Parser::parse_block() {
 }
 
 // statement → function
+//           | interface
+//           | builtin
 //           | extern
 //           | link_with
 //           | type_definition
@@ -254,18 +319,20 @@ Result<ast::Node*, Error> Parser::parse_block() {
 //           | index_assignment
 Result<ast::Node*, Error> Parser::parse_statement() {
     switch (this->current().variant) {
-        case token::Function: return this->parse_function();
-        case token::Extern:   return this->parse_extern();
-        case token::LinkWith: return this->parse_link_with();
-        case token::Type:     return this->parse_type_definition();;
-        case token::Return:   return this->parse_return_stmt();
-        case token::If:       return this->parse_if_else();
-        case token::While:    return this->parse_while_stmt();
-        case token::Break:    return this->parse_break_stmt();
-        case token::Continue: return this->parse_continue_stmt();
-        case token::Use:      return this->parse_use_stmt();
-        case token::Include:  return this->parse_use_stmt();
-        case token::Star:     return this->parse_dereference_assignment();
+        case token::Function:  return this->parse_function();
+        case token::Interface: return this->parse_interface();
+        case token::Builtin:   return this->parse_builtin();
+        case token::Extern:    return this->parse_extern();
+        case token::LinkWith:  return this->parse_link_with();
+        case token::Type:      return this->parse_type_definition();;
+        case token::Return:    return this->parse_return_stmt();
+        case token::If:        return this->parse_if_else();
+        case token::While:     return this->parse_while_stmt();
+        case token::Break:     return this->parse_break_stmt();
+        case token::Continue:  return this->parse_continue_stmt();
+        case token::Use:       return this->parse_use_stmt();
+        case token::Include:   return this->parse_use_stmt();
+        case token::Star:      return this->parse_dereference_assignment();
         case token::Identifier:
         case token::LeftParen:
             if (this->match({token::Identifier, token::Equal})) {
@@ -282,7 +349,7 @@ Result<ast::Node*, Error> Parser::parse_statement() {
                 if (result.is_error()) return result;
 
                 if (result.get_value()->index() == ast::Call) {
-                    if (std::get<ast::CallNode>(*result.get_value()).identifier->value == "[]") {
+                    if (std::get<ast::CallNode>(*result.get_value()).identifier->value == "subscript") {
                         return this->parse_index_assignment(result.get_value());
                     }
                     else {
@@ -361,6 +428,46 @@ Result<ast::Node*, Error> Parser::parse_block_statement_or_expression() {
     }
 }
 
+// type_parameters → "[" identifier (":" interface_type)? ("," identifier (":" interface_type)?)? "]"
+Result<std::vector<ast::TypeParameter>, Error> Parser::parse_type_parameters() {
+    std::vector<ast::TypeParameter> type_parameters;
+
+    // Parse left bracket
+    auto left_bracket = this->parse_token(token::LeftBracket);
+    if (left_bracket.is_error()) return Error {};
+
+    // Parse type parameters
+    while (this->current() != token::RightBracket && !this->at_end()) {
+        auto parameter = this->parse_type();
+        if (parameter.is_error()) return parameter.get_error();
+
+        assert(parameter.get_value().is_final_type_variable());
+
+        ast::TypeParameter type_parameter;
+        type_parameter.type = parameter.get_value();
+
+        if (this->current() == token::Colon) {
+            this->advance();
+
+            auto interface_type = this->parse_interface_type();
+            if (interface_type.is_error()) return Error {};
+            type_parameter.interface.insert(interface_type.get_value());
+        }
+
+        type_parameters.push_back(type_parameter);
+
+        if (this->current() == token::Comma) this->advance();
+        else                                 break;
+    }
+
+    // Parse right bracket
+    auto right_bracket = this->parse_token(token::RightBracket);
+    if (right_bracket.is_error()) return Error {};
+
+    // Return
+    return type_parameters;
+}
+
 // function_argument → "mut"? IDENTIFIER 
 Result<ast::Node*, Error> Parser::parse_function_argument() {
     // Create node
@@ -381,7 +488,7 @@ Result<ast::Node*, Error> Parser::parse_function_argument() {
     return this->ast.last_element();
 }
 
-// function → "function" IDENTIFIER ("[" IDENTIFIER ("," IDENTIFIER)* "]")? "(" (function_argument (":" type)? ",")* ")" (":" type)? block_statement_or_expression
+// function → "function" IDENTIFIER type_parameters? "(" (function_argument (":" type)? ",")* ")" (":" type)? block_statement_or_expression
 Result<ast::Node*, Error> Parser::parse_function() {
     // Create node
     auto function = ast::FunctionNode {this->current().line, this->current().column};
@@ -396,30 +503,11 @@ Result<ast::Node*, Error> Parser::parse_function() {
     if (identifier.is_error()) return identifier;
     function.identifier = (ast::IdentifierNode*) identifier.get_value();
 
-    // Parse possible type parameter
+    // Parse possible type parameters
     if (this->current() == token::LeftBracket) {
-        this->advance();
-
-        // Parse type parameters
-        size_t i = 0;
-        while (this->current() != token::RightBracket && !this->at_end()) {
-            auto parameter = this->parse_type();
-            if (parameter.is_error()) return parameter.get_error();
-
-            assert(parameter.get_value().is_final_type_variable());
-
-            ast::TypeParameter type_parameter;
-            type_parameter.type = parameter.get_value();
-            function.type_parameters.push_back(type_parameter);
-            i += 1;
-
-            if (this->current() == token::Comma) this->advance();
-            else                                 break;
-        }
-
-        // Parse right bracket
-        auto right_bracket = this->parse_token(token::RightBracket);
-        if (right_bracket.is_error()) return Error {};
+        auto type_parameters = this->parse_type_parameters();
+        if (type_parameters.is_error()) return Error {};
+        function.type_parameters = type_parameters.get_value();
     }
 
     // Parse left paren
@@ -453,6 +541,12 @@ Result<ast::Node*, Error> Parser::parse_function() {
     // Parse type annotation
     if (this->current() == token::Colon) {
         this->advance();
+
+        // Parse mut
+        if (this->current() == token::Mut) {
+            function.return_type_is_mutable = true;
+            this->advance();
+        }
 
         auto type = this->parse_type();
         if (type.is_error()) return Error {};
@@ -490,7 +584,151 @@ Result<ast::Node*, Error> Parser::parse_function() {
     return this->ast.last_element();
 }
 
-// extern → "extern" IDENTIFIER "(" (IDENTIFIER (":" type)? ",")* ")" (":" type)?
+// interface → "interface" IDENTIFIER type_parameters "(" (function_argument ":" type) ",")* ")" ":" type
+Result<ast::Node*, Error> Parser::parse_interface() {
+    // Create node
+    auto interface = ast::InterfaceNode {this->current().line, this->current().column};
+    interface.module_path = this->file;
+
+    // Parse keyword
+    auto keyword = this->parse_token(token::Interface);
+    if (keyword.is_error()) return Error {};
+
+    // Parse indentifier
+    auto identifier = this->parse_identifier();
+    if (identifier.is_error()) return identifier;
+    interface.identifier = (ast::IdentifierNode*) identifier.get_value();
+
+    // Parse type parameters
+    auto type_parameters = this->parse_type_parameters();
+    if (type_parameters.is_error()) return Error {};
+    interface.type_parameters = type_parameters.get_value();
+
+    // Parse left paren
+    auto left_paren = this->parse_token(token::LeftParen);
+    if (left_paren.is_error()) return Error {};
+
+    // Parse args
+    while (this->current() != token::RightParen && !this->at_end()) {
+        auto arg = this->parse_function_argument();
+        if (arg.is_error()) return arg;
+
+        // Parse type annotation
+        auto colon = this->parse_token(token::Colon);
+        if (colon.is_error()) return Error {};
+
+        auto type = this->parse_type();
+        if (type.is_error()) return Error {};
+
+        ast::set_type(arg.get_value(), type.get_value());
+        
+        // Add argument
+        interface.args.push_back((ast::FunctionArgumentNode*) arg.get_value());
+
+        if (this->current() == token::Comma) this->advance();
+        else                                 break;
+    }
+
+    // Parse right paren
+    auto right_paren = this->parse_token(token::RightParen);
+    if (right_paren.is_error()) return Error {};
+
+    // Parse type annotation
+    auto colon = this->parse_token(token::Colon);
+    if (colon.is_error()) return Error {};
+
+    // Parse mut
+    if (this->current() == token::Mut) {
+        interface.return_type_is_mutable = true;
+        this->advance();
+    }
+
+    auto type = this->parse_type();
+    if (type.is_error()) return Error {};
+
+    interface.return_type = type.get_value();
+
+    this->ast.push_back(interface);
+    return this->ast.last_element();
+}
+
+// builtin → "builtin" IDENTIFIER type_parameters? "(" (function_argument ":" type) ",")* ")" ":" type
+Result<ast::Node*, Error> Parser::parse_builtin() {
+    // Create node
+    auto builtin = ast::FunctionNode {this->current().line, this->current().column};
+    builtin.module_path = this->file;
+    builtin.is_builtin = true;
+
+    // Parse keyword
+    auto keyword = this->parse_token(token::Builtin);
+    if (keyword.is_error()) return Error {};
+
+    // Parse indentifier
+    auto identifier = this->parse_identifier();
+    if (identifier.is_error()) return identifier;
+    builtin.identifier = (ast::IdentifierNode*) identifier.get_value();
+
+    // Parse possible type parameter
+    if (this->current() == token::LeftBracket) {
+        // Parse type parameters
+        auto type_parameters = this->parse_type_parameters();
+        if (type_parameters.is_error()) return Error {};
+        builtin.type_parameters = type_parameters.get_value();
+    }
+
+    // Parse left paren
+    auto left_paren = this->parse_token(token::LeftParen);
+    if (left_paren.is_error()) return Error {};
+
+    // Parse args
+    while (this->current() != token::RightParen && !this->at_end()) {
+        auto arg = this->parse_function_argument();
+        if (arg.is_error()) return arg;
+
+        // Parse type annotation
+        auto colon = this->parse_token(token::Colon);
+        if (colon.is_error()) return Error {};
+
+        auto type = this->parse_type();
+        if (type.is_error()) return Error {};
+
+        ast::set_type(arg.get_value(), type.get_value());
+        
+        // Add argument
+        builtin.args.push_back((ast::FunctionArgumentNode*) arg.get_value());
+
+        if (this->current() == token::Comma) this->advance();
+        else                                 break;
+    }
+
+    // Parse right paren
+    auto right_paren = this->parse_token(token::RightParen);
+    if (right_paren.is_error()) return Error {};
+
+    // Parse type annotation
+    auto colon = this->parse_token(token::Colon);
+    if (colon.is_error()) return Error {};
+
+    // Parse mut
+    if (this->current() == token::Mut) {
+        builtin.return_type_is_mutable = true;
+        this->advance();
+    }
+
+    auto type = this->parse_type();
+    if (type.is_error()) return Error {};
+
+    builtin.return_type = type.get_value();
+
+    if (builtin.type_parameters.size() > 0) {
+        builtin.state = ast::FunctionGenericCompletelyTyped;
+    }
+
+    this->ast.push_back(builtin);
+    return this->ast.last_element();
+}
+
+// extern → "extern" IDENTIFIER "(" (IDENTIFIER ":" type "..."? ("," IDENTIFIER ":" type "..."?)*)? ")" ":" type
 Result<ast::Node*, Error> Parser::parse_extern() {
     // Create node
     auto function = ast::FunctionNode {this->current().line, this->current().column};
@@ -512,8 +750,26 @@ Result<ast::Node*, Error> Parser::parse_extern() {
 
     // Parse args
     while (this->current() != token::RightParen && !this->at_end()) {
+        // Parse variadic
+        if (this->current() == token::Dot) {
+            auto result = this->parse_token(token::Dot);
+            if (result.is_error()) return result.get_error();
+            result = this->parse_token(token::Dot);
+            if (result.is_error()) return result.get_error();
+            result = this->parse_token(token::Dot);
+            if (result.is_error()) return result.get_error();
+
+            function.is_extern_and_variadic = true;
+            break;
+        }
+
+        // Create node
+        auto function_argument = ast::FunctionArgumentNode {this->current().line, this->current().column};
+
+        // Parse identifier
         auto arg = this->parse_identifier();
         if (arg.is_error()) return arg;
+        function_argument.identifier = (ast::IdentifierNode*) arg.get_value();
 
         // Parse type annotation
         auto colon = this->parse_token(token::Colon);
@@ -521,9 +777,11 @@ Result<ast::Node*, Error> Parser::parse_extern() {
 
         auto type = this->parse_type();
         if (type.is_error()) return Error {};
+        function_argument.type = type.get_value();
 
-        ast::set_type(arg.get_value(), type.get_value());
-        function.args.push_back((ast::FunctionArgumentNode*) arg.get_value());
+        // Store function argument on ast
+        this->ast.push_back(function_argument);
+        function.args.push_back((ast::FunctionArgumentNode*) this->ast.last_element());
 
         // Parse comma
         if (this->current() == token::Comma) this->advance();
@@ -663,6 +921,16 @@ Result<ast::Type, Error> Parser::parse_type() {
     }
 
     return type;
+}
+
+Result<ast::InterfaceType, Error> Parser::parse_interface_type() {
+    auto type_identifier = this->parse_token(token::Identifier);
+    if (type_identifier.is_ok()) return ast::InterfaceType(type_identifier.get_value().get_literal());
+
+    type_identifier = this->parse_token(token::Type);
+    if (type_identifier.is_ok()) return ast::InterfaceType(type_identifier.get_value().get_literal());
+
+    return Error {};
 }
 
 // declaration → IDENTIFIER ("be"|"=") expression (": " type)?
@@ -829,6 +1097,7 @@ Result<ast::Node*, Error> Parser::parse_index_assignment(ast::Node* index_access
     // Parse index access
     assignment.assignable = index_access;
     ((ast::CallNode*) index_access)->args[0]->is_mutable = true;
+    ((ast::CallNode*) index_access)->identifier->value = "subscript_mut";
 
     // Parse equal
     auto equal = this->parse_token(token::Equal);
@@ -1252,6 +1521,16 @@ Result<ast::Node*, Error> Parser::parse_binary(int precedence) {
 
             // Add identifier to call
             call.identifier = (ast::IdentifierNode*) identifier.get_value();
+            if (call.identifier->value == "==") call.identifier->value = "equal";
+            else if (call.identifier->value == "<") call.identifier->value = "less";
+            else if (call.identifier->value == "<=") call.identifier->value = "lessEqual";
+            else if (call.identifier->value == ">") call.identifier->value = "greater";
+            else if (call.identifier->value == ">=") call.identifier->value = "greaterEqual";
+            else if (call.identifier->value == "+") call.identifier->value = "add";
+            else if (call.identifier->value == "-") call.identifier->value = "subtract";
+            else if (call.identifier->value == "*") call.identifier->value = "multiply";
+            else if (call.identifier->value == "/") call.identifier->value = "divide";
+            else if (call.identifier->value == "%") call.identifier->value = "modulo";
 
             // Add left node to call
             this->ast.push_back(left_node);
@@ -1361,6 +1640,7 @@ Result<ast::Node*, Error> Parser::parse_negation() {
     auto identifier = this->parse_identifier(token::Minus);
     if (identifier.is_error()) return identifier;
     call.identifier = (ast::IdentifierNode*) identifier.get_value();
+    call.identifier->value = "negate";
 
     // Parse expression
     auto arg = ast::CallArgumentNode {this->current().line, this->current().column};
@@ -1477,7 +1757,13 @@ Result<ast::Node*, Error> Parser::parse_boolean() {
 }
 
 // identifier → IDENTIFIER
+//            | AND
+//            | OR
+//            | NOT
 Result<ast::Node*, Error> Parser::parse_identifier() {
+    if (this->current() == token::And) return this->parse_identifier(token::And);
+    if (this->current() == token::Or) return this->parse_identifier(token::Or);
+    if (this->current() == token::Not) return this->parse_identifier(token::Not);
     return this->parse_identifier(token::Identifier);
 }
 
@@ -1603,7 +1889,7 @@ Result<ast::Node*, Error> Parser::parse_index_access(ast::Node* expression) {
 
     // Create identifier node
     auto identifier = ast::IdentifierNode {this->current().line, this->current().column};
-    identifier.value = "[]";
+    identifier.value = "subscript";
     this->ast.push_back(identifier);
     index_access.identifier = (ast::IdentifierNode*) this->ast.last_element();
 

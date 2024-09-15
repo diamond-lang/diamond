@@ -31,6 +31,7 @@
 #include "../ast.hpp"
 #include "../utilities.hpp"
 #include "../semantic.hpp"
+#include "../semantic/scopes.hpp"
 
 namespace codegen {
     struct CollectionAsArguments {
@@ -40,6 +41,7 @@ namespace codegen {
 
     struct Context {
         ast::Ast& ast;
+        std::filesystem::path current_module;
 
         llvm::LLVMContext* context;
         llvm::Module* module;
@@ -61,7 +63,17 @@ namespace codegen {
             ~Binding() {}
         };
 
-        std::vector<std::unordered_map<std::string, Binding>> scopes;
+        struct Scope {
+            std::unordered_map<std::string, Binding>& variables_scope;
+            semantic::FunctionsAndTypesScope& functions_and_types_scope;
+        };
+
+        struct Scopes {
+            std::vector<std::unordered_map<std::string, Binding>> variable_scopes;
+            semantic::FunctionsAndTypesScopes functions_and_types_scopes;
+        };
+
+        Scopes scopes;
         std::unordered_map<std::string, ast::Type> type_bindings;
         std::unordered_map<std::string, llvm::Constant*> globals;
 
@@ -70,7 +82,8 @@ namespace codegen {
 
         // Scope management
         void add_scope();
-        std::unordered_map<std::string, Binding>& current_scope();
+        void add_scope(ast::BlockNode& block);
+        Scope current_scope();
         void delete_binding(llvm::Value* pointer, ast::Type type);
         void remove_scope();
         Binding get_binding(std::string identifier);
@@ -88,7 +101,7 @@ namespace codegen {
         bool has_boxed_type(ast::Node* expression);
         CollectionAsArguments get_collection_as_argument(ast::Type type);
         CollectionAsArguments get_struct_type_as_argument(llvm::StructType* struct_type);
-        llvm::FunctionType* get_function_type(std::vector<ast::FunctionArgumentNode*> args, std::vector<ast::Type> args_types, ast::Type return_type);
+        llvm::FunctionType* get_function_type(std::vector<ast::FunctionArgumentNode*> args, std::vector<ast::Type> args_types, ast::Type return_type, bool is_extern_and_variadic);
         std::vector<llvm::Type*> as_llvm_types(std::vector<ast::Type> types);
         std::vector<ast::Type> get_types(std::vector<ast::CallArgumentNode*> nodes);
         llvm::TypeSize get_type_size(llvm::Type* type);
@@ -115,9 +128,10 @@ namespace codegen {
         llvm::Value* codegen(ast::FunctionArgumentNode& node) {return nullptr;}
         llvm::Value* codegen(ast::FunctionNode& node) {return nullptr;}
         void codegen_function_prototypes(std::vector<ast::FunctionNode*> functions);
-        void codegen_function_prototypes(std::filesystem::path module_path, std::string identifier, std::vector<ast::FunctionArgumentNode*> args, std::vector<ast::Type> args_types, ast::Type return_type, bool is_extern);
+        void codegen_function_prototypes(std::filesystem::path module_path, std::string identifier, std::vector<ast::FunctionArgumentNode*> args, std::vector<ast::Type> args_types, ast::Type return_type, bool is_extern, bool is_extern_and_variadic);
         void codegen_function_bodies(std::vector<ast::FunctionNode*> functions);
         void codegen_function_bodies(std::filesystem::path module_path, std::string identifier, std::vector<ast::FunctionArgumentNode*> args, std::vector<ast::Type> args_types, ast::Type return_type, ast::Node* function_body);
+        llvm::Value* codegen(ast::InterfaceNode& node);
         llvm::Value* codegen(ast::DeclarationNode& node);
         llvm::Value* codegen(ast::AssignmentNode& node);
         llvm::Value* codegen(ast::ReturnNode& node);
@@ -129,8 +143,9 @@ namespace codegen {
         llvm::Value* codegen(ast::LinkWithNode& node) {return nullptr;}
         std::vector<llvm::Value*> codegen_args(ast::FunctionNode* function, std::vector<ast::CallArgumentNode*> args);
         llvm::Value* codegen(ast::CallArgumentNode& node) {return nullptr;}
-        llvm::Value* codegen_size_function(llvm::Value* pointer, ast::Type type);
-        llvm::Value* codegen_print_function(ast::Node* expression, bool end_with_new_line = true);
+        llvm::Value* codegen_size_function(std::variant<llvm::Value*, llvm::AllocaInst*> pointer, ast::Type type);
+        llvm::Value* codegen_print_struct_function(ast::Type arg_type, llvm::Value* arg_pointer);
+        llvm::Value* codegen_call(ast::CallNode& node, std::optional<llvm::Value*> allocation);
         llvm::Value* codegen(ast::CallNode& node);
         llvm::Value* codegen(ast::StructLiteralNode& node);
         llvm::Value* codegen(ast::FloatNode& node);

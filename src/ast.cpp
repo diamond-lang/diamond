@@ -6,41 +6,52 @@
 
 // Interface
 // ---------
-bool ast::Interface::operator==(const Interface &interface) const {
+bool ast::InterfaceType::operator==(const InterfaceType &interface) const {
     return interface.name == this->name;
 }
 
-bool ast::Interface::operator!=(const Interface &interface) const {
+bool ast::InterfaceType::operator!=(const InterfaceType &interface) const {
     return !(interface == *this);
 }
 
-ast::Type ast::Interface::get_default_type() {
-    if (this->name== "Number") {
+ast::Type ast::InterfaceType::get_default_type() {
+    if (this->name== "number") {
         return ast::Type("int64");
     }
-    else if (this->name == "Float") {
+    else if (this->name == "float") {
         return ast::Type("float64");
     }
     else {
-        assert(false);
         return ast::Type(ast::NoType{});
     }
 }
 
-bool ast::Interface::is_compatible_with(ast::Type type) {
-    if (this->name== "Number") {
+ast::Type ast::get_default_type(Set<ast::InterfaceType> interface) {
+    for (auto it: interface.elements) {
+        if (!it.get_default_type().is_no_type()) {
+            return it.get_default_type();
+        }
+    }
+    assert(false);
+    return ast::Type(ast::NoType{});
+}
+
+bool ast::InterfaceType::is_compatible_with(ast::Type type, ast::InterfaceNode* interface) {
+    if (this->name== "number") {
         return type.is_integer() || type.is_float();
     }
-    else if (this->name == "Float") {
+    else if (this->name == "float") {
         return type.is_float();
     }
     else if (this->name == "pointer") {
         return type.is_pointer() || type.is_boxed();
     }
+    else if (this->name == "type") {
+        return type.is_struct_type();
+    }
     else {
-        std::cout << this->name << " :: " << type.to_str() << "\n";
-        assert(false);
-        return false;
+        assert(interface != nullptr);
+        return interface->is_compatible_with(type);
     }
 }
 
@@ -211,6 +222,16 @@ std::string ast::Type::to_str() const {
     }
     else if (this->is_final_type_variable()) {
         output += std::get<ast::FinalTypeVariable>(this->type).id;
+        if (this->as_final_type_variable().parameter_constraints.size() > 0) {
+            output += "[";
+            for (size_t i = 0; i < this->as_final_type_variable().parameter_constraints.size(); i++) {
+                output += this->as_final_type_variable().parameter_constraints[i].to_str();
+                if (i + 1 != this->as_final_type_variable().parameter_constraints.size()) {
+                    output += ", ";
+                }
+                output += "]";
+            }
+        }
     }
     else if (this->is_nominal_type()) {
         if (std::get<ast::NominalType>(this->type).parameters.size() == 0) {
@@ -253,17 +274,22 @@ std::string ast::TypeParameter::to_str() {
     assert(this->type.is_final_type_variable());
     std::string output = this->type.to_str();
 
-    if (this->interface.has_value()
-    ||  this->field_constraints.size() > 0) {
+    if (this->interface.size() > 0
+    ||  this->type.as_final_type_variable().field_constraints.size() > 0) {
         output += ": ";
     }
 
-    if (this->interface.has_value()) {
-        output += this->interface.value().name;
+    if (this->interface.size() > 0) {
+        for (size_t i = 0; i < this->interface.elements.size(); i++) {
+            output += this->interface.elements[i].name;
+            if (i + 1 != this->interface.elements.size()) {
+                output += " and ";
+            }
+        }
     }
-    else if (this->field_constraints.size() > 0) {
+    else if (this->type.as_final_type_variable().field_constraints.size() > 0) {
         output += "{";
-        auto fields = this->field_constraints;
+        auto fields = this->type.as_final_type_variable().field_constraints;
         for(auto field = fields.begin(); field != fields.end(); field++) {
             output += field->name + ": " + field->type.to_str() + ", ";
 
@@ -439,23 +465,6 @@ std::size_t std::hash<ast::Type>::operator()(const ast::Type& type) const {
     return std::hash<std::string>()(type.to_str());
 }
 
-// CallInCallStack
-bool ast::CallInCallStack::operator==(const CallInCallStack &t) const {
-    if (this->identifier == t.identifier && this->args.size() == t.args.size()) {
-        for (size_t i = 0; i < this->args.size(); i++) {
-            if (this->args[i] != t.args[i]) return false;
-        }
-        return this->return_type == t.return_type;
-    }
-    else {
-        return false;
-    }
-}
-
-bool ast::CallInCallStack::operator!=(const CallInCallStack &t) const {
-    return !(t == *this);
-}
-
 // Node
 // ----
 ast::Type ast::get_type(Node* node) {
@@ -487,6 +496,22 @@ ast::Type ast::get_concrete_type(Type type, std::unordered_map<std::string, Type
         else if (type.is_struct_type()) {
             std::cout << "WAHT ? " << type.to_str() << "\n";
             assert(false);
+        }
+    }
+    return type;
+}
+
+ast::Type ast::try_to_get_concrete_type(Type type, std::unordered_map<std::string, Type>& type_bindings) {
+    if (type.is_final_type_variable()) {
+        if (type_bindings.find(type.as_final_type_variable().id) != type_bindings.end()) {
+            type = type_bindings[type.as_final_type_variable().id];
+        }
+    }
+    if (!type.is_concrete()) {
+        if (type.is_nominal_type()) {
+            for (size_t i = 0; i < type.as_nominal_type().parameters.size(); i++) {
+                type.as_nominal_type().parameters[i] = ast::try_to_get_concrete_type(type.as_nominal_type().parameters[i], type_bindings);
+            }
         }
     }
     return type;
@@ -538,6 +563,7 @@ bool ast::could_be_expression(Node* node) {
             return false;
         }
         case Function: return false;
+        case Declaration: return false;
         case Assignment: return false;
         case Return: return false;
         case Break: return false;
@@ -752,6 +778,9 @@ void ast::print(Node* node, PrintContext context) {
             for (size_t i = 0; i < block.types.size(); i++) {
                 nodes.push_back((Node*) block.types[i]);
             }
+            for (size_t i = 0; i < block.interfaces.size(); i++) {
+                nodes.push_back((Node*) block.interfaces[i]);
+            }
             for (size_t i = 0; i < block.functions.size(); i++) {
                 nodes.push_back((Node*) block.functions[i]);
             }
@@ -800,6 +829,9 @@ void ast::print(Node* node, PrintContext context) {
             if (function.is_extern) {
                 std::cout << "extern " << function.identifier->value << '(';
             }
+            else if (function.is_builtin) {
+                std::cout << "builtin " << function.identifier->value << '(';
+            }
             else {
                 std::cout << "function " << function.identifier->value;
 
@@ -829,13 +861,21 @@ void ast::print(Node* node, PrintContext context) {
 
                 if (i != function.args.size() - 1) std::cout << ", ";
             }
+
+            if (function.is_extern_and_variadic) {
+                std::cout << ", ...";
+            }
+
             std::cout << ")";
             if (function.return_type != Type(ast::NoType{})) {
-                std::cout << ": " << get_concrete_type_or_type_variable(function.return_type, context).to_str();
+                std::cout << ": ";
+                if (function.return_type_is_mutable) std::cout << "mut ";
+                std::cout << get_concrete_type_or_type_variable(function.return_type, context).to_str();
             }
             std::cout << "\n";
 
-            if (function.is_extern) {
+            if (function.is_extern
+            ||  function.is_builtin) {
                 return;
             }
 
@@ -853,6 +893,54 @@ void ast::print(Node* node, PrintContext context) {
                 context.last.pop_back();
                 context.last.pop_back();
             }
+
+            break;
+        }
+
+        case Interface: {
+            auto& interface = std::get<InterfaceNode>(*node);
+            bool last = true;
+            if (context.last.size() != 0) {
+                last = context.last[context.last.size() - 1];
+                context.last.pop_back();
+            }
+
+            put_indent_level(context.indent_level, append(context.last, last));
+            std::cout << "interface " << interface.identifier->value;
+
+            if (interface.type_parameters.size() > 0 && !context.concrete) {
+                std::cout << '[';
+                for (size_t i = 0; i < interface.type_parameters.size(); i++) {
+                    std::cout << interface.type_parameters[i].to_str();
+                    if (i + 1 != interface.type_parameters.size()) std::cout << ", ";
+                }
+                std::cout << ']';
+            }
+
+            std::cout << '(';
+            for (size_t i = 0; i < interface.args.size(); i++) {
+                auto& arg_name = interface.args[i]->identifier->value;
+                if (interface.args[i]->is_mutable) {
+                    std::cout << "mut ";
+                }
+                std::cout << arg_name;
+
+                auto& arg_type = interface.args[i]->type;
+
+                if (arg_type != Type(ast::NoType{})) {
+                    std::cout << ": " << get_concrete_type_or_type_variable(arg_type, context).to_str();
+                }
+
+                if (i != interface.args.size() - 1) std::cout << ", ";
+            }
+
+            std::cout << ")";
+            if (interface.return_type != Type(ast::NoType{})) {
+                std::cout << ": ";
+                if (interface.return_type_is_mutable) std::cout << "mut ";
+                std::cout << get_concrete_type_or_type_variable(interface.return_type, context).to_str();
+            }
+            std::cout << "\n";
 
             break;
         }
@@ -1228,6 +1316,99 @@ bool ast::FunctionNode::typed_parameter_aready_added(ast::Type type) {
 
 std::optional<ast::TypeParameter*> ast::FunctionNode::get_type_parameter(ast::Type type) {
     for (auto& type_parameter: this->type_parameters) {
+        if (type_parameter.type == type) {
+            return &type_parameter;
+        }
+    }
+    return std::nullopt;
+}
+
+static bool _is_in_type_parameter(ast::Type type_parameter, ast::Type type) {
+    if (type_parameter == type) {
+        return true;
+    }
+
+    for (auto field: type_parameter.as_final_type_variable().field_constraints) {
+        if (_is_in_type_parameter(field.type, type)) {
+            return true;
+        }
+    }
+
+    for (auto parameter: type_parameter.as_final_type_variable().parameter_constraints) {
+        if (_is_in_type_parameter(parameter, type)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool ast::FunctionNode::is_in_type_parameter(ast::Type type) {
+    for (auto type_parameter: this->type_parameters) {
+        if (_is_in_type_parameter(type_parameter.type, type)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+
+bool ast::InterfaceNode::typed_parameter_aready_added(ast::Type type) {
+    for (auto type_parameter: this->type_parameters) {
+        if (type_parameter.type == type) {
+            return true;
+        }
+    }
+    return false;
+}
+
+std::optional<ast::TypeParameter*> ast::InterfaceNode::get_type_parameter(ast::Type type) {
+    for (auto& type_parameter: this->type_parameters) {
+        if (type_parameter.type == type) {
+            return &type_parameter;
+        }
+    }
+    return std::nullopt;
+}
+
+bool ast::InterfaceNode::is_in_type_parameter(ast::Type type) {
+    for (auto type_parameter: this->type_parameters) {
+        if (_is_in_type_parameter(type_parameter.type, type)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+std::vector<ast::Type> ast::InterfaceNode::get_prototype() {
+    std::vector<ast::Type> results;
+    for (auto arg: this->args) {
+        results.push_back(ast::get_type((ast::Node*) arg));
+    }
+    results.push_back(this->return_type);
+    return results;
+}
+
+bool ast::InterfaceNode::is_compatible_with(ast::Type type) {
+    for (auto function: this->functions) {
+        for (size_t i = 0; i < function->args.size(); i++) {
+            if (this->args[i]->type == this->type_parameters[0].type) {
+                if (type == function->args[i]->type) {
+                    return true;
+                }
+                break;
+            }
+        }
+    }
+    std::cout << "No implementation of " << this->identifier->value << " for " << type.to_str() << "\n";
+    assert(false);
+    return false;
+}
+
+std::optional<ast::TypeParameter*> ast::get_type_parameter(std::vector<ast::TypeParameter>& type_parameters, ast::Type type) {
+    for (auto& type_parameter: type_parameters) {
         if (type_parameter.type == type) {
             return &type_parameter;
         }

@@ -1,0 +1,4 @@
+use "plus"
+
+function minus(a, b)
+    return plus(a, -b)

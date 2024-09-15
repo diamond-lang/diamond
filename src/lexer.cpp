@@ -210,6 +210,9 @@ Result<token::Token, Error> lexer::get_token(Source& source) {
     if (match(source, "-")) {
         return advance(token::Token(token::Minus, "-", source.line, source.column), source, 1);
     }
+    if (match(source, "_")) {
+        return get_identifier(source);
+    }
     if (match(source, " "))  {
         advance(source);
         return get_token(source);
@@ -218,7 +221,7 @@ Result<token::Token, Error> lexer::get_token(Source& source) {
         advance(source);
         return get_token(source);
     }
-    if (match(source, "\r\n"))      return advance(token::Token(token::NewLine, "\\n", source.line, source.column), source, 2);
+    if (match(source, "\r\n"))    return advance(token::Token(token::NewLine, "\\n", source.line, source.column), source, 2);
     if (match(source, "\n"))      return advance(token::Token(token::NewLine, "\\n", source.line, source.column), source, 1);
     if (match(source, "\""))      return get_string(source);
     if (isdigit(current(source))) return get_number(source);
@@ -326,6 +329,8 @@ Result<token::Token, Error> lexer::get_identifier(Source& source) {
     if (literal == "else")      return token::Token(token::Else, "else", line, column);
     if (literal == "while")     return token::Token(token::While, "while", line, column);
     if (literal == "function")  return token::Token(token::Function, "function", line, column);
+    if (literal == "interface") return token::Token(token::Interface, "interface", line, column);
+    if (literal == "builtin")   return token::Token(token::Builtin, "builtin", line, column);
     if (literal == "type")      return token::Token(token::Type, "type", line, column);
     if (literal == "be")        return token::Token(token::Be, "be", line, column);
     if (literal == "true")      return token::Token(token::True, "true", line, column);

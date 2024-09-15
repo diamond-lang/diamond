@@ -1,8 +1,8 @@
 fruit = "Watermelon"
-print("Hello, {fruit}!\n")
+print("Hello, {fruit}!")
 
 number = 3
-print("{number} times 4 is {number * 4}\n")
+print("{number} times 4 is {number * 4}")
 
 --- Output
 Hello, Watermelon!

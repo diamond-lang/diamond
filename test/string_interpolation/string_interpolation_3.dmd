@@ -1,0 +1,6 @@
+a = [1, 2, 3]
+print("This is an interpolated array: {a}")
+
+--- Output
+This is an interpolated array: [1, 2, 3]
+---

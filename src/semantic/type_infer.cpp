@@ -1,5 +1,6 @@
 #include "type_infer.hpp"
 #include "semantic.hpp"
+#include "../semantic.hpp"
 
 Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, ast::Node* node) {
     return std::visit(
@@ -10,33 +11,23 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
     );
 }
 
-Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, ast::BlockNode& node) {
-    semantic::add_scope(context);
-
+Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, ast::BlockNode& node) {    
     // Add functions to the current scope
-    auto result = semantic::add_definitions_to_current_scope(context, node);
+    auto result = semantic::add_scope(context, node);
     if (result.is_error()) return result;
 
-    // Analyze functions and types in current scope
-    auto scope = semantic::current_scope(context);
-    for (auto& it: scope) {
-        auto& binding = it.second;
-        if (binding.type == semantic::TypeBinding) {
-            auto result = semantic::analyze(context, *semantic::get_type_definition(binding));
-            if (result.is_error()) return result;
-        }
+    // Analyze types of block
+    for (auto type: node.types) {
+        auto result = semantic::analyze(context, *type);
+        if (result.is_error()) return result;
     }
-    for (auto& it: scope) {
-        auto& binding = it.second;
-        if (binding.type == semantic::FunctionBinding) {
-            auto functions = semantic::get_functions(binding);
-            for (size_t i = 0; i < functions.size(); i++) {
-                if (functions[i]->state == ast::FunctionAnalyzed) continue;
 
-                auto result = semantic::analyze(context, *functions[i]);
-                if (result.is_error()) return result;
-            }
-        }
+    // Analyze functions of block
+    for (auto function: node.functions) {
+        if (function->state == ast::FunctionAnalyzed) continue;
+        if (function->module_path != context.current_module) continue;
+        auto result = semantic::analyze(context, *function);
+        if (result.is_error()) return result;
     }
 
     size_t number_of_errors = context.errors.size();
@@ -99,6 +90,10 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
     return Ok {};
 }
 
+Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, ast::InterfaceNode& node) {
+    return Ok {};
+}
+
 Result<Ok, Error> semantic::type_infer_and_analyze(Context& context, ast::Type& type) {
     return Ok {};
 }
@@ -122,15 +117,15 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
     // Get identifier
     std::string identifier = node.identifier->value;
 
-    if (semantic::current_scope(context).find(identifier) != semantic::current_scope(context).end()
-    && semantic::current_scope(context)[identifier].type == VariableBinding) {
-        auto declaration = get_variable(semantic::current_scope(context)[identifier]);
+    if (semantic::current_scope(context).variables_scope.find(identifier) != semantic::current_scope(context).variables_scope.end()
+    &&  semantic::current_scope(context).variables_scope[identifier].type == VariableBinding) {
+        auto declaration = get_variable(semantic::current_scope(context).variables_scope[identifier]);
         if (!declaration->is_mutable) {
             context.errors.push_back(errors::reassigning_immutable_variable(*node.identifier, *declaration, context.current_module));
             return Error {};
         }
     }
-    semantic::current_scope(context)[identifier] = semantic::Binding(&node);
+    semantic::current_scope(context).variables_scope[identifier] = semantic::Binding(&node);
 
     return Ok{};
 }
@@ -160,15 +155,15 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
         std::string identifier = ((ast::IdentifierNode*) node.assignable)->value;
 
         // Check variable exists
-        semantic::Binding* binding = semantic::get_binding(context, identifier);
-        if (!binding) {
+        std::optional<Binding> binding = semantic::get_binding(context, identifier);
+        if (!binding.has_value()) {
             context.errors.push_back(errors::undefined_variable(*((ast::IdentifierNode*) node.assignable), context.current_module));
             return Error {};
         }
         semantic::add_constraint(context, Set<ast::Type>({semantic::get_binding_type(*binding), ast::get_type(node.expression)}));
 
         // normal assignment
-        if (binding->type == VariableBinding) {
+        if (binding.value().type == VariableBinding) {
             auto declaration = get_variable(*binding);
             if (!declaration->is_mutable) {
                 context.errors.push_back(errors::reassigning_immutable_variable(*((ast::IdentifierNode*) node.assignable), *declaration, context.current_module));
@@ -258,8 +253,8 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
 }
 
 Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, ast::IdentifierNode& node) {
-    semantic::Binding* binding = semantic::get_binding(context, node.value);
-    if (!binding) {
+    std::optional<semantic::Binding> binding = semantic::get_binding(context, node.value);
+    if (!binding.has_value()) {
         context.errors.push_back(errors::undefined_variable(node, context.current_module)); // tested in test/errors/undefined_variable.dm
         return Error {};
     }
@@ -273,7 +268,7 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
 Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, ast::IntegerNode& node) {
     if (node.type == ast::Type(ast::NoType{})) {   
         node.type = semantic::new_type_variable(context);
-        semantic::add_interface_constraint(context, node.type,  ast::Interface("Number"));
+        semantic::add_interface_constraint(context, node.type,  ast::InterfaceType("number"));
     }
     else if (!node.type.is_type_variable() && !node.type.is_integer() && !node.type.is_float()) {
         context.errors.push_back(Error("Error: Type mismatch between type annotation and expression"));
@@ -286,7 +281,7 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
 Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, ast::FloatNode& node) {
     if (node.type == ast::Type(ast::NoType{})) {  
         node.type = semantic::new_type_variable(context);
-        semantic::add_interface_constraint(context, node.type,  ast::Interface("Float"));
+        semantic::add_interface_constraint(context, node.type,  ast::InterfaceType("float"));
     }
     else if (!node.type.is_type_variable() && !node.type.is_float()) {
         context.errors.push_back(Error("Error: Type mismatch between type annotation and expression"));
@@ -347,16 +342,41 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
     return Ok {};
 }
 
-static std::vector<ast::Type> get_default_types(semantic::Context& context, std::vector<ast::Type> types) {
-    std::vector<ast::Type> result;
-    for (size_t i = 0; i < types.size(); i++) {
-        assert(types[i].is_type_variable());
-        assert(context.type_inference.interface_constraints.find(types[i]) != context.type_inference.interface_constraints.end());
-        result.push_back(context.type_inference.interface_constraints[types[i]].get_default_type());
-    }
-    return result;
-}
+static void instantiate_function_with_type(ast::FunctionSpecialization& specialization, std::vector<ast::TypeParameter>& type_parameters, ast::Type function_type, ast::Type argument_type) {
+    if (function_type.is_final_type_variable()) {
+        // If it was no already included
+        if (specialization.type_bindings.find(function_type.as_final_type_variable().id) == specialization.type_bindings.end()) {
+            specialization.type_bindings[function_type.as_final_type_variable().id] = argument_type;
+        }
+        // Else compare with previous type founded for it
+        else if (specialization.type_bindings[function_type.as_final_type_variable().id] != argument_type) {
+            // do nothing
+        }
 
+        // If function argument has field constraints
+        if (ast::get_type_parameter(type_parameters, function_type).has_value()) {
+            if (ast::get_type_parameter(type_parameters, function_type).value()->type.as_final_type_variable().field_constraints.size() > 0) {
+                // todo
+            }
+        }
+    }
+    else if (function_type.is_concrete()) {
+        // do nothing
+    }
+    else if (function_type.is_array()) {
+        if (argument_type.is_array()) {
+            for (size_t i = 0; i < function_type.as_nominal_type().parameters.size(); i++) {
+                instantiate_function_with_type(specialization, type_parameters, function_type.as_nominal_type().parameters[i], argument_type.as_nominal_type().parameters[i]);
+            }
+        }
+        else {
+            assert(argument_type.is_type_variable() || argument_type.is_final_type_variable());
+        }
+    }
+    else if (function_type.is_nominal_type()) {
+        assert(false);
+    }
+}
 
 Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, ast::CallNode& node) {
     auto& identifier = node.identifier->value;
@@ -368,22 +388,114 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
     }
       
     // Check binding exists
-    semantic::Binding* binding = semantic::get_binding(context, identifier);
-    if (!binding) {
-        context.errors.push_back(errors::undefined_function(node, get_default_types(context, ast::get_types(node.args)), context.current_module));
+    std::optional<semantic::Binding> binding = semantic::get_binding(context, identifier);
+    if (!binding.has_value()) {
+        std::cout << context.scopes.functions_and_types_scopes.scopes.size() << "\n";
+        for (auto scope = context.scopes.functions_and_types_scopes.scopes.rbegin(); scope != context.scopes.functions_and_types_scopes.scopes.rend(); scope++) {
+            for (auto it: *scope) {
+                std::cout << "   " << it.first << "\n";
+            }
+        }
+        std::cout << "Undefined function \"" << identifier << "\" in module " << context.current_module << "\n";
+        assert(false);
         return Error {};
     }
-
-    assert(is_function(*binding));
     
     if (!node.type.is_concrete()) {
         node.type = semantic::new_type_variable(context);
     }
 
-    if (binding->type == semantic::FunctionBinding) {
-        // do nothing
+    if (binding.value().type == semantic::InterfaceBinding
+    ||  binding.value().type == semantic::FunctionBinding) {
+        // Create vector for the prototype of the call
+        std::vector<ast::Type> prototype = ast::get_types(node.args);
+        prototype.push_back(node.type);
+
+        // Create vector for the prototype of the interface
+        std::vector<ast::Type> interface_prototype;
+        std::vector<ast::TypeParameter> type_parameters;
+        if (binding.value().type == semantic::InterfaceBinding) {
+            interface_prototype = semantic::get_interface(*binding)->get_prototype();
+            type_parameters = semantic::get_interface(*binding)->type_parameters;
+        }
+        else if (binding.value().type == semantic::FunctionBinding) {
+            auto function = semantic::get_function(*binding);
+            if (function->state == ast::FunctionNotAnalyzed) {
+                if (function->module_path == context.current_module) {
+                    auto result = semantic::analyze(context, *function);
+                    if (result.is_error()) return result;
+                }
+                else {
+                    return Ok {};
+                }
+            }
+
+            if (function->state == ast::FunctionBeingAnalyzed) {
+                return Ok {};
+            }
+
+            for (auto arg: function->args) {
+                interface_prototype.push_back(arg->type);
+            }
+
+            if (function->is_extern_and_variadic) {
+                for (int i = 0; i < node.args.size() - function->args.size(); i++) {
+                    interface_prototype.push_back(ast::Type(ast::NoType{}));
+                }
+            }
+
+            interface_prototype.push_back(function->return_type);
+            type_parameters = semantic::get_function(*binding)->type_parameters;
+        }
+        else {
+            assert(false);
+        }
+
+        // Instantiate function specialization
+        ast::FunctionSpecialization specialization;
+        for (size_t i = 0; i < interface_prototype.size(); i++) {
+            if (interface_prototype[i].is_no_type()) {
+                continue;
+            }
+
+            instantiate_function_with_type(specialization, type_parameters, interface_prototype[i], prototype[i]);
+        }
+        for (size_t i = 0; i < node.args.size(); i++) {
+              specialization.args.push_back(ast::get_concrete_type(interface_prototype[i], specialization.type_bindings));
+        }
+        specialization.return_type = ast::get_concrete_type(interface_prototype[interface_prototype.size() - 1], specialization.type_bindings);
+
+        // Infer stuff
+        std::unordered_map<ast::Type, Set<ast::Type>> sets;
+        for (size_t i = 0; i < node.args.size(); i++) {
+            if (interface_prototype[i].is_no_type()) {
+                continue;
+            }
+
+            semantic::add_constraint(context, Set<ast::Type>({specialization.args[i], prototype[i]}));
+        }
+        semantic::add_constraint(context, Set<ast::Type>({specialization.return_type, prototype[prototype.size() - 1]}));
+
+        // Add interface constraints
+        for (auto it: specialization.type_bindings) {
+            if (!it.second.is_type_variable()) continue;
+
+            if (binding.value().type == InterfaceBinding
+            && semantic::get_interface(*binding)->type_parameters.size() > 0
+            && semantic::get_interface(*binding)->type_parameters[0].type.as_final_type_variable().id == it.first) {
+                semantic::add_interface_constraint(context, it.second, ast::InterfaceType(node.identifier->value));
+            }
+            else if (binding.value().type == FunctionBinding) {
+                for (auto interface: semantic::get_function(*binding)->get_type_parameter(ast::Type(ast::FinalTypeVariable(it.first))).value()->interface.elements) {
+                    semantic::add_interface_constraint(context, it.second, interface);
+                }
+            }
+        }
+
+        return Ok {};
     }
     else {
+        std::cout << "Error: Binding is not a function or interface\n";
         assert(false);
     }
 
@@ -401,8 +513,8 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
     }
       
     // Check binding exists
-    semantic::Binding* binding = semantic::get_binding(context, identifier);
-    if (!binding) {
+    std::optional<semantic::Binding> binding = semantic::get_binding(context, identifier);
+    if (!binding.has_value()) {
         std::cout << "Error: Undefined type"; 
         assert(false);
         return Error {};
@@ -443,9 +555,9 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
 
     if (!ast::get_type(node.accessed).is_type_variable()) {
         // Get binding
-        semantic::Binding* binding = semantic::get_binding(context, ast::get_type(node.accessed).as_nominal_type().name);
+        std::optional<semantic::Binding> binding = semantic::get_binding(context, ast::get_type(node.accessed).as_nominal_type().name);
         assert(binding);
-        assert(binding->type == semantic::TypeBinding);
+        assert(binding.value().type == semantic::TypeBinding);
 
         ast::TypeNode* type_definition = semantic::get_type_definition(*binding);
 
@@ -467,7 +579,7 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
             if (i != node.fields_accessed.size() - 1) {
                 binding = semantic::get_binding(context, node.fields_accessed[i]->type.as_nominal_type().name);
                 assert(binding);
-                assert(binding->type == semantic::TypeBinding);
+                assert(binding.value().type == semantic::TypeBinding);
 
                 type_definition = semantic::get_type_definition(*binding);
             }
@@ -547,7 +659,8 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
         }
         else {
             node.type = semantic::new_type_variable(context);
-            semantic::add_interface_constraint(context, ast::get_type(node.expression),  ast::Interface("pointer"));
+            semantic::add_interface_constraint(context, ast::get_type(node.expression),  ast::InterfaceType("pointer"));
+            semantic::add_parameter_constraint(context, ast::get_type(node.expression), node.type);   
         }
     }
 
