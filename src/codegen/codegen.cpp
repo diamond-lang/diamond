@@ -51,7 +51,7 @@ void codegen::print_assembly(ast::Ast& ast, std::string program_name) {
 
     // Generate assembly
     llvm::legacy::PassManager pass;
-    
+
     auto& llvm_outs = llvm::outs();
     if (TargetMachine->addPassesToEmitFile(pass, llvm_outs, nullptr, llvm::CGFT_AssemblyFile)) {
         llvm::errs() << "TargetMachine can't emit a file of this type";
@@ -178,7 +178,7 @@ static void link(std::string executable_name, std::string object_file_name, std:
         bool result = lld::elf::link(args_as_c_strings, output_stream, errors_stream, false, false);
         if (result == false) {
             std::cout << errors;
-        } 
+        }
     }
 }
 #elif __APPLE__
@@ -205,7 +205,7 @@ static void link(std::string executable_name, std::string object_file_name, std:
         // Execute command
         system(build_command.c_str());
     }
-    
+
     // Link using lld
     else {
         // Get macos version, modified from https://stackoverflow.com/a/69176800 with https://creativecommons.org/licenses/by-sa/4.0/ license.
@@ -226,7 +226,7 @@ static void link(std::string executable_name, std::string object_file_name, std:
 
         if (major >= 20) {
             major -= 9;
-        } 
+        }
         else {
             major -= 4;
         }
@@ -246,12 +246,36 @@ static void link(std::string executable_name, std::string object_file_name, std:
                 perror("popen() failed.");
                 exit(EXIT_FAILURE);
             }
-            
+
             char c;
             libclang_rtx_location = "";
             while (fread(&c, sizeof c, 1, fpipe)) {
                 if (c == '\n') break;
                 libclang_rtx_location += c;
+            }
+        }
+
+        // Get macos sdk path
+        std::string macos_sdk_location = "";
+        if (std::filesystem::exists("/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk")) {
+            macos_sdk_location = "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk";
+        }
+        else if (std::filesystem::exists("/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk")) {
+            macos_sdk_location = "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk";
+        }
+        else {
+            const char *command = "xcrun --show-sdk-path";
+            FILE *fpipe =  (FILE*)popen(command, "r");
+            if (!fpipe) {
+                perror("popen() failed.");
+                exit(EXIT_FAILURE);
+            }
+
+            char c;
+            macos_sdk_location = "";
+            while (fread(&c, sizeof c, 1, fpipe)) {
+                if (c == '\n') break;
+                macos_sdk_location += c;
             }
         }
 
@@ -268,7 +292,7 @@ static void link(std::string executable_name, std::string object_file_name, std:
             std::to_string(major) + ".0.0",
             std::to_string(major) + ".0",
             "-syslibroot",
-            "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk",
+            macos_sdk_location,
             "-L/usr/local/lib",
             "-lSystem",
             libclang_rtx_location
@@ -286,7 +310,7 @@ static void link(std::string executable_name, std::string object_file_name, std:
         bool result = lld::macho::link(args_as_c_strings, output_stream, errors_stream, false, false);
         if (result == false) {
             std::cout << errors;
-        } 
+        }
     }
 }
 #endif
@@ -306,7 +330,7 @@ static void link(std::string executable_name, std::string object_file_name, std:
         "-nologo",
         name.c_str()
     };
-    
+
     if (link_directives.size() > 0) {
         assert(false);
     }
@@ -827,7 +851,7 @@ llvm::Value* codegen::Context::get_field_pointer(ast::FieldAccessNode& node) {
         type_definition = ast::get_concrete_type((ast::Node*) node.fields_accessed[i], this->type_bindings).as_nominal_type().type_definition;
         struct_type = this->get_struct_type(type_definition);
     }
-    
+
     // Get pointer to accessed fieldd
     size_t last_element = node.fields_accessed.size() - 1;
     llvm::Value* ptr = this->builder->CreateStructGEP(struct_type, struct_ptr, type_definition->get_index_of_field(node.fields_accessed[last_element]->value));
@@ -844,7 +868,7 @@ llvm::Value* codegen::Context::get_index_access_pointer(ast::CallNode& node) {
         if (((llvm::AllocaInst*) array_ptr)->getAllocatedType()->isPointerTy()) {
             array_ptr = this->builder->CreateLoad(array_type->getPointerTo(), array_ptr);
         }
-        
+
         return this->builder->CreateGEP(array_type, array_ptr, {llvm::ConstantInt::get(*(this->context), llvm::APInt(64, 0, true)), index}, "", true);
     }
     else {
@@ -856,7 +880,7 @@ llvm::Value* codegen::Context::get_index_access_pointer(ast::CallNode& node) {
                 wrapper_ptr
             );
         }
-        
+
         // Get array pointer
         llvm::Value* array_ptr = this->builder->CreateStructGEP(wrapper_type, wrapper_ptr, 1);
         array_ptr = this->builder->CreateLoad(array_ptr->getType(), array_ptr);
@@ -888,11 +912,11 @@ llvm::AllocaInst* codegen::Context::copy_expression_to_memory(llvm::Value* point
     if (this->has_struct_type(expression)) {
         // Store fields
         this->store_fields(expression, pointer);
-  
+
         // Return
         return nullptr;
     }
-    else if (this->has_array_type(expression)) {            
+    else if (this->has_array_type(expression)) {
         // Store array elements
         this->store_array_elements(expression, pointer);
 
@@ -1053,7 +1077,7 @@ void codegen::Context::codegen_types_prototypes(std::vector<ast::TypeNode*> type
 void codegen::Context::codegen_types_bodies(std::vector<ast::TypeNode*> types) {
     for (auto type: types) {
         llvm::StructType* struct_type = this->get_struct_type(type);
-        
+
         std::vector<llvm::Type*> fields;
         for (auto field: type->fields) {
             fields.push_back(as_llvm_type(field->type));
@@ -1070,7 +1094,7 @@ void codegen::Context::codegen_function_prototypes(std::vector<ast::FunctionNode
         if (function->state != ast::FunctionCompletelyTyped) {
             for (auto& specialization: function->specializations) {
                 this->type_bindings = specialization.type_bindings;
-                
+
                 this->codegen_function_prototypes(
                     function->module_path,
                     function->identifier->value,
@@ -1109,7 +1133,7 @@ void codegen::Context::codegen_function_prototypes(std::filesystem::path module_
     llvm::Function* f = llvm::Function::Create(function_type, llvm::Function::ExternalLinkage, name, this->module);
 
     size_t offset = 0;
-    
+
     if (return_type.is_struct_type() || return_type.is_array()) {
         f->getArg(0)->setName("$result");
         offset += 1;
@@ -1118,7 +1142,7 @@ void codegen::Context::codegen_function_prototypes(std::filesystem::path module_
     // Name arguments
     for (size_t i = 0; i < args.size(); i++) {
         std::string name = args[i]->identifier->value;
-        
+
         if (args_types[i].is_collection() && !args[i]->is_mutable) {
             auto new_args = this->get_collection_as_argument(args_types[i]);
 
@@ -1188,7 +1212,7 @@ void codegen::Context::codegen_function_bodies(std::filesystem::path module_path
     this->add_scope();
 
     size_t offset = 0;
-    
+
     if (return_type.is_collection()) {
         // Create allocation for argument
         auto allocation = this->create_allocation("$result", f->getArg(0)->getType());
@@ -1227,7 +1251,7 @@ void codegen::Context::codegen_function_bodies(std::filesystem::path module_path
                         this->builder->CreateBitCast(
                             allocation,
                             new_args.struct_type.value()->getPointerTo()
-                        ), 
+                        ),
                         j
                     );
                     this->builder->CreateStore(f->getArg(i + offset + j), field_ptr);
@@ -1351,7 +1375,7 @@ llvm::Value* codegen::Context::codegen(ast::AssignmentNode& node) {
         this->delete_binding(pointer, ast::get_concrete_type(node.assignable, this->type_bindings));
     }
     else if (node.assignable->index() == ast::Call) {
-        this->delete_binding(pointer, ast::get_concrete_type(node.assignable, this->type_bindings));   
+        this->delete_binding(pointer, ast::get_concrete_type(node.assignable, this->type_bindings));
     }
     else {
         assert(false);
@@ -1372,7 +1396,7 @@ llvm::Value* codegen::Context::codegen(ast::ReturnNode& node) {
                     this->get_binding("$result").pointer
                 )
             );
-            
+
             // Return
             this->builder->CreateRetVoid();
         }
@@ -1680,10 +1704,10 @@ llvm::Value* codegen::Context::codegen_size_function(std::variant<llvm::Value*, 
             );
         }
         llvm::StructType* array_type = llvm::StructType::getTypeByName(*this->context, "arrayWrapper");
-        
+
         // Get size
         llvm::Value* size_ptr = this->builder->CreateStructGEP(array_type, array_ptr, 0);
-        
+
         // Load size
         return this->builder->CreateLoad(
             this->as_llvm_type(ast::Type("int64")),
@@ -1762,7 +1786,7 @@ llvm::Value* codegen::Context::codegen_call(ast::CallNode& node, std::optional<l
     ast::FunctionNode* function = this->get_function(&node);
 
     // Codegen args
-    std::vector<llvm::Value*> args; 
+    std::vector<llvm::Value*> args;
     if (node.identifier->value != "subscript"
     && node.identifier->value != "size"
     && node.identifier->value != "print"
@@ -1773,7 +1797,7 @@ llvm::Value* codegen::Context::codegen_call(ast::CallNode& node, std::optional<l
             args.insert(args.begin(), allocation.value());
         }
     }
-  
+
     // Intrinsics
     if (node.args.size() == 2) {
         if (node.identifier->value == "add") {
@@ -1879,7 +1903,7 @@ llvm::Value* codegen::Context::codegen_call(ast::CallNode& node, std::optional<l
 
         // Codegen args
         args = this->codegen_args(function, node.args);
-        
+
         // Make call
         return this->builder->CreateCall(llvm_function, args, "calltmp");
     }
@@ -1951,7 +1975,7 @@ llvm::Value* codegen::Context::codegen(ast::IntegerNode& node) {
     else if (ast::get_concrete_type((ast::Node*) &node, this->type_bindings) == ast::Type("int8")) {
         return llvm::ConstantInt::get(*(this->context), llvm::APInt(8, node.value, true));
     }
-    
+
     assert(false);
     return nullptr;
 }

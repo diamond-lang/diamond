@@ -39,6 +39,10 @@ The only dependencies that must be installed are Clang and Python.
 
 To install Clang on Windows you must install Visual Studio, follow this [steps](https://learn.microsoft.com/en-us/cpp/build/vscpp-step-0-installation?view=msvc-170), and when choosing components also select Clang.
 
+### macOs
+
+Also, on macOS at least the prebuilt version of LLVM needs [zstd](https://formulae.brew.sh/formula/zstd) to be installed.
+
 ## Building
 
 To get LLVM you can run `get_llvm.py`. This script download LLVM prebuilt binaries, extract them and save them in `deps` inside `llvm`.

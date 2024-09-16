@@ -68,9 +68,9 @@ def need_to_recompile():
         if not os.path.exists(os.path.join('cache', file.split('.')[0] + get_object_file_extension())):
             return True
 
-    # Check if source file was edited after creation of diamond executable
-    if os.path.getmtime(os.path.join('src', file)) > os.path.getmtime(get_name()):
-        return True
+        # Check if source file was edited after creation of diamond executable
+        if os.path.getmtime(os.path.join('src', file)) > os.path.getmtime(get_name()):
+            return True
 
 # Build
 # ----- 
