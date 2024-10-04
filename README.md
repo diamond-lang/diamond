@@ -1,8 +1,11 @@
-# diamond
+<p align="center">
+    <img src="./images/diamond-light.png#gh-light-mode-only" width="50%" alt="Diamond logo"/>
+    <img src="./images/diamond-dark.png#gh-dark-mode-only" width="50%" alt="Diamond logo"/>
+    <br/>
+    A programming language to make programming easier.
+</p>
 
 [![Build and test](https://github.com/diamond-lang/diamond/actions/workflows/build-and-test.yaml/badge.svg)](https://github.com/diamond-lang/diamond/actions/workflows/build-and-test.yaml)
-
-A programming language that aims to make programming easier.
 
 ## Usage
 ```
