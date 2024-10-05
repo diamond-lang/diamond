@@ -1,7 +1,7 @@
 type Point
-    x: boxed[int64]
-    y: boxed[int64]
-    z: boxed[int64]
+    x: Boxed[Int64]
+    y: Boxed[Int64]
+    z: Boxed[Int64]
 
 point = new Point{x: new 100, y: new 200, z: new 300}
 print(*(*point).x)

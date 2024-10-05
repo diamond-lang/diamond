@@ -1,13 +1,13 @@
 -- Structs in generic functions
 
 type Point
-    x: float64
-    y: float64
+    x: Float64
+    y: Float64
 
 type Point3
-    x: float64
-    y: float64
-    z: float64
+    x: Float64
+    y: Float64
+    z: Float64
 
 function generic1(p)
     print(p.x)

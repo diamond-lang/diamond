@@ -1,8 +1,8 @@
 -- Field assignment
 
 type Point
-    x: float64
-    y: float64
+    x: Float64
+    y: Float64
 
 a = Point{x: 20, y: 30}
 a.x = 40

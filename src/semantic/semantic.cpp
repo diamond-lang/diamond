@@ -149,7 +149,7 @@ Result<Ok, Error> semantic::analyze_block_or_expression(semantic::Context& conte
         for (size_t i = 0; i < context.type_inference.type_constraints.size(); i++) {
             if (context.type_inference.type_constraints[i].contains(context.current_function.value()->return_type)) {
                 if (context.type_inference.type_constraints[i].size() == 1) {
-                    context.type_inference.type_constraints[i].insert(ast::Type("void"));
+                    context.type_inference.type_constraints[i].insert(ast::Type("None"));
                 }
             }
         }
@@ -173,9 +173,9 @@ Result<Ok, Error> semantic::analyze_block_or_expression(semantic::Context& conte
             ast::Type representative = representatives[0];
             for (size_t i = 1; i < representatives.size(); i++) {
                 if (representative.is_nominal_type() && representatives[i].is_nominal_type()) {
-                    if ((representative.as_nominal_type().name == "boxed" || representatives[i].as_nominal_type().name == "boxed")
-                    &&  (representative.as_nominal_type().name == "pointer" || representatives[i].as_nominal_type().name == "pointer")) {
-                        representative = representative.as_nominal_type().name == "boxed" ?  representative : representatives[i];
+                    if ((representative.as_nominal_type().name == "Boxed" || representatives[i].as_nominal_type().name == "Boxed")
+                    &&  (representative.as_nominal_type().name == "Pointer" || representatives[i].as_nominal_type().name == "Pointer")) {
+                        representative = representative.as_nominal_type().name == "Boxed" ?  representative : representatives[i];
                     }
                     else if (representative.is_array() || representatives[i].is_array()) {
                         if (representative.array_size_known() && representatives[i].array_size_known()) {
@@ -396,13 +396,13 @@ Result<Ok, Error> semantic::analyze(semantic::Context& context, ast::FunctionNod
 Result<Ok, Error> semantic::analyze(semantic::Context& context, ast::Type& type) {
     if      (type.is_type_variable()) return Ok {};
     else if (type.is_final_type_variable()) return Ok {};
-    else if (type == ast::Type("int64")) return Ok {};
-    else if (type == ast::Type("int32")) return Ok {};
-    else if (type == ast::Type("int8")) return Ok {};
-    else if (type == ast::Type("float64")) return Ok {};
-    else if (type == ast::Type("bool")) return Ok {};
-    else if (type == ast::Type("void")) return Ok {};
-    else if (type == ast::Type("string")) return Ok {};
+    else if (type == ast::Type("Int64")) return Ok {};
+    else if (type == ast::Type("Int32")) return Ok {};
+    else if (type == ast::Type("Int8")) return Ok {};
+    else if (type == ast::Type("Float64")) return Ok {};
+    else if (type == ast::Type("Bool")) return Ok {};
+    else if (type == ast::Type("None")) return Ok {};
+    else if (type == ast::Type("String")) return Ok {};
     else if (type.is_pointer()) return semantic::analyze(context, type.as_nominal_type().parameters[0]);
     else if (type.is_boxed()) return semantic::analyze(context, type.as_nominal_type().parameters[0]);
     else if (type.is_array()) return semantic::analyze(context, type.as_nominal_type().parameters[0]);
@@ -462,7 +462,7 @@ bool semantic::are_types_compatible(ast::FunctionNode& function, semantic::Funct
             }
             return true;
         }
-        if (function_type.as_nominal_type().name == "array" && argument_type.is_array()) {
+        if (function_type.as_nominal_type().name == "Array" && argument_type.is_array()) {
             for (size_t i = 0; i < function_type.as_nominal_type().parameters.size(); i++) {
                 if (!semantic::are_types_compatible(function, function_and_types_scopes, function_type.as_nominal_type().parameters[i], argument_type.as_nominal_type().parameters[i])) {
                     return false;
@@ -677,7 +677,7 @@ Result<ast::Type, Error> semantic::get_function_type(Context& context, ast::Node
             auto& struct_type = call_args[0];
             for (auto field: struct_type.as_nominal_type().type_definition->fields) {
                 auto print_function = semantic::get_binding(context, "printWithoutLineEnding");
-                (void) semantic::get_function_type(context, print_function.value().value, {false}, {field->type}, ast::Type("void"));
+                (void) semantic::get_function_type(context, print_function.value().value, {false}, {field->type}, ast::Type("None"));
             }
         }
 

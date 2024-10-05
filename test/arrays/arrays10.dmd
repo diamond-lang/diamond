@@ -1,6 +1,6 @@
 -- size
 
-function printArray[t](array: array[t]): void
+function printArray[t](array: Array[t]): None
     i = 1
     print("[]:")
     

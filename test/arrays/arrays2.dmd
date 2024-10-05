@@ -1,5 +1,5 @@
 -- Arrays with type annotations
-a = [1, 2, 3] : array3[int64]
+a = [1, 2, 3] : Array3[Int64]
 
 print(a[1])
 print(a[2])

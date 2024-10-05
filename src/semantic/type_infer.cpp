@@ -41,7 +41,7 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
             case ast::Call: break;
             case ast::Return: {
                 if (result.is_ok()) {
-                    auto return_type = std::get<ast::ReturnNode>(*node.statements[i]).expression.has_value() ? ast::get_type(std::get<ast::ReturnNode>(*node.statements[i]).expression.value()) : ast::Type("void");
+                    auto return_type = std::get<ast::ReturnNode>(*node.statements[i]).expression.has_value() ? ast::get_type(std::get<ast::ReturnNode>(*node.statements[i]).expression.value()) : ast::Type("None");
                     node.type = return_type;
                 }
                 break;
@@ -65,7 +65,7 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
             case ast::While: break;
             case ast::Break:
             case ast::Continue: {
-                node.type = ast::Type("void");
+                node.type = ast::Type("None");
                 break;
             }
             default: assert(false);
@@ -185,7 +185,7 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
     }
     else {
         assert(context.current_function.has_value());
-        semantic::add_constraint(context, Set<ast::Type>({context.current_function.value()->return_type, ast::Type("void")}));
+        semantic::add_constraint(context, Set<ast::Type>({context.current_function.value()->return_type, ast::Type("None")}));
     }
 
     return Ok {};
@@ -292,17 +292,17 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
 }
 
 Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, ast::BooleanNode& node) {
-    node.type = ast::Type("bool");
+    node.type = ast::Type("Bool");
     return Ok {};
 }
 
 Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, ast::StringNode& node) {
-    node.type = ast::Type("string");
+    node.type = ast::Type("String");
     return Ok {};
 }
 
 Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, ast::InterpolatedStringNode& node) {
-    node.type = ast::Type("string");
+    node.type = ast::Type("String");
     for (auto expression: node.expressions) {
         auto result = semantic::type_infer_and_analyze(context, expression);
         if (result.is_error()) return result;
@@ -327,13 +327,13 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
     }
 
     if (node.type.is_no_type()) {
-        node.type = ast::Type(ast::NominalType("array" + std::to_string(node.elements.size())));
+        node.type = ast::Type(ast::NominalType("Array" + std::to_string(node.elements.size())));
         if (node.elements.size() > 0) {
             node.type.as_nominal_type().parameters.push_back(ast::get_type(node.elements[0]));
         }
     }
-    else if (node.type.is_array() && node.type.as_nominal_type().name == "array") {
-        node.type = ast::Type(ast::NominalType("array" + std::to_string(node.elements.size())));
+    else if (node.type.is_array() && node.type.as_nominal_type().name == "Array") {
+        node.type = ast::Type(ast::NominalType("Array" + std::to_string(node.elements.size())));
         if (node.elements.size() > 0) {
             node.type.as_nominal_type().parameters.push_back(ast::get_type(node.elements[0]));
         }
@@ -630,7 +630,7 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
     }
 
     if (node.type.is_no_type()) {
-        node.type = ast::Type(ast::NominalType("pointer"));
+        node.type = ast::Type(ast::NominalType("Pointer"));
         node.type.as_nominal_type().parameters.push_back(ast::get_type(node.expression));
     }
     else if (!node.type.is_type_variable() && !node.type.is_pointer()) {
@@ -680,10 +680,10 @@ Result<Ok, Error> semantic::type_infer_and_analyze(semantic::Context& context, a
     }
 
     if (node.type.is_no_type()) {
-        node.type = ast::Type(ast::NominalType("boxed"));
+        node.type = ast::Type(ast::NominalType("Boxed"));
         node.type.as_nominal_type().parameters.push_back(ast::get_type(node.expression));
     }
-    else if (!node.type.is_type_variable() && !(node.type.as_nominal_type().name != "boxed")) {
+    else if (!node.type.is_type_variable() && !(node.type.as_nominal_type().name != "Boxed")) {
         context.errors.push_back(Error("Error: Type mismatch between type annotation and expression"));
         return Error {};
     }

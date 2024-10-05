@@ -525,13 +525,13 @@ std::string codegen::Context::get_mangled_function_name(std::filesystem::path mo
 
 // Types
 llvm::Type* codegen::Context::as_llvm_type(ast::Type type) {
-    if      (type == ast::Type("float64")) return llvm::Type::getDoubleTy(*(this->context));
-    else if (type == ast::Type("int64"))   return llvm::Type::getInt64Ty(*(this->context));
-    else if (type == ast::Type("int32"))   return llvm::Type::getInt32Ty(*(this->context));
-    else if (type == ast::Type("int8"))    return llvm::Type::getInt8Ty(*(this->context));
-    else if (type == ast::Type("bool"))    return llvm::Type::getInt1Ty(*(this->context));
-    else if (type == ast::Type("string"))  return llvm::Type::getInt8PtrTy(*(this->context));
-    else if (type == ast::Type("void"))    return llvm::Type::getVoidTy(*(this->context));
+    if      (type == ast::Type("Float64")) return llvm::Type::getDoubleTy(*(this->context));
+    else if (type == ast::Type("Int64"))   return llvm::Type::getInt64Ty(*(this->context));
+    else if (type == ast::Type("Int32"))   return llvm::Type::getInt32Ty(*(this->context));
+    else if (type == ast::Type("Int8"))    return llvm::Type::getInt8Ty(*(this->context));
+    else if (type == ast::Type("Bool"))    return llvm::Type::getInt1Ty(*(this->context));
+    else if (type == ast::Type("String"))  return llvm::Type::getInt8PtrTy(*(this->context));
+    else if (type == ast::Type("None"))    return llvm::Type::getVoidTy(*(this->context));
     else if (type.is_pointer())            return this->as_llvm_type(ast::get_concrete_type(type.as_nominal_type().parameters[0], this->type_bindings))->getPointerTo();
     else if (type.is_boxed())              return this->as_llvm_type(ast::get_concrete_type(type.as_nominal_type().parameters[0], this->type_bindings))->getPointerTo();
     else if (type.is_array())              {
@@ -598,27 +598,27 @@ codegen::CollectionAsArguments codegen::Context::get_struct_type_as_argument(llv
             size_t bytes = 0;
             while (bytes < 8) {
                 if (fields[i]->isDoubleTy()) {
-                    type = ast::Type("float64");
+                    type = ast::Type("Float64");
                     bytes += 8;
                 }
                 else if (fields[i]->isIntegerTy(64)) {
-                    type = ast::Type("int64");
+                    type = ast::Type("Int64");
                     bytes += 8;
                 }
                 else if (fields[i]->isIntegerTy(32)) {
-                    type = ast::Type("int64");
+                    type = ast::Type("Int64");
                     bytes += 4;
                 }
                 else if (fields[i]->isIntegerTy(8)) {
-                    type = ast::Type("int64");
+                    type = ast::Type("Int64");
                     bytes += 4;
                 }
                 else if (fields[i]->isIntegerTy(1)) {
-                    type = ast::Type("int64");
+                    type = ast::Type("Int64");
                     bytes += 1;
                 }
                 else if (fields[i]->isPointerTy()) {
-                    type = ast::Type("int64");
+                    type = ast::Type("Int64");
                     bytes += 8;
                 }
                 else {
@@ -1011,7 +1011,7 @@ void codegen::Context::codegen(ast::Ast& ast) {
     // Codegen array wrapper type
     llvm::StructType* array_type = llvm::StructType::create(*this->context, "arrayWrapper");
     std::vector<llvm::Type*> fields;
-    fields.push_back(this->as_llvm_type(ast::Type("int64")));
+    fields.push_back(this->as_llvm_type(ast::Type("Int64")));
     fields.push_back(llvm::Type::getVoidTy(*(this->context))->getPointerTo());
     array_type->setBody(fields);
 
@@ -1275,7 +1275,7 @@ void codegen::Context::codegen_function_bodies(std::filesystem::path module_path
     }
 
     // Codegen body
-    if (ast::is_expression(function_body) && return_type != ast::Type("void")) {
+    if (ast::is_expression(function_body) && return_type != ast::Type("None")) {
         llvm::Value* result = this->codegen(function_body);
         if (result) {
             this->builder->CreateRet(result);
@@ -1283,7 +1283,7 @@ void codegen::Context::codegen_function_bodies(std::filesystem::path module_path
     }
     else {
         this->codegen(function_body);
-        if (return_type == ast::Type("void")) {
+        if (return_type == ast::Type("None")) {
             this->builder->CreateRetVoid();
         }
     }
@@ -1440,7 +1440,7 @@ llvm::Value* codegen::Context::codegen(ast::ContinueNode& node) {
 }
 
 llvm::Value* codegen::Context::codegen(ast::IfElseNode& node) {
-    if (ast::is_expression((ast::Node*) &node) && ast::get_type((ast::Node*) &node) == ast::Type("void")) {
+    if (ast::is_expression((ast::Node*) &node) && ast::get_type((ast::Node*) &node) == ast::Type("None")) {
         llvm::Function *current_function = this->builder->GetInsertBlock()->getParent();
         llvm::BasicBlock *block = llvm::BasicBlock::Create(*(this->context), "then", current_function);
         llvm::BasicBlock *else_block = llvm::BasicBlock::Create(*(this->context), "else");
@@ -1710,7 +1710,7 @@ llvm::Value* codegen::Context::codegen_size_function(std::variant<llvm::Value*, 
 
         // Load size
         return this->builder->CreateLoad(
-            this->as_llvm_type(ast::Type("int64")),
+            this->as_llvm_type(ast::Type("Int64")),
             size_ptr
         );
     }
@@ -1747,7 +1747,7 @@ llvm::Value* codegen::Context::codegen_print_struct_function(ast::Type arg_type,
             );
         }
         else {
-            std::string print_function_name = this->get_mangled_function_name(utilities::get_folder_of_executable() + "/std/std" + ".dmd", "printWithoutLineEnding", {struct_type.as_nominal_type().type_definition->fields[i]->type}, ast::Type("void"), false);
+            std::string print_function_name = this->get_mangled_function_name(utilities::get_folder_of_executable() + "/std/std" + ".dmd", "printWithoutLineEnding", {struct_type.as_nominal_type().type_definition->fields[i]->type}, ast::Type("None"), false);
             llvm::Function* llvm_function = this->module->getFunction(print_function_name);
             assert(llvm_function);
 
@@ -1964,15 +1964,15 @@ llvm::Value* codegen::Context::codegen(ast::FloatNode& node) {
 }
 
 llvm::Value* codegen::Context::codegen(ast::IntegerNode& node) {
-    if (ast::get_concrete_type((ast::Node*) &node, this->type_bindings) == ast::Type("float64"))
+    if (ast::get_concrete_type((ast::Node*) &node, this->type_bindings) == ast::Type("Float64"))
         return llvm::ConstantFP::get(*(this->context), llvm::APFloat((double)node.value));
-    else if (ast::get_concrete_type((ast::Node*) &node, this->type_bindings) == ast::Type("int64")) {
+    else if (ast::get_concrete_type((ast::Node*) &node, this->type_bindings) == ast::Type("Int64")) {
         return llvm::ConstantInt::get(*(this->context), llvm::APInt(64, node.value, true));
     }
-    else if (ast::get_concrete_type((ast::Node*) &node, this->type_bindings) == ast::Type("int32")) {
+    else if (ast::get_concrete_type((ast::Node*) &node, this->type_bindings) == ast::Type("Int32")) {
         return llvm::ConstantInt::get(*(this->context), llvm::APInt(32, node.value, true));
     }
-    else if (ast::get_concrete_type((ast::Node*) &node, this->type_bindings) == ast::Type("int8")) {
+    else if (ast::get_concrete_type((ast::Node*) &node, this->type_bindings) == ast::Type("Int8")) {
         return llvm::ConstantInt::get(*(this->context), llvm::APInt(8, node.value, true));
     }
 

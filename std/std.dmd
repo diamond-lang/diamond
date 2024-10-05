@@ -1,10 +1,10 @@
-interface equal[t](left: t, right: t): bool
-interface notEqual[t](left: t, right: t): bool
+interface equal[t](left: t, right: t): Bool
+interface notEqual[t](left: t, right: t): Bool
 
-interface less[t](left: t, right: t): bool
-interface greater[t](left: t, right: t): bool
-interface lessEqual[t](left: t, right: t): bool
-interface greaterEqual[t](left: t, right: t): bool
+interface less[t](left: t, right: t): Bool
+interface greater[t](left: t, right: t): Bool
+interface lessEqual[t](left: t, right: t): Bool
+interface greaterEqual[t](left: t, right: t): Bool
 
 interface add[t](left: t, right: t): t
 interface subtract[t](left: t, right: t): t
@@ -14,105 +14,103 @@ interface multiply[t](left: t, right: t): t
 interface divide[t](left: t, right: t): t
 interface modulo[t](left: t, right: t): t
 
-builtin equal(left: float64, right: float64): bool
-builtin equal(left: int64, right: int64): bool
-builtin equal(left: int32, right: int32): bool
-builtin equal(left: int8, right: int8): bool
-builtin equal(left: bool, right: bool): bool
+builtin equal(left: Float64, right: Float64): Bool
+builtin equal(left: Int64, right: Int64): Bool
+builtin equal(left: Int32, right: Int32): Bool
+builtin equal(left: Int8, right: Int8): Bool
+builtin equal(left: Bool, right: Bool): Bool
 
-builtin notEqual(left: float64, right: float64): bool
-builtin notEqual(left: int64, right: int64): bool
-builtin notEqual(left: int32, right: int32): bool
-builtin notEqual(left: int8, right: int8): bool
+builtin notEqual(left: Float64, right: Float64): Bool
+builtin notEqual(left: Int64, right: Int64): Bool
+builtin notEqual(left: Int32, right: Int32): Bool
+builtin notEqual(left: Int8, right: Int8): Bool
 
-builtin less(left: float64, right: float64): bool
-builtin less(left: int64, right: int64): bool
-builtin less(left: int32, right: int32): bool
-builtin less(left: int8, right: int8): bool
+builtin less(left: Float64, right: Float64): Bool
+builtin less(left: Int64, right: Int64): Bool
+builtin less(left: Int32, right: Int32): Bool
+builtin less(left: Int8, right: Int8): Bool
 
-builtin lessEqual(left: float64, right: float64): bool
-builtin lessEqual(left: int64, right: int64): bool
-builtin lessEqual(left: int32, right: int32): bool
-builtin lessEqual(left: int8, right: int8): bool
+builtin lessEqual(left: Float64, right: Float64): Bool
+builtin lessEqual(left: Int64, right: Int64): Bool
+builtin lessEqual(left: Int32, right: Int32): Bool
+builtin lessEqual(left: Int8, right: Int8): Bool
 
-builtin greater(left: float64, right: float64): bool
-builtin greater(left: int64, right: int64): bool
-builtin greater(left: int32, right: int32): bool
-builtin greater(left: int8, right: int8): bool
+builtin greater(left: Float64, right: Float64): Bool
+builtin greater(left: Int64, right: Int64): Bool
+builtin greater(left: Int32, right: Int32): Bool
+builtin greater(left: Int8, right: Int8): Bool
 
-builtin greaterEqual(left: float64, right: float64): bool
-builtin greaterEqual(left: int64, right: int64): bool
-builtin greaterEqual(left: int32, right: int32): bool
-builtin greaterEqual(left: int8, right: int8): bool
+builtin greaterEqual(left: Float64, right: Float64): Bool
+builtin greaterEqual(left: Int64, right: Int64): Bool
+builtin greaterEqual(left: Int32, right: Int32): Bool
+builtin greaterEqual(left: Int8, right: Int8): Bool
 
-builtin add(left: float64, right: float64): float64
-builtin add(left: int64, right: int64): int64
-builtin add(left: int32, right: int32): int32
-builtin add(left: int8, right: int8): int8
+builtin add(left: Float64, right: Float64): Float64
+builtin add(left: Int64, right: Int64): Int64
+builtin add(left: Int32, right: Int32): Int32
+builtin add(left: Int8, right: Int8): Int8
 
-builtin subtract(left: float64, right: float64): float64
-builtin subtract(left: int64, right: int64): int64
-builtin subtract(left: int32, right: int32): int32
-builtin subtract(left: int8, right: int8): int8
+builtin subtract(left: Float64, right: Float64): Float64
+builtin subtract(left: Int64, right: Int64): Int64
+builtin subtract(left: Int32, right: Int32): Int32
+builtin subtract(left: Int8, right: Int8): Int8
 
-builtin negate(operand: float64): float64
-builtin negate(operand: int64): int64
-builtin negate(operand: int32): int32
-builtin negate(operand: int8): int8
+builtin negate(operand: Float64): Float64
+builtin negate(operand: Int64): Int64
+builtin negate(operand: Int32): Int32
+builtin negate(operand: Int8): Int8
 
-builtin multiply(left: float64, right: float64): float64
-builtin multiply(left: int64, right: int64): int64
-builtin multiply(left: int32, right: int32): int32
-builtin multiply(left: int8, right: int8): int8
+builtin multiply(left: Float64, right: Float64): Float64
+builtin multiply(left: Int64, right: Int64): Int64
+builtin multiply(left: Int32, right: Int32): Int32
+builtin multiply(left: Int8, right: Int8): Int8
 
-builtin divide(left: float64, right: float64): float64
-builtin divide(left: int64, right: int64): int64
-builtin divide(left: int32, right: int32): int32
-builtin divide(left: int8, right: int8): int8
+builtin divide(left: Float64, right: Float64): Float64
+builtin divide(left: Int64, right: Int64): Int64
+builtin divide(left: Int32, right: Int32): Int32
+builtin divide(left: Int8, right: Int8): Int8
 
-builtin modulo(left: float64, right: float64): float64
-builtin modulo(left: int64, right: int64): int64
-builtin modulo(left: int32, right: int32): int32
-builtin modulo(left: int8, right: int8): int8
+builtin modulo(left: Float64, right: Float64): Float64
+builtin modulo(left: Int64, right: Int64): Int64
+builtin modulo(left: Int32, right: Int32): Int32
+builtin modulo(left: Int8, right: Int8): Int8
 
-builtin not(boolean: bool): bool
-builtin and(left: bool, right: bool): bool
-builtin or(left: bool, right: bool): bool
+builtin not(boolean: Bool): Bool
+builtin and(left: Bool, right: Bool): Bool
+builtin or(left: Bool, right: Bool): Bool
 
-builtin subscript[t](array: array[t], index: int64): t
-builtin subscript_mut[t](mut array: array[t], index: int64): mut t
-builtin size[t](array: array[t]): int64
+builtin subscript[t](array: Array[t], index: Int64): t
+builtin subscript_mut[t](mut array: Array[t], index: Int64): mut t
+builtin size[t](array: Array[t]): Int64
 
-builtin fields[t: type](struct: t): array[string]
+interface printWithoutLineEnding[t](object: t): None
 
-interface printWithoutLineEnding[t](object: t): void
+extern printf(format: String, ...): Int32
 
-extern printf(format: string, ...): int32
-
-function print[t](value: t): void
+function print[t](value: t): None
     printWithoutLineEnding(value)
     _ = printf("\n")
 
-function printWithoutLineEnding(value: float64): void
+function printWithoutLineEnding(value: Float64): None
     _ = printf("%g", value)
 
-function printWithoutLineEnding(value: int64): void
+function printWithoutLineEnding(value: Int64): None
     _ = printf("%d", value)
 
-function printWithoutLineEnding(value: int32): void
+function printWithoutLineEnding(value: Int32): None
     _ = printf("%d", value)
 
-function printWithoutLineEnding(value: int8): void
+function printWithoutLineEnding(value: Int8): None
     _ = printf("%d", value)
 
-function printWithoutLineEnding(value: bool): void
+function printWithoutLineEnding(value: Bool): None
     if value _ = printf("true")
     else     _ = printf("false")
 
-function printWithoutLineEnding(value: string): void
+function printWithoutLineEnding(value: String): None
     _ = printf(value)
 
-function printWithoutLineEnding[t](value: array[t]): void
+function printWithoutLineEnding[t](value: Array[t]): None
     _ = printf("[")
     i = 1
     while i <= size(value)
@@ -122,7 +120,7 @@ function printWithoutLineEnding[t](value: array[t]): void
         i := i + 1
     _ = printf("]")
 
-function printWithoutLineEnding[t: type](struct: t): void
+function printWithoutLineEnding[t: type](struct: t): None
     printStruct(struct)
 
-builtin printStruct[t: type](struct: t): void
+builtin printStruct[t: type](struct: t): None

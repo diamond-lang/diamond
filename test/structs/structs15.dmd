@@ -1,7 +1,7 @@
 -- Assigning struct as field
 type Point
-    x: float64
-    y: float64
+    x: Float64
+    y: Float64
 
 type Rectangle
     p1: Point

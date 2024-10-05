@@ -1,6 +1,6 @@
 -- Passing an element in an array mutably
 
-function addTen(mut x: int64): void
+function addTen(mut x: Int64): None
     x := x + 10
 
 array = [1, 2, 3]

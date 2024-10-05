@@ -1,6 +1,6 @@
 -- Passing arrays to functions
 
-function printArray(array: array3[int64]): void
+function printArray(array: Array3[Int64]): None
     i = 1
     while i <= 3
         print(array[i])

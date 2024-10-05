@@ -1,14 +1,14 @@
 -- Passing structs
 
 type Point
-    x: float64
-    y: float64
+    x: Float64
+    y: Float64
 
 type Rectangle
     p1: Point
     p2: Point
 
-function print_rectangle(rectangle: Rectangle): void
+function print_rectangle(rectangle: Rectangle): None
     print(rectangle.p1.x)
     print(rectangle.p1.y)
     print(rectangle.p2.x)

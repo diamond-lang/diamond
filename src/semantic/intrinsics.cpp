@@ -2,13 +2,13 @@
 #include "../utilities.hpp"
 
 Set<std::string> primitive_types = Set<std::string>({
-    "int8",
-    "int32",
-    "int64",
-    "float64",
-    "bool",
-    "string",
-    "void"
+    "Int8",
+    "Int32",
+    "Int64",
+    "Float64",
+    "Bool",
+    "String",
+    "None"
 });
 
 extern Set<std::filesystem::path> std_libs = Set<std::filesystem::path>({

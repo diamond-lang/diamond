@@ -19,7 +19,7 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::Bl
 
         if (statement->index() == ast::Call
         && !ast::get_type(statement).is_final_type_variable()) {
-            if (ast::get_type(statement) != ast::Type("void")) {
+            if (ast::get_type(statement) != ast::Type("None")) {
                 context.errors.push_back(errors::unhandled_return_value(std::get<ast::CallNode>(*statement), context.current_module));
                 return Error{};
             }
@@ -170,8 +170,8 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::In
     if (node.type.is_final_type_variable() && (
        !context.current_function.has_value()
     || !context.current_function.value()->is_in_type_parameter(node.type))) {
-        semantic::set_unified_type(context, node.type, ast::Type("int64"));
-        node.type = ast::Type("int64");
+        semantic::set_unified_type(context, node.type, ast::Type("Int64"));
+        node.type = ast::Type("Int64");
     }
     
 
@@ -184,8 +184,8 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::Fl
     if (node.type.is_final_type_variable() && (
        !context.current_function.has_value()
     || !context.current_function.value()->is_in_type_parameter(node.type))) {
-        semantic::set_unified_type(context, node.type, ast::Type("float64"));
-        node.type = ast::Type("float64");
+        semantic::set_unified_type(context, node.type, ast::Type("Float64"));
+        node.type = ast::Type("Float64");
     }
     
     return Ok {};

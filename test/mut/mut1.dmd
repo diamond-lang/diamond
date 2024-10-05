@@ -1,4 +1,4 @@
-function addOne(mut x: int64): void
+function addOne(mut x: Int64): None
     x := x + 1
 
 x = 1

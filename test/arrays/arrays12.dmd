@@ -1,5 +1,5 @@
 -- Passing arrays by value
-function awesome(array: array3[int64]): void  
+function awesome(array: Array3[Int64]): None  
     array[1] = 100
     print(array[1])
 

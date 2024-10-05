@@ -1,4 +1,4 @@
-function myAdd(a: float64, b: float64): float64
+function myAdd(a: Float64, b: Float64): Float64
     a + b
 
 print(myAdd(10, 20))

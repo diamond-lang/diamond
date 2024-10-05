@@ -1,10 +1,10 @@
 -- Returning structs
 
 type Point
-    x: float64
-    y: float64
+    x: Float64
+    y: Float64
 
-function make_point(x: float64, y: float64): Point
+function make_point(x: Float64, y: Float64): Point
     return Point{x: x, y: y}
 
 p = make_point(42.0, 93.0)

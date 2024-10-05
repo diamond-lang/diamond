@@ -1,7 +1,7 @@
-function addOne(mut x: int64): void
+function addOne(mut x: Int64): None
     x := x + 1
 
-function addTwo(mut x: int64): void
+function addTwo(mut x: Int64): None
     addOne(mut x)
     addOne(mut x)
 

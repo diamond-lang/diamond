@@ -1,6 +1,6 @@
 -- Returning arrays
 
-function getArray(x: int64, y: int64, z: int64): array3[int64]   
+function getArray(x: Int64, y: Int64, z: Int64): Array3[Int64]   
     return [x, y, z]
 
 a = getArray(10, 20, 30)

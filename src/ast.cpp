@@ -16,10 +16,10 @@ bool ast::InterfaceType::operator!=(const InterfaceType &interface) const {
 
 ast::Type ast::InterfaceType::get_default_type() {
     if (this->name== "number") {
-        return ast::Type("int64");
+        return ast::Type("Int64");
     }
     else if (this->name == "float") {
-        return ast::Type("float64");
+        return ast::Type("Float64");
     }
     else {
         return ast::Type(ast::NoType{});
@@ -363,16 +363,16 @@ bool ast::Type::is_concrete() const {
 }
 
 bool ast::Type::is_integer() const {
-    if (*this == ast::Type("int64"))      return true;
-    else if (*this == ast::Type("int32")) return true;
-    else if (*this == ast::Type("int16")) return true;
-    else if (*this == ast::Type("int8"))  return true;
+    if      (*this == ast::Type("Int64")) return true;
+    else if (*this == ast::Type("Int32")) return true;
+    else if (*this == ast::Type("Int16")) return true;
+    else if (*this == ast::Type("Int8"))  return true;
     else                                  return false;
 }
 
 bool ast::Type::is_float() const {
-    if (*this == ast::Type("float64"))      return true;
-    else if (*this == ast::Type("float32")) return true;
+    if      (*this == ast::Type("Float64")) return true;
+    else if (*this == ast::Type("Float32")) return true;
     else                                    return false;
 }
 
@@ -381,7 +381,7 @@ bool ast::Type::is_pointer() const {
         return false;
     }
 
-    if (std::get<ast::NominalType>(this->type).name != "pointer") {
+    if (std::get<ast::NominalType>(this->type).name != "Pointer") {
         return false;
     }
     
@@ -393,7 +393,7 @@ bool ast::Type::is_boxed() const {
         return false;
     }
 
-    if (std::get<ast::NominalType>(this->type).name != "boxed") {
+    if (std::get<ast::NominalType>(this->type).name != "Boxed") {
         return false;
     }
     
@@ -426,7 +426,7 @@ bool ast::Type::is_array() const {
     }
 
     if (this->as_nominal_type().name.size() < 5
-    || this->as_nominal_type().name.substr(0, 5) != "array") {
+    || this->as_nominal_type().name.substr(0, 5) != "Array") {
         return false;
     }
 

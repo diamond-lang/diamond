@@ -1,17 +1,17 @@
 interface myAdd[t](a: t, b: t): t
 
-function myAdd(a: float64, b: float64): float64
+function myAdd(a: Float64, b: Float64): Float64
     return a + b
 
-function myAdd(a: int64, b: int64): int64
+function myAdd(a: Int64, b: Int64): Int64
     return a + b
 
-a = 10 : float64
+a = 10 : Float64
 print(a)
 print(myAdd(a, 3.6))
 print(myAdd(a, 20))
 
-result = myAdd(20, 30) : float64
+result = myAdd(20, 30) : Float64
 print(result)
 
 --- Output

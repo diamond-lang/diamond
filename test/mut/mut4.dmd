@@ -1,8 +1,8 @@
 type Point
-    x: float64
-    y: float64
+    x: Float64
+    y: Float64
 
-function addOne(mut x: float64): void
+function addOne(mut x: Float64): None
     x := x + 1
 
 point = Point{x: 1, y: 2}

@@ -1,4 +1,4 @@
-function addThree(mut array: array3[int64]): void
+function addThree(mut array: Array3[Int64]): None
     array := [array[1] + 3, array[2] + 3, array[3] + 3]
 
 array = [1, 2, 3]

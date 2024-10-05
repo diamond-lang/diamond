@@ -1,8 +1,8 @@
 -- Passing and returning structs
 
 type Point
-    x: float64
-    y: float64
+    x: Float64
+    y: Float64
 
 function add(a: Point, b: Point): Point
     return Point{x: a.x + b.x, y: a.y + b.y}
