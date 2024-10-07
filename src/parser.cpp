@@ -581,6 +581,12 @@ Result<ast::Node*, Error> Parser::parse_function() {
         }
     }
 
+    // Check if function is - with just one argument
+    if (function.identifier->value == "-"
+    &&  function.args.size() == 1) {
+        function.identifier->value = "-[negation]";
+    }
+
     this->ast.push_back(function);
     return this->ast.last_element();
 }
@@ -648,6 +654,12 @@ Result<ast::Node*, Error> Parser::parse_interface() {
     if (type.is_error()) return Error {};
 
     interface.return_type = type.get_value();
+
+    // Check if interface is - with just one argument
+    if (interface.identifier->value == "-"
+    &&  interface.args.size() == 1) {
+        interface.identifier->value = "-[negation]";
+    }
 
     this->ast.push_back(interface);
     return this->ast.last_element();
@@ -723,6 +735,12 @@ Result<ast::Node*, Error> Parser::parse_builtin() {
 
     if (builtin.type_parameters.size() > 0) {
         builtin.state = ast::FunctionGenericCompletelyTyped;
+    }
+
+    // Check if builtin is - with just one argument
+    if (builtin.identifier->value == "-"
+    &&  builtin.args.size() == 1) {
+        builtin.identifier->value = "-[negation]";
     }
 
     this->ast.push_back(builtin);
@@ -1522,16 +1540,6 @@ Result<ast::Node*, Error> Parser::parse_binary(int precedence) {
 
             // Add identifier to call
             call.identifier = (ast::IdentifierNode*) identifier.get_value();
-            // if (call.identifier->value == "==") call.identifier->value = "equal";
-            // else if (call.identifier->value == "<") call.identifier->value = "less";
-            // else if (call.identifier->value == "<=") call.identifier->value = "lessEqual";
-            // else if (call.identifier->value == ">") call.identifier->value = "greater";
-            // else if (call.identifier->value == ">=") call.identifier->value = "greaterEqual";
-            // else if (call.identifier->value == "+") call.identifier->value = "add";
-            // else if (call.identifier->value == "-") call.identifier->value = "subtract";
-            // else if (call.identifier->value == "*") call.identifier->value = "multiply";
-            // else if (call.identifier->value == "/") call.identifier->value = "divide";
-            // else if (call.identifier->value == "%") call.identifier->value = "modulo";
 
             // Add left node to call
             this->ast.push_back(left_node);
@@ -1641,7 +1649,7 @@ Result<ast::Node*, Error> Parser::parse_negation() {
     auto identifier = this->parse_identifier(token::Minus);
     if (identifier.is_error()) return identifier;
     call.identifier = (ast::IdentifierNode*) identifier.get_value();
-    call.identifier->value = "negate";
+    call.identifier->value = "-[negation]";
 
     // Parse expression
     auto arg = ast::CallArgumentNode {this->current().line, this->current().column};

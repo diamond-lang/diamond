@@ -1883,7 +1883,7 @@ llvm::Value* codegen::Context::codegen_call(ast::CallNode& node, std::optional<l
         }
     }
     if (node.args.size() == 1) {
-        if (node.identifier->value == "negate") {
+        if (node.identifier->value == "-[negation]") {
             if (args[0]->getType()->isDoubleTy()) {
                 return this->builder->CreateFNeg(args[0], "negation");
             }

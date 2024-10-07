@@ -8,7 +8,7 @@ interface >=[t](left: t, right: t): Bool
 
 interface +[t](left: t, right: t): t
 interface -[t](left: t, right: t): t
-interface negate[t](number: t): t
+interface -[t](number: t): t
 
 interface *[t](left: t, right: t): t
 interface /[t](left: t, right: t): t
@@ -55,10 +55,10 @@ builtin -(left: Int64, right: Int64): Int64
 builtin -(left: Int32, right: Int32): Int32
 builtin -(left: Int8, right: Int8): Int8
 
-builtin negate(operand: Float64): Float64
-builtin negate(operand: Int64): Int64
-builtin negate(operand: Int32): Int32
-builtin negate(operand: Int8): Int8
+builtin -(number: Float64): Float64
+builtin -(number: Int64): Int64
+builtin -(number: Int32): Int32
+builtin -(number: Int8): Int8
 
 builtin *(left: Float64, right: Float64): Float64
 builtin *(left: Int64, right: Int64): Int64
