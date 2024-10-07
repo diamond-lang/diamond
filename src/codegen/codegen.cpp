@@ -1800,7 +1800,7 @@ llvm::Value* codegen::Context::codegen_call(ast::CallNode& node, std::optional<l
 
     // Intrinsics
     if (node.args.size() == 2) {
-        if (node.identifier->value == "add") {
+        if (node.identifier->value == "+") {
             if (args[0]->getType()->isDoubleTy() && args[1]->getType()->isDoubleTy()) {
                 return this->builder->CreateFAdd(args[0], args[1], "addtmp");
             }
@@ -1808,7 +1808,7 @@ llvm::Value* codegen::Context::codegen_call(ast::CallNode& node, std::optional<l
                 return this->builder->CreateAdd(args[0], args[1], "addtmp");
             }
         }
-        if (node.identifier->value == "subtract") {
+        if (node.identifier->value == "-") {
             if (args[0]->getType()->isDoubleTy() && args[1]->getType()->isDoubleTy()) {
                 return this->builder->CreateFSub(args[0], args[1], "subtmp");
             }
@@ -1816,7 +1816,7 @@ llvm::Value* codegen::Context::codegen_call(ast::CallNode& node, std::optional<l
                 return this->builder->CreateSub(args[0], args[1], "addtmp");
             }
         }
-        if (node.identifier->value == "multiply") {
+        if (node.identifier->value == "*") {
             if (args[0]->getType()->isDoubleTy() && args[1]->getType()->isDoubleTy()) {
                 return this->builder->CreateFMul(args[0], args[1], "multmp");
             }
@@ -1824,7 +1824,7 @@ llvm::Value* codegen::Context::codegen_call(ast::CallNode& node, std::optional<l
                 return this->builder->CreateMul(args[0], args[1], "addtmp");
             }
         }
-        if (node.identifier->value == "divide") {
+        if (node.identifier->value == "/") {
             if (args[0]->getType()->isDoubleTy() && args[1]->getType()->isDoubleTy()) {
                 return this->builder->CreateFDiv(args[0], args[1], "divtmp");
             }
@@ -1832,10 +1832,10 @@ llvm::Value* codegen::Context::codegen_call(ast::CallNode& node, std::optional<l
                 return this->builder->CreateSDiv(args[0], args[1], "divtmp");
             }
         }
-        if (node.identifier->value == "modulo") {
+        if (node.identifier->value == "%") {
             return this->builder->CreateSRem(args[0], args[1], "remtmp");
         }
-        if (node.identifier->value == "less") {
+        if (node.identifier->value == "<") {
             if (args[0]->getType()->isDoubleTy() && args[1]->getType()->isDoubleTy()) {
                 return this->builder->CreateFCmpULT(args[0], args[1], "cmptmp");
             }
@@ -1843,7 +1843,7 @@ llvm::Value* codegen::Context::codegen_call(ast::CallNode& node, std::optional<l
                 return this->builder->CreateICmpULT(args[0], args[1], "addtmp");
             }
         }
-        if (node.identifier->value == "lessEqual") {
+        if (node.identifier->value == "<=") {
             if (args[0]->getType()->isDoubleTy() && args[1]->getType()->isDoubleTy()) {
                 return this->builder->CreateFCmpULE(args[0], args[1], "cmptmp");
             }
@@ -1851,7 +1851,7 @@ llvm::Value* codegen::Context::codegen_call(ast::CallNode& node, std::optional<l
                 return this->builder->CreateICmpULE(args[0], args[1], "addtmp");
             }
         }
-        if (node.identifier->value == "greater") {
+        if (node.identifier->value == ">") {
             if (args[0]->getType()->isDoubleTy() && args[1]->getType()->isDoubleTy()) {
                 return this->builder->CreateFCmpUGT(args[0], args[1], "cmptmp");
             }
@@ -1859,7 +1859,7 @@ llvm::Value* codegen::Context::codegen_call(ast::CallNode& node, std::optional<l
                 return this->builder->CreateICmpUGT(args[0], args[1], "addtmp");
             }
         }
-        if (node.identifier->value == "greaterEqual") {
+        if (node.identifier->value == ">=") {
             if (args[0]->getType()->isDoubleTy() && args[1]->getType()->isDoubleTy()) {
                 return this->builder->CreateFCmpUGE(args[0], args[1], "cmptmp");
             }
@@ -1867,7 +1867,7 @@ llvm::Value* codegen::Context::codegen_call(ast::CallNode& node, std::optional<l
                 return this->builder->CreateICmpUGE(args[0], args[1], "addtmp");
             }
         }
-        if (node.identifier->value == "equal") {
+        if (node.identifier->value == "==") {
             if (args[0]->getType()->isDoubleTy() && args[1]->getType()->isDoubleTy()) {
                 return this->builder->CreateFCmpUEQ(args[0], args[1], "eqtmp");
             }

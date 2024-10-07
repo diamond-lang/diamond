@@ -65,6 +65,7 @@ struct Parser {
     Result<ast::Node*, Error> parse_integer();
     Result<ast::Node*, Error> parse_boolean();
     Result<ast::Node*, Error> parse_identifier();
+    Result<ast::Node*, Error> parse_function_identifier();
     Result<ast::Node*, Error> parse_identifier(token::TokenVariant token);
     Result<ast::Node*, Error> parse_string();
     Result<ast::Node*, Error> parse_interpolated_string();
@@ -499,7 +500,7 @@ Result<ast::Node*, Error> Parser::parse_function() {
     if (keyword.is_error()) return Error {};
 
     // Parse indentifier
-    auto identifier = this->parse_identifier();
+    auto identifier = this->parse_function_identifier();
     if (identifier.is_error()) return identifier;
     function.identifier = (ast::IdentifierNode*) identifier.get_value();
 
@@ -595,7 +596,7 @@ Result<ast::Node*, Error> Parser::parse_interface() {
     if (keyword.is_error()) return Error {};
 
     // Parse indentifier
-    auto identifier = this->parse_identifier();
+    auto identifier = this->parse_function_identifier();
     if (identifier.is_error()) return identifier;
     interface.identifier = (ast::IdentifierNode*) identifier.get_value();
 
@@ -664,7 +665,7 @@ Result<ast::Node*, Error> Parser::parse_builtin() {
     if (keyword.is_error()) return Error {};
 
     // Parse indentifier
-    auto identifier = this->parse_identifier();
+    auto identifier = this->parse_function_identifier();
     if (identifier.is_error()) return identifier;
     builtin.identifier = (ast::IdentifierNode*) identifier.get_value();
 
@@ -1521,16 +1522,16 @@ Result<ast::Node*, Error> Parser::parse_binary(int precedence) {
 
             // Add identifier to call
             call.identifier = (ast::IdentifierNode*) identifier.get_value();
-            if (call.identifier->value == "==") call.identifier->value = "equal";
-            else if (call.identifier->value == "<") call.identifier->value = "less";
-            else if (call.identifier->value == "<=") call.identifier->value = "lessEqual";
-            else if (call.identifier->value == ">") call.identifier->value = "greater";
-            else if (call.identifier->value == ">=") call.identifier->value = "greaterEqual";
-            else if (call.identifier->value == "+") call.identifier->value = "add";
-            else if (call.identifier->value == "-") call.identifier->value = "subtract";
-            else if (call.identifier->value == "*") call.identifier->value = "multiply";
-            else if (call.identifier->value == "/") call.identifier->value = "divide";
-            else if (call.identifier->value == "%") call.identifier->value = "modulo";
+            // if (call.identifier->value == "==") call.identifier->value = "equal";
+            // else if (call.identifier->value == "<") call.identifier->value = "less";
+            // else if (call.identifier->value == "<=") call.identifier->value = "lessEqual";
+            // else if (call.identifier->value == ">") call.identifier->value = "greater";
+            // else if (call.identifier->value == ">=") call.identifier->value = "greaterEqual";
+            // else if (call.identifier->value == "+") call.identifier->value = "add";
+            // else if (call.identifier->value == "-") call.identifier->value = "subtract";
+            // else if (call.identifier->value == "*") call.identifier->value = "multiply";
+            // else if (call.identifier->value == "/") call.identifier->value = "divide";
+            // else if (call.identifier->value == "%") call.identifier->value = "modulo";
 
             // Add left node to call
             this->ast.push_back(left_node);
@@ -1764,6 +1765,40 @@ Result<ast::Node*, Error> Parser::parse_identifier() {
     if (this->current() == token::And) return this->parse_identifier(token::And);
     if (this->current() == token::Or) return this->parse_identifier(token::Or);
     if (this->current() == token::Not) return this->parse_identifier(token::Not);
+    return this->parse_identifier(token::Identifier);
+}
+
+// identifier → IDENTIFIER
+//            | AND
+//            | OR
+//            | NOT
+//            | PLUS
+//            | MINUS
+//            | STAR
+//            | SLASH
+//            | MODULO
+//            | EQUAL
+//            | EQUAL_EQUAL
+//            | NOT_EQUAL
+//            | LESS
+//            | LESS_EQUAL
+//            | GREATER
+//            | GREATER_EQUAL
+Result<ast::Node*, Error> Parser::parse_function_identifier() {
+    if (this->current() == token::And) return this->parse_identifier(token::And);
+    if (this->current() == token::Or) return this->parse_identifier(token::Or);
+    if (this->current() == token::Not) return this->parse_identifier(token::Not);
+    if (this->current() == token::Plus) return this->parse_identifier(token::Plus);
+    if (this->current() == token::Minus) return this->parse_identifier(token::Minus);
+    if (this->current() == token::Star) return this->parse_identifier(token::Star);
+    if (this->current() == token::Slash) return this->parse_identifier(token::Slash);
+    if (this->current() == token::Modulo) return this->parse_identifier(token::Modulo);
+    if (this->current() == token::EqualEqual) return this->parse_identifier(token::EqualEqual);
+    if (this->current() == token::NotEqual) return this->parse_identifier(token::NotEqual);
+    if (this->current() == token::Less) return this->parse_identifier(token::Less);
+    if (this->current() == token::LessEqual) return this->parse_identifier(token::LessEqual);
+    if (this->current() == token::Greater) return this->parse_identifier(token::Greater);
+    if (this->current() == token::GreaterEqual) return this->parse_identifier(token::GreaterEqual);
     return this->parse_identifier(token::Identifier);
 }
 
