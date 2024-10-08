@@ -353,10 +353,11 @@ static void link(std::string executable_name, std::string object_file_name, std:
 // Constructor
 codegen::Context::Context(ast::Ast& ast) : ast(ast) {
     this->current_module = ast.module_path;
+    auto filename = ast.module_path.filename().string();
 
     // Create llvm context
     this->context = new llvm::LLVMContext();
-    this->module = new llvm::Module("My cool jit", *(this->context));
+    this->module = new llvm::Module(filename, *(this->context));
     this->builder = new llvm::IRBuilder(*(this->context));
 
     // Add function pass optimizations
