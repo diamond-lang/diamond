@@ -160,10 +160,10 @@ static void link(std::string executable_name, std::string object_file_name, std:
             "lld",
             object_file_name,
             name,
-            utilities::get_folder_of_executable() + "/deps/musl/libc.a",
-            utilities::get_folder_of_executable() + "/deps/musl/crt1.o",
-            utilities::get_folder_of_executable() + "/deps/musl/crti.o",
-            utilities::get_folder_of_executable() + "/deps/musl/crtn.o"
+            utilities::get_folder_of_executable().string() + "/deps/musl/libc.a",
+            utilities::get_folder_of_executable().string() + "/deps/musl/crt1.o",
+            utilities::get_folder_of_executable().string() + "/deps/musl/crti.o",
+            utilities::get_folder_of_executable().string() + "/deps/musl/crtn.o"
         };
 
         std::string output = "";
@@ -1748,7 +1748,7 @@ llvm::Value* codegen::Context::codegen_print_struct_function(ast::Type arg_type,
             );
         }
         else {
-            std::string print_function_name = this->get_mangled_function_name(utilities::get_folder_of_executable() + "/std/std" + ".dmd", "printWithoutLineEnding", {struct_type.as_nominal_type().type_definition->fields[i]->type}, ast::Type("None"), false);
+            std::string print_function_name = this->get_mangled_function_name(utilities::get_folder_of_executable().string() + "/std/std" + ".dmd", "printWithoutLineEnding", {struct_type.as_nominal_type().type_definition->fields[i]->type}, ast::Type("None"), false);
             llvm::Function* llvm_function = this->module->getFunction(print_function_name);
             assert(llvm_function);
 
