@@ -8,6 +8,7 @@
 #include "../codegen.hpp"
 #include "codegen.hpp"
 #include "../utilities.hpp"
+#include "../semantic/intrinsics.hpp"
 
 // Print LLVM IR
 // -------------
@@ -508,7 +509,19 @@ codegen::Context::Binding codegen::Context::get_binding(std::string identifier) 
 
 // Name mangling
 std::string codegen::Context::get_mangled_type_name(std::filesystem::path module, std::string identifier) {
-    return module.string() + "::" + identifier;
+    std::string name = "";
+    auto path = module;
+    if (path == this->ast.module_path) {
+        name = identifier;
+    }
+    else if (std_libs.contains(module)) {
+        name = identifier;
+    }
+    else {
+        name = std::filesystem::relative(module, this->ast.module_path.parent_path()).string() + "::" + identifier;
+    }
+
+    return name;
 }
 
 std::string codegen::Context::get_mangled_function_name(std::filesystem::path module, std::string identifier, std::vector<ast::Type> args, ast::Type return_type, bool is_extern) {
@@ -516,11 +529,68 @@ std::string codegen::Context::get_mangled_function_name(std::filesystem::path mo
         return identifier;
     }
 
-    std::string name = module.string() + "::" + identifier;
-    for (size_t i = 0; i < args.size(); i++) {
-        name += "_" + args[i].to_str();
+    std::string name = "";
+    auto path = module;
+    if (path == this->ast.module_path) {
+        name = identifier;
     }
-    return name + "_" + return_type.to_str();
+    else if (std_libs.contains(module)) {
+        name = identifier;
+    }
+    else {
+        name = std::filesystem::relative(module, this->ast.module_path.parent_path()).string() + "::" + identifier;
+    }
+
+    auto binding = this->scopes.functions_and_types_scopes.get_binding(identifier);
+    assert(binding);
+    if (binding->index() == ast::Interface) {
+        auto interface = std::get<ast::InterfaceNode>(*binding);
+        name += "[";
+        bool founded = false;
+        for (size_t i = 0; i < interface.args.size(); i++) {
+            if (interface.args[i]->type == interface.type_parameters[0].type) {
+                name += args[i].to_str();
+                founded = true;
+                break;
+            }
+        }
+        if (!founded) {
+            name += return_type.to_str();
+        }
+        name += "]";
+        return name;
+
+    }
+    else if (binding->index() == ast::Function
+    && std::get<ast::FunctionNode>(*binding).type_parameters.size() > 0) {
+        auto function = std::get<ast::FunctionNode>(*binding);
+        name += "[";
+        for (size_t j = 0; j < function.type_parameters.size(); j++) {
+            bool founded = false;
+            for (size_t i = 0; i < function.args.size(); i++) {
+                if (function.type_parameters[j].type == function.args[i]->type) {
+                    name += args[i].to_str();
+                    founded = true;
+                    break;
+                }
+            }
+
+            if (!founded) {
+                if (function.return_type == function.type_parameters[j].type) {
+                    name += return_type.to_str();
+                }
+            }
+
+            if (j + 1 != function.type_parameters.size()) {
+                name += ", ";
+            }
+        }
+        name += "]";
+        return name;
+    }
+    else {
+        return name;
+    }
 }
 
 
@@ -825,7 +895,11 @@ void codegen::Context::store_array_elements(ast::Node* expression, llvm::Value* 
     }
     else if (expression->index() == ast::Identifier) {
         auto& identifier = std::get<ast::IdentifierNode>(*expression);
-        this->builder->CreateMemCpy(array_allocation, llvm::MaybeAlign(), this->get_binding(identifier.value).pointer, llvm::MaybeAlign(), this->get_type_size(array_type));
+        llvm::Value* array_pointer = this->get_binding(identifier.value).pointer;
+        if (((llvm::AllocaInst*) array_pointer)->getAllocatedType()->isPointerTy()) {
+            array_pointer = this->builder->CreateLoad(array_pointer->getType(), array_pointer);
+        }
+        this->builder->CreateMemCpy(array_allocation, llvm::MaybeAlign(), array_pointer, llvm::MaybeAlign(), this->get_type_size(array_type));
     }
     else {
         assert(false);
@@ -873,7 +947,7 @@ llvm::Value* codegen::Context::get_index_access_pointer(ast::CallNode& node) {
         return this->builder->CreateGEP(array_type, array_ptr, {llvm::ConstantInt::get(*(this->context), llvm::APInt(64, 0, true)), index}, "", true);
     }
     else {
-        llvm::Type* wrapper_type = this->as_llvm_type(ast::get_concrete_type(node.args[0]->expression, this->type_bindings));
+        llvm::Type* wrapper_type = llvm::StructType::getTypeByName(*this->context, "arrayWrapper");
         llvm::Value* wrapper_ptr = this->get_binding(std::get<ast::IdentifierNode>(*node.args[0]->expression).value).pointer;
         if (((llvm::AllocaInst*) wrapper_ptr)->getAllocatedType()->isPointerTy()) {
             wrapper_ptr = this->builder->CreateLoad(
@@ -1026,7 +1100,12 @@ void codegen::Context::codegen(ast::Ast& ast) {
 
     // Codegen functions
     for (auto it = ast.modules.begin(); it != ast.modules.end(); it++) {
+        this->current_module = it->first;
+        this->add_scope(*it->second);
         this->codegen_function_prototypes(it->second->functions);
+        this->scopes.variable_scopes = {};
+        this->scopes.functions_and_types_scopes.scopes = {};
+        this->current_module = ast.module_path;
     }
     for (auto it = ast.modules.begin(); it != ast.modules.end(); it++) {
         this->current_module = it->first;

@@ -114,7 +114,7 @@ function printWithoutLineEnding[t](value: Array[t]): None
     _ = printf("[")
     i = 1
     while i <= size(value)
-        printWithoutLineEnding(i)
+        printWithoutLineEnding(value[i])
         if not i == size(value)
             _ = printf(", ")
         i := i + 1
