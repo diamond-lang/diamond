@@ -51,7 +51,7 @@ void check_usage(int argc, char *argv[]) {
     if (argv[1] == std::string("run") && argc < 3) {
         print_usage_and_exit();
     }
-    if (argv[1] == std::string("emit") && (argc < 4 || !(argv[2] == std::string("--llvm-ir") || argv[2] == std::string("--ast") || argv[2] == std::string("--ast-with-types") || argv[2] == std::string("--ast-with-concrete-types") || argv[2] == std::string("--tokens") || argv[2] == std::string("--obj") || argv[2] == std::string("--asm")))) {
+    if (argv[1] == std::string("emit") && (argc < 4 || !(argv[2] == std::string("--llvm-ir") || argv[2] == std::string("--ast") || argv[2] == std::string("--ast-with-types") || argv[2] == std::string("--ast-with-concrete-types") || argv[2] == std::string("--tokens") || argv[2] == std::string("--object-code") || argv[2] == std::string("--assembly")))) {
         print_usage_and_exit();
     }
 };
@@ -189,14 +189,14 @@ void emit(Command command) {
     }
 
     // Emit asm
-    if (command.options[0] == std::string("--asm")) {
+    if (command.options[0] == std::string("--assembly")) {
         codegen::print_assembly(ast, program_name);
         ast.free();
         return;
     }
 
     // Emit object code
-    if (command.options[0] == std::string("--obj")) {
+    if (command.options[0] == std::string("--object-code")) {
         codegen::generate_object_code(ast, program_name);
         ast.free();
         return;

@@ -1,79 +1,79 @@
-interface equal[t](left: t, right: t): Bool
-interface notEqual[t](left: t, right: t): Bool
+interface ==[t](left: t, right: t): Bool
+interface !=[t](left: t, right: t): Bool
 
-interface less[t](left: t, right: t): Bool
-interface greater[t](left: t, right: t): Bool
-interface lessEqual[t](left: t, right: t): Bool
-interface greaterEqual[t](left: t, right: t): Bool
+interface <[t](left: t, right: t): Bool
+interface >[t](left: t, right: t): Bool
+interface <=[t](left: t, right: t): Bool
+interface >=[t](left: t, right: t): Bool
 
-interface add[t](left: t, right: t): t
-interface subtract[t](left: t, right: t): t
-interface negate[t](number: t): t
+interface +[t](left: t, right: t): t
+interface -[t](left: t, right: t): t
+interface -[t](number: t): t
 
-interface multiply[t](left: t, right: t): t
-interface divide[t](left: t, right: t): t
-interface modulo[t](left: t, right: t): t
+interface *[t](left: t, right: t): t
+interface /[t](left: t, right: t): t
+interface %[t](left: t, right: t): t
 
-builtin equal(left: Float64, right: Float64): Bool
-builtin equal(left: Int64, right: Int64): Bool
-builtin equal(left: Int32, right: Int32): Bool
-builtin equal(left: Int8, right: Int8): Bool
-builtin equal(left: Bool, right: Bool): Bool
+builtin ==(left: Float64, right: Float64): Bool
+builtin ==(left: Int64, right: Int64): Bool
+builtin ==(left: Int32, right: Int32): Bool
+builtin ==(left: Int8, right: Int8): Bool
+builtin ==(left: Bool, right: Bool): Bool
 
-builtin notEqual(left: Float64, right: Float64): Bool
-builtin notEqual(left: Int64, right: Int64): Bool
-builtin notEqual(left: Int32, right: Int32): Bool
-builtin notEqual(left: Int8, right: Int8): Bool
+builtin !=(left: Float64, right: Float64): Bool
+builtin !=(left: Int64, right: Int64): Bool
+builtin !=(left: Int32, right: Int32): Bool
+builtin !=(left: Int8, right: Int8): Bool
 
-builtin less(left: Float64, right: Float64): Bool
-builtin less(left: Int64, right: Int64): Bool
-builtin less(left: Int32, right: Int32): Bool
-builtin less(left: Int8, right: Int8): Bool
+builtin <(left: Float64, right: Float64): Bool
+builtin <(left: Int64, right: Int64): Bool
+builtin <(left: Int32, right: Int32): Bool
+builtin <(left: Int8, right: Int8): Bool
 
-builtin lessEqual(left: Float64, right: Float64): Bool
-builtin lessEqual(left: Int64, right: Int64): Bool
-builtin lessEqual(left: Int32, right: Int32): Bool
-builtin lessEqual(left: Int8, right: Int8): Bool
+builtin <=(left: Float64, right: Float64): Bool
+builtin <=(left: Int64, right: Int64): Bool
+builtin <=(left: Int32, right: Int32): Bool
+builtin <=(left: Int8, right: Int8): Bool
 
-builtin greater(left: Float64, right: Float64): Bool
-builtin greater(left: Int64, right: Int64): Bool
-builtin greater(left: Int32, right: Int32): Bool
-builtin greater(left: Int8, right: Int8): Bool
+builtin >(left: Float64, right: Float64): Bool
+builtin >(left: Int64, right: Int64): Bool
+builtin >(left: Int32, right: Int32): Bool
+builtin >(left: Int8, right: Int8): Bool
 
-builtin greaterEqual(left: Float64, right: Float64): Bool
-builtin greaterEqual(left: Int64, right: Int64): Bool
-builtin greaterEqual(left: Int32, right: Int32): Bool
-builtin greaterEqual(left: Int8, right: Int8): Bool
+builtin >=(left: Float64, right: Float64): Bool
+builtin >=(left: Int64, right: Int64): Bool
+builtin >=(left: Int32, right: Int32): Bool
+builtin >=(left: Int8, right: Int8): Bool
 
-builtin add(left: Float64, right: Float64): Float64
-builtin add(left: Int64, right: Int64): Int64
-builtin add(left: Int32, right: Int32): Int32
-builtin add(left: Int8, right: Int8): Int8
+builtin +(left: Float64, right: Float64): Float64
+builtin +(left: Int64, right: Int64): Int64
+builtin +(left: Int32, right: Int32): Int32
+builtin +(left: Int8, right: Int8): Int8
 
-builtin subtract(left: Float64, right: Float64): Float64
-builtin subtract(left: Int64, right: Int64): Int64
-builtin subtract(left: Int32, right: Int32): Int32
-builtin subtract(left: Int8, right: Int8): Int8
+builtin -(left: Float64, right: Float64): Float64
+builtin -(left: Int64, right: Int64): Int64
+builtin -(left: Int32, right: Int32): Int32
+builtin -(left: Int8, right: Int8): Int8
 
-builtin negate(operand: Float64): Float64
-builtin negate(operand: Int64): Int64
-builtin negate(operand: Int32): Int32
-builtin negate(operand: Int8): Int8
+builtin -(number: Float64): Float64
+builtin -(number: Int64): Int64
+builtin -(number: Int32): Int32
+builtin -(number: Int8): Int8
 
-builtin multiply(left: Float64, right: Float64): Float64
-builtin multiply(left: Int64, right: Int64): Int64
-builtin multiply(left: Int32, right: Int32): Int32
-builtin multiply(left: Int8, right: Int8): Int8
+builtin *(left: Float64, right: Float64): Float64
+builtin *(left: Int64, right: Int64): Int64
+builtin *(left: Int32, right: Int32): Int32
+builtin *(left: Int8, right: Int8): Int8
 
-builtin divide(left: Float64, right: Float64): Float64
-builtin divide(left: Int64, right: Int64): Int64
-builtin divide(left: Int32, right: Int32): Int32
-builtin divide(left: Int8, right: Int8): Int8
+builtin /(left: Float64, right: Float64): Float64
+builtin /(left: Int64, right: Int64): Int64
+builtin /(left: Int32, right: Int32): Int32
+builtin /(left: Int8, right: Int8): Int8
 
-builtin modulo(left: Float64, right: Float64): Float64
-builtin modulo(left: Int64, right: Int64): Int64
-builtin modulo(left: Int32, right: Int32): Int32
-builtin modulo(left: Int8, right: Int8): Int8
+builtin %(left: Float64, right: Float64): Float64
+builtin %(left: Int64, right: Int64): Int64
+builtin %(left: Int32, right: Int32): Int32
+builtin %(left: Int8, right: Int8): Int8
 
 builtin not(boolean: Bool): Bool
 builtin and(left: Bool, right: Bool): Bool
@@ -114,7 +114,7 @@ function printWithoutLineEnding[t](value: Array[t]): None
     _ = printf("[")
     i = 1
     while i <= size(value)
-        printWithoutLineEnding(i)
+        printWithoutLineEnding(value[i])
         if not i == size(value)
             _ = printf(", ")
         i := i + 1

@@ -12,5 +12,5 @@ Set<std::string> primitive_types = Set<std::string>({
 });
 
 extern Set<std::filesystem::path> std_libs = Set<std::filesystem::path>({
-    utilities::get_folder_of_executable() + "/std/std" + ".dmd"
+    utilities::get_folder_of_executable().string() + "/std/std" + ".dmd"
 });

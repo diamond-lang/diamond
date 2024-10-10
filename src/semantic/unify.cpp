@@ -170,8 +170,9 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::In
     if (node.type.is_final_type_variable() && (
        !context.current_function.has_value()
     || !context.current_function.value()->is_in_type_parameter(node.type))) {
-        semantic::set_unified_type(context, node.type, ast::Type("Int64"));
-        node.type = ast::Type("Int64");
+        auto default_type = ast::get_default_type(context.type_inference.interface_constraints[node.type]);
+        semantic::set_unified_type(context, node.type, default_type);
+        node.type = default_type;
     }
     
 
@@ -184,8 +185,9 @@ Result<Ok, Error> semantic::unify_types_and_type_check(Context& context, ast::Fl
     if (node.type.is_final_type_variable() && (
        !context.current_function.has_value()
     || !context.current_function.value()->is_in_type_parameter(node.type))) {
-        semantic::set_unified_type(context, node.type, ast::Type("Float64"));
-        node.type = ast::Type("Float64");
+        auto default_type = ast::get_default_type(context.type_inference.interface_constraints[node.type]);
+        semantic::set_unified_type(context, node.type, default_type);
+        node.type = default_type;
     }
     
     return Ok {};

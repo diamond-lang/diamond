@@ -1,7 +1,7 @@
-function myAdd(a: Float64, b: Float64): Float64
+function add(a: Float64, b: Float64): Float64
     a + b
 
-print(myAdd(10, 20))
+print(add(10, 20))
 
 --- Output
 30

@@ -38,7 +38,8 @@ std::string errors::usage() {
                        "        --ast-with-types\n"
                        "        --ast-with-concrete-types\n"
                        "        --llvm-ir\n"
-                       "        --obj\n";
+                       "        --assembly\n"
+                       "        --object-code\n";
 }
 
 std::string errors::generic_error(Location location, std::string message) {

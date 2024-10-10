@@ -36,32 +36,6 @@ std::string utilities::get_program_name(std::filesystem::path path) {
     return path.stem().string();
 }
 
-#ifdef __linux__
-    std::string utilities::get_executable_name(std::string program_name) {
-        return program_name;
-    }
-
-    std::string utilities::get_run_command(std::string program_name) {
-        return "./" + utilities::get_executable_name(program_name);
-    }
-#elif __APPLE__
-    std::string utilities::get_executable_name(std::string program_name) {
-        return program_name;
-    }
-
-    std::string utilities::get_run_command(std::string program_name) {
-        return "./" + utilities::get_executable_name(program_name);
-    }
-#elif _WIN32
-    std::string utilities::get_executable_name(std::string program_name) {
-        return program_name + ".exe";
-    }
-
-    std::string utilities::get_run_command(std::string program_name) {
-        return ".\\" + utilities::get_executable_name(program_name);
-    }
-#endif
-
 std::string utilities::to_str(Set<ast::Type> set) {
     std::string output = "{";
     for (size_t i = 0; i < set.elements.size(); i++) {
@@ -75,6 +49,66 @@ std::string utilities::to_str(Set<ast::Type> set) {
     return output;
 }
 
-std::string utilities::get_folder_of_executable() {
-    return std::filesystem::weakly_canonical(std::filesystem::path(get_run_command("diamond"))).parent_path().string();
+#ifdef __linux__
+std::filesystem::path get_executable_path() {
+    return std::filesystem::canonical("/proc/self/exe");
+}
+
+std::string utilities::get_executable_name(std::string program_name) {
+    return program_name;
+}
+
+std::string utilities::get_run_command(std::string program_name) {
+    return "./" + utilities::get_executable_name(program_name);
+}
+
+#elif __APPLE__
+#include <mach-o/dyld.h>
+
+std::filesystem::path get_executable_path() {
+    // Get size of path
+    uint32_t size = 0;
+    _NSGetExecutablePath(NULL, &size);
+
+    // Get string
+    std::string path;
+    path.resize(size + 1);
+    _NSGetExecutablePath(&path[0], &size);
+
+    // Return
+    return std::filesystem::canonical(path);
+}
+
+std::string utilities::get_executable_name(std::string program_name) {
+    return program_name;
+}
+
+std::string utilities::get_run_command(std::string program_name) {
+    return "./" + utilities::get_executable_name(program_name);
+}
+
+#elif _WIN32
+#include <Windows.h>
+
+std::filesystem::path get_executable_path() {
+    std::string path;
+    while (true) {
+        path.resize(path.size() + MAX_PATH);
+        auto copied = GetModuleFileNameA(NULL, &path[0], path.size());
+        if (copied + 1 < path.size()) break;
+    }
+    return std::filesystem::canonical(path);
+}
+
+std::string utilities::get_executable_name(std::string program_name) {
+    return program_name + ".exe";
+}
+
+std::string utilities::get_run_command(std::string program_name) {
+    return ".\\" + utilities::get_executable_name(program_name);
+}
+#endif
+
+std::filesystem::path utilities::get_folder_of_executable() {
+    return get_executable_path().parent_path();
 }
