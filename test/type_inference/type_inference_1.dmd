@@ -1,4 +1,4 @@
-a = 10.0
+a = 10
 print(20.5 + a) -- a = 10 won't work until having interfaces
 
 --- Output
