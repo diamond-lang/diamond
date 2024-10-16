@@ -1041,8 +1041,8 @@ llvm::Value* codegen::Context::get_pointer_to(ast::Node* expression) {
         return pointer;
     }
     else if (expression->index() == ast::Call
-    &&       (std::get<ast::CallNode>(*expression).identifier->value == "subscript"
-           || std::get<ast::CallNode>(*expression).identifier->value == "subscript_mut")) {
+    &&       (std::get<ast::CallNode>(*expression).identifier->value == "[]"
+           || std::get<ast::CallNode>(*expression).identifier->value == "[]:mut")) {
         auto& node = std::get<ast::CallNode>(*expression);
         auto pointer = this->get_index_access_pointer(node);
         return pointer;
@@ -1867,7 +1867,7 @@ llvm::Value* codegen::Context::codegen_call(ast::CallNode& node, std::optional<l
 
     // Codegen args
     std::vector<llvm::Value*> args;
-    if (node.identifier->value != "subscript"
+    if (node.identifier->value != "[]"
     && node.identifier->value != "size"
     && node.identifier->value != "print"
     && node.identifier->value != "printStruct") {
@@ -1963,7 +1963,7 @@ llvm::Value* codegen::Context::codegen_call(ast::CallNode& node, std::optional<l
         }
     }
     if (node.args.size() == 1) {
-        if (node.identifier->value == "-[negation]") {
+        if (node.identifier->value == "-:negation") {
             if (args[0]->getType()->isDoubleTy()) {
                 return this->builder->CreateFNeg(args[0], "negation");
             }
@@ -1987,8 +1987,8 @@ llvm::Value* codegen::Context::codegen_call(ast::CallNode& node, std::optional<l
         // Make call
         return this->builder->CreateCall(llvm_function, args, "calltmp");
     }
-    if (node.identifier->value == "subscript"
-    ||  node.identifier->value == "subscript_mut") {
+    if (node.identifier->value == "[]"
+    ||  node.identifier->value == "[]:mut") {
         if (node.args.size() == 2) {
             return this->builder->CreateLoad(
                 this->as_llvm_type(ast::get_concrete_type((ast::Node*)&node, this->type_bindings)),

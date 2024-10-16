@@ -350,7 +350,7 @@ Result<ast::Node*, Error> Parser::parse_statement() {
                 if (result.is_error()) return result;
 
                 if (result.get_value()->index() == ast::Call) {
-                    if (std::get<ast::CallNode>(*result.get_value()).identifier->value == "subscript") {
+                    if (std::get<ast::CallNode>(*result.get_value()).identifier->value == "[]") {
                         return this->parse_index_assignment(result.get_value());
                     }
                     else {
@@ -584,7 +584,11 @@ Result<ast::Node*, Error> Parser::parse_function() {
     // Check if function is - with just one argument
     if (function.identifier->value == "-"
     &&  function.args.size() == 1) {
-        function.identifier->value = "-[negation]";
+        function.identifier->value = "-:negation";
+    }
+    else if (function.identifier->value == "[]"
+    &&  function.args[0]->is_mutable) {
+        function.identifier->value = "[]:mut";
     }
 
     this->ast.push_back(function);
@@ -658,7 +662,11 @@ Result<ast::Node*, Error> Parser::parse_interface() {
     // Check if interface is - with just one argument
     if (interface.identifier->value == "-"
     &&  interface.args.size() == 1) {
-        interface.identifier->value = "-[negation]";
+        interface.identifier->value = "-:negation";
+    }
+    else if (interface.identifier->value == "[]"
+    &&  interface.args[0]->is_mutable) {
+        interface.identifier->value = "[]:mut";
     }
 
     this->ast.push_back(interface);
@@ -740,7 +748,11 @@ Result<ast::Node*, Error> Parser::parse_builtin() {
     // Check if builtin is - with just one argument
     if (builtin.identifier->value == "-"
     &&  builtin.args.size() == 1) {
-        builtin.identifier->value = "-[negation]";
+        builtin.identifier->value = "-:negation";
+    }
+    else if (builtin.identifier->value == "[]"
+    &&  builtin.args[0]->is_mutable) {
+        builtin.identifier->value = "[]:mut";
     }
 
     this->ast.push_back(builtin);
@@ -1116,7 +1128,7 @@ Result<ast::Node*, Error> Parser::parse_index_assignment(ast::Node* index_access
     // Parse index access
     assignment.assignable = index_access;
     ((ast::CallNode*) index_access)->args[0]->is_mutable = true;
-    ((ast::CallNode*) index_access)->identifier->value = "subscript_mut";
+    ((ast::CallNode*) index_access)->identifier->value = "[]:mut";
 
     // Parse equal
     auto equal = this->parse_token(token::Equal);
@@ -1649,7 +1661,7 @@ Result<ast::Node*, Error> Parser::parse_negation() {
     auto identifier = this->parse_identifier(token::Minus);
     if (identifier.is_error()) return identifier;
     call.identifier = (ast::IdentifierNode*) identifier.get_value();
-    call.identifier->value = "-[negation]";
+    call.identifier->value = "-:negation";
 
     // Parse expression
     auto arg = ast::CallArgumentNode {this->current().line, this->current().column};
@@ -1807,6 +1819,14 @@ Result<ast::Node*, Error> Parser::parse_function_identifier() {
     if (this->current() == token::LessEqual) return this->parse_identifier(token::LessEqual);
     if (this->current() == token::Greater) return this->parse_identifier(token::Greater);
     if (this->current() == token::GreaterEqual) return this->parse_identifier(token::GreaterEqual);
+    if (this->match({token::LeftBracket, token::RightBracket})) {
+        auto identifier = ast::IdentifierNode {this->current().line, this->current().column};
+        identifier.value = "[]";
+        this->advance();
+        this->advance();
+        this->ast.push_back(identifier);
+        return this->ast.last_element();
+    }
     return this->parse_identifier(token::Identifier);
 }
 
@@ -1932,7 +1952,7 @@ Result<ast::Node*, Error> Parser::parse_index_access(ast::Node* expression) {
 
     // Create identifier node
     auto identifier = ast::IdentifierNode {this->current().line, this->current().column};
-    identifier.value = "subscript";
+    identifier.value = "[]";
     this->ast.push_back(identifier);
     index_access.identifier = (ast::IdentifierNode*) this->ast.last_element();
 

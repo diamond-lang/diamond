@@ -79,8 +79,8 @@ builtin not(boolean: Bool): Bool
 builtin and(left: Bool, right: Bool): Bool
 builtin or(left: Bool, right: Bool): Bool
 
-builtin subscript[t](array: Array[t], index: Int64): t
-builtin subscript_mut[t](mut array: Array[t], index: Int64): mut t
+builtin [][t](array: Array[t], index: Int64): t
+builtin [][t](mut array: Array[t], index: Int64): mut t
 builtin size[t](array: Array[t]): Int64
 
 interface printWithoutLineEnding[t](object: t): None
