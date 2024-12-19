@@ -46,6 +46,7 @@ namespace token {
         Interface,
         Builtin,
         Type,
+        Case,
         True,
         False,
         Or,

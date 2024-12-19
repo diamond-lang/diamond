@@ -332,6 +332,7 @@ Result<token::Token, Error> lexer::get_identifier(Source& source) {
     if (literal == "interface") return token::Token(token::Interface, "interface", line, column);
     if (literal == "builtin")   return token::Token(token::Builtin, "builtin", line, column);
     if (literal == "type")      return token::Token(token::Type, "type", line, column);
+    if (literal == "case")      return token::Token(token::Case, "case", line, column);
     if (literal == "be")        return token::Token(token::Be, "be", line, column);
     if (literal == "true")      return token::Token(token::True, "true", line, column);
     if (literal == "false")     return token::Token(token::False, "false", line, column);

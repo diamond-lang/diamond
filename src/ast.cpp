@@ -948,12 +948,18 @@ void ast::print(Node* node, PrintContext context) {
         case TypeDef: {
             auto& type = std::get<TypeNode>(*node);
 
-            put_indent_level(context.indent_level, append(context.last, type.fields.size() == 0));
+            put_indent_level(context.indent_level, append(context.last, type.fields.size() == 0 && type.cases.size() == 0));
             std::cout << "type " << type.identifier->value << '\n';
 
             for (size_t i = 0; i < type.fields.size(); i++) {
-                bool is_last = i == type.fields.size() - 1;
+                bool is_last = i == type.fields.size() - 1 && type.cases.size() == 0;
                 print((Node*) type.fields[i], PrintContext{context.indent_level + 1, append(context.last, is_last), context.concrete, context.type_bindings});
+            }
+
+            for (size_t i = 0; i < type.cases.size(); i++) {
+                bool is_last = i == type.cases.size() - 1;
+                put_indent_level(context.indent_level + 1,  append(context.last, is_last));
+                std::cout << "case " << type.cases[i]->identifier->value << '\n';
             }
 
             break;

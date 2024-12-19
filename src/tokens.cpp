@@ -162,6 +162,10 @@ void token::print(std::vector<Token> token) {
                 std::cout << "token::Type";
                 break;
             }
+            case Case: {
+                std::cout << "token::Case";
+                break;
+            }
             case True: {
                 std::cout << "token::True";
                 break;

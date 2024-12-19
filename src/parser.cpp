@@ -31,6 +31,7 @@ struct Parser {
     Result<ast::Node*, Error> parse_extern();
     Result<ast::Node*, Error> parse_link_with();
     Result<ast::Node*, Error> parse_type_definition();
+    Result<Ok, Error> parse_type_definition_body(ast::TypeNode* node);
     Result<ast::Type,  Error> parse_type();
     Result<ast::Node*, Error> parse_interface();
     Result<ast::Node*, Error> parse_statement();
@@ -870,13 +871,26 @@ Result<ast::Node*, Error> Parser::parse_type_definition() {
     if (identifier.is_error()) return identifier;
     type.identifier = (ast::IdentifierNode*) identifier.get_value();
 
+    // Parse body
+    auto body = this->parse_type_definition_body(&type);
+    if (body.is_error()) return body.get_error();
+
+    // return
+    this->ast.push_back(type);
+    return this->ast.last_element();
+}
+
+// type_definition_body →  (("\n"+ IDENTIFIER ": " type)|(CASE IDENTIFIER type_defintion_body))*
+Result<Ok, Error> Parser::parse_type_definition_body(ast::TypeNode* node) {
     // Set new indentation level
+    size_t backup = this->position;
     this->advance_until_next_statement();
     size_t previous = this->current_indentation();
     this->indentation_level.push_back(this->current().column);
     if (previous >= this->current_indentation()) {
-        this->errors.push_back(errors::expecting_new_indentation_level(this->location())); // tested in errors/expecting_new_indentation_level.dm
-        return Error {};
+        this->indentation_level.pop_back();
+        this->position = backup;
+        return Ok{};
     }
 
     while (!this->at_end()) {
@@ -895,28 +909,47 @@ Result<ast::Node*, Error> Parser::parse_type_definition() {
             return Error {};
         }
 
-        // Parse field
-        auto field = this->parse_identifier();
-        if (field.is_error()) return Error {};
+        if (this->current() == token::Identifier) {
+            // Parse field
+            auto field = this->parse_identifier();
+            if (field.is_error()) return Error {};
 
-        // Parse colon
-        auto colon = this->parse_token(token::Colon);
-        if (colon.is_error()) return Error {};
+            // Parse colon
+            auto colon = this->parse_token(token::Colon);
+            if (colon.is_error()) return Error {};
 
-        auto type_annotation = this->parse_type();
-        if (type_annotation.is_error()) return Error {};
+            auto type_annotation = this->parse_type();
+            if (type_annotation.is_error()) return Error {};
 
-        ast::set_type(field.get_value(), type_annotation.get_value());
+            ast::set_type(field.get_value(), type_annotation.get_value());
+            node->fields.push_back((ast::IdentifierNode*) field.get_value());
+        }
+        else if (this->current() == token::Case) {
+            // Parse keyword
+            auto keyword = this->parse_token(token::Case);
+            if (keyword.is_error()) return Error {};
 
-        this->ast.push_back(*field.get_value());
-        type.fields.push_back((ast::IdentifierNode*) this->ast.last_element());
+            // Parse identifier
+            auto identifier = this->parse_identifier();
+            if (identifier.is_error()) return Error {};
+
+            // Parse body
+            ast::TypeNode new_case = ast::TypeNode{this->location().line, this->location().column};
+            this->ast.push_back(new_case);
+            node->cases.push_back((ast::TypeNode*) this->ast.last_element());
+            node->cases[node->cases.size() - 1]->identifier = (ast::IdentifierNode*) identifier.get_value();
+            auto body = this->parse_type_definition_body(node->cases[node->cases.size() - 1]);
+            if (body.is_error()) return body.get_error();
+        }
+        else {
+            assert(false);
+        }
     }
 
     // Pop indentation level
     this->indentation_level.pop_back();
 
-    this->ast.push_back(type);
-    return this->ast.last_element();
+    return Ok{};
 }
 
 // type → IDENTIFIER ("[" type (", " type)* "]")*
