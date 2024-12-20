@@ -141,17 +141,22 @@ Result<Ok, Errors> semantic::FunctionsAndTypesScopes::add_module_functions(ast::
         }
         std::string file = result.get_value();
 
+        // Read module
+        auto module_content = utilities::read_file(module_path);
+
         // Lex
-        auto tokens = lexer::lex(module_path);
-        if (tokens.is_error()) {
-            for (size_t i = 0; i < tokens.get_error().size(); i++) {
-                std::cout << tokens.get_error()[i].value << "\n";
+        auto lexing_result = lexer::lex(module_content);
+        if (std::holds_alternative<std::vector<Error>>(lexing_result)) {
+            auto errors = std::get<std::vector<Error>>(lexing_result);
+            for (size_t i = 0; i < errors.size(); i++) {
+                std::cout << errors[i].value << "\n";
             }
             exit(EXIT_FAILURE);
         }
+        auto tokens = std::get<std::vector<token::Token>>(lexing_result);
 
         // Parse module and add it to the ast
-        auto parsing_result = parse::module(ast, tokens.get_value(), module_path);
+        auto parsing_result = parse::module(ast, tokens, module_path);
         if (parsing_result.is_error()) {
             std::vector<Error> errors = parsing_result.get_errors();
             for (size_t i = 0; i < errors.size(); i++) {

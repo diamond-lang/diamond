@@ -1,10 +1,10 @@
 #include <vector>
-#include <filesystem>
+#include <variant>
 
 #include "shared.hpp"
 #include "errors.hpp"
 #include "tokens.hpp"
 
 namespace lexer {
-    Result<std::vector<token::Token>, Errors> lex(std::filesystem::path path);
+    std::variant<std::vector<token::Token>, std::vector<Error>> lex(std::string source);
 };

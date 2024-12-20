@@ -1,312 +1,210 @@
-#include <cctype>
-#include <iostream>
-#include <cassert>
-#include <stack>
-
 #include "tokens.hpp"
 #include "lexer.hpp"
 #include "errors.hpp"
 
-// Prototypes and definitions
-// --------------------------
+#include <variant>
+
 namespace lexer {
-    struct OnString {
-        char character;
-        bool onString;
+    struct Lexer {
+        size_t line = 1;
+        size_t column = 1;
+        size_t start = 0;
+        size_t current = 0;
+        std::string source;
+        std::vector<token::Token> tokens;
+        std::vector<Error> errors;
     };
 
-    struct Source {
-        size_t line;
-        size_t column;
-        size_t index;
-        std::filesystem::path path;
-        FILE* file_pointer;
-        std::stack<OnString> onString;
-
-        Source() {}
-        Source(std::filesystem::path path, FILE* file_pointer) : line(1), column(1), index(0), path(path), file_pointer(file_pointer) {}
-    };
-
-    char current(Source source) {
-        char c = fgetc(source.file_pointer);
-        if (c == EOF) fseek(source.file_pointer, 0, SEEK_END);
-        else          fseek(source.file_pointer, -1, SEEK_CUR);
-        return c;
-    }
-
-    void advance(Source& source) {
-        if (current(source) == '\n') {
-            source.line += 1;
-            source.column = 1;
-        }
-        else {
-            source.column++;
-        }
-        source.index++;
-        fgetc(source.file_pointer);
-    }
-
-    void advance(Source& source, unsigned int offset) {
-        while (offset != 0) {
-            advance(source);
-            offset--;
-        }
-    }
-
-    char prev(Source source) {
-        int result = fseek(source.file_pointer, -1, SEEK_CUR);
-        if (result < 0) return '\n';
-        char c = current(source);
-        advance(source);
-        return c;
-    }
-
-    char peek(Source source, unsigned int offset = 1);
-    char peek(Source source, unsigned int offset) {
-        unsigned int aux = offset;
-        while (aux > 0) {
-            char c = fgetc(source.file_pointer);
-            if (c == EOF) {
-                fseek(source.file_pointer, -(int)(offset - aux), SEEK_CUR);
-            }
-            aux--;
-        }
-        char c = current(source);
-        fseek(source.file_pointer, -(int)offset, SEEK_CUR);
-        return c;
-    }
-
-    bool at_end(Source source) {
-        return current(source) == EOF;
-    }
-
-    bool match(Source source, std::string to_match) {
-        bool match = true;
-        int i = 0;
-        while (!at_end(source) && i < to_match.size()) {
-            if (current(source) != to_match[i]) {
-                match = false;
-                break;
-            }
-            advance(source);
-            i++;
-        }
-        if (at_end(source) && i != to_match.size()) {
-            match = false;
-        }
-        fseek(source.file_pointer, -i, SEEK_CUR);
-        return match;
-    }
-
-    Result<token::Token, Error> get_token(Source& source);
-    Result<token::Token, Error> advance(token::Token token, Source& source, unsigned int offset);
-    void advance_until_new_line(Source& source);
-    Result<token::Token, Error> get_string(Source& source);
-    Result<token::Token, Error> get_number(Source& source);
-    Result<token::Token, Error> get_identifier(Source& source);
-    std::string get_integer(Source& source);
-    Result<token::Token, Error> get_indent(Source& source);
+    bool atEnd(Lexer& lexer);
+    void advance(Lexer& lexer);
+    bool match(Lexer& lexer, std::string string);
+    char peek(Lexer& lexer);
+    char peekNext(Lexer& lexer);
+    void advanceUntilNewLine(Lexer& lexer);
+    void scanToken(Lexer& lexer);
+    void scanNumber(Lexer& lexer);
+    void scanInteger(Lexer& lexer);
+    void scanIdentifierOrKeyword(Lexer& lexer);
+    void scanString(Lexer& lexer);
+    void addToken(Lexer& lexer, token::TokenKind kind);
 }
 
 // Lexing
 // ------
-Result<std::vector<token::Token>, Errors> lexer::lex(std::filesystem::path path) {
-     std::vector<token::Token> tokens;
-     Errors errors;
-
-    // Read file
-    FILE* file_pointer = fopen(path.string().c_str(), "rb");
-    if (!file_pointer) {
-        errors.push_back(errors::file_couldnt_be_found(path));
-        return Result<std::vector<token::Token>, Errors>(errors);
-    }
-
-    // Create source
-    Source source(path, file_pointer);
+std::variant<std::vector<token::Token>, std::vector<Error>> lexer::lex(std::string source) {
+    // Create lexer
+    Lexer lexer = Lexer {
+        .source = source
+    };
 
     // Tokenize
-    while (!at_end(source)) {
-        auto result = get_token(source);
-        if (result.is_ok() && result.get_value() != token::EndOfFile) {
-            tokens.push_back(result.get_value());
-        }
-        else if (result.is_error()) {
-            errors.push_back(result.get_error());
-            advance(source);
-        }
+    while (!atEnd(lexer)) {
+        scanToken(lexer);
     }
-    tokens.push_back(token::Token(token::EndOfFile, source.line, source.column));
 
-    // Close file
-    fclose(file_pointer);
+    lexer.tokens.push_back(token::Token{
+        .kind = token::EndOfFile{},
+        .line = lexer.line,
+        .column = lexer.column
+    });
 
-    if (errors.size() != 0) return Result<std::vector<token::Token>, Errors>(errors);
-    else                    return Result<std::vector<token::Token>, Errors>(tokens);
+    if (lexer.errors.size() > 0) {
+        return lexer.errors;
+    }
+    return lexer.tokens;
 }
 
-Result<token::Token, Error> lexer::get_token(Source& source) {
-    if (at_end(source))      return advance(token::Token(token::EndOfFile, "EndOfFile", source.line, source.column), source, 1);
-    if (match(source, "("))  return advance(token::Token(token::LeftParen, "(", source.line, source.column), source, 1);
-    if (match(source, ")"))  return advance(token::Token(token::RightParen, ")", source.line, source.column), source, 1);
-    if (match(source, "["))  return advance(token::Token(token::LeftBracket, "[", source.line, source.column), source, 1);
-    if (match(source, "]"))  return advance(token::Token(token::RightBracket, "]", source.line, source.column), source, 1);
-    if (match(source, "{"))  {
-        if (!source.onString.empty()) {
-            source.onString.push(OnString{'{', false});
-        }
-        return advance(token::Token(token::LeftCurly, "{", source.line, source.column), source, 1);
-    }
-    if (match(source, "}")) {
-        if (!source.onString.empty()
-        && source.onString.top().character == '{') {
-            if (source.onString.top().onString) {
-                return get_string(source);
-            }
-            else {
-                source.onString.pop();
-                return advance(token::Token(token::RightCurly, "}", source.line, source.column), source, 1);
-            }
-        }
+void lexer::scanToken(Lexer& lexer) {
+    lexer.start = lexer.current;
 
-        return advance(token::Token(token::RightCurly, "}", source.line, source.column), source, 1);
+    if (match(lexer, "("))  return addToken(lexer, token::LeftParen{});
+    if (match(lexer, ")"))  return addToken(lexer, token::RightParen{});
+    if (match(lexer, "["))  return addToken(lexer, token::LeftBracket{});
+    if (match(lexer, "]"))  return addToken(lexer, token::RightBracket{});
+    if (match(lexer, "{"))  {
+        // if (!source.onString.empty()) {
+        //     source.onString.push(OnString{'{', false});
+        // }
+        return addToken(lexer, token::LeftCurly{});
     }
-    if (match(source, "+"))  return advance(token::Token(token::Plus, "+", source.line, source.column), source, 1);
-    if (match(source, "*"))  return advance(token::Token(token::Star, "*", source.line, source.column), source, 1);
-    if (match(source, "/"))  return advance(token::Token(token::Slash, "/", source.line, source.column), source, 1);
-    if (match(source, "%"))  return advance(token::Token(token::Modulo, "%", source.line, source.column), source, 1);
-    if (match(source, ":=")) return advance(token::Token(token::ColonEqual, ":=", source.line, source.column), source, 2);
-    if (match(source, ":"))  return advance(token::Token(token::Colon, ":", source.line, source.column), source, 1);
-    if (match(source, ","))  return advance(token::Token(token::Comma, ",", source.line, source.column), source, 1);
-    if (match(source, "!=")) return advance(token::Token(token::NotEqual, "!=", source.line, source.column), source, 2);
-    if (match(source, "==")) return advance(token::Token(token::EqualEqual, "==", source.line, source.column), source, 2);
-    if (match(source, "="))  return advance(token::Token(token::Equal, "=", source.line, source.column), source, 1);
-    if (match(source, ">=")) return advance(token::Token(token::GreaterEqual, ">=", source.line, source.column), source, 2);
-    if (match(source, ">"))  return advance(token::Token(token::Greater, ">", source.line, source.column), source, 1);
-    if (match(source, "<=")) return advance(token::Token(token::LessEqual, "<=", source.line, source.column), source, 2);
-    if (match(source, "<"))  return advance(token::Token(token::Less, "<", source.line, source.column), source, 1);
-    if (match(source, "&"))  return advance(token::Token(token::Ampersand, "&", source.line, source.column), source, 1);
-    if (match(source, ".") && isdigit(peek(source))) {
-        return get_number(source);
-    }
-    if (match(source, ".")) {
-        return advance(token::Token(token::Dot, ".", source.line, source.column), source, 1);
-    }
-    if (match(source, "---")) {
-        advance(source, 3);
-        while (!(at_end(source) || match(source, "---"))) {
-            advance(source);
-        }
-        if (at_end(source)) {
-            return Result<token::Token, Error>(std::string("Error: Unclosed block comment\n"));
-        }
+    if (match(lexer, "}")) {
+        // if (!source.onString.empty()
+        // && source.onString.top().character == '{') {
+        //     if (source.onString.top().onString) {
+        //         return get_string(source);
+        //     }
+        //     else {
+        //         source.onString.pop();
+        //         return Token(lexer, token::RightCurly, "}", source.line, source.column), lexer, 1);
+        //     }
+        // }
 
-        advance(source, 3);
-        return get_token(source);
+        return addToken(lexer, token::RightCurly{});
     }
-    if (match(source, "--")) {
-        advance_until_new_line(source);
-        return get_token(source);
+    if (match(lexer, "+"))  return addToken(lexer, token::Plus{});
+    if (match(lexer, "*"))  return addToken(lexer, token::Star{});
+    if (match(lexer, "/"))  return addToken(lexer, token::Slash{});
+    if (match(lexer, "%"))  return addToken(lexer, token::Modulo{});
+    if (match(lexer, ":=")) return addToken(lexer, token::ColonEqual{});
+    if (match(lexer, ":"))  return addToken(lexer, token::Colon{});
+    if (match(lexer, ","))  return addToken(lexer, token::Comma{});
+    if (match(lexer, "!=")) return addToken(lexer, token::NotEqual{});
+    if (match(lexer, "==")) return addToken(lexer, token::EqualEqual{});
+    if (match(lexer, "="))  return addToken(lexer, token::Equal{});
+    if (match(lexer, ">=")) return addToken(lexer, token::GreaterEqual{});
+    if (match(lexer, ">"))  return addToken(lexer, token::Greater{});
+    if (match(lexer, "<=")) return addToken(lexer, token::LessEqual{});
+    if (match(lexer, "<"))  return addToken(lexer, token::Less{});
+    if (match(lexer, "&"))  return addToken(lexer, token::Ampersand{});
+    if (peek(lexer) == '.' && isdigit(peekNext(lexer))) {
+        return scanNumber(lexer);
     }
-    if (match(source, "-")) {
-        return advance(token::Token(token::Minus, "-", source.line, source.column), source, 1);
+    if (match(lexer, ".")) {
+        return addToken(lexer, token::Dot{});
     }
-    if (match(source, "_")) {
-        return get_identifier(source);
+    if (match(lexer, "---")) {
+        while (!(atEnd(lexer) || match(lexer, "---"))) {
+            advance(lexer);
+        }
+        if (atEnd(lexer)) {
+            lexer.errors.push_back(Error{std::string("Error: Unclosed block comment\n")});
+            return;
+        }
+        return scanToken(lexer);
     }
-    if (match(source, " "))  {
-        advance(source);
-        return get_token(source);
+    if (match(lexer, "--")) {
+        advanceUntilNewLine(lexer);
+        advance(lexer);
+        return scanToken(lexer);
     }
-    if (match(source, "\t")) {
-        advance(source);
-        return get_token(source);
+    if (match(lexer, "-")) {
+        return addToken(lexer, token::Minus{});
     }
-    if (match(source, "\r\n"))    return advance(token::Token(token::NewLine, "\\n", source.line, source.column), source, 2);
-    if (match(source, "\n"))      return advance(token::Token(token::NewLine, "\\n", source.line, source.column), source, 1);
-    if (match(source, "\""))      return get_string(source);
-    if (isdigit(current(source))) return get_number(source);
-    if (isalpha(current(source))) return get_identifier(source);
+    if (match(lexer, "_")) {
+        return scanIdentifierOrKeyword(lexer);
+    }
+    if (match(lexer, " ")
+    ||  match(lexer, "\t")) {
+        return; 
+    }
+    if (match(lexer, "\r\n")
+    ||  match(lexer, "\n")) {
+        lexer.line += 1;
+        lexer.column = 1;
+        return addToken(lexer, token::NewLine{});
+    }
+    if (match(lexer, "\"")) {
+        return scanString(lexer);
+    }
+    if (isdigit(peek(lexer))) return scanNumber(lexer);
+    if (isalpha(peek(lexer))) return scanIdentifierOrKeyword(lexer);
 
-    return Result<token::Token, Error>(std::string("Error: Unrecognized character \"") + std::string(1, current(source)) + std::string("\".\n"));
+    lexer.errors.push_back(Error{std::string("Error: Unrecognized character \"")});
 }
 
-Result<token::Token, Error> lexer::advance(token::Token token, Source& source, unsigned int offset) {
-    advance(source, offset);
-    return Result<token::Token, Error>(token);
-}
-
-void lexer::advance_until_new_line(Source& source) {
-    while (!at_end(source) && current(source) != '\n') {
-        advance(source);
-    }
-    if (!at_end(source)) advance(source);
-}
-
-Result<token::Token, Error> lexer::get_string(Source& source) {
+void lexer::scanString(Lexer& lexer) {
     std::string literal = "";
-    size_t line = source.line;
-    size_t column = source.column;
+    size_t line = lexer.line;
+    size_t column = lexer.column;
     bool isRight = false;
 
-    if (current(source) == '\"') {
-        source.onString.push(OnString{current(source), true});
-    }
-    else if (current(source) == '}') {
-        source.onString.pop();
-        isRight = true;
-    }
-    else {
-        assert(false);
-    }
+    // if (peek(lexer) == '\"') {
+    //     source.onString.push(OnString{current(source), true});
+    // }
+    // else if (current(source) == '}') {
+    //     source.onString.pop();
+    //     isRight = true;
+    // }
+    // else {
+    //     assert(false);
+    // }
 
-    advance(source);
-    while (!(at_end(source) || match(source, "\n"))) {
-        if (match(source, "\\n")) {
+    advance(lexer);
+    while (!(atEnd(lexer) || match(lexer, "\n"))) {
+        if (match(lexer, "\\n")) {
             literal += "\n";
-            advance(source);
         }
-        else if (match(source, "\\\"")) {
+        else if (match(lexer, "\\\"")) {
             literal += "\"";
-            advance(source);
         }
-        else if (match(source, "\"")) {
+        else if (match(lexer, "\"")) {
             break;
         }
-        else if (match(source, "\\{")) {
+        else if (match(lexer, "\\{")) {
             literal += "{";
         }
-        else if (match(source, "{")) {
+        else if (match(lexer, "{")) {
             break;
         }
         else {
-            literal += current(source);
+            literal += peek(lexer);
+            advance(lexer);
         }
-        advance(source);
     }
 
-    if (at_end(source) || match(source, "\n")) {
-        return Result<token::Token, Error>(std::string("Error: Unclosed string\n"));
+    if (atEnd(lexer) || match(lexer, "\n")) {
+        lexer.errors.push_back(Error{std::string("Error: Unclosed string\n")});
+        return;
     }
     else {
-        if (match(source, "{")) {
-            source.onString.push(OnString{current(source), true});
-            advance(source);
-            if (isRight) {
-                return Result<token::Token, Error>(token::Token(token::StringMiddle, literal, line, column));
-            }
-            else {
-                return Result<token::Token, Error>(token::Token(token::StringLeft, literal, line, column));
-            }
-        }
-        else if (match(source, "\"")) {
-            source.onString.pop();
-            advance(source);
-            if (isRight) {
-                return Result<token::Token, Error>(token::Token(token::StringRight, literal, line, column));
-            }
-            else {
-                return Result<token::Token, Error>(token::Token(token::String, literal, line, column));
-            }
+        // if (match(source, "{")) {
+        //     source.onString.push(OnString{current(source), true});
+        //     advance(source);
+        //     if (isRight) {
+        //         return Result<token::Token, Error>(token::Token(token::StringMiddle, literal, line, column));
+        //     }
+        //     else {
+        //         return Result<token::Token, Error>(token::Token(token::StringLeft, literal, line, column));
+        //     }
+        // }
+        /*else*/ if (match(lexer, "\"")) {
+            //source.onString.pop();
+            // if (isRight) {
+            //     return Result<token::Token, Error>(token::Token(token::StringRight, literal, line, column));
+            // }
+            // else {
+            return addToken(lexer, token::String{.literal = literal});
+            //}
         }
         else {
             assert(false);
@@ -314,75 +212,108 @@ Result<token::Token, Error> lexer::get_string(Source& source) {
     }
 }
 
-Result<token::Token, Error> lexer::get_identifier(Source& source) {
-    std::string literal = "";
-    size_t line = source.line;
-    size_t column = source.column;
+void lexer::scanIdentifierOrKeyword(Lexer& lexer) {
+    while (isalnum(peek(lexer)) || peek(lexer) == '_') advance(lexer);
+    auto literal = lexer.source.substr(lexer.start, lexer.current - lexer.start);
 
-    while (!(at_end(source) || match(source, "\n"))) {
-        if (!(isalnum(current(source)) || current(source) == '_')) break;
-        literal += current(source);
-        advance(source);
-    }
+    if (literal == "if")        return addToken(lexer, token::If{});
+    if (literal == "else")      return addToken(lexer, token::Else{});
+    if (literal == "while")     return addToken(lexer, token::While{});
+    if (literal == "function")  return addToken(lexer, token::Function{});
+    if (literal == "interface") return addToken(lexer, token::Interface{});
+    if (literal == "builtin")   return addToken(lexer, token::Builtin{});
+    if (literal == "type")      return addToken(lexer, token::Type{});
+    if (literal == "case")      return addToken(lexer, token::Case{});
+    if (literal == "be")        return addToken(lexer, token::Be{});
+    if (literal == "true")      return addToken(lexer, token::True{});
+    if (literal == "false")     return addToken(lexer, token::False{});
+    if (literal == "and")       return addToken(lexer, token::And{});
+    if (literal == "or")        return addToken(lexer, token::Or{});
+    if (literal == "use")       return addToken(lexer, token::Use{});
+    if (literal == "include")   return addToken(lexer, token::Include{});
+    if (literal == "break")     return addToken(lexer, token::Break{});
+    if (literal == "continue")  return addToken(lexer, token::Continue{});
+    if (literal == "return")    return addToken(lexer, token::Return{});
+    if (literal == "mut")       return addToken(lexer, token::Mut{});
+    if (literal == "new")       return addToken(lexer, token::New{});
+    if (literal == "not")       return addToken(lexer, token::Not{});
+    if (literal == "extern")    return addToken(lexer, token::Extern{});
+    if (literal == "link_with") return addToken(lexer, token::LinkWith{});
 
-    if (literal == "if")        return token::Token(token::If, "if", line, column);
-    if (literal == "else")      return token::Token(token::Else, "else", line, column);
-    if (literal == "while")     return token::Token(token::While, "while", line, column);
-    if (literal == "function")  return token::Token(token::Function, "function", line, column);
-    if (literal == "interface") return token::Token(token::Interface, "interface", line, column);
-    if (literal == "builtin")   return token::Token(token::Builtin, "builtin", line, column);
-    if (literal == "type")      return token::Token(token::Type, "type", line, column);
-    if (literal == "case")      return token::Token(token::Case, "case", line, column);
-    if (literal == "be")        return token::Token(token::Be, "be", line, column);
-    if (literal == "true")      return token::Token(token::True, "true", line, column);
-    if (literal == "false")     return token::Token(token::False, "false", line, column);
-    if (literal == "and")       return token::Token(token::And, "and", line, column);
-    if (literal == "or")        return token::Token(token::Or, "or", line, column);
-    if (literal == "use")       return token::Token(token::Use, "use", line, column);
-    if (literal == "include")   return token::Token(token::Include, "include", line, column);
-    if (literal == "break")     return token::Token(token::Break, "break", line, column);
-    if (literal == "continue")  return token::Token(token::Continue, "continue", line, column);
-    if (literal == "return")    return token::Token(token::Return, "return", line, column);
-    if (literal == "mut")       return token::Token(token::Mut, "mut", line, column);
-    if (literal == "new")       return token::Token(token::New, "new", line, column);
-    if (literal == "not")       return token::Token(token::Not, "not", line, column);
-    if (literal == "extern")    return token::Token(token::Extern, "extern", line, column);
-    if (literal == "link_with") return token::Token(token::LinkWith, "link_with", line, column);
-
-    return token::Token(token::Identifier, literal, line, column);
+    return addToken(lexer, token::Identifier{.literal = literal});
 }
 
-Result<token::Token, Error> lexer::get_number(Source& source) {
-    std::string literal = "";
-    size_t line = source.line;
-    size_t column = source.column;
+void lexer::scanNumber(Lexer& lexer) {
+    // consume digits
+    while (isdigit(peek(lexer))) advance(lexer);
 
     // eg: .8
-    if (match(source, ".")) {
-        advance(source);
-        literal += "." + get_integer(source);
-        return token::Token(token::Float, literal, line, column);
+    if (peek(lexer) == '.' && isdigit(peekNext(lexer))) {
+        // consume "."
+        advance(lexer);
+
+        // consume digits
+        while (isdigit(peek(lexer))) advance(lexer);
     }
 
-    literal += get_integer(source);
-
-    // eg: 6.7
-    if (match(source, ".")) {
-        advance(source);
-        literal += "." + get_integer(source);
-        return token::Token(token::Float, literal, line, column);
-
-    // eg: 16
-    } else {
-        return token::Token(token::Integer, literal, line, column);
-    }
+    // Add token
+    auto literal = lexer.source.substr(lexer.start, lexer.current - lexer.start);
+    return addToken(lexer, token::Float{.literal = literal});
 }
 
-std::string lexer::get_integer(Source& source) {
-    std::string integer = "";
-    while (!(at_end(source) || match(source, "\n")) && isdigit(current(source))) {
-        integer += current(source);
-        advance(source);
+void lexer::scanInteger(Lexer& lexer) {
+    while (isdigit(peek(lexer))) advance(lexer);
+    auto literal = lexer.source.substr(lexer.start, lexer.current - lexer.start);
+    return addToken(lexer, token::Integer{.literal = literal});
+}
+
+bool lexer::atEnd(Lexer& lexer) {
+    return lexer.current >= lexer.source.length();
+}
+
+void lexer::advance(Lexer& lexer) {
+    lexer.current += 1;
+    lexer.column += 1;
+}
+
+bool lexer::match(Lexer& lexer, std::string string) {
+    bool match = true;
+    int i = 0;
+    while (!atEnd(lexer) && i < string.size()) {
+        if (peek(lexer) != string[i]) {
+            match = false;
+            lexer.current -= i;
+            break;
+        }
+        advance(lexer);
+        i++;
     }
-    return integer;
+    if (atEnd(lexer) && i != string.size()) {
+        match = false;
+        lexer.current -= i;
+    }
+
+    return match;
+}
+
+char lexer::peek(Lexer& lexer) {
+    if (atEnd(lexer)) return '\0';
+    return lexer.source[lexer.current];
+}
+
+char lexer::peekNext(Lexer& lexer) {
+    if (lexer.current + 1 >= lexer.source.length()) return '\0';
+    return lexer.source[lexer.current + 1];
+}
+
+void lexer::advanceUntilNewLine(Lexer& lexer) {
+    while (peek(lexer) != '\n') {advance(lexer);}
+}
+
+void lexer::addToken(Lexer& lexer, token::TokenKind kind) {
+    lexer.tokens.push_back(token::Token{
+        .kind = kind,
+        .line = lexer.line,
+        .column = lexer.column - (lexer.current - lexer.start)
+    });
 }

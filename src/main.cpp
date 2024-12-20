@@ -80,10 +80,15 @@ void build(Command command) {
     // Get program name
     std::string program_name = utilities::get_program_name(command.file);
 
+    // Read file
+    auto file = utilities::read_file(std::filesystem::path(command.file));
+
     // Lex
-    auto lexing_result = lexer::lex(std::filesystem::path(command.file));
-    if (lexing_result.is_error()) print_errors_and_exit(lexing_result.get_error());
-    auto tokens = lexing_result.get_value();
+    auto lexing_result = lexer::lex(file);
+    if (std::holds_alternative<std::vector<Error>>(lexing_result)) {
+        print_errors_and_exit(std::get<std::vector<Error>>(lexing_result));
+    }
+    auto tokens = std::get<std::vector<token::Token>>(lexing_result);
 
     // Parse
     auto parsing_result = parse::program(tokens, command.file);
@@ -108,10 +113,15 @@ void run(Command command) {
     // Check if executable already existed
     bool already_existed = utilities::file_exists(utilities::get_executable_name(program_name));
 
+    // Read file
+    auto file = utilities::read_file(std::filesystem::path(command.file));
+
     // Lex
-    auto lexing_result = lexer::lex(std::filesystem::path(command.file));
-    if (lexing_result.is_error()) print_errors_and_exit(lexing_result.get_error());
-    auto tokens = lexing_result.get_value();
+    auto lexing_result = lexer::lex(file);
+    if (std::holds_alternative<std::vector<Error>>(lexing_result)) {
+        print_errors_and_exit(std::get<std::vector<Error>>(lexing_result));
+    }
+    auto tokens = std::get<std::vector<token::Token>>(lexing_result);
 
     // Parse
     auto parsing_result = parse::program(tokens, command.file);
@@ -140,10 +150,15 @@ void emit(Command command) {
     // Get program name
     std::string program_name = utilities::get_program_name(command.file);
 
+    // Read file
+    auto file = utilities::read_file(std::filesystem::path(command.file));
+
     // Lex
-    auto lexing_result = lexer::lex(std::filesystem::path(command.file));
-    if (lexing_result.is_error()) print_errors_and_exit(lexing_result.get_error());
-    auto tokens = lexing_result.get_value();
+    auto lexing_result = lexer::lex(file);
+    if (std::holds_alternative<std::vector<Error>>(lexing_result)) {
+        print_errors_and_exit(std::get<std::vector<Error>>(lexing_result));
+    }
+    auto tokens = std::get<std::vector<token::Token>>(lexing_result);
 
     // Emit tokens
     if (command.options[0] == std::string("--tokens")) {

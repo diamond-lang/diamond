@@ -4,6 +4,7 @@
 #include <vector>
 #include <cassert>
 #include <variant>
+#include <filesystem>
 
 struct Error {
     std::string value;

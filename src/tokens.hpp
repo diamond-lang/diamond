@@ -6,7 +6,63 @@
 #include <vector>
 
 namespace token {
-    enum TokenVariant {
+    struct LeftParen {};
+    struct RightParen {};
+    struct LeftBracket {};
+    struct RightBracket {};
+    struct LeftCurly {};
+    struct RightCurly {};
+    struct Comma {};
+    struct Plus {};
+    struct Slash {};
+    struct Modulo {};
+    struct Star {};
+    struct Minus {};
+    struct Colon {};
+    struct Ampersand {};
+    struct Dot {};
+    struct Not {};
+    struct NotEqual {};
+    struct Greater {};
+    struct GreaterEqual {};
+    struct Less {};
+    struct LessEqual {};
+    struct ColonEqual {};
+    struct Equal {};
+    struct EqualEqual {};
+    struct Be {};
+    struct Integer {std::string literal;};
+    struct Float {std::string literal;};
+    struct Identifier {std::string literal;};
+    struct String {std::string literal;};
+    struct StringLeft {};
+    struct StringMiddle {};
+    struct StringRight {};
+    struct If {};
+    struct Else {};
+    struct While {};
+    struct Function {};
+    struct Interface {};
+    struct Builtin {};
+    struct Type {};
+    struct Case {};
+    struct True {};
+    struct False {};
+    struct Or {};
+    struct And {};
+    struct Use {};
+    struct Break {};
+    struct Continue {};
+    struct Return {};
+    struct Mut {};
+    struct New {};
+    struct Include {};
+    struct Extern {};
+    struct LinkWith {};
+    struct NewLine {};
+    struct EndOfFile {};
+
+    using TokenKind = std::variant<
         LeftParen,
         RightParen,
         LeftBracket,
@@ -62,34 +118,17 @@ namespace token {
         LinkWith,
         NewLine,
         EndOfFile
-    };
+    >;
 
     struct Token {
-        token::TokenVariant variant;
-        std::string str;
-        const char* static_str = nullptr;
+        TokenKind kind;
         size_t line;
         size_t column;
 
-        Token() {}
-        Token(token::TokenVariant variant, size_t line, size_t column) : variant(variant), line(line), column(column) {}
-        Token(token::TokenVariant variant, std::string literal, size_t line, size_t column) : variant(variant), str(literal), line(line), column(column) {}
-        Token(token::TokenVariant variant, const char* literal, size_t line, size_t column) : variant(variant), static_str(literal), line(line), column(column) {}
-        ~Token() {}
-
-        std::string get_literal() {
-            if (static_str) return std::string(this->static_str);
-            else            return this->str;
-        }
-
-        bool operator==(const TokenVariant variant) const {
-            return this->variant == variant;
-        }
-        bool operator!=(const TokenVariant variant) const {
-            return !(*this == variant);
-        }
+        std::string get_literal();
     };
 
+    size_t getIndex(TokenKind kind);
     void print(std::vector<Token> tokens);
 };
 
