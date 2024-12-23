@@ -5,3 +5,7 @@ diamond.exe
 deps/llvm
 bindings
 .DS_Store
+
+# Added by cargo
+
+/target
