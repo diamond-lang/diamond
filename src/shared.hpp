@@ -51,4 +51,19 @@ struct Location {
     Location(size_t line, size_t column, std::filesystem::path file) : line(line), column(column), file(file) {}
 };
 
+#define todo() assert(false);
+
+template<typename V, typename T, size_t I = 0>
+constexpr size_t getIndex() {
+    if constexpr (I >= std::variant_size_v<V>) {
+        return (std::variant_size_v<V>);
+    } else {    
+        if constexpr (std::is_same_v<std::variant_alternative_t<I, V>, T>) {
+            return (I);
+        } else {
+            return (getIndex<V, T, I + 1>());
+        }
+    }
+}
+
 #endif

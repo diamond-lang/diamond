@@ -26,18 +26,18 @@ namespace lexer {
     void scanInteger(Lexer& lexer);
     void scanIdentifierOrKeyword(Lexer& lexer);
     void scanString(Lexer& lexer);
-    void addToken(Lexer& lexer, token::TokenKind kind);
+    void addToken(Lexer& lexer, token::Kind kind);
 }
 
 // Lexing
 // ------
 std::variant<std::vector<token::Token>, std::vector<Error>> lexer::lex(std::string source) {
-    // Create lexer
+    // create lexer
     Lexer lexer = Lexer {
         .source = source
     };
 
-    // Tokenize
+    // tokenize
     while (!atEnd(lexer)) {
         scanToken(lexer);
     }
@@ -48,6 +48,7 @@ std::variant<std::vector<token::Token>, std::vector<Error>> lexer::lex(std::stri
         .column = lexer.column
     });
 
+    // return
     if (lexer.errors.size() > 0) {
         return lexer.errors;
     }
@@ -61,26 +62,8 @@ void lexer::scanToken(Lexer& lexer) {
     if (match(lexer, ")"))  return addToken(lexer, token::RightParen{});
     if (match(lexer, "["))  return addToken(lexer, token::LeftBracket{});
     if (match(lexer, "]"))  return addToken(lexer, token::RightBracket{});
-    if (match(lexer, "{"))  {
-        // if (!source.onString.empty()) {
-        //     source.onString.push(OnString{'{', false});
-        // }
-        return addToken(lexer, token::LeftCurly{});
-    }
-    if (match(lexer, "}")) {
-        // if (!source.onString.empty()
-        // && source.onString.top().character == '{') {
-        //     if (source.onString.top().onString) {
-        //         return get_string(source);
-        //     }
-        //     else {
-        //         source.onString.pop();
-        //         return Token(lexer, token::RightCurly, "}", source.line, source.column), lexer, 1);
-        //     }
-        // }
-
-        return addToken(lexer, token::RightCurly{});
-    }
+    if (match(lexer, "{"))  return addToken(lexer, token::LeftCurly{});
+    if (match(lexer, "}"))  return addToken(lexer, token::RightCurly{});
     if (match(lexer, "+"))  return addToken(lexer, token::Plus{});
     if (match(lexer, "*"))  return addToken(lexer, token::Star{});
     if (match(lexer, "/"))  return addToken(lexer, token::Slash{});
@@ -127,11 +110,11 @@ void lexer::scanToken(Lexer& lexer) {
     ||  match(lexer, "\t")) {
         return; 
     }
-    if (match(lexer, "\r\n")
-    ||  match(lexer, "\n")) {
-        lexer.line += 1;
-        lexer.column = 1;
-        return addToken(lexer, token::NewLine{});
+    if (peek(lexer) == '\n'
+    || (peek(lexer) == '\r' && peekNext(lexer) == '\n')) {
+        addToken(lexer, token::NewLine{});
+        advance(lexer);
+        return;
     }
     if (match(lexer, "\"")) {
         return scanString(lexer);
@@ -146,18 +129,6 @@ void lexer::scanString(Lexer& lexer) {
     std::string literal = "";
     size_t line = lexer.line;
     size_t column = lexer.column;
-    bool isRight = false;
-
-    // if (peek(lexer) == '\"') {
-    //     source.onString.push(OnString{current(source), true});
-    // }
-    // else if (current(source) == '}') {
-    //     source.onString.pop();
-    //     isRight = true;
-    // }
-    // else {
-    //     assert(false);
-    // }
 
     advance(lexer);
     while (!(atEnd(lexer) || match(lexer, "\n"))) {
@@ -186,29 +157,11 @@ void lexer::scanString(Lexer& lexer) {
         lexer.errors.push_back(Error{std::string("Error: Unclosed string\n")});
         return;
     }
+    else if (match(lexer, "\"")) {
+        return addToken(lexer, token::String{.literal = literal});
+    }
     else {
-        // if (match(source, "{")) {
-        //     source.onString.push(OnString{current(source), true});
-        //     advance(source);
-        //     if (isRight) {
-        //         return Result<token::Token, Error>(token::Token(token::StringMiddle, literal, line, column));
-        //     }
-        //     else {
-        //         return Result<token::Token, Error>(token::Token(token::StringLeft, literal, line, column));
-        //     }
-        // }
-        /*else*/ if (match(lexer, "\"")) {
-            //source.onString.pop();
-            // if (isRight) {
-            //     return Result<token::Token, Error>(token::Token(token::StringRight, literal, line, column));
-            // }
-            // else {
-            return addToken(lexer, token::String{.literal = literal});
-            //}
-        }
-        else {
-            assert(false);
-        }
+        todo();
     }
 }
 
@@ -272,17 +225,33 @@ bool lexer::atEnd(Lexer& lexer) {
 }
 
 void lexer::advance(Lexer& lexer) {
-    lexer.current += 1;
-    lexer.column += 1;
+    if (peek(lexer) == '\n') {
+        lexer.column = 1;
+        lexer.line += 1;
+        lexer.current += 1;
+    }
+    else if (peek(lexer) == '\r' && peekNext(lexer) == '\n') {
+        lexer.column = 1;
+        lexer.line += 1;
+        lexer.current += 2;
+    }
+    else {
+        lexer.column += 1;
+        lexer.current += 1;
+    }
 }
 
 bool lexer::match(Lexer& lexer, std::string string) {
     bool match = true;
     int i = 0;
+    size_t line = lexer.line;
+    size_t column = lexer.column;
     while (!atEnd(lexer) && i < string.size()) {
         if (peek(lexer) != string[i]) {
             match = false;
             lexer.current -= i;
+            lexer.line = line;
+            lexer.column = column;
             break;
         }
         advance(lexer);
@@ -291,6 +260,8 @@ bool lexer::match(Lexer& lexer, std::string string) {
     if (atEnd(lexer) && i != string.size()) {
         match = false;
         lexer.current -= i;
+        lexer.line = line;
+        lexer.column = column;
     }
 
     return match;
@@ -310,7 +281,7 @@ void lexer::advanceUntilNewLine(Lexer& lexer) {
     while (peek(lexer) != '\n') {advance(lexer);}
 }
 
-void lexer::addToken(Lexer& lexer, token::TokenKind kind) {
+void lexer::addToken(Lexer& lexer, token::Kind kind) {
     lexer.tokens.push_back(token::Token{
         .kind = kind,
         .line = lexer.line,

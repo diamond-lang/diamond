@@ -35,9 +35,9 @@ namespace token {
     struct Float {std::string literal;};
     struct Identifier {std::string literal;};
     struct String {std::string literal;};
-    struct StringLeft {};
-    struct StringMiddle {};
-    struct StringRight {};
+    struct StringLeft {std::string literal;};
+    struct StringMiddle {std::string literal;};
+    struct StringRight {std::string literal;};
     struct If {};
     struct Else {};
     struct While {};
@@ -62,7 +62,7 @@ namespace token {
     struct NewLine {};
     struct EndOfFile {};
 
-    using TokenKind = std::variant<
+    using Kind = std::variant<
         LeftParen,
         RightParen,
         LeftBracket,
@@ -121,14 +121,12 @@ namespace token {
     >;
 
     struct Token {
-        TokenKind kind;
+        Kind kind;
         size_t line;
         size_t column;
-
-        std::string get_literal();
     };
 
-    size_t getIndex(TokenKind kind);
+    std::string getLiteral(Token token);
     void print(std::vector<Token> tokens);
 };
 
