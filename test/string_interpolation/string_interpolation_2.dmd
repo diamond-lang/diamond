@@ -4,3 +4,9 @@ function printSomethingTwoTimes(something)
 printSomethingTwoTimes(54)
 printSomethingTwoTimes(false)
 printSomethingTwoTimes("YEAH!")
+
+--- Output
+54 54
+false false
+YEAH! YEAH!
+---

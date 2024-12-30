@@ -279,7 +279,7 @@ Result<ast::Node*, Error> Parser::parse_block() {
             }
 
             if (!this->at_end() && !std::holds_alternative<token::NewLine>(this->current().kind)) {
-                this->errors.push_back(errors::unexpected_character(this->location())); // tested in test/errors/expecting_line_ending.dm
+                this->errors.push_back(errors::unexpected_character(this->location()));
                 there_was_errors = true;
             }
         }
@@ -469,7 +469,7 @@ Result<std::vector<ast::TypeParameter>, Error> Parser::parse_type_parameters() {
     if (left_bracket.is_error()) return Error {};
 
     // Parse type parameters
-    while (std::holds_alternative<token::RightBracket>(this->current().kind) && !this->at_end()) {
+    while (!std::holds_alternative<token::RightBracket>(this->current().kind) && !this->at_end()) {
         auto parameter = this->parse_type();
         if (parameter.is_error()) return parameter.get_error();
 

@@ -13,7 +13,7 @@ namespace token {
     std::string getLiteral(token::RightCurly token) {return "}";}
     std::string getLiteral(token::Comma token) {return ",";}
     std::string getLiteral(token::Plus token) {return "+";}
-    std::string getLiteral(token::Slash token) {return "";}
+    std::string getLiteral(token::Slash token) {return "/";}
     std::string getLiteral(token::Modulo token) {return "%";}
     std::string getLiteral(token::Star token) {return "*";}
     std::string getLiteral(token::Minus token) {return "-";}

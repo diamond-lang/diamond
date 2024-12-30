@@ -356,7 +356,7 @@ static void instantiate_function_with_type(ast::FunctionSpecialization& speciali
         // If function argument has field constraints
         if (ast::get_type_parameter(type_parameters, function_type).has_value()) {
             if (ast::get_type_parameter(type_parameters, function_type).value()->type.as_final_type_variable().field_constraints.size() > 0) {
-                todo();
+                // todo();
             }
         }
     }

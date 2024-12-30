@@ -3,14 +3,20 @@
 #include "errors.hpp"
 
 #include <variant>
+#include <stack>
 
 namespace lexer {
+    struct Context {
+        bool onString;
+    };
+
     struct Lexer {
         size_t line = 1;
         size_t column = 1;
         size_t start = 0;
         size_t current = 0;
         std::string source;
+        std::stack<Context> context;
         std::vector<token::Token> tokens;
         std::vector<Error> errors;
     };
@@ -62,8 +68,30 @@ void lexer::scanToken(Lexer& lexer) {
     if (match(lexer, ")"))  return addToken(lexer, token::RightParen{});
     if (match(lexer, "["))  return addToken(lexer, token::LeftBracket{});
     if (match(lexer, "]"))  return addToken(lexer, token::RightBracket{});
-    if (match(lexer, "{"))  return addToken(lexer, token::LeftCurly{});
-    if (match(lexer, "}"))  return addToken(lexer, token::RightCurly{});
+    if (peek(lexer) == '{')  {
+        if (!lexer.context.empty()) {
+            lexer.context.push(Context{.onString = false});
+        }
+        advance(lexer);
+        return addToken(lexer, token::LeftCurly{});
+    }
+    if (peek(lexer) == '}')  {
+        if (!lexer.context.empty()) {
+            if (lexer.context.top().onString) {
+                lexer.context.pop();
+                return scanString(lexer);
+            }
+            else {
+                lexer.context.pop();
+                advance(lexer);
+                return addToken(lexer, token::RightCurly{});
+            }
+        }
+        else {
+            advance(lexer);
+            return addToken(lexer, token::RightCurly{});
+        }
+    }
     if (match(lexer, "+"))  return addToken(lexer, token::Plus{});
     if (match(lexer, "*"))  return addToken(lexer, token::Star{});
     if (match(lexer, "/"))  return addToken(lexer, token::Slash{});
@@ -116,7 +144,7 @@ void lexer::scanToken(Lexer& lexer) {
         advance(lexer);
         return;
     }
-    if (match(lexer, "\"")) {
+    if (peek(lexer) == '\"') {
         return scanString(lexer);
     }
     if (isdigit(peek(lexer))) return scanNumber(lexer);
@@ -129,6 +157,11 @@ void lexer::scanString(Lexer& lexer) {
     std::string literal = "";
     size_t line = lexer.line;
     size_t column = lexer.column;
+    bool isRight = false;
+
+    if (peek(lexer) == '}') {
+        isRight = true;
+    }
 
     advance(lexer);
     while (!(atEnd(lexer) || match(lexer, "\n"))) {
@@ -139,13 +172,24 @@ void lexer::scanString(Lexer& lexer) {
             literal += "\"";
         }
         else if (match(lexer, "\"")) {
-            break;
+            if (isRight) {
+                return addToken(lexer, token::StringRight{.literal = literal});
+            }
+            else {
+                return addToken(lexer, token::String{.literal = literal});
+            }
         }
         else if (match(lexer, "\\{")) {
             literal += "{";
         }
         else if (match(lexer, "{")) {
-            break;
+            lexer.context.push(Context{.onString = true});
+            if (isRight) {
+                return addToken(lexer, token::StringMiddle{.literal = literal});
+            }
+            else {
+                return addToken(lexer, token::StringLeft{.literal = literal});
+            }
         }
         else {
             literal += peek(lexer);
@@ -153,16 +197,7 @@ void lexer::scanString(Lexer& lexer) {
         }
     }
 
-    if (atEnd(lexer) || match(lexer, "\n")) {
-        lexer.errors.push_back(Error{std::string("Error: Unclosed string\n")});
-        return;
-    }
-    else if (match(lexer, "\"")) {
-        return addToken(lexer, token::String{.literal = literal});
-    }
-    else {
-        todo();
-    }
+    todo();
 }
 
 void lexer::scanIdentifierOrKeyword(Lexer& lexer) {
@@ -207,11 +242,15 @@ void lexer::scanNumber(Lexer& lexer) {
 
         // consume digits
         while (isdigit(peek(lexer))) advance(lexer);
+
+        // Add token
+        auto literal = lexer.source.substr(lexer.start, lexer.current - lexer.start);
+        return addToken(lexer, token::Float{.literal = literal});
     }
 
     // Add token
     auto literal = lexer.source.substr(lexer.start, lexer.current - lexer.start);
-    return addToken(lexer, token::Float{.literal = literal});
+    return addToken(lexer, token::Integer{.literal = literal});
 }
 
 void lexer::scanInteger(Lexer& lexer) {
