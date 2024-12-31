@@ -1,9 +1,7 @@
-#include <iostream>
-#include <fstream>
-#include <filesystem>
-
 #include "utilities.hpp"
-#include "errors.hpp"
+
+#include <filesystem>
+#include <fstream>
 
 std::string utilities::read_file(std::filesystem::path path) {
     std::string file = "";
@@ -15,8 +13,7 @@ std::string utilities::read_file(std::filesystem::path path) {
         }
         f.close();
         return file;
-    }
-    else {
+    } else {
         return "";
     }
 }
@@ -26,8 +23,7 @@ bool utilities::file_exists(std::string path) {
     if (f.is_open()) {
         f.close();
         return true;
-    }
-    else {
+    } else {
         return false;
     }
 }

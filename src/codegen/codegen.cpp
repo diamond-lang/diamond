@@ -1,14 +1,41 @@
-#include <iostream>
-#include <cstdio>
-#include <unordered_map>
-#include <filesystem>
-#include <fstream>
+#include "../codegen.hpp"
+
 #include <assert.h>
 
-#include "../codegen.hpp"
-#include "codegen.hpp"
-#include "../utilities.hpp"
+#include <cstdio>
+#include <filesystem>
+#include <iostream>
+
+#include "../ast.hpp"
+#include "../semantic.hpp"
 #include "../semantic/intrinsics.hpp"
+#include "../utilities.hpp"
+#include "codegen.hpp"
+#include "lld/Common/Driver.h"
+#include "llvm/ADT/APFloat.h"
+#include "llvm/ADT/Optional.h"
+#include "llvm/IR/BasicBlock.h"
+#include "llvm/IR/Constants.h"
+#include "llvm/IR/DerivedTypes.h"
+#include "llvm/IR/Function.h"
+#include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/Instructions.h"
+#include "llvm/IR/LLVMContext.h"
+#include "llvm/IR/LegacyPassManager.h"
+#include "llvm/IR/Module.h"
+#include "llvm/IR/Type.h"
+#include "llvm/IR/Verifier.h"
+#include "llvm/MC/TargetRegistry.h"
+#include "llvm/Support/FileSystem.h"
+#include "llvm/Support/Host.h"
+#include "llvm/Support/TargetSelect.h"
+#include "llvm/Support/raw_ostream.h"
+#include "llvm/Target/TargetMachine.h"
+#include "llvm/Target/TargetOptions.h"
+#include "llvm/Transforms/InstCombine/InstCombine.h"
+#include "llvm/Transforms/Scalar.h"
+#include "llvm/Transforms/Scalar/GVN.h"
+#include "llvm/Transforms/Utils.h"
 
 // Print LLVM IR
 // -------------
@@ -17,7 +44,6 @@ void codegen::print_llvm_ir(ast::Ast& ast, std::string program_name) {
     llvm_ir.codegen(ast);
     llvm_ir.module->print(llvm::outs(), nullptr);
 }
-
 
 // Print assembly
 // --------------
@@ -45,7 +71,8 @@ void codegen::print_assembly(ast::Ast& ast, std::string program_name) {
 
     llvm::TargetOptions opt;
     auto RM = llvm::Optional<llvm::Reloc::Model>();
-    auto TargetMachine = Target->createTargetMachine(TargetTriple, CPU, Features, opt, RM);
+    auto TargetMachine =
+        Target->createTargetMachine(TargetTriple, CPU, Features, opt, RM);
 
     llvm_ir.module->setDataLayout(TargetMachine->createDataLayout());
     llvm_ir.module->setTargetTriple(TargetTriple);
@@ -54,7 +81,9 @@ void codegen::print_assembly(ast::Ast& ast, std::string program_name) {
     llvm::legacy::PassManager pass;
 
     auto& llvm_outs = llvm::outs();
-    if (TargetMachine->addPassesToEmitFile(pass, llvm_outs, nullptr, llvm::CGFT_AssemblyFile)) {
+    if (TargetMachine->addPassesToEmitFile(
+            pass, llvm_outs, nullptr, llvm::CGFT_AssemblyFile
+        )) {
         llvm::errs() << "TargetMachine can't emit a file of this type";
     }
 
@@ -62,11 +91,13 @@ void codegen::print_assembly(ast::Ast& ast, std::string program_name) {
     llvm_outs.flush();
 }
 
-
 // Generate object code
 // --------------------
 static std::string get_object_file_name(std::string executable_name);
-static void link(std::string executable_name, std::string object_file_name, std::vector<std::string> link_directives);
+static void link(
+    std::string executable_name, std::string object_file_name,
+    std::vector<std::string> link_directives
+);
 
 void codegen::generate_object_code(ast::Ast& ast, std::string program_name) {
     codegen::Context llvm_ir(ast);
@@ -92,7 +123,8 @@ void codegen::generate_object_code(ast::Ast& ast, std::string program_name) {
 
     llvm::TargetOptions opt;
     auto RM = llvm::Optional<llvm::Reloc::Model>();
-    auto TargetMachine = Target->createTargetMachine(TargetTriple, CPU, Features, opt, RM);
+    auto TargetMachine =
+        Target->createTargetMachine(TargetTriple, CPU, Features, opt, RM);
 
     llvm_ir.module->setDataLayout(TargetMachine->createDataLayout());
     llvm_ir.module->setTargetTriple(TargetTriple);
@@ -124,7 +156,10 @@ void codegen::generate_executable(ast::Ast& ast, std::string program_name) {
     codegen::generate_object_code(ast, program_name);
 
     // Link
-    link(utilities::get_executable_name(program_name), get_object_file_name(program_name), ast.link_with);
+    link(
+        utilities::get_executable_name(program_name),
+        get_object_file_name(program_name), ast.link_with
+    );
 
     // Remove generated object file
     remove(get_object_file_name(program_name).c_str());
@@ -135,7 +170,10 @@ static std::string get_object_file_name(std::string executable_name) {
     return executable_name + ".o";
 }
 
-static void link(std::string executable_name, std::string object_file_name, std::vector<std::string> link_directives) {
+static void link(
+    std::string executable_name, std::string object_file_name,
+    std::vector<std::string> link_directives
+) {
     std::string name = "-o" + executable_name;
 
     // Link using a native C compiler
@@ -145,7 +183,7 @@ static void link(std::string executable_name, std::string object_file_name, std:
         build_command += " " + name;
 
         // Add linker directives
-        for (auto& directive: link_directives) {
+        for (auto& directive : link_directives) {
             build_command += " " + directive;
         }
 
@@ -157,13 +195,16 @@ static void link(std::string executable_name, std::string object_file_name, std:
     }
     // Link using lld
     else {
-         std::vector<std::string> args = {
+        std::vector<std::string> args = {
             "lld",
             object_file_name,
             name,
-            utilities::get_folder_of_executable().string() + "/deps/musl/libc.a",
-            utilities::get_folder_of_executable().string() + "/deps/musl/crt1.o",
-            utilities::get_folder_of_executable().string() + "/deps/musl/crti.o",
+            utilities::get_folder_of_executable().string() +
+                "/deps/musl/libc.a",
+            utilities::get_folder_of_executable().string() +
+                "/deps/musl/crt1.o",
+            utilities::get_folder_of_executable().string() +
+                "/deps/musl/crti.o",
             utilities::get_folder_of_executable().string() + "/deps/musl/crtn.o"
         };
 
@@ -173,10 +214,12 @@ static void link(std::string executable_name, std::string object_file_name, std:
         llvm::raw_string_ostream errors_stream(errors);
 
         std::vector<const char*> args_as_c_strings;
-        for (auto& arg: args) {
+        for (auto& arg : args) {
             args_as_c_strings.push_back(arg.c_str());
         }
-        bool result = lld::elf::link(args_as_c_strings, output_stream, errors_stream, false, false);
+        bool result = lld::elf::link(
+            args_as_c_strings, output_stream, errors_stream, false, false
+        );
         if (result == false) {
             std::cout << errors;
         }
@@ -191,7 +234,10 @@ static std::string get_object_file_name(std::string executable_name) {
     return executable_name + ".o";
 }
 
-static void link(std::string executable_name, std::string object_file_name, std::vector<std::string> link_directives) {
+static void link(
+    std::string executable_name, std::string object_file_name,
+    std::vector<std::string> link_directives
+) {
     // Link using a native C compiler
     if (link_directives.size() > 0) {
         std::string build_command = "cc";
@@ -199,7 +245,7 @@ static void link(std::string executable_name, std::string object_file_name, std:
         build_command += " -o " + executable_name;
 
         // Add linker directives
-        for (auto& directive: link_directives) {
+        for (auto& directive : link_directives) {
             build_command += " " + directive;
         }
 
@@ -209,12 +255,14 @@ static void link(std::string executable_name, std::string object_file_name, std:
 
     // Link using lld
     else {
-        // Get macos version, modified from https://stackoverflow.com/a/69176800 with https://creativecommons.org/licenses/by-sa/4.0/ license.
+        // Get macos version, modified from https://stackoverflow.com/a/69176800
+        // with https://creativecommons.org/licenses/by-sa/4.0/ license.
         char osversion[32];
         size_t osversion_len = sizeof(osversion) - 1;
-        int osversion_name[] = { CTL_KERN, KERN_OSRELEASE };
+        int osversion_name[] = {CTL_KERN, KERN_OSRELEASE};
 
-        if (sysctl(osversion_name, 2, osversion, &osversion_len, NULL, 0) == -1) {
+        if (sysctl(osversion_name, 2, osversion, &osversion_len, NULL, 0) ==
+            -1) {
             printf("sysctl() failed\n");
             exit(EXIT_FAILURE);
         }
@@ -227,22 +275,24 @@ static void link(std::string executable_name, std::string object_file_name, std:
 
         if (major >= 20) {
             major -= 9;
-        }
-        else {
+        } else {
             major -= 4;
         }
 
-        std::string libclang_rtx_location = "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/";
+        std::string libclang_rtx_location =
+            "/Applications/Xcode.app/Contents/Developer/Toolchains/"
+            "XcodeDefault.xctoolchain/usr/lib/clang/";
         if (std::filesystem::exists(libclang_rtx_location)) {
-            for(auto& entry: std::filesystem::recursive_directory_iterator(libclang_rtx_location)) {
+            for (auto& entry : std::filesystem::recursive_directory_iterator(
+                     libclang_rtx_location
+                 )) {
                 libclang_rtx_location = entry.path().string();
                 break;
             }
             libclang_rtx_location += "/lib/darwin/libclang_rt.osx.a";
-        }
-        else {
-            const char *command = "cc --print-file-name=libclang_rt.osx.a";
-            FILE *fpipe =  (FILE*)popen(command, "r");
+        } else {
+            const char* command = "cc --print-file-name=libclang_rt.osx.a";
+            FILE* fpipe = (FILE*)popen(command, "r");
             if (!fpipe) {
                 perror("popen() failed.");
                 exit(EXIT_FAILURE);
@@ -258,15 +308,21 @@ static void link(std::string executable_name, std::string object_file_name, std:
 
         // Get macos sdk path
         std::string macos_sdk_location = "";
-        if (std::filesystem::exists("/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk")) {
-            macos_sdk_location = "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk";
-        }
-        else if (std::filesystem::exists("/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk")) {
-            macos_sdk_location = "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk";
-        }
-        else {
-            const char *command = "xcrun --show-sdk-path";
-            FILE *fpipe =  (FILE*)popen(command, "r");
+        if (std::filesystem::exists(
+                "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk"
+            )) {
+            macos_sdk_location =
+                "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk";
+        } else if (std::filesystem::exists(
+                       "/Applications/Xcode.app/Contents/Developer/Platforms/"
+                       "MacOSX.platform/Developer/SDKs/MacOSX.sdk"
+                   )) {
+            macos_sdk_location =
+                "/Applications/Xcode.app/Contents/Developer/Platforms/"
+                "MacOSX.platform/Developer/SDKs/MacOSX.sdk";
+        } else {
+            const char* command = "xcrun --show-sdk-path";
+            FILE* fpipe = (FILE*)popen(command, "r");
             if (!fpipe) {
                 perror("popen() failed.");
                 exit(EXIT_FAILURE);
@@ -305,10 +361,12 @@ static void link(std::string executable_name, std::string object_file_name, std:
         llvm::raw_string_ostream errors_stream(errors);
 
         std::vector<const char*> args_as_c_strings;
-        for (auto& arg: args) {
+        for (auto& arg : args) {
             args_as_c_strings.push_back(arg.c_str());
         }
-        bool result = lld::macho::link(args_as_c_strings, output_stream, errors_stream, false, false);
+        bool result = lld::macho::link(
+            args_as_c_strings, output_stream, errors_stream, false, false
+        );
         if (result == false) {
             std::cout << errors;
         }
@@ -321,7 +379,10 @@ static std::string get_object_file_name(std::string executable_name) {
     return executable_name + ".obj";
 }
 
-static void link(std::string executable_name, std::string object_file_name, std::vector<std::string> link_directives) {
+static void link(
+    std::string executable_name, std::string object_file_name,
+    std::vector<std::string> link_directives
+) {
     std::string name = "-out:" + executable_name;
     std::vector<const char*> args = {
         "lld",
@@ -341,7 +402,8 @@ static void link(std::string executable_name, std::string object_file_name, std:
     llvm::raw_string_ostream output_stream(output);
     llvm::raw_string_ostream errors_stream(errors);
 
-    bool result = lld::coff::link(args, output_stream, errors_stream, false, false);
+    bool result =
+        lld::coff::link(args, output_stream, errors_stream, false, false);
     if (errors != "") {
         std::cout << errors;
     }
@@ -362,7 +424,8 @@ codegen::Context::Context(ast::Ast& ast) : ast(ast) {
     this->builder = new llvm::IRBuilder(*(this->context));
 
     // Add function pass optimizations
-    this->function_pass_manager = new llvm::legacy::FunctionPassManager(this->module);
+    this->function_pass_manager =
+        new llvm::legacy::FunctionPassManager(this->module);
     this->function_pass_manager->add(llvm::createPromoteMemoryToRegisterPass());
     this->function_pass_manager->add(llvm::createInstructionCombiningPass());
     this->function_pass_manager->add(llvm::createReassociatePass());
@@ -371,22 +434,29 @@ codegen::Context::Context(ast::Ast& ast) : ast(ast) {
     this->function_pass_manager->doInitialization();
 }
 
-
 // Scope management
 void codegen::Context::add_scope() {
-    this->scopes.variable_scopes.push_back(std::unordered_map<std::string, Binding>());
+    this->scopes.variable_scopes.push_back(
+        std::unordered_map<std::string, Binding>()
+    );
 }
 
 void codegen::Context::add_scope(ast::BlockNode& block) {
-    this->scopes.variable_scopes.push_back(std::unordered_map<std::string, Binding>());
-    auto result = this->scopes.functions_and_types_scopes.add_definitions_from_block_to_scope(this->ast, this->current_module, block);
+    this->scopes.variable_scopes.push_back(
+        std::unordered_map<std::string, Binding>()
+    );
+    auto result = this->scopes.functions_and_types_scopes
+                      .add_definitions_from_block_to_scope(
+                          this->ast, this->current_module, block
+                      );
     assert(result.is_ok());
 }
 
 codegen::Context::Scope codegen::Context::current_scope() {
-    return codegen::Context::Scope {
+    return codegen::Context::Scope{
         this->scopes.variable_scopes[this->scopes.variable_scopes.size() - 1],
-        this->scopes.functions_and_types_scopes.scopes[this->scopes.functions_and_types_scopes.scopes.size() - 1]
+        this->scopes.functions_and_types_scopes
+            .scopes[this->scopes.functions_and_types_scopes.scopes.size() - 1]
     };
 }
 
@@ -398,81 +468,92 @@ void codegen::Context::delete_binding(llvm::Value* pointer, ast::Type type) {
     }
 
     if (type.has_boxed_elements()) {
-        if (type.is_nominal_type()
-        &&  type.as_nominal_type().type_definition) {
-            auto struct_type = this->get_struct_type(type.as_nominal_type().type_definition);
-            for (size_t i = 0; i < type.as_nominal_type().type_definition->fields.size(); i++) {
-                llvm::Value* field_pointer = this->builder->CreateStructGEP(struct_type, pointer, i);
-                this->delete_binding(field_pointer, type.as_nominal_type().type_definition->fields[i]->type);
+        if (type.is_nominal_type() && type.as_nominal_type().type_definition) {
+            auto struct_type =
+                this->get_struct_type(type.as_nominal_type().type_definition);
+            for (size_t i = 0;
+                 i < type.as_nominal_type().type_definition->fields.size();
+                 i++) {
+                llvm::Value* field_pointer =
+                    this->builder->CreateStructGEP(struct_type, pointer, i);
+                this->delete_binding(
+                    field_pointer,
+                    type.as_nominal_type().type_definition->fields[i]->type
+                );
             }
-        }
-        else if (type.is_array()) {
-            llvm::Function *current_function = this->builder->GetInsertBlock()->getParent();
-            llvm::BasicBlock *loop_block = llvm::BasicBlock::Create(*(this->context), "loop", current_function);
-            llvm::BasicBlock *then_block = llvm::BasicBlock::Create(*(this->context), "then");
+        } else if (type.is_array()) {
+            llvm::Function* current_function =
+                this->builder->GetInsertBlock()->getParent();
+            llvm::BasicBlock* loop_block = llvm::BasicBlock::Create(
+                *(this->context), "loop", current_function
+            );
+            llvm::BasicBlock* then_block =
+                llvm::BasicBlock::Create(*(this->context), "then");
             this->last_after_while_block = then_block;
             this->last_while_block = loop_block;
 
             // Create counter
-            llvm::Value* index_expression = llvm::ConstantInt::get(*(this->context), llvm::APInt(64, 0, true));
-            llvm::AllocaInst* index = this->create_allocation("",  index_expression->getType());
+            llvm::Value* index_expression = llvm::ConstantInt::get(
+                *(this->context), llvm::APInt(64, 0, true)
+            );
+            llvm::AllocaInst* index =
+                this->create_allocation("", index_expression->getType());
             this->builder->CreateStore(index_expression, index);
 
             // Jump to loop block if condition is true
             this->builder->CreateCondBr(
                 this->builder->CreateICmpULE(
                     this->builder->CreateLoad(index->getAllocatedType(), index),
-                    this->codegen_size_function(pointer, type),
-                    "cmptmp"
+                    this->codegen_size_function(pointer, type), "cmptmp"
                 ),
-                loop_block,
-                then_block
+                loop_block, then_block
             );
 
             // Free
             this->builder->SetInsertPoint(loop_block);
 
             llvm::Value* element_pointer = this->builder->CreateGEP(
-                this->as_llvm_type(type),
-                pointer,
-                {llvm::ConstantInt::get(*(this->context), llvm::APInt(64, 0, true)), this->builder->CreateLoad(index->getAllocatedType(), index)},
-                "",
-                true
+                this->as_llvm_type(type), pointer,
+                {llvm::ConstantInt::get(
+                     *(this->context), llvm::APInt(64, 0, true)
+                 ),
+                 this->builder->CreateLoad(index->getAllocatedType(), index)},
+                "", true
             );
             std::vector<llvm::Value*> args;
-            args.push_back(
-                this->builder->CreateLoad(
-                    this->as_llvm_type(type.as_nominal_type().parameters[0]),
-                    element_pointer
-                )
-            );
+            args.push_back(this->builder->CreateLoad(
+                this->as_llvm_type(type.as_nominal_type().parameters[0]),
+                element_pointer
+            ));
             this->builder->CreateCall(this->module->getFunction("free"), args);
 
             // Codegen index + 1
             this->builder->CreateStore(
                 this->builder->CreateAdd(
                     this->builder->CreateLoad(index->getAllocatedType(), index),
-                    llvm::ConstantInt::get(*(this->context), llvm::APInt(64, 1, true)),
+                    llvm::ConstantInt::get(
+                        *(this->context), llvm::APInt(64, 1, true)
+                    ),
                     "addtmp"
                 ),
                 index
             );
 
             // Jump to loop block again if condition is true
-            this->builder->CreateCondBr(this->builder->CreateICmpULT(
-                this->builder->CreateLoad(index->getAllocatedType(), index),
-                this->codegen_size_function(pointer, type),
-                "cmptmp"
-            ), loop_block, then_block);
+            this->builder->CreateCondBr(
+                this->builder->CreateICmpULT(
+                    this->builder->CreateLoad(index->getAllocatedType(), index),
+                    this->codegen_size_function(pointer, type), "cmptmp"
+                ),
+                loop_block, then_block
+            );
 
             // Insert then block
             current_function->getBasicBlockList().push_back(then_block);
             this->builder->SetInsertPoint(then_block);
-        }
-        else if (type.is_pointer()) {
+        } else if (type.is_pointer()) {
             // do nothing
-        }
-        else {
+        } else {
             assert(false);
         }
     }
@@ -485,10 +566,15 @@ void codegen::Context::delete_binding(llvm::Value* pointer, ast::Type type) {
 }
 
 void codegen::Context::remove_scope() {
-    for (auto binding: this->current_scope().variables_scope) {
+    for (auto binding : this->current_scope().variables_scope) {
         if (binding.second.node) {
             llvm::Value* pointer = binding.second.pointer;
-            this->delete_binding(pointer, ast::get_concrete_type(ast::get_type(binding.second.node), this->type_bindings));
+            this->delete_binding(
+                pointer,
+                ast::get_concrete_type(
+                    ast::get_type(binding.second.node), this->type_bindings
+                )
+            );
         }
     }
 
@@ -496,8 +582,10 @@ void codegen::Context::remove_scope() {
     this->scopes.functions_and_types_scopes.remove_scope();
 }
 
-codegen::Context::Binding codegen::Context::get_binding(std::string identifier) {
-    for (auto scope = this->scopes.variable_scopes.rbegin(); scope != this->scopes.variable_scopes.rend(); scope++) {
+codegen::Context::Binding codegen::Context::get_binding(std::string identifier
+) {
+    for (auto scope = this->scopes.variable_scopes.rbegin();
+         scope != this->scopes.variable_scopes.rend(); scope++) {
         if (scope->find(identifier) != scope->end()) {
             return (*scope)[identifier];
         }
@@ -506,25 +594,31 @@ codegen::Context::Binding codegen::Context::get_binding(std::string identifier) 
     return Binding{};
 }
 
-
 // Name mangling
-std::string codegen::Context::get_mangled_type_name(std::filesystem::path module, std::string identifier) {
+std::string codegen::Context::get_mangled_type_name(
+    std::filesystem::path module, std::string identifier
+) {
     std::string name = "";
     auto path = module;
     if (path == this->ast.module_path) {
         name = identifier;
-    }
-    else if (std_libs.contains(module)) {
+    } else if (std_libs.contains(module)) {
         name = identifier;
-    }
-    else {
-        name = std::filesystem::relative(module, this->ast.module_path.parent_path()).string() + "::" + identifier;
+    } else {
+        name = std::filesystem::relative(
+                   module, this->ast.module_path.parent_path()
+               )
+                   .string() +
+               "::" + identifier;
     }
 
     return name;
 }
 
-std::string codegen::Context::get_mangled_function_name(std::filesystem::path module, std::string identifier, std::vector<ast::Type> args, ast::Type return_type, bool is_extern) {
+std::string codegen::Context::get_mangled_function_name(
+    std::filesystem::path module, std::string identifier,
+    std::vector<ast::Type> args, ast::Type return_type, bool is_extern
+) {
     if (is_extern) {
         return identifier;
     }
@@ -533,15 +627,18 @@ std::string codegen::Context::get_mangled_function_name(std::filesystem::path mo
     auto path = module;
     if (path == this->ast.module_path) {
         name = identifier;
-    }
-    else if (std_libs.contains(module)) {
+    } else if (std_libs.contains(module)) {
         name = identifier;
-    }
-    else {
-        name = std::filesystem::relative(module, this->ast.module_path.parent_path()).string() + "::" + identifier;
+    } else {
+        name = std::filesystem::relative(
+                   module, this->ast.module_path.parent_path()
+               )
+                   .string() +
+               "::" + identifier;
     }
 
-    auto binding = this->scopes.functions_and_types_scopes.get_binding(identifier);
+    auto binding =
+        this->scopes.functions_and_types_scopes.get_binding(identifier);
     assert(binding);
     if (binding->index() == ast::Interface) {
         auto interface = std::get<ast::InterfaceNode>(*binding);
@@ -560,15 +657,16 @@ std::string codegen::Context::get_mangled_function_name(std::filesystem::path mo
         name += "]";
         return name;
 
-    }
-    else if (binding->index() == ast::Function
-    && std::get<ast::FunctionNode>(*binding).type_parameters.size() > 0) {
+    } else if (binding->index() == ast::Function &&
+               std::get<ast::FunctionNode>(*binding).type_parameters.size() >
+                   0) {
         auto function = std::get<ast::FunctionNode>(*binding);
         name += "[";
         for (size_t j = 0; j < function.type_parameters.size(); j++) {
             bool founded = false;
             for (size_t i = 0; i < function.args.size(); i++) {
-                if (function.type_parameters[j].type == function.args[i]->type) {
+                if (function.type_parameters[j].type ==
+                    function.args[i]->type) {
                     name += args[i].to_str();
                     founded = true;
                     break;
@@ -587,78 +685,112 @@ std::string codegen::Context::get_mangled_function_name(std::filesystem::path mo
         }
         name += "]";
         return name;
-    }
-    else {
+    } else {
         return name;
     }
 }
 
-
 // Types
 llvm::Type* codegen::Context::as_llvm_type(ast::Type type) {
-    if      (type == ast::Type("Float64")) return llvm::Type::getDoubleTy(*(this->context));
-    else if (type == ast::Type("Int64"))   return llvm::Type::getInt64Ty(*(this->context));
-    else if (type == ast::Type("Int32"))   return llvm::Type::getInt32Ty(*(this->context));
-    else if (type == ast::Type("Int8"))    return llvm::Type::getInt8Ty(*(this->context));
-    else if (type == ast::Type("Bool"))    return llvm::Type::getInt1Ty(*(this->context));
-    else if (type == ast::Type("String"))  return llvm::Type::getInt8PtrTy(*(this->context));
-    else if (type == ast::Type("None"))    return llvm::Type::getVoidTy(*(this->context));
-    else if (type.is_pointer())            return this->as_llvm_type(ast::get_concrete_type(type.as_nominal_type().parameters[0], this->type_bindings))->getPointerTo();
-    else if (type.is_boxed())              return this->as_llvm_type(ast::get_concrete_type(type.as_nominal_type().parameters[0], this->type_bindings))->getPointerTo();
-    else if (type.is_array())              {
+    if (type == ast::Type("Float64"))
+        return llvm::Type::getDoubleTy(*(this->context));
+    else if (type == ast::Type("Int64"))
+        return llvm::Type::getInt64Ty(*(this->context));
+    else if (type == ast::Type("Int32"))
+        return llvm::Type::getInt32Ty(*(this->context));
+    else if (type == ast::Type("Int8"))
+        return llvm::Type::getInt8Ty(*(this->context));
+    else if (type == ast::Type("Bool"))
+        return llvm::Type::getInt1Ty(*(this->context));
+    else if (type == ast::Type("String"))
+        return llvm::Type::getInt8PtrTy(*(this->context));
+    else if (type == ast::Type("None"))
+        return llvm::Type::getVoidTy(*(this->context));
+    else if (type.is_pointer())
+        return this
+            ->as_llvm_type(ast::get_concrete_type(
+                type.as_nominal_type().parameters[0], this->type_bindings
+            ))
+            ->getPointerTo();
+    else if (type.is_boxed())
+        return this
+            ->as_llvm_type(ast::get_concrete_type(
+                type.as_nominal_type().parameters[0], this->type_bindings
+            ))
+            ->getPointerTo();
+    else if (type.is_array()) {
         if (type.array_size_known()) {
-            return llvm::ArrayType::get(this->as_llvm_type(ast::get_concrete_type(type.as_nominal_type().parameters[0], this->type_bindings)), type.get_array_size());
+            return llvm::ArrayType::get(
+                this->as_llvm_type(ast::get_concrete_type(
+                    type.as_nominal_type().parameters[0], this->type_bindings
+                )),
+                type.get_array_size()
+            );
+        } else {
+            return llvm::StructType::getTypeByName(
+                *this->context, "arrayWrapper"
+            );
         }
-        else {
-            return llvm::StructType::getTypeByName(*this->context, "arrayWrapper");
-        }
-    }
-    else if (type.is_nominal_type() && type.as_nominal_type().type_definition) {
+    } else if (type.is_nominal_type() &&
+               type.as_nominal_type().type_definition) {
         return this->get_struct_type(type.as_nominal_type().type_definition);
-    }
-    else {
+    } else {
         std::cout << "type: " << type.to_str() << "\n";
         assert(false);
     }
 }
 
-llvm::StructType* codegen::Context::get_struct_type(ast::TypeNode* type_definition) {
-    return llvm::StructType::getTypeByName(*this->context, this->get_mangled_type_name(type_definition->module_path, type_definition->identifier->value));
+llvm::StructType* codegen::Context::get_struct_type(
+    ast::TypeNode* type_definition
+) {
+    return llvm::StructType::getTypeByName(
+        *this->context,
+        this->get_mangled_type_name(
+            type_definition->module_path, type_definition->identifier->value
+        )
+    );
 }
 
 bool codegen::Context::has_struct_type(ast::Node* expression) {
-    auto concrete_type = ast::get_concrete_type(expression, this->type_bindings);
+    auto concrete_type =
+        ast::get_concrete_type(expression, this->type_bindings);
     return concrete_type.is_struct_type();
 }
 
 bool codegen::Context::has_array_type(ast::Node* expression) {
-    auto concrete_type = ast::get_concrete_type(expression, this->type_bindings);
+    auto concrete_type =
+        ast::get_concrete_type(expression, this->type_bindings);
     return concrete_type.is_array();
 }
 
 bool codegen::Context::has_collection_type(ast::Node* expression) {
-    return this->has_struct_type(expression) || this->has_array_type(expression);
+    return this->has_struct_type(expression) ||
+           this->has_array_type(expression);
 }
 
 bool codegen::Context::has_boxed_type(ast::Node* expression) {
     return ast::get_concrete_type(expression, this->type_bindings).is_boxed();
 }
 
-codegen::CollectionAsArguments codegen::Context::get_collection_as_argument(ast::Type type) {
+codegen::CollectionAsArguments codegen::Context::get_collection_as_argument(
+    ast::Type type
+) {
     if (type.is_struct_type()) {
-        return this->get_struct_type_as_argument((llvm::StructType*) this->as_llvm_type(type));
-    }
-    else if (type.is_array()) {
+        return this->get_struct_type_as_argument(
+            (llvm::StructType*)this->as_llvm_type(type)
+        );
+    } else if (type.is_array()) {
         CollectionAsArguments result;
         result.types.push_back(this->as_llvm_type(type));
         return result;
-    }
-    else {
+    } else {
         assert(false);
     }
 }
 
-codegen::CollectionAsArguments codegen::Context::get_struct_type_as_argument(llvm::StructType* struct_type) {
+codegen::CollectionAsArguments codegen::Context::get_struct_type_as_argument(
+    llvm::StructType* struct_type
+) {
     std::vector<llvm::Type*> sub_types;
     if (this->get_type_size(struct_type) <= 16) {
         auto fields = struct_type->elements();
@@ -671,28 +803,22 @@ codegen::CollectionAsArguments codegen::Context::get_struct_type_as_argument(llv
                 if (fields[i]->isDoubleTy()) {
                     type = ast::Type("Float64");
                     bytes += 8;
-                }
-                else if (fields[i]->isIntegerTy(64)) {
+                } else if (fields[i]->isIntegerTy(64)) {
                     type = ast::Type("Int64");
                     bytes += 8;
-                }
-                else if (fields[i]->isIntegerTy(32)) {
+                } else if (fields[i]->isIntegerTy(32)) {
                     type = ast::Type("Int64");
                     bytes += 4;
-                }
-                else if (fields[i]->isIntegerTy(8)) {
+                } else if (fields[i]->isIntegerTy(8)) {
                     type = ast::Type("Int64");
                     bytes += 4;
-                }
-                else if (fields[i]->isIntegerTy(1)) {
+                } else if (fields[i]->isIntegerTy(1)) {
                     type = ast::Type("Int64");
                     bytes += 1;
-                }
-                else if (fields[i]->isPointerTy()) {
+                } else if (fields[i]->isPointerTy()) {
                     type = ast::Type("Int64");
                     bytes += 8;
-                }
-                else {
+                } else {
                     assert(false);
                 }
                 i += 1;
@@ -700,8 +826,7 @@ codegen::CollectionAsArguments codegen::Context::get_struct_type_as_argument(llv
 
             sub_types.push_back(this->as_llvm_type(type));
         }
-    }
-    else {
+    } else {
         sub_types.push_back(struct_type->getPointerTo());
     }
 
@@ -711,12 +836,18 @@ codegen::CollectionAsArguments codegen::Context::get_struct_type_as_argument(llv
     return result;
 }
 
-llvm::FunctionType* codegen::Context::get_function_type(std::vector<ast::FunctionArgumentNode*> args, std::vector<ast::Type> args_types, ast::Type return_type, bool is_extern_and_variadic) {
+llvm::FunctionType* codegen::Context::get_function_type(
+    std::vector<ast::FunctionArgumentNode*> args,
+    std::vector<ast::Type> args_types, ast::Type return_type,
+    bool is_extern_and_variadic
+) {
     // Get args types
     std::vector<llvm::Type*> llvm_args_types;
 
     if (return_type.is_collection()) {
-        llvm_args_types.push_back(this->as_llvm_type(return_type)->getPointerTo());
+        llvm_args_types.push_back(
+            this->as_llvm_type(return_type)->getPointerTo()
+        );
     }
 
     for (size_t i = 0; i < args.size(); i++) {
@@ -724,36 +855,38 @@ llvm::FunctionType* codegen::Context::get_function_type(std::vector<ast::Functio
 
         if (args[i]->is_mutable) {
             if (args_types[i].is_array()) {
-                if ((args[i]->type.is_array() && args[i]->type.array_size_known())
-                ||  !args[i]->type.is_array()) {
+                if ((args[i]->type.is_array() &&
+                     args[i]->type.array_size_known()) ||
+                    !args[i]->type.is_array()) {
                     llvm_args_types.push_back(llvm_type->getPointerTo());
-                }
-                else {
+                } else {
                     assert(false);
                 }
-            }
-            else {
+            } else {
                 llvm_args_types.push_back(llvm_type->getPointerTo());
             }
-        }
-        else {
+        } else {
             if (args_types[i].is_collection()) {
                 if (args_types[i].is_array()) {
-                    if ((args[i]->type.is_array() && args[i]->type.array_size_known())
-                    ||  !args[i]->type.is_array()) {
+                    if ((args[i]->type.is_array() &&
+                         args[i]->type.array_size_known()) ||
+                        !args[i]->type.is_array()) {
                         llvm_args_types.push_back(llvm_type->getPointerTo());
-                    }
-                    else {
-                        llvm::StructType* array_type = llvm::StructType::getTypeByName(*this->context, "arrayWrapper");
+                    } else {
+                        llvm::StructType* array_type =
+                            llvm::StructType::getTypeByName(
+                                *this->context, "arrayWrapper"
+                            );
                         llvm_args_types.push_back(array_type->getPointerTo());
                     }
+                } else {
+                    auto new_args =
+                        this->get_collection_as_argument(args_types[i]).types;
+                    llvm_args_types.insert(
+                        llvm_args_types.end(), new_args.begin(), new_args.end()
+                    );
                 }
-                else {
-                    auto new_args = this->get_collection_as_argument(args_types[i]).types;
-                    llvm_args_types.insert(llvm_args_types.end(), new_args.begin(), new_args.end());
-                }
-            }
-            else {
+            } else {
                 llvm_args_types.push_back(llvm_type);
             }
         }
@@ -765,10 +898,15 @@ llvm::FunctionType* codegen::Context::get_function_type(std::vector<ast::Functio
         llvm_return_type = llvm::Type::getVoidTy(*this->context);
     }
 
-    return llvm::FunctionType::get(llvm_return_type, llvm::ArrayRef(llvm_args_types), is_extern_and_variadic);
+    return llvm::FunctionType::get(
+        llvm_return_type, llvm::ArrayRef(llvm_args_types),
+        is_extern_and_variadic
+    );
 }
 
-std::vector<llvm::Type*> codegen::Context::as_llvm_types(std::vector<ast::Type> types) {
+std::vector<llvm::Type*> codegen::Context::as_llvm_types(
+    std::vector<ast::Type> types
+) {
     std::vector<llvm::Type*> llvm_types;
     for (size_t i = 0; i < types.size(); i++) {
         llvm_types.push_back(this->as_llvm_type(types[i]));
@@ -776,10 +914,14 @@ std::vector<llvm::Type*> codegen::Context::as_llvm_types(std::vector<ast::Type> 
     return llvm_types;
 }
 
-std::vector<ast::Type> codegen::Context::get_types(std::vector<ast::CallArgumentNode*> nodes) {
+std::vector<ast::Type> codegen::Context::get_types(
+    std::vector<ast::CallArgumentNode*> nodes
+) {
     std::vector<ast::Type> types;
-    for (auto& node: nodes) {
-        types.push_back(ast::get_concrete_type((ast::Node*)node, this->type_bindings));
+    for (auto& node : nodes) {
+        types.push_back(
+            ast::get_concrete_type((ast::Node*)node, this->type_bindings)
+        );
     }
     return types;
 }
@@ -789,29 +931,33 @@ llvm::TypeSize codegen::Context::get_type_size(llvm::Type* type) {
     return dl.getTypeAllocSize(type);
 }
 
-
 // Codegen helpers
 ast::FunctionNode* codegen::Context::get_function(ast::CallNode* call) {
     std::vector<ast::FunctionNode*> functions;
-    ast::Node* binding = this->scopes.functions_and_types_scopes.get_binding(call->identifier->value);
+    ast::Node* binding = this->scopes.functions_and_types_scopes.get_binding(
+        call->identifier->value
+    );
     assert(binding);
     if (binding->index() == ast::Interface) {
-        functions = ((ast::InterfaceNode*) binding)->functions;
-    }
-    else if (binding->index() == ast::Function) {
-        functions = {(ast::FunctionNode*) binding};
-    }
-    else {
+        functions = ((ast::InterfaceNode*)binding)->functions;
+    } else if (binding->index() == ast::Function) {
+        functions = {(ast::FunctionNode*)binding};
+    } else {
         assert(false);
     }
 
     ast::FunctionNode* result = nullptr;
-    for (auto function: functions) {
+    for (auto function : functions) {
         std::vector<ast::Type> function_types = ast::get_types(function->args);
         function_types.push_back(function->return_type);
         std::vector<ast::Type> call_types = this->get_types(call->args);
-        call_types.push_back(ast::get_concrete_type(call->type, this->type_bindings));
-        if (semantic::are_arguments_compatible(*function, this->scopes.functions_and_types_scopes, call->get_args_mutability(), function_types, call_types)) {
+        call_types.push_back(
+            ast::get_concrete_type(call->type, this->type_bindings)
+        );
+        if (semantic::are_arguments_compatible(
+                *function, this->scopes.functions_and_types_scopes,
+                call->get_args_mutability(), function_types, call_types
+            )) {
             assert(result == nullptr);
             result = function;
         }
@@ -820,61 +966,71 @@ ast::FunctionNode* codegen::Context::get_function(ast::CallNode* call) {
     return result;
 }
 
-void codegen::Context::store_fields(ast::Node* expression, llvm::Value* struct_allocation) {
+void codegen::Context::store_fields(
+    ast::Node* expression, llvm::Value* struct_allocation
+) {
     // Get struct type
-    llvm::StructType* struct_type = this->get_struct_type(ast::get_concrete_type(expression, this->type_bindings).as_nominal_type().type_definition);
+    llvm::StructType* struct_type = this->get_struct_type(
+        ast::get_concrete_type(expression, this->type_bindings)
+            .as_nominal_type()
+            .type_definition
+    );
 
     if (expression->index() == ast::StructLiteral) {
         // Get call
         auto& struct_literal = std::get<ast::StructLiteralNode>(*expression);
 
         // For each field
-        for (auto field: struct_literal.fields) {
+        for (auto field : struct_literal.fields) {
             // Get pointer to the field
             llvm::Value* ptr = this->builder->CreateStructGEP(
-                struct_type,
-                struct_allocation,
-                ast::get_concrete_type(expression, this->type_bindings).as_nominal_type().type_definition->get_index_of_field(field.first->value)
+                struct_type, struct_allocation,
+                ast::get_concrete_type(expression, this->type_bindings)
+                    .as_nominal_type()
+                    .type_definition->get_index_of_field(field.first->value)
             );
 
             // If the field type has a struct type
             if (this->has_struct_type(field.second)) {
                 this->store_fields(field.second, ptr);
-            }
-            else {
+            } else {
                 this->builder->CreateStore(this->codegen(field.second), ptr);
             }
         }
-    }
-    else if (expression->index() == ast::Call) {
+    } else if (expression->index() == ast::Call) {
         auto& call = std::get<ast::CallNode>(*expression);
         this->codegen_call(call, struct_allocation);
-    }
-    else if (expression->index() == ast::Identifier) {
+    } else if (expression->index() == ast::Identifier) {
         auto& identifier = std::get<ast::IdentifierNode>(*expression);
         llvm::Value* pointer = this->get_binding(identifier.value).pointer;
 
-        if (this->get_binding(identifier.value).is_mutable
-        ||  this->get_binding(identifier.value).pointer->getAllocatedType()->isPointerTy()) {
-            pointer = this->builder->CreateLoad(
-                pointer->getType(),
-                pointer
-            );
+        if (this->get_binding(identifier.value).is_mutable ||
+            this->get_binding(identifier.value)
+                .pointer->getAllocatedType()
+                ->isPointerTy()) {
+            pointer = this->builder->CreateLoad(pointer->getType(), pointer);
         }
 
-        this->builder->CreateMemCpy(struct_allocation, llvm::MaybeAlign(), pointer, llvm::MaybeAlign(), this->get_type_size(struct_type));
-    }
-    else if (expression->index() == ast::FieldAccess) {
+        this->builder->CreateMemCpy(
+            struct_allocation, llvm::MaybeAlign(), pointer, llvm::MaybeAlign(),
+            this->get_type_size(struct_type)
+        );
+    } else if (expression->index() == ast::FieldAccess) {
         llvm::Value* pointer = this->get_pointer_to(expression);
-        this->builder->CreateMemCpy(struct_allocation, llvm::MaybeAlign(), pointer, llvm::MaybeAlign(), this->get_type_size(struct_type));
-    }
-    else {
+        this->builder->CreateMemCpy(
+            struct_allocation, llvm::MaybeAlign(), pointer, llvm::MaybeAlign(),
+            this->get_type_size(struct_type)
+        );
+    } else {
         assert(false);
     }
 }
 
-void codegen::Context::store_array_elements(ast::Node* expression, llvm::Value* array_allocation) {
-    llvm::Type* array_type = this->as_llvm_type(ast::get_concrete_type(expression, type_bindings));
+void codegen::Context::store_array_elements(
+    ast::Node* expression, llvm::Value* array_allocation
+) {
+    llvm::Type* array_type =
+        this->as_llvm_type(ast::get_concrete_type(expression, type_bindings));
 
     if (expression->index() == ast::Array) {
         auto& array = std::get<ast::ArrayNode>(*expression);
@@ -882,87 +1038,159 @@ void codegen::Context::store_array_elements(ast::Node* expression, llvm::Value* 
         // Store array elements
         for (size_t i = 0; i < array.elements.size(); i++) {
             // Get pointer to the element
-            llvm::Value* index = llvm::ConstantInt::get(*(this->context), llvm::APInt(64, i, true));
-            llvm::Value* ptr = this->builder->CreateGEP(array_type, array_allocation, {llvm::ConstantInt::get(*(this->context), llvm::APInt(64, 0, true)), index}, "", true);
+            llvm::Value* index = llvm::ConstantInt::get(
+                *(this->context), llvm::APInt(64, i, true)
+            );
+            llvm::Value* ptr = this->builder->CreateGEP(
+                array_type, array_allocation,
+                {llvm::ConstantInt::get(
+                     *(this->context), llvm::APInt(64, 0, true)
+                 ),
+                 index},
+                "", true
+            );
 
             // Store element
             this->builder->CreateStore(this->codegen(array.elements[i]), ptr);
         }
-    }
-    else if (expression->index() == ast::Call) {
+    } else if (expression->index() == ast::Call) {
         auto& call = std::get<ast::CallNode>(*expression);
         this->codegen_call(call, array_allocation);
-    }
-    else if (expression->index() == ast::Identifier) {
+    } else if (expression->index() == ast::Identifier) {
         auto& identifier = std::get<ast::IdentifierNode>(*expression);
-        llvm::Value* array_pointer = this->get_binding(identifier.value).pointer;
-        if (((llvm::AllocaInst*) array_pointer)->getAllocatedType()->isPointerTy()) {
-            array_pointer = this->builder->CreateLoad(array_pointer->getType(), array_pointer);
+        llvm::Value* array_pointer =
+            this->get_binding(identifier.value).pointer;
+        if (((llvm::AllocaInst*)array_pointer)
+                ->getAllocatedType()
+                ->isPointerTy()) {
+            array_pointer = this->builder->CreateLoad(
+                array_pointer->getType(), array_pointer
+            );
         }
-        this->builder->CreateMemCpy(array_allocation, llvm::MaybeAlign(), array_pointer, llvm::MaybeAlign(), this->get_type_size(array_type));
-    }
-    else {
+        this->builder->CreateMemCpy(
+            array_allocation, llvm::MaybeAlign(), array_pointer,
+            llvm::MaybeAlign(), this->get_type_size(array_type)
+        );
+    } else {
         assert(false);
     }
 }
 
 llvm::Value* codegen::Context::get_field_pointer(ast::FieldAccessNode& node) {
-    // There should be at least 1 identifiers in fields accessed. eg: circle.radius
+    // There should be at least 1 identifiers in fields accessed. eg:
+    // circle.radius
     assert(node.fields_accessed.size() >= 1);
 
     // Get struct allocation and type
-    assert(ast::get_concrete_type(node.accessed, this->type_bindings).as_nominal_type().type_definition);
+    assert(ast::get_concrete_type(node.accessed, this->type_bindings)
+               .as_nominal_type()
+               .type_definition);
     llvm::Value* struct_ptr = this->get_pointer_to(node.accessed);
-    llvm::StructType* struct_type = this->get_struct_type(ast::get_concrete_type(node.accessed, this->type_bindings).as_nominal_type().type_definition);
+    llvm::StructType* struct_type = this->get_struct_type(
+        ast::get_concrete_type(node.accessed, this->type_bindings)
+            .as_nominal_type()
+            .type_definition
+    );
 
     // Get type definition
-    ast::TypeNode* type_definition = ast::get_concrete_type(node.accessed, this->type_bindings).as_nominal_type().type_definition;
+    ast::TypeNode* type_definition =
+        ast::get_concrete_type(node.accessed, this->type_bindings)
+            .as_nominal_type()
+            .type_definition;
 
     for (size_t i = 0; i < node.fields_accessed.size() - 1; i++) {
         // Get pointer to accessed field
-        struct_ptr = this->builder->CreateStructGEP(struct_type, struct_ptr, type_definition->get_index_of_field(node.fields_accessed[i]->value));
+        struct_ptr = this->builder->CreateStructGEP(
+            struct_type, struct_ptr,
+            type_definition->get_index_of_field(node.fields_accessed[i]->value)
+        );
 
         // Update current type definition
-        type_definition = ast::get_concrete_type((ast::Node*) node.fields_accessed[i], this->type_bindings).as_nominal_type().type_definition;
+        type_definition =
+            ast::get_concrete_type(
+                (ast::Node*)node.fields_accessed[i], this->type_bindings
+            )
+                .as_nominal_type()
+                .type_definition;
         struct_type = this->get_struct_type(type_definition);
     }
 
     // Get pointer to accessed fieldd
     size_t last_element = node.fields_accessed.size() - 1;
-    llvm::Value* ptr = this->builder->CreateStructGEP(struct_type, struct_ptr, type_definition->get_index_of_field(node.fields_accessed[last_element]->value));
+    llvm::Value* ptr = this->builder->CreateStructGEP(
+        struct_type, struct_ptr,
+        type_definition->get_index_of_field(
+            node.fields_accessed[last_element]->value
+        )
+    );
     return ptr;
 }
 
 llvm::Value* codegen::Context::get_index_access_pointer(ast::CallNode& node) {
-    llvm::Value* index = this->builder->CreateSub(this->codegen(node.args[1]->expression), llvm::ConstantInt::get(*(this->context), llvm::APInt(64, 1, true)));
+    llvm::Value* index = this->builder->CreateSub(
+        this->codegen(node.args[1]->expression),
+        llvm::ConstantInt::get(*(this->context), llvm::APInt(64, 1, true))
+    );
 
-    if (ast::get_concrete_type(node.args[0]->expression, this->type_bindings).array_size_known()) {
-        llvm::Type* array_type = this->as_llvm_type(ast::get_concrete_type(node.args[0]->expression, this->type_bindings));
-        llvm::Value* array_ptr = this->get_binding(std::get<ast::IdentifierNode>(*node.args[0]->expression).value).pointer;
+    if (ast::get_concrete_type(node.args[0]->expression, this->type_bindings)
+            .array_size_known()) {
+        llvm::Type* array_type = this->as_llvm_type(ast::get_concrete_type(
+            node.args[0]->expression, this->type_bindings
+        ));
+        llvm::Value* array_ptr =
+            this->get_binding(
+                    std::get<ast::IdentifierNode>(*node.args[0]->expression)
+                        .value
+            )
+                .pointer;
 
-        if (((llvm::AllocaInst*) array_ptr)->getAllocatedType()->isPointerTy()) {
-            array_ptr = this->builder->CreateLoad(array_type->getPointerTo(), array_ptr);
-        }
-
-        return this->builder->CreateGEP(array_type, array_ptr, {llvm::ConstantInt::get(*(this->context), llvm::APInt(64, 0, true)), index}, "", true);
-    }
-    else {
-        llvm::Type* wrapper_type = llvm::StructType::getTypeByName(*this->context, "arrayWrapper");
-        llvm::Value* wrapper_ptr = this->get_binding(std::get<ast::IdentifierNode>(*node.args[0]->expression).value).pointer;
-        if (((llvm::AllocaInst*) wrapper_ptr)->getAllocatedType()->isPointerTy()) {
-            wrapper_ptr = this->builder->CreateLoad(
-                wrapper_ptr->getType(),
-                wrapper_ptr
+        if (((llvm::AllocaInst*)array_ptr)->getAllocatedType()->isPointerTy()) {
+            array_ptr = this->builder->CreateLoad(
+                array_type->getPointerTo(), array_ptr
             );
         }
 
+        return this->builder->CreateGEP(
+            array_type, array_ptr,
+            {llvm::ConstantInt::get(*(this->context), llvm::APInt(64, 0, true)),
+             index},
+            "", true
+        );
+    } else {
+        llvm::Type* wrapper_type =
+            llvm::StructType::getTypeByName(*this->context, "arrayWrapper");
+        llvm::Value* wrapper_ptr =
+            this->get_binding(
+                    std::get<ast::IdentifierNode>(*node.args[0]->expression)
+                        .value
+            )
+                .pointer;
+        if (((llvm::AllocaInst*)wrapper_ptr)
+                ->getAllocatedType()
+                ->isPointerTy()) {
+            wrapper_ptr =
+                this->builder->CreateLoad(wrapper_ptr->getType(), wrapper_ptr);
+        }
+
         // Get array pointer
-        llvm::Value* array_ptr = this->builder->CreateStructGEP(wrapper_type, wrapper_ptr, 1);
+        llvm::Value* array_ptr =
+            this->builder->CreateStructGEP(wrapper_type, wrapper_ptr, 1);
         array_ptr = this->builder->CreateLoad(array_ptr->getType(), array_ptr);
 
-        ast::Type elements_type = ast::get_concrete_type(node.args[0]->expression, this->type_bindings).as_nominal_type().parameters[0];
-        llvm::Type* array_type = llvm::ArrayType::get(this->as_llvm_type(elements_type), 0);
-        return this->builder->CreateGEP(array_type, array_ptr, {llvm::ConstantInt::get(*(this->context), llvm::APInt(64, 0, true)), index}, "", true);
+        ast::Type elements_type =
+            ast::get_concrete_type(
+                node.args[0]->expression, this->type_bindings
+            )
+                .as_nominal_type()
+                .parameters[0];
+        llvm::Type* array_type =
+            llvm::ArrayType::get(this->as_llvm_type(elements_type), 0);
+        return this->builder->CreateGEP(
+            array_type, array_ptr,
+            {llvm::ConstantInt::get(*(this->context), llvm::APInt(64, 0, true)),
+             index},
+            "", true
+        );
     }
 }
 
@@ -977,28 +1205,32 @@ llvm::Constant* codegen::Context::get_global_string(std::string str) {
     return this->globals[str];
 }
 
-llvm::AllocaInst* codegen::Context::create_allocation(std::string name, llvm::Type* type) {
+llvm::AllocaInst* codegen::Context::create_allocation(
+    std::string name, llvm::Type* type
+) {
     assert(this->current_entry_block);
-    llvm::IRBuilder<> block(this->current_entry_block, this->current_entry_block->begin());
+    llvm::IRBuilder<> block(
+        this->current_entry_block, this->current_entry_block->begin()
+    );
     return block.CreateAlloca(type, 0, name.c_str());
 }
 
-llvm::AllocaInst* codegen::Context::copy_expression_to_memory(llvm::Value* pointer, ast::Node* expression) {
+llvm::AllocaInst* codegen::Context::copy_expression_to_memory(
+    llvm::Value* pointer, ast::Node* expression
+) {
     if (this->has_struct_type(expression)) {
         // Store fields
         this->store_fields(expression, pointer);
 
         // Return
         return nullptr;
-    }
-    else if (this->has_array_type(expression)) {
+    } else if (this->has_array_type(expression)) {
         // Store array elements
         this->store_array_elements(expression, pointer);
 
         // Return
         return nullptr;
-    }
-    else {
+    } else {
         // Generate value of expression
         llvm::Value* expr = this->codegen(expression);
 
@@ -1013,45 +1245,41 @@ llvm::Value* codegen::Context::get_pointer_to(ast::Node* expression) {
     if (expression->index() == ast::Identifier) {
         auto& node = std::get<ast::IdentifierNode>(*expression);
 
-        if (ast::get_concrete_type(node.type, this->type_bindings).is_collection()) {
+        if (ast::get_concrete_type(node.type, this->type_bindings)
+                .is_collection()) {
             llvm::Value* pointer = this->get_binding(node.value).pointer;
-            if (this->get_binding(node.value).is_mutable
-            || ((llvm::AllocaInst*) pointer)->getAllocatedType()->isPointerTy()) {
-                pointer = this->builder->CreateLoad(
-                    pointer->getType(),
-                    pointer
-                );
+            if (this->get_binding(node.value).is_mutable ||
+                ((llvm::AllocaInst*)pointer)
+                    ->getAllocatedType()
+                    ->isPointerTy()) {
+                pointer =
+                    this->builder->CreateLoad(pointer->getType(), pointer);
             }
             return pointer;
-        }
-        else {
+        } else {
             llvm::Value* pointer = this->get_binding(node.value).pointer;
             if (this->get_binding(node.value).is_mutable) {
-                pointer = this->builder->CreateLoad(
-                    pointer->getType(),
-                    pointer
-                );
+                pointer =
+                    this->builder->CreateLoad(pointer->getType(), pointer);
             }
             return pointer;
         }
-    }
-    else if (expression->index() == ast::FieldAccess) {
+    } else if (expression->index() == ast::FieldAccess) {
         auto& node = std::get<ast::FieldAccessNode>(*expression);
         auto pointer = this->get_field_pointer(node);
         return pointer;
-    }
-    else if (expression->index() == ast::Call
-    &&       (std::get<ast::CallNode>(*expression).identifier->value == "[]"
-           || std::get<ast::CallNode>(*expression).identifier->value == "[]:mut")) {
+    } else if (expression->index() == ast::Call &&
+               (std::get<ast::CallNode>(*expression).identifier->value ==
+                    "[]" ||
+                std::get<ast::CallNode>(*expression).identifier->value ==
+                    "[]:mut")) {
         auto& node = std::get<ast::CallNode>(*expression);
         auto pointer = this->get_index_access_pointer(node);
         return pointer;
-    }
-    else if (expression->index() == ast::Dereference) {
+    } else if (expression->index() == ast::Dereference) {
         auto& node = std::get<ast::DereferenceNode>(*expression);
         return this->codegen(node.expression);
-    }
-    else {
+    } else {
         std::cout << expression->index() << "\n";
         assert(false);
     }
@@ -1061,30 +1289,44 @@ llvm::Value* codegen::Context::get_pointer_to(ast::Node* expression) {
 
 llvm::Value* codegen::Context::create_heap_allocation(ast::Type type) {
     std::vector<llvm::Value*> mallocArgs;
-    mallocArgs.push_back(llvm::ConstantInt::get(*(this->context), llvm::APInt(64, this->get_type_size(this->as_llvm_type(type)), true)));
-    llvm::Value* malloc_call = this->builder->CreateCall(this->module->getFunction("malloc"), mallocArgs);
+    mallocArgs.push_back(llvm::ConstantInt::get(
+        *(this->context),
+        llvm::APInt(64, this->get_type_size(this->as_llvm_type(type)), true)
+    ));
+    llvm::Value* malloc_call = this->builder->CreateCall(
+        this->module->getFunction("malloc"), mallocArgs
+    );
     return malloc_call;
 }
 
 // Codegeneration
 // --------------
 void codegen::Context::codegen(ast::Ast& ast) {
-    ast::BlockNode* node = (ast::BlockNode*) ast.program;
+    ast::BlockNode* node = (ast::BlockNode*)ast.program;
 
     // Declare malloc
     std::vector<llvm::Type*> args = {};
     args.push_back(llvm::Type::getInt64Ty(*this->context));
-    llvm::FunctionType* mallocType = llvm::FunctionType::get(llvm::Type::getVoidTy(*(this->context))->getPointerTo(), args, false);
-    llvm::Function::Create(mallocType, llvm::Function::ExternalLinkage, "malloc", this->module);
+    llvm::FunctionType* mallocType = llvm::FunctionType::get(
+        llvm::Type::getVoidTy(*(this->context))->getPointerTo(), args, false
+    );
+    llvm::Function::Create(
+        mallocType, llvm::Function::ExternalLinkage, "malloc", this->module
+    );
 
     // Declare free
     args = {};
     args.push_back(llvm::Type::getVoidTy(*(this->context))->getPointerTo());
-    llvm::FunctionType* freeType = llvm::FunctionType::get(llvm::Type::getVoidTy(*(this->context)), args, false);
-    llvm::Function::Create(freeType, llvm::Function::ExternalLinkage, "free", this->module);
+    llvm::FunctionType* freeType = llvm::FunctionType::get(
+        llvm::Type::getVoidTy(*(this->context)), args, false
+    );
+    llvm::Function::Create(
+        freeType, llvm::Function::ExternalLinkage, "free", this->module
+    );
 
     // Codegen array wrapper type
-    llvm::StructType* array_type = llvm::StructType::create(*this->context, "arrayWrapper");
+    llvm::StructType* array_type =
+        llvm::StructType::create(*this->context, "arrayWrapper");
     std::vector<llvm::Type*> fields;
     fields.push_back(this->as_llvm_type(ast::Type("Int64")));
     fields.push_back(llvm::Type::getVoidTy(*(this->context))->getPointerTo());
@@ -1117,23 +1359,31 @@ void codegen::Context::codegen(ast::Ast& ast) {
     }
 
     // Crate main function
-    llvm::FunctionType* mainType = llvm::FunctionType::get(this->builder->getInt32Ty(), false);
-    llvm::Function* main = llvm::Function::Create(mainType, llvm::Function::ExternalLinkage, "main", this->module);
-    llvm::BasicBlock* entry = llvm::BasicBlock::Create(*(this->context), "entry", main);
+    llvm::FunctionType* mainType =
+        llvm::FunctionType::get(this->builder->getInt32Ty(), false);
+    llvm::Function* main = llvm::Function::Create(
+        mainType, llvm::Function::ExternalLinkage, "main", this->module
+    );
+    llvm::BasicBlock* entry =
+        llvm::BasicBlock::Create(*(this->context), "entry", main);
     this->builder->SetInsertPoint(entry);
 
     // Set current entry block
     this->current_entry_block = &main->getEntryBlock();
 
     // Codegen statements
-    this->codegen((ast::Node*) ast.program);
+    this->codegen((ast::Node*)ast.program);
 
     // Create return statement
-    this->builder->CreateRet(llvm::ConstantInt::get(*(this->context), llvm::APInt(32, 0)));
+    this->builder->CreateRet(
+        llvm::ConstantInt::get(*(this->context), llvm::APInt(32, 0))
+    );
 }
 
 llvm::Value* codegen::Context::codegen(ast::Node* node) {
-    return std::visit([this](auto& variant) {return this->codegen(variant);}, *node);
+    return std::visit(
+        [this](auto& variant) { return this->codegen(variant); }, *node
+    );
 }
 
 llvm::Value* codegen::Context::codegen(ast::BlockNode& node) {
@@ -1148,18 +1398,24 @@ llvm::Value* codegen::Context::codegen(ast::BlockNode& node) {
     return nullptr;
 }
 
-void codegen::Context::codegen_types_prototypes(std::vector<ast::TypeNode*> types) {
-    for (auto type: types) {
-        (void) llvm::StructType::create(*this->context, this->get_mangled_type_name(type->module_path, type->identifier->value));
+void codegen::Context::codegen_types_prototypes(
+    std::vector<ast::TypeNode*> types
+) {
+    for (auto type : types) {
+        (void)llvm::StructType::create(
+            *this->context, this->get_mangled_type_name(
+                                type->module_path, type->identifier->value
+                            )
+        );
     }
 }
 
 void codegen::Context::codegen_types_bodies(std::vector<ast::TypeNode*> types) {
-    for (auto type: types) {
+    for (auto type : types) {
         llvm::StructType* struct_type = this->get_struct_type(type);
 
         std::vector<llvm::Type*> fields;
-        for (auto field: type->fields) {
+        for (auto field : type->fields) {
             fields.push_back(as_llvm_type(field->type));
         }
 
@@ -1167,50 +1423,58 @@ void codegen::Context::codegen_types_bodies(std::vector<ast::TypeNode*> types) {
     }
 }
 
-void codegen::Context::codegen_function_prototypes(std::vector<ast::FunctionNode*> functions) {
-    for (auto& function: functions) {
+void codegen::Context::codegen_function_prototypes(
+    std::vector<ast::FunctionNode*> functions
+) {
+    for (auto& function : functions) {
         if (function->is_builtin) continue;
 
         if (function->state != ast::FunctionCompletelyTyped) {
-            for (auto& specialization: function->specializations) {
+            for (auto& specialization : function->specializations) {
                 this->type_bindings = specialization.type_bindings;
 
                 this->codegen_function_prototypes(
-                    function->module_path,
-                    function->identifier->value,
-                    function->args,
-                    specialization.args,
-                    specialization.return_type,
-                    function->is_extern,
+                    function->module_path, function->identifier->value,
+                    function->args, specialization.args,
+                    specialization.return_type, function->is_extern,
                     function->is_extern_and_variadic
                 );
 
                 this->type_bindings = {};
             }
-        }
-        else {
+        } else {
             if (!function->is_used) continue;
 
             this->codegen_function_prototypes(
-                function->module_path,
-                function->identifier->value,
-                function->args,
-                ast::get_types(function->args),
-                function->return_type,
-                function->is_extern,
+                function->module_path, function->identifier->value,
+                function->args, ast::get_types(function->args),
+                function->return_type, function->is_extern,
                 function->is_extern_and_variadic
             );
         }
     }
 }
 
-void codegen::Context::codegen_function_prototypes(std::filesystem::path module_path, std::string identifier, std::vector<ast::FunctionArgumentNode*> args, std::vector<ast::Type> args_types, ast::Type return_type, bool is_extern, bool is_extern_and_variadic) {
+void codegen::Context::codegen_function_prototypes(
+    std::filesystem::path module_path, std::string identifier,
+    std::vector<ast::FunctionArgumentNode*> args,
+    std::vector<ast::Type> args_types, ast::Type return_type, bool is_extern,
+    bool is_extern_and_variadic
+) {
     // Make function type
-    llvm::FunctionType* function_type = this->get_function_type(args, args_types, return_type, is_extern_and_variadic);
+    llvm::FunctionType* function_type = this->get_function_type(
+        args, args_types, return_type, is_extern_and_variadic
+    );
 
     // Create function
-    std::string name = this->get_mangled_function_name(module_path, identifier, ast::get_concrete_types(args_types, this->type_bindings), ast::get_concrete_type(return_type, this->type_bindings), is_extern);
-    llvm::Function* f = llvm::Function::Create(function_type, llvm::Function::ExternalLinkage, name, this->module);
+    std::string name = this->get_mangled_function_name(
+        module_path, identifier,
+        ast::get_concrete_types(args_types, this->type_bindings),
+        ast::get_concrete_type(return_type, this->type_bindings), is_extern
+    );
+    llvm::Function* f = llvm::Function::Create(
+        function_type, llvm::Function::ExternalLinkage, name, this->module
+    );
 
     size_t offset = 0;
 
@@ -1235,54 +1499,58 @@ void codegen::Context::codegen_function_prototypes(std::filesystem::path module_
 
                 continue;
             }
-        }
-        else {
+        } else {
             f->getArg(i + offset)->setName(name);
         }
     }
 }
 
-void codegen::Context::codegen_function_bodies(std::vector<ast::FunctionNode*> functions) {
-    for (auto& function: functions) {
+void codegen::Context::codegen_function_bodies(
+    std::vector<ast::FunctionNode*> functions
+) {
+    for (auto& function : functions) {
         if (function->is_extern || function->is_builtin) continue;
 
         if (function->state != ast::FunctionCompletelyTyped) {
-            for (auto& specialization: function->specializations) {
+            for (auto& specialization : function->specializations) {
                 this->type_bindings = specialization.type_bindings;
 
                 this->codegen_function_bodies(
-                    function->module_path,
-                    function->identifier->value,
-                    function->args,
-                    specialization.args,
-                    specialization.return_type,
-                    function->body
+                    function->module_path, function->identifier->value,
+                    function->args, specialization.args,
+                    specialization.return_type, function->body
                 );
 
                 this->type_bindings = {};
             }
-        }
-        else {
+        } else {
             if (!function->is_used) continue;
 
             this->codegen_function_bodies(
-                function->module_path,
-                function->identifier->value,
-                function->args,
-                ast::get_types(function->args),
-                function->return_type,
-                function->body
+                function->module_path, function->identifier->value,
+                function->args, ast::get_types(function->args),
+                function->return_type, function->body
             );
         }
     }
 }
 
-void codegen::Context::codegen_function_bodies(std::filesystem::path module_path, std::string identifier, std::vector<ast::FunctionArgumentNode*> args, std::vector<ast::Type> args_types, ast::Type return_type, ast::Node* function_body) {
-    std::string name = this->get_mangled_function_name(module_path, identifier, ast::get_concrete_types(args_types, this->type_bindings), ast::get_concrete_type(return_type, this->type_bindings), false);
+void codegen::Context::codegen_function_bodies(
+    std::filesystem::path module_path, std::string identifier,
+    std::vector<ast::FunctionArgumentNode*> args,
+    std::vector<ast::Type> args_types, ast::Type return_type,
+    ast::Node* function_body
+) {
+    std::string name = this->get_mangled_function_name(
+        module_path, identifier,
+        ast::get_concrete_types(args_types, this->type_bindings),
+        ast::get_concrete_type(return_type, this->type_bindings), false
+    );
     llvm::Function* f = this->module->getFunction(name);
 
     // Create the body of the function
-    llvm::BasicBlock *body = llvm::BasicBlock::Create(*(this->context), "entry", f);
+    llvm::BasicBlock* body =
+        llvm::BasicBlock::Create(*(this->context), "entry", f);
     this->builder->SetInsertPoint(body);
 
     // Set current entry block
@@ -1295,13 +1563,15 @@ void codegen::Context::codegen_function_bodies(std::filesystem::path module_path
 
     if (return_type.is_collection()) {
         // Create allocation for argument
-        auto allocation = this->create_allocation("$result", f->getArg(0)->getType());
+        auto allocation =
+            this->create_allocation("$result", f->getArg(0)->getType());
 
         // Store initial value
         this->builder->CreateStore(f->getArg(0), allocation);
 
         // Add arguments to scope
-        this->current_scope().variables_scope["$result"] = Binding(nullptr, allocation);
+        this->current_scope().variables_scope["$result"] =
+            Binding(nullptr, allocation);
 
         offset += 1;
     }
@@ -1311,18 +1581,22 @@ void codegen::Context::codegen_function_bodies(std::filesystem::path module_path
 
         if (args[i]->is_mutable) {
             // Create allocation for argument
-            auto allocation = this->create_allocation(name, f->getArg(i + offset)->getType());
+            auto allocation =
+                this->create_allocation(name, f->getArg(i + offset)->getType());
 
             // Store initial value
             this->builder->CreateStore(f->getArg(i + offset), allocation);
 
             // Add arguments to scope
-            this->current_scope().variables_scope[name] = Binding((ast::Node*) args[i], allocation, args[i]->is_mutable);
-        }
-        else {
-            if (args_types[i].is_collection() && this->get_collection_as_argument(args_types[i]).types.size() > 1) {
+            this->current_scope().variables_scope[name] =
+                Binding((ast::Node*)args[i], allocation, args[i]->is_mutable);
+        } else {
+            if (args_types[i].is_collection() &&
+                this->get_collection_as_argument(args_types[i]).types.size() >
+                    1) {
                 auto new_args = this->get_collection_as_argument(args_types[i]);
-                auto allocation = this->create_allocation(name, new_args.struct_type.value());
+                auto allocation =
+                    this->create_allocation(name, new_args.struct_type.value());
 
                 // Store values on struct
                 for (size_t j = 0; j < new_args.types.size(); j++) {
@@ -1334,22 +1608,28 @@ void codegen::Context::codegen_function_bodies(std::filesystem::path module_path
                         ),
                         j
                     );
-                    this->builder->CreateStore(f->getArg(i + offset + j), field_ptr);
+                    this->builder->CreateStore(
+                        f->getArg(i + offset + j), field_ptr
+                    );
                 }
                 offset += new_args.types.size() - 1;
 
                 // Add struct to scope
-                this->current_scope().variables_scope[name] = Binding((ast::Node*) args[i], allocation);
-            }
-            else {
+                this->current_scope().variables_scope[name] =
+                    Binding((ast::Node*)args[i], allocation);
+            } else {
                 // Create allocation for argument
-                auto allocation = this->create_allocation(name, f->getArg(i + offset)->getType());
+                auto allocation = this->create_allocation(
+                    name, f->getArg(i + offset)->getType()
+                );
 
                 // Store initial value
                 this->builder->CreateStore(f->getArg(i + offset), allocation);
 
                 // Add arguments to scope
-                this->current_scope().variables_scope[name] =  Binding((ast::Node*) args[i], allocation, args[i]->is_mutable);
+                this->current_scope().variables_scope[name] = Binding(
+                    (ast::Node*)args[i], allocation, args[i]->is_mutable
+                );
             }
         }
     }
@@ -1360,8 +1640,7 @@ void codegen::Context::codegen_function_bodies(std::filesystem::path module_path
         if (result) {
             this->builder->CreateRet(result);
         }
-    }
-    else {
+    } else {
         this->codegen(function_body);
         if (return_type == ast::Type("None")) {
             this->builder->CreateRetVoid();
@@ -1378,7 +1657,6 @@ void codegen::Context::codegen_function_bodies(std::filesystem::path module_path
     this->scopes.variable_scopes.pop_back();
 }
 
-
 llvm::Value* codegen::Context::codegen(ast::InterfaceNode& node) {
     assert(false);
     return nullptr;
@@ -1386,55 +1664,114 @@ llvm::Value* codegen::Context::codegen(ast::InterfaceNode& node) {
 
 llvm::Value* codegen::Context::codegen(ast::DeclarationNode& node) {
     // Delete binding if already exists
-    if (this->current_scope().variables_scope.find(node.identifier->value) != this->current_scope().variables_scope.end()) {
-        llvm::Value* pointer = this->current_scope().variables_scope[node.identifier->value].pointer;
-        this->delete_binding(pointer, ast::get_concrete_type(ast::get_type(this->current_scope().variables_scope[node.identifier->value].node), this->type_bindings));
+    if (this->current_scope().variables_scope.find(node.identifier->value) !=
+        this->current_scope().variables_scope.end()) {
+        llvm::Value* pointer = this->current_scope()
+                                   .variables_scope[node.identifier->value]
+                                   .pointer;
+        this->delete_binding(
+            pointer,
+            ast::get_concrete_type(
+                ast::get_type(this->current_scope()
+                                  .variables_scope[node.identifier->value]
+                                  .node),
+                this->type_bindings
+            )
+        );
     }
 
     if (this->has_collection_type(node.expression)) {
         // Create binding and allocation
-        this->current_scope().variables_scope[node.identifier->value] = Binding(node.expression, this->create_allocation("", this->as_llvm_type(ast::get_concrete_type(node.expression, this->type_bindings))));
+        this->current_scope().variables_scope[node.identifier->value] = Binding(
+            node.expression, this->create_allocation(
+                                 "", this->as_llvm_type(ast::get_concrete_type(
+                                         node.expression, this->type_bindings
+                                     ))
+                             )
+        );
 
         // Copy expression into memory
-        this->copy_expression_to_memory(this->current_scope().variables_scope[node.identifier->value].pointer, node.expression);
+        this->copy_expression_to_memory(
+            this->current_scope()
+                .variables_scope[node.identifier->value]
+                .pointer,
+            node.expression
+        );
 
         // Return
         return nullptr;
-    }
-    else if (this->has_boxed_type(node.expression) && node.expression->index() != ast::New) {
-        ast::Type type = ast::get_concrete_type(node.expression, this->type_bindings);
+    } else if (this->has_boxed_type(node.expression) &&
+               node.expression->index() != ast::New) {
+        ast::Type type =
+            ast::get_concrete_type(node.expression, this->type_bindings);
 
-        // Create allocation if doesn't exists or if already exists, but it has a different type
-        if (this->current_scope().variables_scope.find(node.identifier->value) == this->current_scope().variables_scope.end()
-        ||  ast::get_concrete_type(ast::get_type(this->current_scope().variables_scope[node.identifier->value].node), this->type_bindings) != ast::get_concrete_type(ast::get_type(node.expression), this->type_bindings)) {
-            this->current_scope().variables_scope[node.identifier->value] = Binding(node.expression, this->create_allocation(node.identifier->value, this->as_llvm_type(type)));
+        // Create allocation if doesn't exists or if already exists, but it has
+        // a different type
+        if (this->current_scope().variables_scope.find(node.identifier->value
+            ) == this->current_scope().variables_scope.end() ||
+            ast::get_concrete_type(
+                ast::get_type(this->current_scope()
+                                  .variables_scope[node.identifier->value]
+                                  .node),
+                this->type_bindings
+            ) !=
+                ast::get_concrete_type(
+                    ast::get_type(node.expression), this->type_bindings
+                )) {
+            this->current_scope().variables_scope[node.identifier->value] =
+                Binding(
+                    node.expression,
+                    this->create_allocation(
+                        node.identifier->value, this->as_llvm_type(type)
+                    )
+                );
         }
 
         // Create heap allocation
-        auto heap_allocation = this->create_heap_allocation(type.as_nominal_type().parameters[0]);
+        auto heap_allocation =
+            this->create_heap_allocation(type.as_nominal_type().parameters[0]);
 
         // Copy memory
-        llvm::Value* value = this->builder->CreateLoad(this->as_llvm_type(type.as_nominal_type().parameters[0]), this->codegen(node.expression));
+        llvm::Value* value = this->builder->CreateLoad(
+            this->as_llvm_type(type.as_nominal_type().parameters[0]),
+            this->codegen(node.expression)
+        );
         this->builder->CreateStore(value, heap_allocation);
 
         // Store pointer in binding
-        this->builder->CreateStore(heap_allocation, this->current_scope().variables_scope[node.identifier->value].pointer);
+        this->builder->CreateStore(
+            heap_allocation, this->current_scope()
+                                 .variables_scope[node.identifier->value]
+                                 .pointer
+        );
 
         // Return
         return nullptr;
-    }
-    else {
+    } else {
         // Generate value of expression
         llvm::Value* expr = this->codegen(node.expression);
 
-        // Create allocation if doesn't exists or if already exists, but it has a different type
-        if (this->current_scope().variables_scope.find(node.identifier->value) == this->current_scope().variables_scope.end()
-        ||  this->current_scope().variables_scope[node.identifier->value].pointer->getType() != expr->getType()) {
-            this->current_scope().variables_scope[node.identifier->value] = Binding(node.expression, this->create_allocation(node.identifier->value, expr->getType()));
+        // Create allocation if doesn't exists or if already exists, but it has
+        // a different type
+        if (this->current_scope().variables_scope.find(node.identifier->value
+            ) == this->current_scope().variables_scope.end() ||
+            this->current_scope()
+                    .variables_scope[node.identifier->value]
+                    .pointer->getType() != expr->getType()) {
+            this->current_scope().variables_scope[node.identifier->value] =
+                Binding(
+                    node.expression, this->create_allocation(
+                                         node.identifier->value, expr->getType()
+                                     )
+                );
         }
 
         // Store value
-        this->builder->CreateStore(expr, this->current_scope().variables_scope[node.identifier->value].pointer);
+        this->builder->CreateStore(
+            expr, this->current_scope()
+                      .variables_scope[node.identifier->value]
+                      .pointer
+        );
 
         // Return
         return nullptr;
@@ -1447,17 +1784,22 @@ llvm::Value* codegen::Context::codegen(ast::AssignmentNode& node) {
     // Delete previous value
     if (node.assignable->index() == ast::Identifier) {
         // do nothing
-    }
-    else if (node.assignable->index() == ast::Dereference) {
-        this->delete_binding(pointer, ast::get_concrete_type(node.assignable, this->type_bindings));
-    }
-    else if (node.assignable->index() == ast::FieldAccess) {
-        this->delete_binding(pointer, ast::get_concrete_type(node.assignable, this->type_bindings));
-    }
-    else if (node.assignable->index() == ast::Call) {
-        this->delete_binding(pointer, ast::get_concrete_type(node.assignable, this->type_bindings));
-    }
-    else {
+    } else if (node.assignable->index() == ast::Dereference) {
+        this->delete_binding(
+            pointer,
+            ast::get_concrete_type(node.assignable, this->type_bindings)
+        );
+    } else if (node.assignable->index() == ast::FieldAccess) {
+        this->delete_binding(
+            pointer,
+            ast::get_concrete_type(node.assignable, this->type_bindings)
+        );
+    } else if (node.assignable->index() == ast::Call) {
+        this->delete_binding(
+            pointer,
+            ast::get_concrete_type(node.assignable, this->type_bindings)
+        );
+    } else {
         assert(false);
     }
 
@@ -1472,36 +1814,41 @@ llvm::Value* codegen::Context::codegen(ast::ReturnNode& node) {
             this->store_fields(
                 node.expression.value(),
                 this->builder->CreateLoad(
-                    this->as_llvm_type(ast::get_concrete_type(node.expression.value(), this->type_bindings))->getPointerTo(),
+                    this
+                        ->as_llvm_type(ast::get_concrete_type(
+                            node.expression.value(), this->type_bindings
+                        ))
+                        ->getPointerTo(),
                     this->get_binding("$result").pointer
                 )
             );
 
             // Return
             this->builder->CreateRetVoid();
-        }
-        else if (this->has_array_type(node.expression.value())) {
+        } else if (this->has_array_type(node.expression.value())) {
             // Store elements
             this->store_array_elements(
                 node.expression.value(),
                 this->builder->CreateLoad(
-                    this->as_llvm_type(ast::get_concrete_type(node.expression.value(), this->type_bindings))->getPointerTo(),
+                    this
+                        ->as_llvm_type(ast::get_concrete_type(
+                            node.expression.value(), this->type_bindings
+                        ))
+                        ->getPointerTo(),
                     this->get_binding("$result").pointer
                 )
             );
 
             // Return
             this->builder->CreateRetVoid();
-        }
-        else {
+        } else {
             // Generate value of expression
             llvm::Value* expr = this->codegen(node.expression.value());
 
             // Create return value
             this->builder->CreateRet(expr);
         }
-    }
-    else {
+    } else {
         this->builder->CreateRetVoid();
     }
     return nullptr;
@@ -1520,14 +1867,22 @@ llvm::Value* codegen::Context::codegen(ast::ContinueNode& node) {
 }
 
 llvm::Value* codegen::Context::codegen(ast::IfElseNode& node) {
-    if (ast::is_expression((ast::Node*) &node) && ast::get_type((ast::Node*) &node) == ast::Type("None")) {
-        llvm::Function *current_function = this->builder->GetInsertBlock()->getParent();
-        llvm::BasicBlock *block = llvm::BasicBlock::Create(*(this->context), "then", current_function);
-        llvm::BasicBlock *else_block = llvm::BasicBlock::Create(*(this->context), "else");
-        llvm::BasicBlock *merge_block = llvm::BasicBlock::Create(*(this->context), "merge");
+    if (ast::is_expression((ast::Node*)&node) &&
+        ast::get_type((ast::Node*)&node) == ast::Type("None")) {
+        llvm::Function* current_function =
+            this->builder->GetInsertBlock()->getParent();
+        llvm::BasicBlock* block = llvm::BasicBlock::Create(
+            *(this->context), "then", current_function
+        );
+        llvm::BasicBlock* else_block =
+            llvm::BasicBlock::Create(*(this->context), "else");
+        llvm::BasicBlock* merge_block =
+            llvm::BasicBlock::Create(*(this->context), "merge");
 
         // Jump to if block or else block depending of the condition
-        this->builder->CreateCondBr(this->codegen(node.condition), block, else_block);
+        this->builder->CreateCondBr(
+            this->codegen(node.condition), block, else_block
+        );
 
         // Create if block
         this->builder->SetInsertPoint(block);
@@ -1547,15 +1902,21 @@ llvm::Value* codegen::Context::codegen(ast::IfElseNode& node) {
         // Create merge block
         current_function->getBasicBlockList().push_back(merge_block);
         this->builder->SetInsertPoint(merge_block);
-    }
-    else if (ast::is_expression((ast::Node*) &node)) {
-        llvm::Function *current_function = this->builder->GetInsertBlock()->getParent();
-        llvm::BasicBlock *block = llvm::BasicBlock::Create(*(this->context), "then", current_function);
-        llvm::BasicBlock *else_block = llvm::BasicBlock::Create(*(this->context), "else");
-        llvm::BasicBlock *merge_block = llvm::BasicBlock::Create(*(this->context), "merge");
+    } else if (ast::is_expression((ast::Node*)&node)) {
+        llvm::Function* current_function =
+            this->builder->GetInsertBlock()->getParent();
+        llvm::BasicBlock* block = llvm::BasicBlock::Create(
+            *(this->context), "then", current_function
+        );
+        llvm::BasicBlock* else_block =
+            llvm::BasicBlock::Create(*(this->context), "else");
+        llvm::BasicBlock* merge_block =
+            llvm::BasicBlock::Create(*(this->context), "merge");
 
         // Jump to if block or else block depending of the condition
-        this->builder->CreateCondBr(this->codegen(node.condition), block, else_block);
+        this->builder->CreateCondBr(
+            this->codegen(node.condition), block, else_block
+        );
 
         // Create if block
         this->builder->SetInsertPoint(block);
@@ -1575,28 +1936,36 @@ llvm::Value* codegen::Context::codegen(ast::IfElseNode& node) {
         // Create merge block
         current_function->getBasicBlockList().push_back(merge_block);
         this->builder->SetInsertPoint(merge_block);
-        llvm::PHINode* phi_node = this->builder->CreatePHI(expr->getType(), 2, "iftmp");
+        llvm::PHINode* phi_node =
+            this->builder->CreatePHI(expr->getType(), 2, "iftmp");
         phi_node->addIncoming(expr, block);
         phi_node->addIncoming(else_expr, else_block);
 
         return phi_node;
-    }
-    else {
-        llvm::Function *current_function = this->builder->GetInsertBlock()->getParent();
-        llvm::BasicBlock *block = llvm::BasicBlock::Create(*(this->context), "then", current_function);
-        llvm::BasicBlock *else_block = llvm::BasicBlock::Create(*(this->context), "else");
-        llvm::BasicBlock *merge_block = llvm::BasicBlock::Create(*(this->context), "merge");
+    } else {
+        llvm::Function* current_function =
+            this->builder->GetInsertBlock()->getParent();
+        llvm::BasicBlock* block = llvm::BasicBlock::Create(
+            *(this->context), "then", current_function
+        );
+        llvm::BasicBlock* else_block =
+            llvm::BasicBlock::Create(*(this->context), "else");
+        llvm::BasicBlock* merge_block =
+            llvm::BasicBlock::Create(*(this->context), "merge");
 
         // If theres no else block
         if (!node.else_branch.has_value()) {
             // Jump to if block or merge block depending of the condition
-            this->builder->CreateCondBr(this->codegen(node.condition), block, merge_block);
+            this->builder->CreateCondBr(
+                this->codegen(node.condition), block, merge_block
+            );
 
             // Create if block
             this->builder->SetInsertPoint(block);
             this->codegen(node.if_branch);
 
-            // Jump to merge block if does not return (NoType) means the if does not return)
+            // Jump to merge block if does not return (NoType) means the if does
+            // not return)
             if (ast::get_type(node.if_branch) == ast::Type(ast::NoType{})) {
                 this->builder->CreateBr(merge_block);
             }
@@ -1604,16 +1973,18 @@ llvm::Value* codegen::Context::codegen(ast::IfElseNode& node) {
             // Create merge block
             current_function->getBasicBlockList().push_back(merge_block);
             this->builder->SetInsertPoint(merge_block);
-        }
-        else {
+        } else {
             // Jump to if block or else block depending of the condition
-            this->builder->CreateCondBr(this->codegen(node.condition), block, else_block);
+            this->builder->CreateCondBr(
+                this->codegen(node.condition), block, else_block
+            );
 
             // Create if block
             this->builder->SetInsertPoint(block);
             this->codegen(node.if_branch);
 
-            // Jump to merge block if if does not return (NoType means the block does not return)
+            // Jump to merge block if if does not return (NoType means the block
+            // does not return)
             if (ast::get_type(node.if_branch) == ast::Type(ast::NoType{})) {
                 this->builder->CreateBr(merge_block);
             }
@@ -1623,13 +1994,17 @@ llvm::Value* codegen::Context::codegen(ast::IfElseNode& node) {
             this->builder->SetInsertPoint(else_block);
             this->codegen(node.else_branch.value());
 
-            // Jump to merge block if else does not return (NoType means the block does not return)
-            if (ast::get_type(node.else_branch.value()) == ast::Type(ast::NoType{})) {
+            // Jump to merge block if else does not return (NoType means the
+            // block does not return)
+            if (ast::get_type(node.else_branch.value()) ==
+                ast::Type(ast::NoType{})) {
                 this->builder->CreateBr(merge_block);
             }
 
             // Create merge block
-            if (ast::get_type(node.if_branch) == ast::Type(ast::NoType{}) || ast::get_type(node.else_branch.value()) == ast::Type(ast::NoType{})) {
+            if (ast::get_type(node.if_branch) == ast::Type(ast::NoType{}) ||
+                ast::get_type(node.else_branch.value()) ==
+                    ast::Type(ast::NoType{})) {
                 current_function->getBasicBlockList().push_back(merge_block);
                 this->builder->SetInsertPoint(merge_block);
             }
@@ -1640,21 +2015,28 @@ llvm::Value* codegen::Context::codegen(ast::IfElseNode& node) {
 }
 
 llvm::Value* codegen::Context::codegen(ast::WhileNode& node) {
-    llvm::Function *current_function = this->builder->GetInsertBlock()->getParent();
-    llvm::BasicBlock *loop_block = llvm::BasicBlock::Create(*(this->context), "loop", current_function);
-    llvm::BasicBlock *then_block = llvm::BasicBlock::Create(*(this->context), "then");
+    llvm::Function* current_function =
+        this->builder->GetInsertBlock()->getParent();
+    llvm::BasicBlock* loop_block =
+        llvm::BasicBlock::Create(*(this->context), "loop", current_function);
+    llvm::BasicBlock* then_block =
+        llvm::BasicBlock::Create(*(this->context), "then");
     this->last_after_while_block = then_block;
     this->last_while_block = loop_block;
 
     // Jump to loop block if condition is true
-    this->builder->CreateCondBr(this->codegen(node.condition), loop_block, then_block);
+    this->builder->CreateCondBr(
+        this->codegen(node.condition), loop_block, then_block
+    );
 
     // Codegen loop block
     this->builder->SetInsertPoint(loop_block);
     this->codegen(node.block);
 
     // Jump to loop block again if condition is true
-    this->builder->CreateCondBr(this->codegen(node.condition), loop_block, then_block);
+    this->builder->CreateCondBr(
+        this->codegen(node.condition), loop_block, then_block
+    );
 
     // Insert then block
     current_function->getBasicBlockList().push_back(then_block);
@@ -1663,26 +2045,37 @@ llvm::Value* codegen::Context::codegen(ast::WhileNode& node) {
     return nullptr;
 }
 
-std::vector<llvm::Value*> codegen::Context::codegen_args(ast::FunctionNode* function, std::vector<ast::CallArgumentNode*> args) {
+std::vector<llvm::Value*> codegen::Context::codegen_args(
+    ast::FunctionNode* function, std::vector<ast::CallArgumentNode*> args
+) {
     std::vector<llvm::Value*> result;
 
     for (size_t i = 0; i < args.size(); i++) {
         if (args[i]->is_mutable) {
-            if (this->has_array_type(args[i]->expression)
-            && !(function->args[i]->type.is_array() && function->args[i]->type.array_size_known())
-            &&  function->args[i]->type.is_array()) {
+            if (this->has_array_type(args[i]->expression) &&
+                !(function->args[i]->type.is_array() &&
+                  function->args[i]->type.array_size_known()) &&
+                function->args[i]->type.is_array()) {
                 assert(false);
-            }
-            else {
+            } else {
                 result.push_back(this->get_pointer_to(args[i]->expression));
             }
-        }
-        else {
-            if (this->has_collection_type(args[i]->expression) && this->get_collection_as_argument(ast::get_concrete_type(args[i]->type, this->type_bindings)).types.size() > 1) {
-                auto new_args = this->get_collection_as_argument(ast::get_concrete_type(args[i]->type, this->type_bindings));
+        } else {
+            if (this->has_collection_type(args[i]->expression) &&
+                this
+                        ->get_collection_as_argument(ast::get_concrete_type(
+                            args[i]->type, this->type_bindings
+                        ))
+                        .types.size() > 1) {
+                auto new_args = this->get_collection_as_argument(
+                    ast::get_concrete_type(args[i]->type, this->type_bindings)
+                );
 
                 // Create allocation;
-                llvm::AllocaInst* allocation = this->create_allocation(function->args[i]->identifier->value, new_args.struct_type.value());
+                llvm::AllocaInst* allocation = this->create_allocation(
+                    function->args[i]->identifier->value,
+                    new_args.struct_type.value()
+                );
 
                 // Store fields
                 this->store_fields(args[i]->expression, allocation);
@@ -1696,66 +2089,109 @@ std::vector<llvm::Value*> codegen::Context::codegen_args(ast::FunctionNode* func
                         ),
                         j
                     );
-                    result.push_back(this->builder->CreateLoad(
-                        new_args.types[j],
-                        field_ptr
-                    ));
+                    result.push_back(
+                        this->builder->CreateLoad(new_args.types[j], field_ptr)
+                    );
                 }
-            }
-            else if (this->has_array_type(args[i]->expression)
-            &&      !(function->args[i]->type.is_array() && function->args[i]->type.array_size_known())
-            &&        function->args[i]->type.is_array()) {
-                    // Create allocation
-                    llvm::Type* array_type = this->as_llvm_type(ast::get_concrete_type(args[i]->expression, this->type_bindings));
-                    llvm::AllocaInst* allocation = this->create_allocation(function->args[i]->identifier->value, array_type);
-
-                    // Store array elements
-                    this->store_array_elements(args[i]->expression, allocation);
-
-                    // Create array type allocation
-                    llvm::StructType* wrapper_type = llvm::StructType::getTypeByName(*this->context, "arrayWrapper");
-                    llvm::AllocaInst* wrapper_allocation = this->create_allocation("array_wrapper", wrapper_type);
-
-                    // Store fields
-                    llvm::Value* size_ptr = this->builder->CreateStructGEP(wrapper_type, wrapper_allocation, 0);
-                    llvm::Value* array_ptr = this->builder->CreateStructGEP(wrapper_type, wrapper_allocation, 1);
-
-                    size_t number_of_elements = ast::get_concrete_type(args[i]->expression, this->type_bindings).get_array_size();
-                    this->builder->CreateStore(llvm::ConstantInt::get(*(this->context), llvm::APInt(64, number_of_elements, true)), size_ptr);
-                    this->builder->CreateStore(allocation, array_ptr);
-
-                    // Add to args
-                    result.push_back(wrapper_allocation);
-            }
-            else if (this->has_collection_type(args[i]->expression)) {
+            } else if (this->has_array_type(args[i]->expression) &&
+                       !(function->args[i]->type.is_array() &&
+                         function->args[i]->type.array_size_known()) &&
+                       function->args[i]->type.is_array()) {
                 // Create allocation
-                llvm::AllocaInst* allocation = this->create_allocation("", this->as_llvm_type(ast::get_concrete_type(args[i]->expression, this->type_bindings)));
+                llvm::Type* array_type =
+                    this->as_llvm_type(ast::get_concrete_type(
+                        args[i]->expression, this->type_bindings
+                    ));
+                llvm::AllocaInst* allocation = this->create_allocation(
+                    function->args[i]->identifier->value, array_type
+                );
+
+                // Store array elements
+                this->store_array_elements(args[i]->expression, allocation);
+
+                // Create array type allocation
+                llvm::StructType* wrapper_type =
+                    llvm::StructType::getTypeByName(
+                        *this->context, "arrayWrapper"
+                    );
+                llvm::AllocaInst* wrapper_allocation =
+                    this->create_allocation("array_wrapper", wrapper_type);
+
+                // Store fields
+                llvm::Value* size_ptr = this->builder->CreateStructGEP(
+                    wrapper_type, wrapper_allocation, 0
+                );
+                llvm::Value* array_ptr = this->builder->CreateStructGEP(
+                    wrapper_type, wrapper_allocation, 1
+                );
+
+                size_t number_of_elements =
+                    ast::get_concrete_type(
+                        args[i]->expression, this->type_bindings
+                    )
+                        .get_array_size();
+                this->builder->CreateStore(
+                    llvm::ConstantInt::get(
+                        *(this->context),
+                        llvm::APInt(64, number_of_elements, true)
+                    ),
+                    size_ptr
+                );
+                this->builder->CreateStore(allocation, array_ptr);
+
+                // Add to args
+                result.push_back(wrapper_allocation);
+            } else if (this->has_collection_type(args[i]->expression)) {
+                // Create allocation
+                llvm::AllocaInst* allocation = this->create_allocation(
+                    "", this->as_llvm_type(ast::get_concrete_type(
+                            args[i]->expression, this->type_bindings
+                        ))
+                );
 
                 // Copy expression into memory
-                this->copy_expression_to_memory(allocation, args[i]->expression);
+                this->copy_expression_to_memory(
+                    allocation, args[i]->expression
+                );
 
                 // Add to args
                 result.push_back(allocation);
-            }
-            else if (this->has_boxed_type(args[i]->expression) && args[i]->expression->index() != ast::New) {
+            } else if (this->has_boxed_type(args[i]->expression) &&
+                       args[i]->expression->index() != ast::New) {
                 // Create heap allocation
-                auto heap_allocation = this->create_heap_allocation(ast::get_concrete_type(ast::get_type((args[i]->expression)), this->type_bindings).as_nominal_type().parameters[0]);
+                auto heap_allocation = this->create_heap_allocation(
+                    ast::get_concrete_type(
+                        ast::get_type((args[i]->expression)),
+                        this->type_bindings
+                    )
+                        .as_nominal_type()
+                        .parameters[0]
+                );
 
                 // Copy memory
-                llvm::Value* value = this->builder->CreateLoad(this->as_llvm_type(ast::get_concrete_type(ast::get_type((args[i]->expression)), this->type_bindings).as_nominal_type().parameters[0]), this->codegen(args[i]->expression));
+                llvm::Value* value = this->builder->CreateLoad(
+                    this->as_llvm_type(ast::get_concrete_type(
+                                           ast::get_type((args[i]->expression)),
+                                           this->type_bindings
+                    )
+                                           .as_nominal_type()
+                                           .parameters[0]),
+                    this->codegen(args[i]->expression)
+                );
                 this->builder->CreateStore(value, heap_allocation);
 
                 result.push_back(heap_allocation);
-            }
-            else if (function->is_extern_and_variadic && i >= function->args.size()) {
+            } else if (function->is_extern_and_variadic &&
+                       i >= function->args.size()) {
                 auto arg = this->codegen(args[i]->expression);
-                if (arg->getType()->isIntegerTy(8)
-                ||  arg->getType()->isIntegerTy(16)) {
-                    arg = this->builder->CreateSExt(arg, llvm::Type::getInt32Ty(*this->context));
+                if (arg->getType()->isIntegerTy(8) ||
+                    arg->getType()->isIntegerTy(16)) {
+                    arg = this->builder->CreateSExt(
+                        arg, llvm::Type::getInt32Ty(*this->context)
+                    );
                 }
                 result.push_back(arg);
-            }
-            else {
+            } else {
                 result.push_back(this->codegen(args[i]->expression));
             }
         }
@@ -1764,75 +2200,108 @@ std::vector<llvm::Value*> codegen::Context::codegen_args(ast::FunctionNode* func
     return result;
 }
 
-llvm::Value* codegen::Context::codegen_size_function(std::variant<llvm::Value*, llvm::AllocaInst*> pointer, ast::Type type) {
+llvm::Value* codegen::Context::codegen_size_function(
+    std::variant<llvm::Value*, llvm::AllocaInst*> pointer, ast::Type type
+) {
     assert(type.is_array());
     if (type.array_size_known()) {
-        return llvm::ConstantInt::get(*(this->context), llvm::APInt(64, type.get_array_size(), true));
-    }
-    else {
+        return llvm::ConstantInt::get(
+            *(this->context), llvm::APInt(64, type.get_array_size(), true)
+        );
+    } else {
         // Get array pointer and array type
         llvm::Value* array_ptr;
-        if (pointer.index() == 0) array_ptr = std::get<llvm::Value*>(pointer);
-        else if (pointer.index() == 1) array_ptr = std::get<llvm::AllocaInst*>(pointer);
-        else assert(false);
+        if (pointer.index() == 0)
+            array_ptr = std::get<llvm::Value*>(pointer);
+        else if (pointer.index() == 1)
+            array_ptr = std::get<llvm::AllocaInst*>(pointer);
+        else
+            assert(false);
 
-        if (pointer.index() == 1
-        && std::get<llvm::AllocaInst*>(pointer)->getAllocatedType()->isPointerTy()) {
-            array_ptr = this->builder->CreateLoad(
-                array_ptr->getType(),
-                array_ptr
-            );
+        if (pointer.index() == 1 && std::get<llvm::AllocaInst*>(pointer)
+                                        ->getAllocatedType()
+                                        ->isPointerTy()) {
+            array_ptr =
+                this->builder->CreateLoad(array_ptr->getType(), array_ptr);
         }
-        llvm::StructType* array_type = llvm::StructType::getTypeByName(*this->context, "arrayWrapper");
+        llvm::StructType* array_type =
+            llvm::StructType::getTypeByName(*this->context, "arrayWrapper");
 
         // Get size
-        llvm::Value* size_ptr = this->builder->CreateStructGEP(array_type, array_ptr, 0);
+        llvm::Value* size_ptr =
+            this->builder->CreateStructGEP(array_type, array_ptr, 0);
 
         // Load size
         return this->builder->CreateLoad(
-            this->as_llvm_type(ast::Type("Int64")),
-            size_ptr
+            this->as_llvm_type(ast::Type("Int64")), size_ptr
         );
     }
 }
 
-llvm::Value* codegen::Context::codegen_print_struct_function(ast::Type arg_type, llvm::Value* arg_pointer) {
+llvm::Value* codegen::Context::codegen_print_struct_function(
+    ast::Type arg_type, llvm::Value* arg_pointer
+) {
     std::vector<llvm::Value*> print_args;
 
     print_args = {};
-    print_args.push_back(this->get_global_string(ast::get_concrete_type(arg_type, this->type_bindings).to_str()));
+    print_args.push_back(this->get_global_string(
+        ast::get_concrete_type(arg_type, this->type_bindings).to_str()
+    ));
     this->builder->CreateCall(this->module->getFunction("printf"), print_args);
 
     print_args = {};
     print_args.push_back(this->get_global_string("{"));
     this->builder->CreateCall(this->module->getFunction("printf"), print_args);
 
-    ast::Type struct_type = ast::get_concrete_type(arg_type, this->type_bindings);
-    for (size_t i = 0; i < struct_type.as_nominal_type().type_definition->fields.size(); i++) {
+    ast::Type struct_type =
+        ast::get_concrete_type(arg_type, this->type_bindings);
+    for (size_t i = 0;
+         i < struct_type.as_nominal_type().type_definition->fields.size();
+         i++) {
         print_args = {};
-        print_args.push_back(this->get_global_string(struct_type.as_nominal_type().type_definition->fields[i]->value));
-        this->builder->CreateCall(this->module->getFunction("printf"), print_args);
+        print_args.push_back(this->get_global_string(
+            struct_type.as_nominal_type().type_definition->fields[i]->value
+        ));
+        this->builder->CreateCall(
+            this->module->getFunction("printf"), print_args
+        );
 
         print_args = {};
         print_args.push_back(this->get_global_string(": "));
-        this->builder->CreateCall(this->module->getFunction("printf"), print_args);
+        this->builder->CreateCall(
+            this->module->getFunction("printf"), print_args
+        );
 
         // Print field value
-        llvm::Value* field_ptr = this->builder->CreateStructGEP(this->as_llvm_type(struct_type), arg_pointer, i);
+        llvm::Value* field_ptr = this->builder->CreateStructGEP(
+            this->as_llvm_type(struct_type), arg_pointer, i
+        );
 
-        if (struct_type.as_nominal_type().type_definition->fields[i]->type.as_nominal_type().type_definition) {
+        if (struct_type.as_nominal_type()
+                .type_definition->fields[i]
+                ->type.as_nominal_type()
+                .type_definition) {
             this->codegen_print_struct_function(
                 struct_type.as_nominal_type().type_definition->fields[i]->type,
                 field_ptr
             );
-        }
-        else {
-            std::string print_function_name = this->get_mangled_function_name(utilities::get_folder_of_executable().string() + "/std/std" + ".dmd", "printWithoutLineEnding", {struct_type.as_nominal_type().type_definition->fields[i]->type}, ast::Type("None"), false);
-            llvm::Function* llvm_function = this->module->getFunction(print_function_name);
+        } else {
+            std::string print_function_name = this->get_mangled_function_name(
+                utilities::get_folder_of_executable().string() + "/std/std" +
+                    ".dmd",
+                "printWithoutLineEnding",
+                {struct_type.as_nominal_type().type_definition->fields[i]->type
+                },
+                ast::Type("None"), false
+            );
+            llvm::Function* llvm_function =
+                this->module->getFunction(print_function_name);
             assert(llvm_function);
 
             llvm::Value* load_arg = this->builder->CreateLoad(
-                this->as_llvm_type(struct_type.as_nominal_type().type_definition->fields[i]->type),
+                this->as_llvm_type(struct_type.as_nominal_type()
+                                       .type_definition->fields[i]
+                                       ->type),
                 field_ptr
             );
 
@@ -1842,10 +2311,13 @@ llvm::Value* codegen::Context::codegen_print_struct_function(ast::Type arg_type,
             this->builder->CreateCall(llvm_function, print_args);
         }
 
-        if (i + 1 != struct_type.as_nominal_type().type_definition->fields.size()) {
+        if (i + 1 !=
+            struct_type.as_nominal_type().type_definition->fields.size()) {
             print_args = {};
             print_args.push_back(this->get_global_string(", "));
-            this->builder->CreateCall(this->module->getFunction("printf"), print_args);
+            this->builder->CreateCall(
+                this->module->getFunction("printf"), print_args
+            );
         }
     }
 
@@ -1855,10 +2327,14 @@ llvm::Value* codegen::Context::codegen_print_struct_function(ast::Type arg_type,
     return nullptr;
 }
 
-llvm::Value* codegen::Context::codegen_call(ast::CallNode& node, std::optional<llvm::Value*> allocation) {
+llvm::Value* codegen::Context::codegen_call(
+    ast::CallNode& node, std::optional<llvm::Value*> allocation
+) {
     // If type is a collection and there wasn't an allocation passed
     if (node.type.is_collection() && allocation == std::nullopt) {
-        llvm::Type* collection_type = this->as_llvm_type(ast::get_concrete_type(node.type, this->type_bindings));
+        llvm::Type* collection_type = this->as_llvm_type(
+            ast::get_concrete_type(node.type, this->type_bindings)
+        );
         allocation = this->create_allocation("", collection_type);
     }
 
@@ -1867,10 +2343,9 @@ llvm::Value* codegen::Context::codegen_call(ast::CallNode& node, std::optional<l
 
     // Codegen args
     std::vector<llvm::Value*> args;
-    if (node.identifier->value != "[]"
-    && node.identifier->value != "size"
-    && node.identifier->value != "print"
-    && node.identifier->value != "printStruct") {
+    if (node.identifier->value != "[]" && node.identifier->value != "size" &&
+        node.identifier->value != "print" &&
+        node.identifier->value != "printStruct") {
         args = this->codegen_args(function, node.args);
 
         if (node.type.is_collection()) {
@@ -1881,34 +2356,42 @@ llvm::Value* codegen::Context::codegen_call(ast::CallNode& node, std::optional<l
     // Intrinsics
     if (node.args.size() == 2) {
         if (node.identifier->value == "+") {
-            if (args[0]->getType()->isDoubleTy() && args[1]->getType()->isDoubleTy()) {
+            if (args[0]->getType()->isDoubleTy() &&
+                args[1]->getType()->isDoubleTy()) {
                 return this->builder->CreateFAdd(args[0], args[1], "addtmp");
             }
-            if (args[0]->getType()->isIntegerTy() && args[1]->getType()->isIntegerTy()) {
+            if (args[0]->getType()->isIntegerTy() &&
+                args[1]->getType()->isIntegerTy()) {
                 return this->builder->CreateAdd(args[0], args[1], "addtmp");
             }
         }
         if (node.identifier->value == "-") {
-            if (args[0]->getType()->isDoubleTy() && args[1]->getType()->isDoubleTy()) {
+            if (args[0]->getType()->isDoubleTy() &&
+                args[1]->getType()->isDoubleTy()) {
                 return this->builder->CreateFSub(args[0], args[1], "subtmp");
             }
-            if (args[0]->getType()->isIntegerTy() && args[1]->getType()->isIntegerTy()) {
+            if (args[0]->getType()->isIntegerTy() &&
+                args[1]->getType()->isIntegerTy()) {
                 return this->builder->CreateSub(args[0], args[1], "addtmp");
             }
         }
         if (node.identifier->value == "*") {
-            if (args[0]->getType()->isDoubleTy() && args[1]->getType()->isDoubleTy()) {
+            if (args[0]->getType()->isDoubleTy() &&
+                args[1]->getType()->isDoubleTy()) {
                 return this->builder->CreateFMul(args[0], args[1], "multmp");
             }
-            if (args[0]->getType()->isIntegerTy() && args[1]->getType()->isIntegerTy()) {
+            if (args[0]->getType()->isIntegerTy() &&
+                args[1]->getType()->isIntegerTy()) {
                 return this->builder->CreateMul(args[0], args[1], "addtmp");
             }
         }
         if (node.identifier->value == "/") {
-            if (args[0]->getType()->isDoubleTy() && args[1]->getType()->isDoubleTy()) {
+            if (args[0]->getType()->isDoubleTy() &&
+                args[1]->getType()->isDoubleTy()) {
                 return this->builder->CreateFDiv(args[0], args[1], "divtmp");
             }
-            if (args[0]->getType()->isIntegerTy() && args[1]->getType()->isIntegerTy()) {
+            if (args[0]->getType()->isIntegerTy() &&
+                args[1]->getType()->isIntegerTy()) {
                 return this->builder->CreateSDiv(args[0], args[1], "divtmp");
             }
         }
@@ -1916,42 +2399,52 @@ llvm::Value* codegen::Context::codegen_call(ast::CallNode& node, std::optional<l
             return this->builder->CreateSRem(args[0], args[1], "remtmp");
         }
         if (node.identifier->value == "<") {
-            if (args[0]->getType()->isDoubleTy() && args[1]->getType()->isDoubleTy()) {
+            if (args[0]->getType()->isDoubleTy() &&
+                args[1]->getType()->isDoubleTy()) {
                 return this->builder->CreateFCmpULT(args[0], args[1], "cmptmp");
             }
-            if (args[0]->getType()->isIntegerTy() && args[1]->getType()->isIntegerTy()) {
+            if (args[0]->getType()->isIntegerTy() &&
+                args[1]->getType()->isIntegerTy()) {
                 return this->builder->CreateICmpULT(args[0], args[1], "addtmp");
             }
         }
         if (node.identifier->value == "<=") {
-            if (args[0]->getType()->isDoubleTy() && args[1]->getType()->isDoubleTy()) {
+            if (args[0]->getType()->isDoubleTy() &&
+                args[1]->getType()->isDoubleTy()) {
                 return this->builder->CreateFCmpULE(args[0], args[1], "cmptmp");
             }
-            if (args[0]->getType()->isIntegerTy() && args[1]->getType()->isIntegerTy()) {
+            if (args[0]->getType()->isIntegerTy() &&
+                args[1]->getType()->isIntegerTy()) {
                 return this->builder->CreateICmpULE(args[0], args[1], "addtmp");
             }
         }
         if (node.identifier->value == ">") {
-            if (args[0]->getType()->isDoubleTy() && args[1]->getType()->isDoubleTy()) {
+            if (args[0]->getType()->isDoubleTy() &&
+                args[1]->getType()->isDoubleTy()) {
                 return this->builder->CreateFCmpUGT(args[0], args[1], "cmptmp");
             }
-            if (args[0]->getType()->isIntegerTy() && args[1]->getType()->isIntegerTy()) {
+            if (args[0]->getType()->isIntegerTy() &&
+                args[1]->getType()->isIntegerTy()) {
                 return this->builder->CreateICmpUGT(args[0], args[1], "addtmp");
             }
         }
         if (node.identifier->value == ">=") {
-            if (args[0]->getType()->isDoubleTy() && args[1]->getType()->isDoubleTy()) {
+            if (args[0]->getType()->isDoubleTy() &&
+                args[1]->getType()->isDoubleTy()) {
                 return this->builder->CreateFCmpUGE(args[0], args[1], "cmptmp");
             }
-            if (args[0]->getType()->isIntegerTy() && args[1]->getType()->isIntegerTy()) {
+            if (args[0]->getType()->isIntegerTy() &&
+                args[1]->getType()->isIntegerTy()) {
                 return this->builder->CreateICmpUGE(args[0], args[1], "addtmp");
             }
         }
         if (node.identifier->value == "==") {
-            if (args[0]->getType()->isDoubleTy() && args[1]->getType()->isDoubleTy()) {
+            if (args[0]->getType()->isDoubleTy() &&
+                args[1]->getType()->isDoubleTy()) {
                 return this->builder->CreateFCmpUEQ(args[0], args[1], "eqtmp");
             }
-            if (args[0]->getType()->isIntegerTy() && args[1]->getType()->isIntegerTy()) {
+            if (args[0]->getType()->isIntegerTy() &&
+                args[1]->getType()->isIntegerTy()) {
                 return this->builder->CreateICmpEQ(args[0], args[1], "addtmp");
             }
         }
@@ -1977,7 +2470,12 @@ llvm::Value* codegen::Context::codegen_call(ast::CallNode& node, std::optional<l
     }
     if (node.identifier->value == "print") {
         // Get function
-        std::string name = this->get_mangled_function_name(function->module_path, node.identifier->value, this->get_types(node.args), ast::get_concrete_type((ast::Node*) &node, this->type_bindings), function->is_extern);
+        std::string name = this->get_mangled_function_name(
+            function->module_path, node.identifier->value,
+            this->get_types(node.args),
+            ast::get_concrete_type((ast::Node*)&node, this->type_bindings),
+            function->is_extern
+        );
         llvm::Function* llvm_function = this->module->getFunction(name);
         assert(llvm_function);
 
@@ -1987,24 +2485,35 @@ llvm::Value* codegen::Context::codegen_call(ast::CallNode& node, std::optional<l
         // Make call
         return this->builder->CreateCall(llvm_function, args, "calltmp");
     }
-    if (node.identifier->value == "[]"
-    ||  node.identifier->value == "[]:mut") {
+    if (node.identifier->value == "[]" || node.identifier->value == "[]:mut") {
         if (node.args.size() == 2) {
             return this->builder->CreateLoad(
-                this->as_llvm_type(ast::get_concrete_type((ast::Node*)&node, this->type_bindings)),
+                this->as_llvm_type(ast::get_concrete_type(
+                    (ast::Node*)&node, this->type_bindings
+                )),
                 this->get_index_access_pointer(node)
             );
         }
     }
     if (node.identifier->value == "size") {
         return this->codegen_size_function(
-            this->get_binding(std::get<ast::IdentifierNode>(*node.args[0]->expression).value).pointer,
-            ast::get_concrete_type((ast::Node*) node.args[0], this->type_bindings)
+            this->get_binding(
+                    std::get<ast::IdentifierNode>(*node.args[0]->expression)
+                        .value
+            )
+                .pointer,
+            ast::get_concrete_type(
+                (ast::Node*)node.args[0], this->type_bindings
+            )
         );
     }
     if (node.identifier->value == "printStruct") {
         // Create allocation
-        llvm::AllocaInst* allocation = this->create_allocation("", this->as_llvm_type(ast::get_concrete_type(node.args[0]->expression, this->type_bindings)));
+        llvm::AllocaInst* allocation = this->create_allocation(
+            "", this->as_llvm_type(ast::get_concrete_type(
+                    node.args[0]->expression, this->type_bindings
+                ))
+        );
 
         // Copy expression into memory
         this->copy_expression_to_memory(allocation, node.args[0]->expression);
@@ -2016,7 +2525,12 @@ llvm::Value* codegen::Context::codegen_call(ast::CallNode& node, std::optional<l
     }
 
     // Get function
-    std::string name = this->get_mangled_function_name(function->module_path, node.identifier->value, this->get_types(node.args), ast::get_concrete_type((ast::Node*) &node, this->type_bindings), function->is_extern);
+    std::string name = this->get_mangled_function_name(
+        function->module_path, node.identifier->value,
+        this->get_types(node.args),
+        ast::get_concrete_type((ast::Node*)&node, this->type_bindings),
+        function->is_extern
+    );
     llvm::Function* llvm_function = this->module->getFunction(name);
     assert(llvm_function);
 
@@ -2024,8 +2538,7 @@ llvm::Value* codegen::Context::codegen_call(ast::CallNode& node, std::optional<l
     if (node.type.is_collection()) {
         this->builder->CreateCall(llvm_function, args, "calltmp");
         return allocation.value();
-    }
-    else {
+    } else {
         return this->builder->CreateCall(llvm_function, args, "calltmp");
     }
 }
@@ -2044,16 +2557,26 @@ llvm::Value* codegen::Context::codegen(ast::FloatNode& node) {
 }
 
 llvm::Value* codegen::Context::codegen(ast::IntegerNode& node) {
-    if (ast::get_concrete_type((ast::Node*) &node, this->type_bindings) == ast::Type("Float64"))
-        return llvm::ConstantFP::get(*(this->context), llvm::APFloat((double)node.value));
-    else if (ast::get_concrete_type((ast::Node*) &node, this->type_bindings) == ast::Type("Int64")) {
-        return llvm::ConstantInt::get(*(this->context), llvm::APInt(64, node.value, true));
-    }
-    else if (ast::get_concrete_type((ast::Node*) &node, this->type_bindings) == ast::Type("Int32")) {
-        return llvm::ConstantInt::get(*(this->context), llvm::APInt(32, node.value, true));
-    }
-    else if (ast::get_concrete_type((ast::Node*) &node, this->type_bindings) == ast::Type("Int8")) {
-        return llvm::ConstantInt::get(*(this->context), llvm::APInt(8, node.value, true));
+    if (ast::get_concrete_type((ast::Node*)&node, this->type_bindings) ==
+        ast::Type("Float64"))
+        return llvm::ConstantFP::get(
+            *(this->context), llvm::APFloat((double)node.value)
+        );
+    else if (ast::get_concrete_type((ast::Node*)&node, this->type_bindings) ==
+             ast::Type("Int64")) {
+        return llvm::ConstantInt::get(
+            *(this->context), llvm::APInt(64, node.value, true)
+        );
+    } else if (ast::get_concrete_type((ast::Node*)&node, this->type_bindings) ==
+               ast::Type("Int32")) {
+        return llvm::ConstantInt::get(
+            *(this->context), llvm::APInt(32, node.value, true)
+        );
+    } else if (ast::get_concrete_type((ast::Node*)&node, this->type_bindings) ==
+               ast::Type("Int8")) {
+        return llvm::ConstantInt::get(
+            *(this->context), llvm::APInt(8, node.value, true)
+        );
     }
 
     assert(false);
@@ -2064,16 +2587,14 @@ llvm::Value* codegen::Context::codegen(ast::IdentifierNode& node) {
     llvm::Value* pointer = this->get_binding(node.value).pointer;
 
     if (this->get_binding(node.value).is_mutable) {
-        pointer = this->builder->CreateLoad(
-            pointer->getType(),
-            pointer
-        );
+        pointer = this->builder->CreateLoad(pointer->getType(), pointer);
     }
 
     return this->builder->CreateLoad(
-        this->as_llvm_type(ast::get_concrete_type((ast::Node*) &node, this->type_bindings)),
-        pointer,
-        node.value.c_str()
+        this->as_llvm_type(
+            ast::get_concrete_type((ast::Node*)&node, this->type_bindings)
+        ),
+        pointer, node.value.c_str()
     );
 }
 
@@ -2097,23 +2618,33 @@ llvm::Value* codegen::Context::codegen(ast::ArrayNode& node) {
 
 llvm::Value* codegen::Context::codegen(ast::FieldAccessNode& node) {
     return this->builder->CreateLoad(
-        this->as_llvm_type(ast::get_concrete_type((ast::Node*) &node, this->type_bindings)),
+        this->as_llvm_type(
+            ast::get_concrete_type((ast::Node*)&node, this->type_bindings)
+        ),
         this->get_field_pointer(node)
     );
 }
 
 llvm::Value* codegen::Context::codegen(ast::AddressOfNode& node) {
-    return this->get_binding(((ast::IdentifierNode*) node.expression)->value).pointer;
+    return this->get_binding(((ast::IdentifierNode*)node.expression)->value)
+        .pointer;
 }
-
 
 llvm::Value* codegen::Context::codegen(ast::DereferenceNode& node) {
     auto pointer = this->codegen(node.expression);
-    return this->builder->CreateLoad(this->as_llvm_type(ast::get_concrete_type((ast::Node*) &node, this->type_bindings)), pointer);;
+    return this->builder->CreateLoad(
+        this->as_llvm_type(
+            ast::get_concrete_type((ast::Node*)&node, this->type_bindings)
+        ),
+        pointer
+    );
+    ;
 }
 
 llvm::Value* codegen::Context::codegen(ast::NewNode& node) {
-   auto allocation = this->create_heap_allocation(ast::get_concrete_type(node.expression, this->type_bindings));
-   this->copy_expression_to_memory(allocation, node.expression);
-   return allocation;
+    auto allocation = this->create_heap_allocation(
+        ast::get_concrete_type(node.expression, this->type_bindings)
+    );
+    this->copy_expression_to_memory(allocation, node.expression);
+    return allocation;
 }

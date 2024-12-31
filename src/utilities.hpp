@@ -4,8 +4,7 @@
 #include <filesystem>
 #include <string>
 
-#include "shared.hpp"
-#include "errors.hpp"
+#include "ast.hpp"
 
 namespace utilities {
     std::string read_file(std::filesystem::path path);
@@ -17,5 +16,4 @@ namespace utilities {
     std::string get_program_name();
     std::filesystem::path get_folder_of_executable();
 }
-
 #endif

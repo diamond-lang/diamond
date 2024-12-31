@@ -1,10 +1,10 @@
 #ifndef SHARED_HPP
 #define SHARED_HPP
 
-#include <vector>
 #include <cassert>
-#include <variant>
 #include <filesystem>
+#include <variant>
+#include <vector>
 
 struct Error {
     std::string value;
@@ -27,9 +27,9 @@ struct Result {
     Result(T2 error) : value(error) {}
     ~Result() {}
 
-    bool is_ok()    {return std::holds_alternative<T1>(this->value);}
-    bool is_error() {return !std::holds_alternative<T1>(this->value);}
-    T1 get_value()  {
+    bool is_ok() { return std::holds_alternative<T1>(this->value); }
+    bool is_error() { return !std::holds_alternative<T1>(this->value); }
+    T1 get_value() {
         assert(this->is_ok() == true);
         return std::get<T1>(this->value);
     }
@@ -37,7 +37,7 @@ struct Result {
         assert(this->is_error() == true);
         return std::get<T2>(this->value);
     }
-    T2 get_errors()  {
+    T2 get_errors() {
         assert(this->is_error() == true);
         return std::get<T2>(this->value);
     }
@@ -48,16 +48,17 @@ struct Location {
     size_t column;
     std::filesystem::path file;
 
-    Location(size_t line, size_t column, std::filesystem::path file) : line(line), column(column), file(file) {}
+    Location(size_t line, size_t column, std::filesystem::path file)
+        : line(line), column(column), file(file) {}
 };
 
 #define todo() assert(false);
 
-template<typename V, typename T, size_t I = 0>
+template <typename V, typename T, size_t I = 0>
 constexpr size_t getIndex() {
     if constexpr (I >= std::variant_size_v<V>) {
         return (std::variant_size_v<V>);
-    } else {    
+    } else {
         if constexpr (std::is_same_v<std::variant_alternative_t<I, V>, T>) {
             return (I);
         } else {

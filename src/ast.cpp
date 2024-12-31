@@ -1,33 +1,32 @@
 #include "ast.hpp"
-#include "semantic/intrinsics.hpp"
 
 #include <cassert>
 #include <iostream>
 
+#include "semantic/intrinsics.hpp"
+
 // Interface
 // ---------
-bool ast::InterfaceType::operator==(const InterfaceType &interface) const {
+bool ast::InterfaceType::operator==(const InterfaceType& interface) const {
     return interface.name == this->name;
 }
 
-bool ast::InterfaceType::operator!=(const InterfaceType &interface) const {
+bool ast::InterfaceType::operator!=(const InterfaceType& interface) const {
     return !(interface == *this);
 }
 
 ast::Type ast::InterfaceType::get_default_type() {
-    if (this->name== "number") {
+    if (this->name == "number") {
         return ast::Type("Int64");
-    }
-    else if (this->name == "float") {
+    } else if (this->name == "float") {
         return ast::Type("Float64");
-    }
-    else {
+    } else {
         return ast::Type(ast::NoType{});
     }
 }
 
 ast::Type ast::get_default_type(Set<ast::InterfaceType> interface) {
-    for (auto it: interface.elements) {
+    for (auto it : interface.elements) {
         if (!it.get_default_type().is_no_type()) {
             return it.get_default_type();
         }
@@ -36,20 +35,17 @@ ast::Type ast::get_default_type(Set<ast::InterfaceType> interface) {
     return ast::Type(ast::NoType{});
 }
 
-bool ast::InterfaceType::is_compatible_with(ast::Type type, ast::InterfaceNode* interface) {
-    if (this->name== "number") {
+bool ast::InterfaceType::
+    is_compatible_with(ast::Type type, ast::InterfaceNode* interface) {
+    if (this->name == "number") {
         return type.is_integer() || type.is_float();
-    }
-    else if (this->name == "float") {
+    } else if (this->name == "float") {
         return type.is_float();
-    }
-    else if (this->name == "pointer") {
+    } else if (this->name == "pointer") {
         return type.is_pointer() || type.is_boxed();
-    }
-    else if (this->name == "type") {
+    } else if (this->name == "type") {
         return type.is_struct_type();
-    }
-    else {
+    } else {
         assert(interface != nullptr);
         return interface->is_compatible_with(type);
     }
@@ -65,11 +61,11 @@ std::vector<ast::FieldConstraint>::iterator ast::FieldTypes::end() {
     return this->fields.end();
 }
 
-std::size_t ast::FieldTypes::size() const {
-    return this->fields.size();
-}
+std::size_t ast::FieldTypes::size() const { return this->fields.size(); }
 
-std::vector<ast::FieldConstraint>::iterator ast::FieldTypes::find(std::string field_name) {
+std::vector<ast::FieldConstraint>::iterator ast::FieldTypes::find(
+    std::string field_name
+) {
     for (auto field = this->begin(); field != this->fields.end(); field++) {
         if (field_name == field->name) {
             return field;
@@ -84,12 +80,15 @@ ast::Type& ast::FieldTypes::operator[](const std::string& field_name) {
             return this->fields[i].type;
         }
     }
-    
-    this->fields.push_back(ast::FieldConstraint{field_name, ast::Type(ast::NoType{})});
+
+    this->fields.push_back(
+        ast::FieldConstraint{field_name, ast::Type(ast::NoType{})}
+    );
     return this->fields[this->fields.size() - 1].type;
 }
 
-const ast::Type& ast::FieldTypes::operator[](const std::string& field_name) const {
+const ast::Type& ast::FieldTypes::operator[](const std::string& field_name
+) const {
     for (size_t i = 0; i < this->fields.size(); i++) {
         if (field_name == this->fields[i].name) {
             return this->fields[i].type;
@@ -151,23 +150,28 @@ ast::StructType ast::Type::as_struct_type() const {
     return std::get<ast::StructType>(this->type);
 }
 
-bool ast::Type::operator==(const Type &t) const {
+bool ast::Type::operator==(const Type& t) const {
     if (this->type.index() != t.type.index()) return false;
 
     if (this->is_no_type()) {
         return true;
-    }
-    else if (this->is_type_variable()) {
-        return std::get<ast::TypeVariable>(this->type).id == std::get<ast::TypeVariable>(t.type).id;
-    }
-    else if (this->is_final_type_variable()) {
-        return std::get<ast::FinalTypeVariable>(this->type).id == std::get<ast::FinalTypeVariable>(t.type).id;
-    }
-    else if (this->is_nominal_type()) {
-        if (std::get<ast::NominalType>(this->type).name == std::get<ast::NominalType>(t.type).name) {
-            if (std::get<ast::NominalType>(this->type).parameters.size() == std::get<ast::NominalType>(t.type).parameters.size()) {
-                for (size_t i = 0; i < std::get<ast::NominalType>(this->type).parameters.size(); i++) {
-                    if (std::get<ast::NominalType>(this->type).parameters[i] != std::get<ast::NominalType>(t.type).parameters[i]) {
+    } else if (this->is_type_variable()) {
+        return std::get<ast::TypeVariable>(this->type).id ==
+               std::get<ast::TypeVariable>(t.type).id;
+    } else if (this->is_final_type_variable()) {
+        return std::get<ast::FinalTypeVariable>(this->type).id ==
+               std::get<ast::FinalTypeVariable>(t.type).id;
+    } else if (this->is_nominal_type()) {
+        if (std::get<ast::NominalType>(this->type).name ==
+            std::get<ast::NominalType>(t.type).name) {
+            if (std::get<ast::NominalType>(this->type).parameters.size() ==
+                std::get<ast::NominalType>(t.type).parameters.size()) {
+                for (size_t i = 0;
+                     i <
+                     std::get<ast::NominalType>(this->type).parameters.size();
+                     i++) {
+                    if (std::get<ast::NominalType>(this->type).parameters[i] !=
+                        std::get<ast::NominalType>(t.type).parameters[i]) {
                         return false;
                     }
                 }
@@ -177,10 +181,10 @@ bool ast::Type::operator==(const Type &t) const {
         }
 
         return false;
-    }
-    else if (this->is_struct_type()) {
-        for (auto field: this->as_struct_type().fields) {
-            if (t.as_struct_type().fields.find(field.name) == t.as_struct_type().fields.end()) {
+    } else if (this->is_struct_type()) {
+        for (auto field : this->as_struct_type().fields) {
+            if (t.as_struct_type().fields.find(field.name) ==
+                t.as_struct_type().fields.end()) {
                 return false;
             }
 
@@ -189,23 +193,20 @@ bool ast::Type::operator==(const Type &t) const {
             }
         }
         return true;
-    }
-    else {
+    } else {
         assert(false);
         return false;
     }
 }
 
-bool ast::Type::operator!=(const Type &t) const {
-    return !(t == *this);
-}
+bool ast::Type::operator!=(const Type& t) const { return !(t == *this); }
 
 static std::string as_letter(size_t type_var) {
     char letters[] = "abcdefghijklmnopqrstuvwxyz";
     if (type_var > 25) {
-        return letters[(type_var + 18) % 26] + std::to_string(1 + type_var / 26);
-    }
-    else {
+        return letters[(type_var + 18) % 26] +
+               std::to_string(1 + type_var / 26);
+    } else {
         return std::string(1, letters[(type_var + 18) % 26]);
     }
 }
@@ -214,49 +215,56 @@ std::string ast::Type::to_str() const {
     std::string output = "";
     if (this->is_no_type()) {
         output += "ast::Notype";
-    }
-    else if (this->is_type_variable()) {
+    } else if (this->is_type_variable()) {
         output += std::to_string(std::get<ast::TypeVariable>(this->type).id);
 
         return output;
-    }
-    else if (this->is_final_type_variable()) {
+    } else if (this->is_final_type_variable()) {
         output += std::get<ast::FinalTypeVariable>(this->type).id;
         if (this->as_final_type_variable().parameter_constraints.size() > 0) {
             output += "[";
-            for (size_t i = 0; i < this->as_final_type_variable().parameter_constraints.size(); i++) {
-                output += this->as_final_type_variable().parameter_constraints[i].to_str();
-                if (i + 1 != this->as_final_type_variable().parameter_constraints.size()) {
+            for (size_t i = 0;
+                 i <
+                 this->as_final_type_variable().parameter_constraints.size();
+                 i++) {
+                output += this->as_final_type_variable()
+                              .parameter_constraints[i]
+                              .to_str();
+                if (i + 1 !=
+                    this->as_final_type_variable().parameter_constraints.size(
+                    )) {
                     output += ", ";
                 }
                 output += "]";
             }
         }
-    }
-    else if (this->is_nominal_type()) {
+    } else if (this->is_nominal_type()) {
         if (std::get<ast::NominalType>(this->type).parameters.size() == 0) {
             output += std::get<ast::NominalType>(this->type).name;
-        }
-        else {
+        } else {
             output += std::get<ast::NominalType>(this->type).name;
             output += "[";
-            output += std::get<ast::NominalType>(this->type).parameters[0].to_str();
-            for (size_t i = 1; i < std::get<ast::NominalType>(this->type).parameters.size(); i++) {
+            output +=
+                std::get<ast::NominalType>(this->type).parameters[0].to_str();
+            for (size_t i = 1;
+                 i < std::get<ast::NominalType>(this->type).parameters.size();
+                 i++) {
                 output += ", ";
-                output += std::get<ast::NominalType>(this->type).parameters[i].to_str();
+                output += std::get<ast::NominalType>(this->type)
+                              .parameters[i]
+                              .to_str();
             }
             output += "]";
         }
-    }
-    else if (this->is_struct_type()) {
+    } else if (this->is_struct_type()) {
         output += "struct {";
-        
+
         auto fields = this->as_struct_type().fields;
-        for(auto field = fields.begin(); field != fields.end(); field++) {
+        for (auto field = fields.begin(); field != fields.end(); field++) {
             output += field->name + ": " + field->type.to_str();
 
-            if (std::next(field) != this->as_struct_type().fields.end()
-            || this->as_struct_type().open) {
+            if (std::next(field) != this->as_struct_type().fields.end() ||
+                this->as_struct_type().open) {
                 output += ", ";
             }
         }
@@ -274,8 +282,8 @@ std::string ast::TypeParameter::to_str() {
     assert(this->type.is_final_type_variable());
     std::string output = this->type.to_str();
 
-    if (this->interface.size() > 0
-    ||  this->type.as_final_type_variable().field_constraints.size() > 0) {
+    if (this->interface.size() > 0 ||
+        this->type.as_final_type_variable().field_constraints.size() > 0) {
         output += ": ";
     }
 
@@ -286,13 +294,12 @@ std::string ast::TypeParameter::to_str() {
                 output += " and ";
             }
         }
-    }
-    else if (this->type.as_final_type_variable().field_constraints.size() > 0) {
+    } else if (this->type.as_final_type_variable().field_constraints.size() >
+               0) {
         output += "{";
         auto fields = this->type.as_final_type_variable().field_constraints;
-        for(auto field = fields.begin(); field != fields.end(); field++) {
+        for (auto field = fields.begin(); field != fields.end(); field++) {
             output += field->name + ": " + field->type.to_str() + ", ";
-
         }
 
         output += "...}";
@@ -325,7 +332,8 @@ bool ast::Type::is_nominal_type() const {
 }
 
 bool ast::Type::is_struct_type() const {
-    return this->type.index() == ast::NominalTypeVariant && this->as_nominal_type().type_definition;
+    return this->type.index() == ast::NominalTypeVariant &&
+           this->as_nominal_type().type_definition;
 }
 
 bool ast::Type::is_structural_struct_type() const {
@@ -346,11 +354,13 @@ bool ast::Type::is_concrete() const {
     }
 
     if (this->is_nominal_type()) {
-        return ast::types_are_concrete(std::get<ast::NominalType>(this->type).parameters);
+        return ast::types_are_concrete(
+            std::get<ast::NominalType>(this->type).parameters
+        );
     }
 
     if (this->is_struct_type()) {
-        for (auto field: this->as_struct_type().fields) {
+        for (auto field : this->as_struct_type().fields) {
             if (!field.type.is_concrete()) {
                 return false;
             }
@@ -363,17 +373,25 @@ bool ast::Type::is_concrete() const {
 }
 
 bool ast::Type::is_integer() const {
-    if      (*this == ast::Type("Int64")) return true;
-    else if (*this == ast::Type("Int32")) return true;
-    else if (*this == ast::Type("Int16")) return true;
-    else if (*this == ast::Type("Int8"))  return true;
-    else                                  return false;
+    if (*this == ast::Type("Int64"))
+        return true;
+    else if (*this == ast::Type("Int32"))
+        return true;
+    else if (*this == ast::Type("Int16"))
+        return true;
+    else if (*this == ast::Type("Int8"))
+        return true;
+    else
+        return false;
 }
 
 bool ast::Type::is_float() const {
-    if      (*this == ast::Type("Float64")) return true;
-    else if (*this == ast::Type("Float32")) return true;
-    else                                    return false;
+    if (*this == ast::Type("Float64"))
+        return true;
+    else if (*this == ast::Type("Float32"))
+        return true;
+    else
+        return false;
 }
 
 bool ast::Type::is_pointer() const {
@@ -384,7 +402,7 @@ bool ast::Type::is_pointer() const {
     if (std::get<ast::NominalType>(this->type).name != "Pointer") {
         return false;
     }
-    
+
     return true;
 }
 
@@ -396,7 +414,7 @@ bool ast::Type::is_boxed() const {
     if (std::get<ast::NominalType>(this->type).name != "Boxed") {
         return false;
     }
-    
+
     return true;
 }
 
@@ -405,12 +423,12 @@ bool ast::Type::has_boxed_elements() const {
         return false;
     }
 
-    for (auto parameter: this->as_nominal_type().parameters) {
+    for (auto parameter : this->as_nominal_type().parameters) {
         return parameter.is_boxed() || parameter.has_boxed_elements();
     }
 
     if (this->as_nominal_type().type_definition != nullptr) {
-        for (auto field: this->as_nominal_type().type_definition->fields) {
+        for (auto field : this->as_nominal_type().type_definition->fields) {
             if (field->type.is_boxed() || field->type.has_boxed_elements()) {
                 return true;
             }
@@ -425,24 +443,24 @@ bool ast::Type::is_array() const {
         return false;
     }
 
-    if (this->as_nominal_type().name.size() < 5
-    || this->as_nominal_type().name.substr(0, 5) != "Array") {
+    if (this->as_nominal_type().name.size() < 5 ||
+        this->as_nominal_type().name.substr(0, 5) != "Array") {
         return false;
     }
 
-    if (this->as_nominal_type().name.size() > 5
-    && !is_number(this->as_nominal_type().name.substr(5, this->as_nominal_type().name.size()))) {
+    if (this->as_nominal_type().name.size() > 5 &&
+        !is_number(this->as_nominal_type()
+                       .name.substr(5, this->as_nominal_type().name.size()))) {
         return false;
     }
-    
+
     return true;
 }
 
 bool ast::Type::is_builtin_type() const {
-    return this->is_pointer()
-        || this->is_boxed()
-        || this->is_array()
-        || (this->is_nominal_type() && primitive_types.contains(this->as_nominal_type().name));
+    return this->is_pointer() || this->is_boxed() || this->is_array() ||
+           (this->is_nominal_type() &&
+            primitive_types.contains(this->as_nominal_type().name));
 }
 
 bool ast::Type::is_collection() const {
@@ -457,10 +475,12 @@ size_t ast::Type::array_size_known() const {
 size_t ast::Type::get_array_size() const {
     assert(this->is_array());
     assert(this->as_nominal_type().name.size() > 5);
-    return stoi(std::get<ast::NominalType>(this->type).name.substr(5, this->as_nominal_type().name.size()));
+    return stoi(std::get<ast::NominalType>(this->type)
+                    .name.substr(5, this->as_nominal_type().name.size()));
 }
 
-// Add hash struct for ast::Type to be able to use ast::Type as keys of std::unordered_map
+// Add hash struct for ast::Type to be able to use ast::Type as keys of
+// std::unordered_map
 std::size_t std::hash<ast::Type>::operator()(const ast::Type& type) const {
     return std::hash<std::string>()(type.to_str());
 }
@@ -468,32 +488,39 @@ std::size_t std::hash<ast::Type>::operator()(const ast::Type& type) const {
 // Node
 // ----
 ast::Type ast::get_type(Node* node) {
-    return std::visit([](const auto& variant) {
-        return variant.type;
-    }, *node);
+    return std::visit([](const auto& variant) { return variant.type; }, *node);
 }
 
-ast::Type ast::get_concrete_type(Node* node, std::unordered_map<std::string, Type>& type_bindings) {
+ast::Type ast::get_concrete_type(
+    Node* node,
+    std::unordered_map<std::string, Type>& type_bindings
+) {
     return ast::get_concrete_type(ast::get_type(node), type_bindings);
 }
 
-ast::Type ast::get_concrete_type(Type type, std::unordered_map<std::string, Type>& type_bindings) {
+ast::Type ast::get_concrete_type(
+    Type type,
+    std::unordered_map<std::string, Type>& type_bindings
+) {
     if (type.is_final_type_variable()) {
-        if (type_bindings.find(type.as_final_type_variable().id) != type_bindings.end()) {
+        if (type_bindings.find(type.as_final_type_variable().id) !=
+            type_bindings.end()) {
             type = type_bindings[type.as_final_type_variable().id];
-        }
-        else {
+        } else {
             std::cout << "unknown type: " << type.to_str() << "\n";
             assert(false);
         }
     }
     if (!type.is_concrete()) {
         if (type.is_nominal_type()) {
-            for (size_t i = 0; i < type.as_nominal_type().parameters.size(); i++) {
-                type.as_nominal_type().parameters[i] = ast::get_concrete_type(type.as_nominal_type().parameters[i], type_bindings);
+            for (size_t i = 0; i < type.as_nominal_type().parameters.size();
+                 i++) {
+                type.as_nominal_type().parameters[i] = ast::get_concrete_type(
+                    type.as_nominal_type().parameters[i],
+                    type_bindings
+                );
             }
-        }
-        else if (type.is_struct_type()) {
+        } else if (type.is_struct_type()) {
             std::cout << "WAHT ? " << type.to_str() << "\n";
             assert(false);
         }
@@ -501,16 +528,25 @@ ast::Type ast::get_concrete_type(Type type, std::unordered_map<std::string, Type
     return type;
 }
 
-ast::Type ast::try_to_get_concrete_type(Type type, std::unordered_map<std::string, Type>& type_bindings) {
+ast::Type ast::try_to_get_concrete_type(
+    Type type,
+    std::unordered_map<std::string, Type>& type_bindings
+) {
     if (type.is_final_type_variable()) {
-        if (type_bindings.find(type.as_final_type_variable().id) != type_bindings.end()) {
+        if (type_bindings.find(type.as_final_type_variable().id) !=
+            type_bindings.end()) {
             type = type_bindings[type.as_final_type_variable().id];
         }
     }
     if (!type.is_concrete()) {
         if (type.is_nominal_type()) {
-            for (size_t i = 0; i < type.as_nominal_type().parameters.size(); i++) {
-                type.as_nominal_type().parameters[i] = ast::try_to_get_concrete_type(type.as_nominal_type().parameters[i], type_bindings);
+            for (size_t i = 0; i < type.as_nominal_type().parameters.size();
+                 i++) {
+                type.as_nominal_type().parameters[i] =
+                    ast::try_to_get_concrete_type(
+                        type.as_nominal_type().parameters[i],
+                        type_bindings
+                    );
             }
         }
     }
@@ -518,7 +554,7 @@ ast::Type ast::try_to_get_concrete_type(Type type, std::unordered_map<std::strin
 }
 
 void ast::set_type(Node* node, Type type) {
-    std::visit([type](auto& variant) {variant.type = type;}, *node);
+    std::visit([type](auto& variant) { variant.type = type; }, *node);
 }
 
 std::vector<ast::Type> ast::get_types(std::vector<CallArgumentNode*> nodes) {
@@ -529,7 +565,8 @@ std::vector<ast::Type> ast::get_types(std::vector<CallArgumentNode*> nodes) {
     return types;
 }
 
-std::vector<ast::Type> ast::get_types(std::vector<FunctionArgumentNode*> nodes) {
+std::vector<ast::Type> ast::get_types(std::vector<FunctionArgumentNode*> nodes
+) {
     std::vector<Type> types;
     for (size_t i = 0; i < nodes.size(); i++) {
         types.push_back(nodes[i]->type);
@@ -537,7 +574,10 @@ std::vector<ast::Type> ast::get_types(std::vector<FunctionArgumentNode*> nodes) 
     return types;
 }
 
-std::vector<ast::Type> ast::get_concrete_types(std::vector<Node*> nodes, std::unordered_map<std::string, Type>& type_bindings) {
+std::vector<ast::Type> ast::get_concrete_types(
+    std::vector<Node*> nodes,
+    std::unordered_map<std::string, Type>& type_bindings
+) {
     std::vector<Type> types;
     for (size_t i = 0; i < nodes.size(); i++) {
         types.push_back(get_concrete_type(nodes[i], type_bindings));
@@ -545,8 +585,10 @@ std::vector<ast::Type> ast::get_concrete_types(std::vector<Node*> nodes, std::un
     return types;
 }
 
-
-std::vector<ast::Type> ast::get_concrete_types(std::vector<ast::Type> type_variables, std::unordered_map<std::string, Type>& type_bindings) {
+std::vector<ast::Type> ast::get_concrete_types(
+    std::vector<ast::Type> type_variables,
+    std::unordered_map<std::string, Type>& type_bindings
+) {
     std::vector<Type> types;
     for (size_t i = 0; i < type_variables.size(); i++) {
         types.push_back(get_concrete_type(type_variables[i], type_bindings));
@@ -558,33 +600,48 @@ bool ast::could_be_expression(Node* node) {
     switch (node->index()) {
         case Block: {
             auto& block = std::get<BlockNode>(*node);
-            if (block.statements.size() == 1
-            && could_be_expression(block.statements[0])) return true;
+            if (block.statements.size() == 1 &&
+                could_be_expression(block.statements[0]))
+                return true;
             return false;
         }
-        case Function: return false;
-        case Declaration: return false;
-        case Assignment: return false;
-        case Return: return false;
-        case Break: return false;
-        case Continue: return false;
+        case Function:
+            return false;
+        case Declaration:
+            return false;
+        case Assignment:
+            return false;
+        case Return:
+            return false;
+        case Break:
+            return false;
+        case Continue:
+            return false;
         case IfElse: {
             auto& if_else = std::get<IfElseNode>(*node);
-            if (if_else.else_branch.has_value()
-            && could_be_expression(if_else.if_branch)
-            && could_be_expression(if_else.else_branch.value())) {
+            if (if_else.else_branch.has_value() &&
+                could_be_expression(if_else.if_branch) &&
+                could_be_expression(if_else.else_branch.value())) {
                 return true;
             }
             return false;
         }
-        case While: return false;
-        case Use: return false;
-        case Call: return true;
-        case Float: return true;
-        case Integer: return true;
-        case Identifier: return true;
-        case Boolean: return true;
-        case String: return true;
+        case While:
+            return false;
+        case Use:
+            return false;
+        case Call:
+            return true;
+        case Float:
+            return true;
+        case Integer:
+            return true;
+        case Identifier:
+            return true;
+        case Boolean:
+            return true;
+        case String:
+            return true;
         default: {
             std::cout << node->index() << "\n";
             assert(false);
@@ -608,25 +665,32 @@ void ast::transform_to_expression(ast::Node*& node) {
             transform_to_expression(if_else.else_branch.value());
             break;
         }
-        case Call: break;
-        case Float: break;
-        case Integer: break;
-        case Identifier: break;
-        case Boolean: break;
-        case String: break;
-        default: assert(false);
+        case Call:
+            break;
+        case Float:
+            break;
+        case Integer:
+            break;
+        case Identifier:
+            break;
+        case Boolean:
+            break;
+        case String:
+            break;
+        default:
+            assert(false);
     }
 }
 
 bool ast::has_type_variables(std::vector<ast::Type> types) {
-    for (auto& type: types) {
+    for (auto& type : types) {
         if (type.is_type_variable()) return true;
     }
     return false;
 }
 
 bool ast::types_are_concrete(std::vector<ast::Type> types) {
-    for (auto& type: types) {
+    for (auto& type : types) {
         if (!type.is_concrete()) return false;
     }
     return true;
@@ -634,29 +698,45 @@ bool ast::types_are_concrete(std::vector<ast::Type> types) {
 
 bool ast::is_expression(Node* node) {
     switch (node->index()) {
-        case Block: return false;
-        case Function: return false;
-        case Assignment: return false;
-        case Return: return false;
-        case Break: return false;
-        case Continue: return false;
+        case Block:
+            return false;
+        case Function:
+            return false;
+        case Assignment:
+            return false;
+        case Return:
+            return false;
+        case Break:
+            return false;
+        case Continue:
+            return false;
         case IfElse: {
             auto& if_else = std::get<IfElseNode>(*node);
-            if (if_else.else_branch.has_value()
-            && is_expression(if_else.if_branch) && is_expression(if_else.else_branch.value())) {
+            if (if_else.else_branch.has_value() &&
+                is_expression(if_else.if_branch) &&
+                is_expression(if_else.else_branch.value())) {
                 return true;
             }
             return false;
         }
-        case While: return false;
-        case Use: return false;
-        case Call: return true;
-        case Float: return true;
-        case Integer: return true;
-        case Identifier: return true;
-        case Boolean: return true;
-        case String: return true;
-        default: assert(false);
+        case While:
+            return false;
+        case Use:
+            return false;
+        case Call:
+            return true;
+        case Float:
+            return true;
+        case Integer:
+            return true;
+        case Identifier:
+            return true;
+        case Boolean:
+            return true;
+        case String:
+            return true;
+        default:
+            assert(false);
     }
     return false;
 }
@@ -684,28 +764,39 @@ size_t ast::Ast::capacity() {
 
 void ast::Ast::push_back(Node node) {
     if (this->size + 1 > this->capacity()) {
-        Node* array = new Node[this->initial_size * static_cast<unsigned int>(pow(this->growth_factor, this->nodes.size()))];
+        Node* array = new Node
+            [this->initial_size *
+             static_cast<unsigned int>(
+                 pow(this->growth_factor, this->nodes.size())
+             )];
         this->nodes.push_back(array);
     }
 
     this->size++;
-    this->nodes[this->nodes.size() - 1][this->size - 1 - this->size_of_arrays_filled()] = node;
+    this->nodes[this->nodes.size() - 1]
+               [this->size - 1 - this->size_of_arrays_filled()] = node;
 }
 
 size_t ast::Ast::size_of_arrays_filled() {
-    if (this->nodes.size() == 0) return 0;
+    if (this->nodes.size() == 0)
+        return 0;
     else {
         size_t size_of_arrays_filled = 0;
         for (size_t i = 0; i < this->nodes.size() - 1; i++) {
-            size_of_arrays_filled += this->initial_size * static_cast<unsigned int>(pow(this->growth_factor, i));
+            size_of_arrays_filled +=
+                this->initial_size *
+                static_cast<unsigned int>(pow(this->growth_factor, i));
         }
         return size_of_arrays_filled;
     }
 }
 
 ast::Node* ast::Ast::last_element() {
-    if (this->size == 0) return nullptr;
-    else                 return &this->nodes[this->nodes.size() - 1][this->size - 1 - this->size_of_arrays_filled()];
+    if (this->size == 0)
+        return nullptr;
+    else
+        return &this->nodes[this->nodes.size() - 1]
+                           [this->size - 1 - this->size_of_arrays_filled()];
 }
 
 void ast::Ast::free() {
@@ -737,24 +828,26 @@ void put_indent_level(size_t indent_level, std::vector<bool> last) {
     }
 }
 
-ast::Type ast::get_concrete_type_or_type_variable(ast::Type type, ast::PrintContext context) {
+ast::Type ast::get_concrete_type_or_type_variable(
+    ast::Type type,
+    ast::PrintContext context
+) {
     if (context.concrete) {
         return ast::get_concrete_type(type, context.type_bindings);
-    }
-    else {
+    } else {
         return type;
     }
 }
 
 void ast::print(const Ast& ast, PrintContext context) {
     std::cout << "program\n";
-    print((ast::Node*) ast.program, context);
+    print((ast::Node*)ast.program, context);
 }
 
 void ast::print_with_concrete_types(const Ast& ast, PrintContext context) {
     context.concrete = true;
     std::cout << "program\n";
-    print_with_concrete_types((ast::Node*) ast.program, context);
+    print_with_concrete_types((ast::Node*)ast.program, context);
 }
 
 void ast::print_with_concrete_types(Node* node, PrintContext context) {
@@ -770,42 +863,60 @@ void ast::print(Node* node, PrintContext context) {
             // Put all nodes of block in a vector
             std::vector<Node*> nodes = {};
             for (size_t i = 0; i < block.use_statements.size(); i++) {
-                nodes.push_back((Node*) block.use_statements[i]);
+                nodes.push_back((Node*)block.use_statements[i]);
             }
             for (size_t i = 0; i < block.statements.size(); i++) {
                 nodes.push_back(block.statements[i]);
             }
             for (size_t i = 0; i < block.types.size(); i++) {
-                nodes.push_back((Node*) block.types[i]);
+                nodes.push_back((Node*)block.types[i]);
             }
             for (size_t i = 0; i < block.interfaces.size(); i++) {
-                nodes.push_back((Node*) block.interfaces[i]);
+                nodes.push_back((Node*)block.interfaces[i]);
             }
             for (size_t i = 0; i < block.functions.size(); i++) {
-                nodes.push_back((Node*) block.functions[i]);
+                nodes.push_back((Node*)block.functions[i]);
             }
 
             // Print all nodes
             for (size_t i = 0; i < nodes.size(); i++) {
                 if (!context.concrete || nodes[i]->index() != Function) {
                     bool is_last = i == nodes.size() - 1;
-                    print(nodes[i], PrintContext{context.indent_level + 1, append(context.last, is_last), context.concrete, context.type_bindings});
-                }
-                else {
-                    auto function = (ast::FunctionNode*) nodes[i];
-                    for (size_t j = 0; j < function->specializations.size(); j++) {
-
+                    print(
+                        nodes[i],
+                        PrintContext{
+                            context.indent_level + 1,
+                            append(context.last, is_last),
+                            context.concrete,
+                            context.type_bindings
+                        }
+                    );
+                } else {
+                    auto function = (ast::FunctionNode*)nodes[i];
+                    for (size_t j = 0; j < function->specializations.size();
+                         j++) {
                         // Check if is last specialization
-                        bool is_last = j == function->specializations.size() - 1;
+                        bool is_last =
+                            j == function->specializations.size() - 1;
                         for (size_t k = i + 1; k < nodes.size(); k++) {
-                            if (((FunctionNode*)nodes[k])->specializations.size() != 0) {
+                            if (((FunctionNode*)nodes[k])
+                                    ->specializations.size() != 0) {
                                 is_last = false;
                                 break;
                             }
                         }
 
-                        context.type_bindings = function->specializations[j].type_bindings;
-                        print((ast::Node*) nodes[i], PrintContext{context.indent_level + 1, append(context.last, is_last), context.concrete, context.type_bindings});
+                        context.type_bindings =
+                            function->specializations[j].type_bindings;
+                        print(
+                            (ast::Node*)nodes[i],
+                            PrintContext{
+                                context.indent_level + 1,
+                                append(context.last, is_last),
+                                context.concrete,
+                                context.type_bindings
+                            }
+                        );
                     }
                 }
             }
@@ -828,18 +939,18 @@ void ast::print(Node* node, PrintContext context) {
             put_indent_level(context.indent_level, append(context.last, last));
             if (function.is_extern) {
                 std::cout << "extern " << function.identifier->value << '(';
-            }
-            else if (function.is_builtin) {
+            } else if (function.is_builtin) {
                 std::cout << "builtin " << function.identifier->value << '(';
-            }
-            else {
+            } else {
                 std::cout << "function " << function.identifier->value;
 
                 if (function.type_parameters.size() > 0 && !context.concrete) {
                     std::cout << '[';
-                    for (size_t i = 0; i < function.type_parameters.size(); i++) {
+                    for (size_t i = 0; i < function.type_parameters.size();
+                         i++) {
                         std::cout << function.type_parameters[i].to_str();
-                        if (i + 1 != function.type_parameters.size()) std::cout << ", ";
+                        if (i + 1 != function.type_parameters.size())
+                            std::cout << ", ";
                     }
                     std::cout << ']';
                 }
@@ -856,7 +967,10 @@ void ast::print(Node* node, PrintContext context) {
                 auto& arg_type = function.args[i]->type;
 
                 if (arg_type != Type(ast::NoType{})) {
-                    std::cout << ": " << get_concrete_type_or_type_variable(arg_type, context).to_str();
+                    std::cout
+                        << ": "
+                        << get_concrete_type_or_type_variable(arg_type, context)
+                               .to_str();
                 }
 
                 if (i != function.args.size() - 1) std::cout << ", ";
@@ -870,12 +984,15 @@ void ast::print(Node* node, PrintContext context) {
             if (function.return_type != Type(ast::NoType{})) {
                 std::cout << ": ";
                 if (function.return_type_is_mutable) std::cout << "mut ";
-                std::cout << get_concrete_type_or_type_variable(function.return_type, context).to_str();
+                std::cout << get_concrete_type_or_type_variable(
+                                 function.return_type,
+                                 context
+                )
+                                 .to_str();
             }
             std::cout << "\n";
 
-            if (function.is_extern
-            ||  function.is_builtin) {
+            if (function.is_extern || function.is_builtin) {
                 return;
             }
 
@@ -883,8 +1000,7 @@ void ast::print(Node* node, PrintContext context) {
                 context.last.push_back(last);
                 print(function.body, context);
                 context.last.pop_back();
-            }
-            else {
+            } else {
                 context.indent_level += 1;
                 context.last.push_back(last);
                 context.last.push_back(true);
@@ -912,7 +1028,8 @@ void ast::print(Node* node, PrintContext context) {
                 std::cout << '[';
                 for (size_t i = 0; i < interface.type_parameters.size(); i++) {
                     std::cout << interface.type_parameters[i].to_str();
-                    if (i + 1 != interface.type_parameters.size()) std::cout << ", ";
+                    if (i + 1 != interface.type_parameters.size())
+                        std::cout << ", ";
                 }
                 std::cout << ']';
             }
@@ -928,7 +1045,10 @@ void ast::print(Node* node, PrintContext context) {
                 auto& arg_type = interface.args[i]->type;
 
                 if (arg_type != Type(ast::NoType{})) {
-                    std::cout << ": " << get_concrete_type_or_type_variable(arg_type, context).to_str();
+                    std::cout
+                        << ": "
+                        << get_concrete_type_or_type_variable(arg_type, context)
+                               .to_str();
                 }
 
                 if (i != interface.args.size() - 1) std::cout << ", ";
@@ -938,7 +1058,11 @@ void ast::print(Node* node, PrintContext context) {
             if (interface.return_type != Type(ast::NoType{})) {
                 std::cout << ": ";
                 if (interface.return_type_is_mutable) std::cout << "mut ";
-                std::cout << get_concrete_type_or_type_variable(interface.return_type, context).to_str();
+                std::cout << get_concrete_type_or_type_variable(
+                                 interface.return_type,
+                                 context
+                )
+                                 .to_str();
             }
             std::cout << "\n";
 
@@ -948,18 +1072,37 @@ void ast::print(Node* node, PrintContext context) {
         case TypeDef: {
             auto& type = std::get<TypeNode>(*node);
 
-            put_indent_level(context.indent_level, append(context.last, type.fields.size() == 0 && type.cases.size() == 0));
+            put_indent_level(
+                context.indent_level,
+                append(
+                    context.last,
+                    type.fields.size() == 0 && type.cases.size() == 0
+                )
+            );
             std::cout << "type " << type.identifier->value << '\n';
 
             for (size_t i = 0; i < type.fields.size(); i++) {
-                bool is_last = i == type.fields.size() - 1 && type.cases.size() == 0;
-                print((Node*) type.fields[i], PrintContext{context.indent_level + 1, append(context.last, is_last), context.concrete, context.type_bindings});
+                bool is_last =
+                    i == type.fields.size() - 1 && type.cases.size() == 0;
+                print(
+                    (Node*)type.fields[i],
+                    PrintContext{
+                        context.indent_level + 1,
+                        append(context.last, is_last),
+                        context.concrete,
+                        context.type_bindings
+                    }
+                );
             }
 
             for (size_t i = 0; i < type.cases.size(); i++) {
                 bool is_last = i == type.cases.size() - 1;
-                put_indent_level(context.indent_level + 1,  append(context.last, is_last));
-                std::cout << "case " << type.cases[i]->identifier->value << '\n';
+                put_indent_level(
+                    context.indent_level + 1,
+                    append(context.last, is_last)
+                );
+                std::cout << "case " << type.cases[i]->identifier->value
+                          << '\n';
             }
 
             break;
@@ -972,7 +1115,7 @@ void ast::print(Node* node, PrintContext context) {
             std::cout << (declaration.is_mutable ? "=" : "be") << '\n';
             context.indent_level += 1;
             context.last.push_back(false);
-            print((ast::Node*) declaration.identifier, context);
+            print((ast::Node*)declaration.identifier, context);
             context.last[context.last.size() - 1] = true;
             print(declaration.expression, context);
             break;
@@ -1023,36 +1166,105 @@ void ast::print(Node* node, PrintContext context) {
                 context.last.pop_back();
 
                 bool has_else_block = if_else.else_branch ? true : false;
-                put_indent_level(context.indent_level, append(context.last, is_last && !has_else_block));
+                put_indent_level(
+                    context.indent_level,
+                    append(context.last, is_last && !has_else_block)
+                );
                 std::cout << "if" << '\n';
-                print(if_else.condition, PrintContext{context.indent_level + 1, append(append(context.last, is_last && !has_else_block), false), context.concrete, context.type_bindings});
+                print(
+                    if_else.condition,
+                    PrintContext{
+                        context.indent_level + 1,
+                        append(
+                            append(context.last, is_last && !has_else_block),
+                            false
+                        ),
+                        context.concrete,
+                        context.type_bindings
+                    }
+                );
 
-                print(if_else.if_branch, PrintContext{context.indent_level, append(context.last, is_last && !has_else_block), context.concrete, context.type_bindings});
+                print(
+                    if_else.if_branch,
+                    PrintContext{
+                        context.indent_level,
+                        append(context.last, is_last && !has_else_block),
+                        context.concrete,
+                        context.type_bindings
+                    }
+                );
 
                 if (if_else.else_branch.has_value()) {
-                    put_indent_level(context.indent_level, append(context.last, is_last));
+                    put_indent_level(
+                        context.indent_level,
+                        append(context.last, is_last)
+                    );
                     std::cout << "else" << "\n";
-                    print(if_else.else_branch.value(), PrintContext{context.indent_level, append(context.last, is_last), context.concrete, context.type_bindings});
+                    print(
+                        if_else.else_branch.value(),
+                        PrintContext{
+                            context.indent_level,
+                            append(context.last, is_last),
+                            context.concrete,
+                            context.type_bindings
+                        }
+                    );
                 }
-            }
-            else {
+            } else {
                 bool is_last = true;
                 if (context.last.size() > 0) {
                     is_last = context.last[context.last.size() - 1];
                     context.last.pop_back();
                 }
 
-                put_indent_level(context.indent_level, append(context.last, false));
+                put_indent_level(
+                    context.indent_level,
+                    append(context.last, false)
+                );
                 std::cout << "if";
-                if (get_concrete_type_or_type_variable(if_else.type, context) != Type(ast::NoType{})) std::cout << ": " << get_concrete_type_or_type_variable(if_else.type, context).to_str();
+                if (get_concrete_type_or_type_variable(if_else.type, context) !=
+                    Type(ast::NoType{}))
+                    std::cout << ": "
+                              << get_concrete_type_or_type_variable(
+                                     if_else.type,
+                                     context
+                                 )
+                                     .to_str();
                 std::cout << "\n";
-                print(if_else.condition, PrintContext{context.indent_level + 1, append(append(context.last, false), false), context.concrete, context.type_bindings});
-                print(if_else.if_branch, PrintContext{context.indent_level + 1, append(append(context.last, false), true), context.concrete, context.type_bindings});
+                print(
+                    if_else.condition,
+                    PrintContext{
+                        context.indent_level + 1,
+                        append(append(context.last, false), false),
+                        context.concrete,
+                        context.type_bindings
+                    }
+                );
+                print(
+                    if_else.if_branch,
+                    PrintContext{
+                        context.indent_level + 1,
+                        append(append(context.last, false), true),
+                        context.concrete,
+                        context.type_bindings
+                    }
+                );
 
                 assert(if_else.else_branch.has_value());
-                put_indent_level(context.indent_level, append(context.last, is_last));
+                put_indent_level(
+                    context.indent_level,
+                    append(context.last, is_last)
+                );
                 std::cout << "else" << "\n";
-                print(if_else.else_branch.value(), PrintContext{context.indent_level + 1, append(append(context.last, is_last), true), context.concrete, context.type_bindings});
+                print(
+                    if_else.else_branch.value(),
+                    PrintContext{
+                        context.indent_level + 1,
+                        append(append(context.last, is_last), true),
+                        context.concrete,
+                        context.type_bindings
+                    }
+                );
             }
 
             break;
@@ -1063,15 +1275,33 @@ void ast::print(Node* node, PrintContext context) {
 
             put_indent_level(context.indent_level, context.last);
             std::cout << "while" << '\n';
-            print(while_node.condition, PrintContext{context.indent_level + 1, append(context.last, false), context.concrete, context.type_bindings});
-            print(while_node.block, PrintContext{context.indent_level, context.last, context.concrete, context.type_bindings});
+            print(
+                while_node.condition,
+                PrintContext{
+                    context.indent_level + 1,
+                    append(context.last, false),
+                    context.concrete,
+                    context.type_bindings
+                }
+            );
+            print(
+                while_node.block,
+                PrintContext{
+                    context.indent_level,
+                    context.last,
+                    context.concrete,
+                    context.type_bindings
+                }
+            );
             break;
         }
 
         case Use: {
             auto& use_node = std::get<UseNode>(*node);
-            if (use_node.include) std::cout << "include";
-            else                  std::cout << "use";
+            if (use_node.include)
+                std::cout << "include";
+            else
+                std::cout << "use";
             std::cout << " \"" << use_node.path->value << "\"\n";
             break;
         }
@@ -1089,16 +1319,38 @@ void ast::print(Node* node, PrintContext context) {
                     std::cout << "mut ";
                 }
                 std::cout << call_argument.identifier.value()->value << ":\n";
-                print(call_argument.expression, PrintContext{context.indent_level + 1, append(context.last, true), context.concrete, context.type_bindings});
-            }
-            else {
+                print(
+                    call_argument.expression,
+                    PrintContext{
+                        context.indent_level + 1,
+                        append(context.last, true),
+                        context.concrete,
+                        context.type_bindings
+                    }
+                );
+            } else {
                 if (call_argument.is_mutable) {
                     put_indent_level(context.indent_level, context.last);
                     std::cout << "mut " << "\n";
-                    print(call_argument.expression, PrintContext{context.indent_level + 1, append(context.last, true), context.concrete, context.type_bindings});
-                }
-                else {
-                    print(call_argument.expression, PrintContext{context.indent_level, context.last, context.concrete, context.type_bindings});
+                    print(
+                        call_argument.expression,
+                        PrintContext{
+                            context.indent_level + 1,
+                            append(context.last, true),
+                            context.concrete,
+                            context.type_bindings
+                        }
+                    );
+                } else {
+                    print(
+                        call_argument.expression,
+                        PrintContext{
+                            context.indent_level,
+                            context.last,
+                            context.concrete,
+                            context.type_bindings
+                        }
+                    );
                 }
             }
 
@@ -1110,10 +1362,22 @@ void ast::print(Node* node, PrintContext context) {
 
             put_indent_level(context.indent_level, context.last);
             std::cout << call.identifier->value;
-            if (call.type != Type(ast::NoType{})) std::cout << ": " << get_concrete_type_or_type_variable(call.type, context).to_str();
+            if (call.type != Type(ast::NoType{}))
+                std::cout
+                    << ": "
+                    << get_concrete_type_or_type_variable(call.type, context)
+                           .to_str();
             std::cout << "\n";
             for (size_t i = 0; i < call.args.size(); i++) {
-                print((ast::Node*) call.args[i], PrintContext{context.indent_level + 1, append(context.last, i == call.args.size() - 1), context.concrete, context.type_bindings});
+                print(
+                    (ast::Node*)call.args[i],
+                    PrintContext{
+                        context.indent_level + 1,
+                        append(context.last, i == call.args.size() - 1),
+                        context.concrete,
+                        context.type_bindings
+                    }
+                );
             }
             break;
         }
@@ -1123,13 +1387,32 @@ void ast::print(Node* node, PrintContext context) {
 
             put_indent_level(context.indent_level, context.last);
             std::cout << struct_literal.identifier->value << "{}";
-            if (struct_literal.type != Type(ast::NoType{})) std::cout << ": " << get_concrete_type_or_type_variable(struct_literal.type, context).to_str();
+            if (struct_literal.type != Type(ast::NoType{}))
+                std::cout << ": "
+                          << get_concrete_type_or_type_variable(
+                                 struct_literal.type,
+                                 context
+                             )
+                                 .to_str();
             std::cout << "\n";
-            for (auto it = struct_literal.fields.begin(); it != struct_literal.fields.end(); it++) {
+            for (auto it = struct_literal.fields.begin();
+                 it != struct_literal.fields.end();
+                 it++) {
                 auto is_last = std::next(it) == struct_literal.fields.end();
-                put_indent_level(context.indent_level + 1, append(context.last, is_last));
+                put_indent_level(
+                    context.indent_level + 1,
+                    append(context.last, is_last)
+                );
                 std::cout << it->first->value << ":\n";
-                print(it->second, PrintContext{context.indent_level + 2, append(append(context.last, is_last), true), context.concrete, context.type_bindings});
+                print(
+                    it->second,
+                    PrintContext{
+                        context.indent_level + 2,
+                        append(append(context.last, is_last), true),
+                        context.concrete,
+                        context.type_bindings
+                    }
+                );
             }
             break;
         }
@@ -1139,7 +1422,13 @@ void ast::print(Node* node, PrintContext context) {
 
             put_indent_level(context.indent_level, context.last);
             std::cout << float_node.value;
-            if (float_node.type != Type(ast::NoType{})) std::cout << ": " << get_concrete_type_or_type_variable(float_node.type, context).to_str();
+            if (float_node.type != Type(ast::NoType{}))
+                std::cout << ": "
+                          << get_concrete_type_or_type_variable(
+                                 float_node.type,
+                                 context
+                             )
+                                 .to_str();
             std::cout << "\n";
             break;
         }
@@ -1149,7 +1438,11 @@ void ast::print(Node* node, PrintContext context) {
 
             put_indent_level(context.indent_level, context.last);
             std::cout << integer.value;
-            if (integer.type != Type(ast::NoType{})) std::cout << ": " << get_concrete_type_or_type_variable(integer.type, context).to_str();
+            if (integer.type != Type(ast::NoType{}))
+                std::cout
+                    << ": "
+                    << get_concrete_type_or_type_variable(integer.type, context)
+                           .to_str();
             std::cout << "\n";
             break;
         }
@@ -1159,7 +1452,13 @@ void ast::print(Node* node, PrintContext context) {
 
             put_indent_level(context.indent_level, context.last);
             std::cout << identifier.value;
-            if (identifier.type != Type(ast::NoType{})) std::cout << ": " << get_concrete_type_or_type_variable(identifier.type, context).to_str();
+            if (identifier.type != Type(ast::NoType{}))
+                std::cout << ": "
+                          << get_concrete_type_or_type_variable(
+                                 identifier.type,
+                                 context
+                             )
+                                 .to_str();
             std::cout << "\n";
             break;
         }
@@ -1169,7 +1468,11 @@ void ast::print(Node* node, PrintContext context) {
 
             put_indent_level(context.indent_level, context.last);
             std::cout << (boolean.value ? "true" : "false");
-            if (boolean.type != Type(ast::NoType{})) std::cout << ": " << get_concrete_type_or_type_variable(boolean.type, context).to_str();
+            if (boolean.type != Type(ast::NoType{}))
+                std::cout
+                    << ": "
+                    << get_concrete_type_or_type_variable(boolean.type, context)
+                           .to_str();
             std::cout << "\n";
             break;
         }
@@ -1182,13 +1485,16 @@ void ast::print(Node* node, PrintContext context) {
             for (size_t i = 0; i < string.value.size(); i++) {
                 if (string.value[i] == '\n') {
                     std::cout << "\\n";
-                }
-                else {
+                } else {
                     std::cout << string.value[i];
                 }
             }
             std::cout << "\"";
-            if (string.type != Type(ast::NoType{})) std::cout << ": " << get_concrete_type_or_type_variable(string.type, context).to_str();
+            if (string.type != Type(ast::NoType{}))
+                std::cout
+                    << ": "
+                    << get_concrete_type_or_type_variable(string.type, context)
+                           .to_str();
             std::cout << "\n";
             break;
         }
@@ -1198,18 +1504,24 @@ void ast::print(Node* node, PrintContext context) {
 
             put_indent_level(context.indent_level, context.last);
             std::cout << "InterpolatedString";
-            if (string.type != Type(ast::NoType{})) std::cout << ": " << get_concrete_type_or_type_variable(string.type, context).to_str();
+            if (string.type != Type(ast::NoType{}))
+                std::cout
+                    << ": "
+                    << get_concrete_type_or_type_variable(string.type, context)
+                           .to_str();
             std::cout << "\n";
 
             for (size_t i = 0; i < string.strings.size(); i++) {
                 bool is_last = i + 1 == string.strings.size();
-                put_indent_level(context.indent_level + 1, append(context.last, is_last));
+                put_indent_level(
+                    context.indent_level + 1,
+                    append(context.last, is_last)
+                );
                 std::cout << "\"";
                 for (size_t j = 0; j < string.strings[i].size(); j++) {
                     if (string.strings[i][j] == '\n') {
                         std::cout << "\\n";
-                    }
-                    else {
+                    } else {
                         std::cout << string.strings[i][j];
                     }
                 }
@@ -1231,10 +1543,22 @@ void ast::print(Node* node, PrintContext context) {
 
             put_indent_level(context.indent_level, context.last);
             std::cout << "[]";
-            if (array.type != Type(ast::NoType{})) std::cout << ": " << get_concrete_type_or_type_variable(array.type, context).to_str();
+            if (array.type != Type(ast::NoType{}))
+                std::cout
+                    << ": "
+                    << get_concrete_type_or_type_variable(array.type, context)
+                           .to_str();
             std::cout << "\n";
             for (size_t i = 0; i < array.elements.size(); i++) {
-                print(array.elements[i], PrintContext{context.indent_level + 1, append(context.last, i + 1 == array.elements.size()), context.concrete, context.type_bindings});
+                print(
+                    array.elements[i],
+                    PrintContext{
+                        context.indent_level + 1,
+                        append(context.last, i + 1 == array.elements.size()),
+                        context.concrete,
+                        context.type_bindings
+                    }
+                );
             }
             break;
         }
@@ -1242,7 +1566,8 @@ void ast::print(Node* node, PrintContext context) {
         case FieldAccess: {
             auto& field_access = std::get<FieldAccessNode>(*node);
 
-            // There should be at least 1 identifiers in fields accessed. eg: circle.radius
+            // There should be at least 1 identifiers in fields accessed. eg:
+            // circle.radius
             assert(field_access.fields_accessed.size() >= 1);
 
             print(field_access.accessed, context);
@@ -1251,7 +1576,14 @@ void ast::print(Node* node, PrintContext context) {
             for (size_t i = 0; i < field_access.fields_accessed.size(); i++) {
                 put_indent_level(context.indent_level + i + 1, last);
                 std::cout << field_access.fields_accessed[i]->value;
-                if (field_access.fields_accessed[i]->type != Type(ast::NoType{})) std::cout << ": " << get_concrete_type_or_type_variable(field_access.fields_accessed[i]->type, context).to_str();
+                if (field_access.fields_accessed[i]->type !=
+                    Type(ast::NoType{}))
+                    std::cout << ": "
+                              << get_concrete_type_or_type_variable(
+                                     field_access.fields_accessed[i]->type,
+                                     context
+                                 )
+                                     .to_str();
                 std::cout << "\n";
                 last.push_back(true);
             }
@@ -1264,7 +1596,13 @@ void ast::print(Node* node, PrintContext context) {
 
             put_indent_level(context.indent_level, context.last);
             std::cout << "&";
-            if (address_of.type != Type(ast::NoType{})) std::cout << ": " << get_concrete_type_or_type_variable(address_of.type, context).to_str();
+            if (address_of.type != Type(ast::NoType{}))
+                std::cout << ": "
+                          << get_concrete_type_or_type_variable(
+                                 address_of.type,
+                                 context
+                             )
+                                 .to_str();
             std::cout << "\n";
 
             context.indent_level += 1;
@@ -1279,7 +1617,13 @@ void ast::print(Node* node, PrintContext context) {
 
             put_indent_level(context.indent_level, context.last);
             std::cout << "*";
-            if (dereference.type != Type(ast::NoType{})) std::cout << ": " << get_concrete_type_or_type_variable(dereference.type, context).to_str();
+            if (dereference.type != Type(ast::NoType{}))
+                std::cout << ": "
+                          << get_concrete_type_or_type_variable(
+                                 dereference.type,
+                                 context
+                             )
+                                 .to_str();
             std::cout << "\n";
 
             context.indent_level += 1;
@@ -1294,7 +1638,13 @@ void ast::print(Node* node, PrintContext context) {
 
             put_indent_level(context.indent_level, context.last);
             std::cout << "new";
-            if (new_node.type != Type(ast::NoType{})) std::cout << ": " << get_concrete_type_or_type_variable(new_node.type, context).to_str();
+            if (new_node.type != Type(ast::NoType{}))
+                std::cout << ": "
+                          << get_concrete_type_or_type_variable(
+                                 new_node.type,
+                                 context
+                             )
+                                 .to_str();
             std::cout << "\n";
 
             context.indent_level += 1;
@@ -1312,7 +1662,7 @@ void ast::print(Node* node, PrintContext context) {
 }
 
 bool ast::FunctionNode::typed_parameter_aready_added(ast::Type type) {
-    for (auto type_parameter: this->type_parameters) {
+    for (auto type_parameter : this->type_parameters) {
         if (type_parameter.type == type) {
             return true;
         }
@@ -1320,8 +1670,10 @@ bool ast::FunctionNode::typed_parameter_aready_added(ast::Type type) {
     return false;
 }
 
-std::optional<ast::TypeParameter*> ast::FunctionNode::get_type_parameter(ast::Type type) {
-    for (auto& type_parameter: this->type_parameters) {
+std::optional<ast::TypeParameter*> ast::FunctionNode::get_type_parameter(
+    ast::Type type
+) {
+    for (auto& type_parameter : this->type_parameters) {
         if (type_parameter.type == type) {
             return &type_parameter;
         }
@@ -1334,13 +1686,15 @@ static bool _is_in_type_parameter(ast::Type type_parameter, ast::Type type) {
         return true;
     }
 
-    for (auto field: type_parameter.as_final_type_variable().field_constraints) {
+    for (auto field :
+         type_parameter.as_final_type_variable().field_constraints) {
         if (_is_in_type_parameter(field.type, type)) {
             return true;
         }
     }
 
-    for (auto parameter: type_parameter.as_final_type_variable().parameter_constraints) {
+    for (auto parameter :
+         type_parameter.as_final_type_variable().parameter_constraints) {
         if (_is_in_type_parameter(parameter, type)) {
             return true;
         }
@@ -1350,7 +1704,7 @@ static bool _is_in_type_parameter(ast::Type type_parameter, ast::Type type) {
 }
 
 bool ast::FunctionNode::is_in_type_parameter(ast::Type type) {
-    for (auto type_parameter: this->type_parameters) {
+    for (auto type_parameter : this->type_parameters) {
         if (_is_in_type_parameter(type_parameter.type, type)) {
             return true;
         }
@@ -1359,9 +1713,8 @@ bool ast::FunctionNode::is_in_type_parameter(ast::Type type) {
     return false;
 }
 
-
 bool ast::InterfaceNode::typed_parameter_aready_added(ast::Type type) {
-    for (auto type_parameter: this->type_parameters) {
+    for (auto type_parameter : this->type_parameters) {
         if (type_parameter.type == type) {
             return true;
         }
@@ -1369,8 +1722,10 @@ bool ast::InterfaceNode::typed_parameter_aready_added(ast::Type type) {
     return false;
 }
 
-std::optional<ast::TypeParameter*> ast::InterfaceNode::get_type_parameter(ast::Type type) {
-    for (auto& type_parameter: this->type_parameters) {
+std::optional<ast::TypeParameter*> ast::InterfaceNode::get_type_parameter(
+    ast::Type type
+) {
+    for (auto& type_parameter : this->type_parameters) {
         if (type_parameter.type == type) {
             return &type_parameter;
         }
@@ -1379,7 +1734,7 @@ std::optional<ast::TypeParameter*> ast::InterfaceNode::get_type_parameter(ast::T
 }
 
 bool ast::InterfaceNode::is_in_type_parameter(ast::Type type) {
-    for (auto type_parameter: this->type_parameters) {
+    for (auto type_parameter : this->type_parameters) {
         if (_is_in_type_parameter(type_parameter.type, type)) {
             return true;
         }
@@ -1390,15 +1745,15 @@ bool ast::InterfaceNode::is_in_type_parameter(ast::Type type) {
 
 std::vector<ast::Type> ast::InterfaceNode::get_prototype() {
     std::vector<ast::Type> results;
-    for (auto arg: this->args) {
-        results.push_back(ast::get_type((ast::Node*) arg));
+    for (auto arg : this->args) {
+        results.push_back(ast::get_type((ast::Node*)arg));
     }
     results.push_back(this->return_type);
     return results;
 }
 
 bool ast::InterfaceNode::is_compatible_with(ast::Type type) {
-    for (auto function: this->functions) {
+    for (auto function : this->functions) {
         for (size_t i = 0; i < function->args.size(); i++) {
             if (this->args[i]->type == this->type_parameters[0].type) {
                 if (type == function->args[i]->type) {
@@ -1408,13 +1763,17 @@ bool ast::InterfaceNode::is_compatible_with(ast::Type type) {
             }
         }
     }
-    std::cout << "No implementation of " << this->identifier->value << " for " << type.to_str() << "\n";
+    std::cout << "No implementation of " << this->identifier->value << " for "
+              << type.to_str() << "\n";
     assert(false);
     return false;
 }
 
-std::optional<ast::TypeParameter*> ast::get_type_parameter(std::vector<ast::TypeParameter>& type_parameters, ast::Type type) {
-    for (auto& type_parameter: type_parameters) {
+std::optional<ast::TypeParameter*> ast::get_type_parameter(
+    std::vector<ast::TypeParameter>& type_parameters,
+    ast::Type type
+) {
+    for (auto& type_parameter : type_parameters) {
         if (type_parameter.type == type) {
             return &type_parameter;
         }

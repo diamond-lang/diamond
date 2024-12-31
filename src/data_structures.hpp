@@ -1,8 +1,8 @@
 #ifndef DATA_STRUCTURES_HPP
 #define DATA_STRUCTURES_HPP
 
-#include <vector>
 #include <cassert>
+#include <vector>
 
 // Set
 template <typename T>
@@ -10,7 +10,7 @@ struct Set {
     std::vector<T> elements;
 
     Set() {}
-    
+
     Set(std::vector<T> elements) {
         for (size_t i = 0; i < elements.size(); i++) {
             this->insert(elements[i]);
@@ -43,9 +43,7 @@ struct Set {
         return false;
     }
 
-    size_t size() const {
-        return this->elements.size();
-    }
+    size_t size() const { return this->elements.size(); }
 
     void merge(Set<T> b) {
         for (size_t i = 0; i < b.elements.size(); i++) {
@@ -55,7 +53,7 @@ struct Set {
 
     Set<T> intersect(Set<T> b) {
         Set<T> intersection;
-        for (auto& element: this->elements) {
+        for (auto& element : this->elements) {
             if (b.contains(element)) {
                 intersection.elements.push_back(element);
             }

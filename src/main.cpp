@@ -1,12 +1,12 @@
-#include <iostream>
 #include <cassert>
+#include <iostream>
 
+#include "codegen.hpp"
 #include "errors.hpp"
 #include "lexer.hpp"
-#include "utilities.hpp"
 #include "parser.hpp"
 #include "semantic.hpp"
-#include "codegen.hpp"
+#include "utilities.hpp"
 
 // Definitions and prototypes
 // --------------------------
@@ -16,18 +16,16 @@
 void enable_colored_text_and_unicode() {
     // Colored text
     HANDLE handle = GetStdHandle(STD_OUTPUT_HANDLE);
-    SetConsoleMode(handle, ENABLE_PROCESSED_OUTPUT | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
+    SetConsoleMode(
+        handle, ENABLE_PROCESSED_OUTPUT | ENABLE_VIRTUAL_TERMINAL_PROCESSING
+    );
 
     // Unicode
     SetConsoleOutputCP(65001);
 }
 #endif
 
-enum CommandType {
-    BuildCommand,
-    RunCommand,
-    EmitCommand
-};
+enum CommandType { BuildCommand, RunCommand, EmitCommand };
 
 struct Command {
     std::filesystem::path file;
@@ -35,7 +33,10 @@ struct Command {
     std::vector<std::string> options;
 
     Command(std::string file, CommandType type) : file(file), type(type) {}
-    Command(std::string file, CommandType type, std::vector<std::string> options) : file(file), type(type), options(options) {}
+    Command(
+        std::string file, CommandType type, std::vector<std::string> options
+    )
+        : file(file), type(type), options(options) {}
     ~Command() {}
 };
 
@@ -51,10 +52,17 @@ void check_usage(int argc, char *argv[]) {
     if (argv[1] == std::string("run") && argc < 3) {
         print_usage_and_exit();
     }
-    if (argv[1] == std::string("emit") && (argc < 4 || !(argv[2] == std::string("--llvm-ir") || argv[2] == std::string("--ast") || argv[2] == std::string("--ast-with-types") || argv[2] == std::string("--ast-with-concrete-types") || argv[2] == std::string("--tokens") || argv[2] == std::string("--object-code") || argv[2] == std::string("--assembly")))) {
+    if (argv[1] == std::string("emit") &&
+        (argc < 4 || !(argv[2] == std::string("--llvm-ir") ||
+                       argv[2] == std::string("--ast") ||
+                       argv[2] == std::string("--ast-with-types") ||
+                       argv[2] == std::string("--ast-with-concrete-types") ||
+                       argv[2] == std::string("--tokens") ||
+                       argv[2] == std::string("--object-code") ||
+                       argv[2] == std::string("--assembly")))) {
         print_usage_and_exit();
     }
-};
+}
 
 Command get_command(int argc, char *argv[]) {
     if (argv[1] == std::string("build")) {
@@ -64,7 +72,9 @@ Command get_command(int argc, char *argv[]) {
         return Command(std::string(argv[2]), RunCommand);
     }
     if (argv[1] == std::string("emit")) {
-        return Command(std::string(argv[3]), EmitCommand, std::vector<std::string>{argv[2]});
+        return Command(
+            std::string(argv[3]), EmitCommand, std::vector<std::string>{argv[2]}
+        );
     }
     assert(false);
 }
@@ -92,12 +102,14 @@ void build(Command command) {
 
     // Parse
     auto parsing_result = parse::program(tokens, command.file);
-    if (parsing_result.is_error()) print_errors_and_exit(parsing_result.get_error());
+    if (parsing_result.is_error())
+        print_errors_and_exit(parsing_result.get_error());
     auto ast = parsing_result.get_value();
 
     // Analyze
     auto analyze_result = semantic::analyze(ast);
-    if (analyze_result.is_error()) print_errors_and_exit(analyze_result.get_error());
+    if (analyze_result.is_error())
+        print_errors_and_exit(analyze_result.get_error());
 
     // Generate executable
     codegen::generate_executable(ast, program_name);
@@ -111,7 +123,8 @@ void run(Command command) {
     std::string program_name = utilities::get_program_name(command.file);
 
     // Check if executable already existed
-    bool already_existed = utilities::file_exists(utilities::get_executable_name(program_name));
+    bool already_existed =
+        utilities::file_exists(utilities::get_executable_name(program_name));
 
     // Read file
     auto file = utilities::read_file(std::filesystem::path(command.file));
@@ -125,12 +138,14 @@ void run(Command command) {
 
     // Parse
     auto parsing_result = parse::program(tokens, command.file);
-    if (parsing_result.is_error()) print_errors_and_exit(parsing_result.get_error());
+    if (parsing_result.is_error())
+        print_errors_and_exit(parsing_result.get_error());
     auto ast = parsing_result.get_value();
 
     // Analyze
     auto analyze_result = semantic::analyze(ast);
-    if (analyze_result.is_error()) print_errors_and_exit(analyze_result.get_error());
+    if (analyze_result.is_error())
+        print_errors_and_exit(analyze_result.get_error());
 
     // Generate executable
     codegen::generate_executable(ast, program_name);
@@ -168,7 +183,8 @@ void emit(Command command) {
 
     // Parse
     auto parsing_result = parse::program(tokens, command.file);
-    if (parsing_result.is_error()) print_errors_and_exit(parsing_result.get_error());
+    if (parsing_result.is_error())
+        print_errors_and_exit(parsing_result.get_error());
     auto ast = parsing_result.get_value();
 
     // Emit AST
@@ -180,7 +196,8 @@ void emit(Command command) {
 
     // Analyze
     auto analyze_result = semantic::analyze(ast);
-    if (analyze_result.is_error()) print_errors_and_exit(analyze_result.get_error());
+    if (analyze_result.is_error())
+        print_errors_and_exit(analyze_result.get_error());
 
     // Emit AST with types
     if (command.options[0] == std::string("--ast-with-types")) {
@@ -221,9 +238,9 @@ void emit(Command command) {
 // Main
 // ----
 int main(int argc, char *argv[]) {
-    #ifdef _WIN32
-        enable_colored_text_and_unicode();
-    #endif
+#ifdef _WIN32
+    enable_colored_text_and_unicode();
+#endif
 
     // Check usage
     check_usage(argc, argv);

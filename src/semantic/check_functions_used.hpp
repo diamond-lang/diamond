@@ -6,7 +6,9 @@
 namespace semantic {
     void check_functions_used(Context& context, ast::Node* node);
     void check_functions_used(Context& context, ast::BlockNode& node);
-    void check_functions_used(Context& context, ast::FunctionArgumentNode& node);
+    void check_functions_used(
+        Context& context, ast::FunctionArgumentNode& node
+    );
     void check_functions_used(Context& context, ast::FunctionNode& node);
     void check_functions_used(Context& context, ast::InterfaceNode& node);
     void check_functions_used(Context& context, ast::TypeNode& node);
@@ -27,7 +29,9 @@ namespace semantic {
     void check_functions_used(Context& context, ast::IdentifierNode& node);
     void check_functions_used(Context& context, ast::BooleanNode& node);
     void check_functions_used(Context& context, ast::StringNode& node);
-    void check_functions_used(Context& context, ast::InterpolatedStringNode& node);
+    void check_functions_used(
+        Context& context, ast::InterpolatedStringNode& node
+    );
     void check_functions_used(Context& context, ast::ArrayNode& node);
     void check_functions_used(Context& context, ast::FieldAccessNode& node);
     void check_functions_used(Context& context, ast::AddressOfNode& node);

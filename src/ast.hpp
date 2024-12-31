@@ -1,15 +1,14 @@
 #ifndef AST_HPP
 #define AST_HPP
 
-#include <string>
-#include <vector>
-#include <variant>
-#include <unordered_map>
+#include <cassert>
 #include <filesystem>
 #include <optional>
-#include <cmath>
-#include <cassert>
-#include <iostream>
+#include <string>
+#include <unordered_map>
+#include <variant>
+#include <vector>
+
 #include "data_structures.hpp"
 
 namespace ast {
@@ -74,39 +73,16 @@ namespace ast {
     };
 
     using Node = std::variant<
-        BlockNode,
-        FunctionArgumentNode,
-        FunctionNode,
-        InterfaceNode,
-        TypeNode,
-        DeclarationNode,
-        AssignmentNode,
-        ReturnNode,
-        BreakNode,
-        ContinueNode,
-        IfElseNode,
-        WhileNode,
-        UseNode,
-        LinkWithNode,
-        CallArgumentNode,
-        CallNode,
-        StructLiteralNode,
-        FloatNode,
-        IntegerNode,
-        IdentifierNode,
-        BooleanNode,
-        StringNode,
-        InterpolatedStringNode,
-        ArrayNode,
-        FieldAccessNode,
-        AddressOfNode,
-        DereferenceNode,
-        NewNode
-    >;
+        BlockNode, FunctionArgumentNode, FunctionNode, InterfaceNode, TypeNode,
+        DeclarationNode, AssignmentNode, ReturnNode, BreakNode, ContinueNode,
+        IfElseNode, WhileNode, UseNode, LinkWithNode, CallArgumentNode,
+        CallNode, StructLiteralNode, FloatNode, IntegerNode, IdentifierNode,
+        BooleanNode, StringNode, InterpolatedStringNode, ArrayNode,
+        FieldAccessNode, AddressOfNode, DereferenceNode, NewNode>;
 
     struct Type;
     struct FieldConstraint;
-    
+
     struct FieldTypes {
         std::vector<FieldConstraint> fields;
 
@@ -121,11 +97,11 @@ namespace ast {
 
     struct InterfaceType {
         std::string name;
-        
+
         InterfaceType() {}
         InterfaceType(std::string name) : name(name) {}
-        bool operator==(const InterfaceType &interface) const;
-        bool operator!=(const InterfaceType &interface) const;
+        bool operator==(const InterfaceType& interface) const;
+        bool operator!=(const InterfaceType& interface) const;
 
         ast::Type get_default_type();
         bool is_compatible_with(ast::Type type, ast::InterfaceNode* interface);
@@ -133,9 +109,7 @@ namespace ast {
 
     ast::Type get_default_type(Set<ast::InterfaceType> interface);
 
-    struct NoType {
-
-    };
+    struct NoType {};
 
     struct TypeVariable {
         size_t id;
@@ -157,8 +131,10 @@ namespace ast {
         TypeNode* type_definition = nullptr;
 
         NominalType(std::string name) : name(name) {}
-        NominalType(std::string name, std::vector<Type> parameters) : name(name), parameters(parameters) {}
-        NominalType(std::string name, TypeNode* type_definition) : name(name), type_definition(type_definition) {}
+        NominalType(std::string name, std::vector<Type> parameters)
+            : name(name), parameters(parameters) {}
+        NominalType(std::string name, TypeNode* type_definition)
+            : name(name), type_definition(type_definition) {}
     };
 
     struct StructType {
@@ -178,13 +154,20 @@ namespace ast {
     };
 
     struct Type {
-        std::variant<NoType, TypeVariable, FinalTypeVariable, NominalType, StructType> type;
+        std::variant<
+            NoType, TypeVariable, FinalTypeVariable, NominalType, StructType>
+            type;
 
         Type() : type(NoType{}) {}
         Type(std::string name) : type(NominalType(name)) {}
-        Type(std::string name, std::vector<Type> parameters) : type(NominalType(name, parameters)) {}
-        Type(std::string name, TypeNode* type_definition) : type(NominalType(name, type_definition)) {}
-        Type(std::variant<NoType, TypeVariable, FinalTypeVariable, NominalType, StructType> type) : type(type) {}
+        Type(std::string name, std::vector<Type> parameters)
+            : type(NominalType(name, parameters)) {}
+        Type(std::string name, TypeNode* type_definition)
+            : type(NominalType(name, type_definition)) {}
+        Type(std::variant<
+             NoType, TypeVariable, FinalTypeVariable, NominalType, StructType>
+                 type)
+            : type(type) {}
 
         ast::NoType& as_no_type();
         ast::TypeVariable& as_type_variable();
@@ -198,8 +181,8 @@ namespace ast {
         ast::NominalType as_nominal_type() const;
         ast::StructType as_struct_type() const;
 
-        bool operator==(const Type &t) const;
-        bool operator!=(const Type &t) const;
+        bool operator==(const Type& t) const;
+        bool operator!=(const Type& t) const;
         std::string to_str() const;
         bool is_no_type() const;
         bool is_type_variable() const;
@@ -221,14 +204,26 @@ namespace ast {
     };
 
     Type get_type(Node* node);
-    Type get_concrete_type(Node* node, std::unordered_map<std::string, Type>& type_bindings);
-    Type get_concrete_type(Type type_variable, std::unordered_map<std::string, Type>& type_bindings);
-    Type try_to_get_concrete_type(Type type_variable, std::unordered_map<std::string, Type>& type_bindings);
+    Type get_concrete_type(
+        Node* node, std::unordered_map<std::string, Type>& type_bindings
+    );
+    Type get_concrete_type(
+        Type type_variable, std::unordered_map<std::string, Type>& type_bindings
+    );
+    Type try_to_get_concrete_type(
+        Type type_variable, std::unordered_map<std::string, Type>& type_bindings
+    );
     void set_type(Node* node, Type type);
     std::vector<Type> get_types(std::vector<CallArgumentNode*> nodes);
-    std::vector<Type> get_types(std::vector<FunctionArgumentNode*> nodes);  
-    std::vector<Type> get_concrete_types(std::vector<Node*> nodes, std::unordered_map<std::string, Type>& type_bindings);
-    std::vector<Type> get_concrete_types(std::vector<Type> type_variables, std::unordered_map<std::string, Type>& type_bindings);
+    std::vector<Type> get_types(std::vector<FunctionArgumentNode*> nodes);
+    std::vector<Type> get_concrete_types(
+        std::vector<Node*> nodes,
+        std::unordered_map<std::string, Type>& type_bindings
+    );
+    std::vector<Type> get_concrete_types(
+        std::vector<Type> type_variables,
+        std::unordered_map<std::string, Type>& type_bindings
+    );
     bool is_expression(Node* node);
     bool could_be_expression(Node* node);
     void transform_to_expression(Node*& node);
@@ -299,7 +294,8 @@ namespace ast {
         std::vector<FunctionSpecialization> specializations;
         Type return_type = Type(ast::NoType{});
         bool return_type_is_mutable = false;
-        std::filesystem::path module_path; // Used in to tell from which module the function comes from
+        std::filesystem::path module_path;  // Used in to tell from which module
+                                            // the function comes from
         bool is_used = false;
 
         bool typed_parameter_aready_added(ast::Type type);
@@ -318,9 +314,10 @@ namespace ast {
 
         Type return_type = Type(ast::NoType{});
         bool return_type_is_mutable = false;
-        std::filesystem::path module_path; // Used in to tell from which module the function comes from
+        std::filesystem::path module_path;  // Used in to tell from which module
+                                            // the function comes from
         std::vector<ast::FunctionNode*> functions;
-    
+
         bool typed_parameter_aready_added(ast::Type type);
         std::optional<ast::TypeParameter*> get_type_parameter(ast::Type type);
         std::vector<ast::Type> get_prototype();
@@ -329,7 +326,9 @@ namespace ast {
         bool is_compatible_with(ast::Type type);
     };
 
-    std::optional<ast::TypeParameter*> get_type_parameter(std::vector<ast::TypeParameter>& type_parameters, ast::Type type);
+    std::optional<ast::TypeParameter*> get_type_parameter(
+        std::vector<ast::TypeParameter>& type_parameters, ast::Type type
+    );
 
     struct TypeNode {
         size_t line;
@@ -339,7 +338,8 @@ namespace ast {
         IdentifierNode* identifier;
         std::vector<IdentifierNode*> fields;
         std::vector<TypeNode*> cases;
-        std::filesystem::path module_path; // Used in to tell from which module the type comes from
+        std::filesystem::path module_path;  // Used in to tell from which module
+                                            // the type comes from
 
         size_t get_index_of_field(std::string field_name);
     };
@@ -350,7 +350,7 @@ namespace ast {
         Type type = Type(ast::NoType{});
 
         bool is_mutable = false;
-    
+
         IdentifierNode* identifier;
         Node* expression;
     };
@@ -441,7 +441,7 @@ namespace ast {
 
         std::vector<bool> get_args_mutability() {
             std::vector<bool> result;
-            for (auto arg: this->args) {
+            for (auto arg : this->args) {
                 result.push_back(arg->is_mutable);
             }
             return result;
@@ -536,7 +536,7 @@ namespace ast {
         size_t line;
         size_t column;
         Type type = Type(ast::NoType{});
-    
+
         ast::Node* expression;
     };
 
@@ -544,7 +544,7 @@ namespace ast {
         size_t line;
         size_t column;
         Type type = Type(ast::NoType{});
-    
+
         ast::Node* expression;
     };
 
@@ -579,11 +579,16 @@ namespace ast {
     Type get_concrete_type_or_type_variable(Type type, PrintContext context);
     void print(const Ast& ast, PrintContext context = PrintContext{});
     void print(Node* node, PrintContext context = PrintContext{});
-    void print_with_concrete_types(const Ast& ast, PrintContext context = PrintContext{});
-    void print_with_concrete_types(Node* node, PrintContext context = PrintContext{});
+    void print_with_concrete_types(
+        const Ast& ast, PrintContext context = PrintContext{}
+    );
+    void print_with_concrete_types(
+        Node* node, PrintContext context = PrintContext{}
+    );
 };
 
-// Add hash struct for ast::Type to be able to use ast::Type as keys of std::unordered_map
+// Add hash struct for ast::Type to be able to use ast::Type as keys of
+// std::unordered_map
 namespace std {
     template <>
     struct hash<ast::Type> {
