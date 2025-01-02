@@ -49,7 +49,9 @@ std::variant<std::vector<token::Token>, std::vector<Error>> lexer::lex(
     }
 
     lexer.tokens.push_back(token::Token{
-        .kind = token::EndOfFile{}, .line = lexer.line, .column = lexer.column
+        .kind = token::EndOfFile{},
+        .line = lexer.line,
+        .column = lexer.column
     });
 
     // return
@@ -135,8 +137,8 @@ void lexer::scanToken(Lexer& lexer) {
     if (match(lexer, " ") || match(lexer, "\t")) {
         return;
     }
-    if (peek(lexer) == '\n' ||
-        (peek(lexer) == '\r' && peekNext(lexer) == '\n')) {
+    if (peek(lexer) == '\n'
+        || (peek(lexer) == '\r' && peekNext(lexer) == '\n')) {
         addToken(lexer, token::NewLine{});
         advance(lexer);
         return;
@@ -193,8 +195,8 @@ void lexer::scanString(Lexer& lexer) {
 
 void lexer::scanIdentifierOrKeyword(Lexer& lexer) {
     while (isalnum(peek(lexer)) || peek(lexer) == '_') advance(lexer);
-    auto literal =
-        lexer.source.substr(lexer.start, lexer.current - lexer.start);
+    auto literal
+        = lexer.source.substr(lexer.start, lexer.current - lexer.start);
 
     if (literal == "if") return addToken(lexer, token::If{});
     if (literal == "else") return addToken(lexer, token::Else{});
@@ -236,21 +238,21 @@ void lexer::scanNumber(Lexer& lexer) {
         while (isdigit(peek(lexer))) advance(lexer);
 
         // Add token
-        auto literal =
-            lexer.source.substr(lexer.start, lexer.current - lexer.start);
+        auto literal
+            = lexer.source.substr(lexer.start, lexer.current - lexer.start);
         return addToken(lexer, token::Float{.literal = literal});
     }
 
     // Add token
-    auto literal =
-        lexer.source.substr(lexer.start, lexer.current - lexer.start);
+    auto literal
+        = lexer.source.substr(lexer.start, lexer.current - lexer.start);
     return addToken(lexer, token::Integer{.literal = literal});
 }
 
 void lexer::scanInteger(Lexer& lexer) {
     while (isdigit(peek(lexer))) advance(lexer);
-    auto literal =
-        lexer.source.substr(lexer.start, lexer.current - lexer.start);
+    auto literal
+        = lexer.source.substr(lexer.start, lexer.current - lexer.start);
     return addToken(lexer, token::Integer{.literal = literal});
 }
 

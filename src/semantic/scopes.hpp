@@ -25,11 +25,13 @@ namespace semantic {
             std::vector<ast::TypeNode*>& types
         );
         Result<Ok, Errors> add_definitions_from_block_to_scope(
-            ast::Ast& ast, std::filesystem::path module_path,
+            ast::Ast& ast,
+            std::filesystem::path module_path,
             ast::BlockNode& block
         );
         Result<Ok, Errors> add_module_functions(
-            ast::Ast& ast, std::filesystem::path module_path,
+            ast::Ast& ast,
+            std::filesystem::path module_path,
             std::set<std::filesystem::path>& already_included_modules
         );
     };

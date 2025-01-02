@@ -17,7 +17,8 @@ void enable_colored_text_and_unicode() {
     // Colored text
     HANDLE handle = GetStdHandle(STD_OUTPUT_HANDLE);
     SetConsoleMode(
-        handle, ENABLE_PROCESSED_OUTPUT | ENABLE_VIRTUAL_TERMINAL_PROCESSING
+        handle,
+        ENABLE_PROCESSED_OUTPUT | ENABLE_VIRTUAL_TERMINAL_PROCESSING
     );
 
     // Unicode
@@ -52,14 +53,17 @@ void check_usage(int argc, char *argv[]) {
     if (argv[1] == std::string("run") && argc < 3) {
         print_usage_and_exit();
     }
-    if (argv[1] == std::string("emit") &&
-        (argc < 4 || !(argv[2] == std::string("--llvm-ir") ||
-                       argv[2] == std::string("--ast") ||
-                       argv[2] == std::string("--ast-with-types") ||
-                       argv[2] == std::string("--ast-with-concrete-types") ||
-                       argv[2] == std::string("--tokens") ||
-                       argv[2] == std::string("--object-code") ||
-                       argv[2] == std::string("--assembly")))) {
+    if (argv[1] == std::string("emit")
+        && (argc < 4
+            || !(
+                argv[2] == std::string("--llvm-ir")
+                || argv[2] == std::string("--ast")
+                || argv[2] == std::string("--ast-with-types")
+                || argv[2] == std::string("--ast-with-concrete-types")
+                || argv[2] == std::string("--tokens")
+                || argv[2] == std::string("--object-code")
+                || argv[2] == std::string("--assembly")
+            ))) {
         print_usage_and_exit();
     }
 }
@@ -73,7 +77,9 @@ Command get_command(int argc, char *argv[]) {
     }
     if (argv[1] == std::string("emit")) {
         return Command(
-            std::string(argv[3]), EmitCommand, std::vector<std::string>{argv[2]}
+            std::string(argv[3]),
+            EmitCommand,
+            std::vector<std::string>{argv[2]}
         );
     }
     assert(false);
@@ -123,8 +129,8 @@ void run(Command command) {
     std::string program_name = utilities::get_program_name(command.file);
 
     // Check if executable already existed
-    bool already_existed =
-        utilities::file_exists(utilities::get_executable_name(program_name));
+    bool already_existed
+        = utilities::file_exists(utilities::get_executable_name(program_name));
 
     // Read file
     auto file = utilities::read_file(std::filesystem::path(command.file));

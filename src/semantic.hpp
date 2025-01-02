@@ -13,7 +13,8 @@ namespace semantic {
     bool are_types_compatible(
         ast::FunctionNode& function,
         semantic::FunctionsAndTypesScopes& function_and_types_scopes,
-        ast::Type function_type, ast::Type argument_type
+        ast::Type function_type,
+        ast::Type argument_type
     );
     bool are_types_compatible(
         ast::FunctionNode& function,

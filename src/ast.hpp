@@ -41,44 +41,35 @@ namespace ast {
     struct DereferenceNode;
     struct NewNode;
 
-    enum NodeVariant {
-        Block,
-        FunctionArgument,
-        Function,
-        Interface,
-        TypeDef,
-        Declaration,
-        Assignment,
-        Return,
-        Break,
-        Continue,
-        IfElse,
-        While,
-        Use,
-        LinkWith,
-        CallArgument,
-        Call,
-        StructLiteral,
-        Float,
-        Integer,
-        Identifier,
-        Boolean,
-        String,
-        InterpolatedString,
-        Array,
-        FieldAccess,
-        AddressOf,
-        Dereference,
-        New
-    };
-
     using Node = std::variant<
-        BlockNode, FunctionArgumentNode, FunctionNode, InterfaceNode, TypeNode,
-        DeclarationNode, AssignmentNode, ReturnNode, BreakNode, ContinueNode,
-        IfElseNode, WhileNode, UseNode, LinkWithNode, CallArgumentNode,
-        CallNode, StructLiteralNode, FloatNode, IntegerNode, IdentifierNode,
-        BooleanNode, StringNode, InterpolatedStringNode, ArrayNode,
-        FieldAccessNode, AddressOfNode, DereferenceNode, NewNode>;
+        BlockNode,
+        FunctionArgumentNode,
+        FunctionNode,
+        InterfaceNode,
+        TypeNode,
+        DeclarationNode,
+        AssignmentNode,
+        ReturnNode,
+        BreakNode,
+        ContinueNode,
+        IfElseNode,
+        WhileNode,
+        UseNode,
+        LinkWithNode,
+        CallArgumentNode,
+        CallNode,
+        StructLiteralNode,
+        FloatNode,
+        IntegerNode,
+        IdentifierNode,
+        BooleanNode,
+        StringNode,
+        InterpolatedStringNode,
+        ArrayNode,
+        FieldAccessNode,
+        AddressOfNode,
+        DereferenceNode,
+        NewNode>;
 
     struct Type;
     struct FieldConstraint;
@@ -155,7 +146,11 @@ namespace ast {
 
     struct Type {
         std::variant<
-            NoType, TypeVariable, FinalTypeVariable, NominalType, StructType>
+            NoType,
+            TypeVariable,
+            FinalTypeVariable,
+            NominalType,
+            StructType>
             type;
 
         Type() : type(NoType{}) {}
@@ -165,8 +160,11 @@ namespace ast {
         Type(std::string name, TypeNode* type_definition)
             : type(NominalType(name, type_definition)) {}
         Type(std::variant<
-             NoType, TypeVariable, FinalTypeVariable, NominalType, StructType>
-                 type)
+             NoType,
+             TypeVariable,
+             FinalTypeVariable,
+             NominalType,
+             StructType> type)
             : type(type) {}
 
         ast::NoType& as_no_type();

@@ -11,7 +11,8 @@ namespace parse {
         const std::filesystem::path& file
     );
     Result<Ok, Errors> module(
-        ast::Ast& ast, const std::vector<token::Token>& tokens,
+        ast::Ast& ast,
+        const std::vector<token::Token>& tokens,
         const std::filesystem::path& file
     );
 };

@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <iostream>
+#include <variant>
 
 #include "../errors.hpp"
 #include "../lexer.hpp"
@@ -16,15 +17,15 @@ void semantic::FunctionsAndTypesScopes::add_scope() {
 
 void semantic::FunctionsAndTypesScopes::remove_scope() {
     for (auto binding : this->current_scope()) {
-        if (binding.second->index() == ast::Interface) {
+        if (std::holds_alternative<ast::InterfaceNode>(*binding.second)) {
             ((ast::InterfaceNode*)binding.second)->functions = {};
         }
     }
 
     this->scopes.pop_back();
 }
-std::unordered_map<std::string, ast::Node*>&
-semantic::FunctionsAndTypesScopes::current_scope() {
+std::unordered_map<std::string, ast::Node*>& semantic::FunctionsAndTypesScopes::
+    current_scope() {
     assert(this->scopes.size() != 0);
     return this->scopes[this->scopes.size() - 1];
 }
@@ -40,12 +41,12 @@ ast::Node* semantic::FunctionsAndTypesScopes::get_binding(std::string identifier
     return nullptr;
 }
 
-Result<Ok, Error>
-semantic::FunctionsAndTypesScopes::add_definitions_to_current_scope(
-    std::vector<ast::FunctionNode*>& functions,
-    std::vector<ast::InterfaceNode*>& interfaces,
-    std::vector<ast::TypeNode*>& types
-) {
+Result<Ok, Error> semantic::FunctionsAndTypesScopes::
+    add_definitions_to_current_scope(
+        std::vector<ast::FunctionNode*>& functions,
+        std::vector<ast::InterfaceNode*>& interfaces,
+        std::vector<ast::TypeNode*>& types
+    ) {
     auto& scope = this->current_scope();
 
     // Add interfaces from block to current scope
@@ -54,11 +55,15 @@ semantic::FunctionsAndTypesScopes::add_definitions_to_current_scope(
 
         if (this->get_binding(identifier) == nullptr) {
             scope[identifier] = (ast::Node*)interface;
-        } else if (this->get_binding(identifier)->index() == ast::Function) {
+        } else if (std::holds_alternative<ast::FunctionNode>(
+                       *this->get_binding(identifier)
+                   )) {
             std::cout << "Function \"" << identifier
                       << "\" defined before interface" << "\n";
             assert(false);
-        } else if (this->get_binding(identifier)->index() == ast::Interface) {
+        } else if (std::holds_alternative<ast::InterfaceNode>(
+                       *this->get_binding(identifier)
+                   )) {
             std::cout << "Multiple definitions for interface "
                       << interface->identifier->value << "\n";
             assert(false);
@@ -73,7 +78,9 @@ semantic::FunctionsAndTypesScopes::add_definitions_to_current_scope(
 
         if (this->get_binding(identifier) == nullptr) {
             scope[identifier] = (ast::Node*)function;
-        } else if (this->get_binding(identifier)->index() == ast::Interface) {
+        } else if (std::holds_alternative<ast::InterfaceNode>(
+                       *this->get_binding(identifier)
+                   )) {
             bool alreadyAdded = false;
             for (auto function2 :
                  ((ast::InterfaceNode*)this->get_binding(identifier))
@@ -87,7 +94,9 @@ semantic::FunctionsAndTypesScopes::add_definitions_to_current_scope(
                 ((ast::InterfaceNode*)this->get_binding(identifier))
                     ->functions.push_back(function);
             }
-        } else if (this->get_binding(identifier)->index() == ast::Function) {
+        } else if (std::holds_alternative<ast::FunctionNode>(
+                       *this->get_binding(identifier)
+                   )) {
             std::cout << "Multiple definitions for function "
                       << function->identifier->value << "\n";
             assert(false);
@@ -114,18 +123,21 @@ semantic::FunctionsAndTypesScopes::add_definitions_to_current_scope(
     return Ok{};
 }
 
-Result<Ok, Errors>
-semantic::FunctionsAndTypesScopes::add_definitions_from_block_to_scope(
-    ast::Ast& ast, std::filesystem::path module_path, ast::BlockNode& block
-) {
+Result<Ok, Errors> semantic::FunctionsAndTypesScopes::
+    add_definitions_from_block_to_scope(
+        ast::Ast& ast, std::filesystem::path module_path, ast::BlockNode& block
+    ) {
     std::set<std::filesystem::path> already_included_modules = {module_path};
 
     // Add std libs
     if (this->scopes.size() == 0) {
         this->add_scope();
         if (std::find(
-                std_libs.elements.begin(), std_libs.elements.end(), module_path
-            ) == std_libs.elements.end()) {
+                std_libs.elements.begin(),
+                std_libs.elements.end(),
+                module_path
+            )
+            == std_libs.elements.end()) {
             for (auto path : std_libs.elements) {
                 this->add_module_functions(ast, path, already_included_modules);
             }
@@ -143,14 +155,18 @@ semantic::FunctionsAndTypesScopes::add_definitions_from_block_to_scope(
         );
         assert(std::filesystem::exists(module_path));
         auto result = this->add_module_functions(
-            ast, module_path, already_included_modules
+            ast,
+            module_path,
+            already_included_modules
         );
         if (result.is_error()) return result;
     }
 
     // Add functions from current scope
     auto result = this->add_definitions_to_current_scope(
-        block.functions, block.interfaces, block.types
+        block.functions,
+        block.interfaces,
+        block.types
     );
     if (result.is_error()) return Errors{result.get_error()};
 
@@ -158,13 +174,14 @@ semantic::FunctionsAndTypesScopes::add_definitions_from_block_to_scope(
 }
 
 Result<Ok, Errors> semantic::FunctionsAndTypesScopes::add_module_functions(
-    ast::Ast& ast, std::filesystem::path module_path,
+    ast::Ast& ast,
+    std::filesystem::path module_path,
     std::set<std::filesystem::path>& already_included_modules
 ) {
     if (ast.modules.find(module_path.string()) == ast.modules.end()) {
         // Read file
-        Result<std::string, Error> result =
-            utilities::read_file(module_path.string());
+        Result<std::string, Error> result
+            = utilities::read_file(module_path.string());
         if (result.is_error()) {
             std::cout << result.get_error().value;
             exit(EXIT_FAILURE);
@@ -202,8 +219,8 @@ Result<Ok, Errors> semantic::FunctionsAndTypesScopes::add_module_functions(
         }
     }
 
-    if (already_included_modules.find(module_path) ==
-        already_included_modules.end()) {
+    if (already_included_modules.find(module_path)
+        == already_included_modules.end()) {
         this->add_definitions_to_current_scope(
             ast.modules[module_path.string()]->functions,
             ast.modules[module_path.string()]->interfaces,
@@ -220,7 +237,9 @@ Result<Ok, Errors> semantic::FunctionsAndTypesScopes::add_module_functions(
                     module_path.parent_path() / (use_stmt->path->value + ".dmd")
                 );
                 auto result = this->add_module_functions(
-                    ast, include_path, already_included_modules
+                    ast,
+                    include_path,
+                    already_included_modules
                 );
                 if (result.is_error()) return result;
             }

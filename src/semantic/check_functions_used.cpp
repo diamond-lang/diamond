@@ -96,24 +96,30 @@ void semantic::check_functions_used(
 
 void semantic::check_functions_used(Context& context, ast::CallNode& node) {
     // Get binding
-    std::optional<semantic::Binding> binding =
-        semantic::get_binding(context, node.identifier->value);
+    std::optional<semantic::Binding> binding
+        = semantic::get_binding(context, node.identifier->value);
     assert(binding.has_value());
     assert(
-        binding.value().type == semantic::FunctionBinding ||
-        binding.value().type == semantic::InterfaceBinding
+        binding.value().type == semantic::FunctionBinding
+        || binding.value().type == semantic::InterfaceBinding
     );
     for (auto arg : node.args) {
         semantic::check_functions_used(context, *arg);
     }
 
     auto args_types = ast::get_concrete_types(
-        ast::get_types(node.args), context.type_inference.type_bindings
+        ast::get_types(node.args),
+        context.type_inference.type_bindings
     );
-    auto call_type =
-        ast::get_concrete_type(node.type, context.type_inference.type_bindings);
+    auto call_type = ast::get_concrete_type(
+        node.type,
+        context.type_inference.type_bindings
+    );
     auto function_type = semantic::get_function_type(
-        context, binding.value().value, node.get_args_mutability(), args_types,
+        context,
+        binding.value().value,
+        node.get_args_mutability(),
+        args_types,
         call_type
     );
 }
@@ -122,15 +128,16 @@ void semantic::check_functions_used(
     Context& context, ast::StructLiteralNode& node
 ) {
     // Get binding
-    std::optional<semantic::Binding> binding =
-        semantic::get_binding(context, node.identifier->value);
+    std::optional<semantic::Binding> binding
+        = semantic::get_binding(context, node.identifier->value);
     assert(binding.has_value());
 
     for (auto field : node.fields) {
         semantic::check_functions_used(context, field.second);
     }
     node.type = ast::Type(
-        node.identifier->value, semantic::get_type_definition(*binding)
+        node.identifier->value,
+        semantic::get_type_definition(*binding)
     );
 }
 

@@ -1,5 +1,7 @@
 #include "context.hpp"
 
+#include <variant>
+
 #include "../lexer.hpp"
 
 // Bindings
@@ -106,13 +108,14 @@ Result<Ok, Error> semantic::add_scope(Context& context, ast::BlockNode& block) {
     context.scopes.variables_scopes.push_back({});
     auto result = context.scopes.functions_and_types_scopes
                       .add_definitions_from_block_to_scope(
-                          *context.ast, context.current_module, block
+                          *context.ast,
+                          context.current_module,
+                          block
                       );
     if (result.is_error()) {
         auto errors = result.get_error();
-        context.errors.insert(
-            context.errors.end(), errors.begin(), errors.end()
-        );
+        context.errors
+            .insert(context.errors.end(), errors.begin(), errors.end());
         return Error{};
     }
     return Ok{};
@@ -137,7 +140,8 @@ std::optional<semantic::Binding> semantic::get_binding(
     Context& context, std::string identifier
 ) {
     for (auto scope = context.scopes.variables_scopes.rbegin();
-         scope != context.scopes.variables_scopes.rend(); scope++) {
+         scope != context.scopes.variables_scopes.rend();
+         scope++) {
         if (scope->find(identifier) != scope->end()) {
             return (*scope)[identifier];
         }
@@ -146,11 +150,14 @@ std::optional<semantic::Binding> semantic::get_binding(
          scope != context.scopes.functions_and_types_scopes.scopes.rend();
          scope++) {
         if (scope->find(identifier) != scope->end()) {
-            if ((*scope)[identifier]->index() == ast::Interface) {
+            if (std::holds_alternative<ast::InterfaceNode>(*(*scope)[identifier]
+                )) {
                 return Binding((ast::InterfaceNode*)(*scope)[identifier]);
-            } else if ((*scope)[identifier]->index() == ast::Function) {
+            } else if (std::holds_alternative<ast::FunctionNode>(*(*scope
+                       )[identifier])) {
                 return Binding((ast::FunctionNode*)(*scope)[identifier]);
-            } else if ((*scope)[identifier]->index() == ast::TypeDef) {
+            } else if (std::holds_alternative<ast::TypeNode>(*(*scope
+                       )[identifier])) {
                 return Binding((ast::TypeNode*)(*scope)[identifier]);
             }
         }
@@ -161,8 +168,8 @@ std::optional<semantic::Binding> semantic::get_binding(
 // Work with modules
 semantic::Scopes semantic::get_definitions(Context& context) {
     Scopes scopes;
-    scopes.functions_and_types_scopes =
-        context.scopes.functions_and_types_scopes;
+    scopes.functions_and_types_scopes
+        = context.scopes.functions_and_types_scopes;
     return scopes;
 }
 
@@ -182,10 +189,10 @@ void semantic::add_constraint(Context& context, Set<ast::Type> constraint) {
 void semantic::
     add_interface_constraint(Context& context, ast::Type type, ast::InterfaceType interface) {
     assert(type.to_str() != "t");
-    if (context.type_inference.interface_constraints.find(type) ==
-        context.type_inference.interface_constraints.end()) {
-        context.type_inference.interface_constraints[type] =
-            Set<ast::InterfaceType>();
+    if (context.type_inference.interface_constraints.find(type)
+        == context.type_inference.interface_constraints.end()) {
+        context.type_inference.interface_constraints[type]
+            = Set<ast::InterfaceType>();
     }
 
     context.type_inference.interface_constraints[type].insert(interface);
@@ -198,10 +205,11 @@ void semantic::add_parameter_constraint(
         context.type_inference.parameter_constraints[type] = {parameter};
     } else {
         semantic::add_constraint(
-            context, Set<ast::Type>(
-                         {context.type_inference.parameter_constraints[type][0],
-                          parameter}
-                     )
+            context,
+            Set<ast::Type>(
+                {context.type_inference.parameter_constraints[type][0],
+                 parameter}
+            )
         );
     }
 }
@@ -209,22 +217,25 @@ void semantic::add_parameter_constraint(
 // For unify and analyze
 ast::Type semantic::get_unified_type(Context& context, ast::Type type_var) {
     for (auto it = context.type_inference.labeled_type_constraints.begin();
-         it != context.type_inference.labeled_type_constraints.end(); it++) {
+         it != context.type_inference.labeled_type_constraints.end();
+         it++) {
         if (it->second.contains(type_var)) {
             type_var = it->first;
 
             if (type_var.is_nominal_type()) {
                 for (size_t i = 0;
-                     i < type_var.as_nominal_type().parameters.size(); i++) {
-                    type_var.as_nominal_type().parameters[i] =
-                        semantic::get_unified_type(
-                            context, type_var.as_nominal_type().parameters[i]
+                     i < type_var.as_nominal_type().parameters.size();
+                     i++) {
+                    type_var.as_nominal_type().parameters[i]
+                        = semantic::get_unified_type(
+                            context,
+                            type_var.as_nominal_type().parameters[i]
                         );
                 }
             } else if (type_var.is_struct_type()) {
                 for (auto field : type_var.as_struct_type().fields) {
-                    type_var.as_struct_type().fields[field.name] =
-                        semantic::get_unified_type(context, field.type);
+                    type_var.as_struct_type().fields[field.name]
+                        = semantic::get_unified_type(context, field.type);
                 }
             }
 
@@ -234,15 +245,16 @@ ast::Type semantic::get_unified_type(Context& context, ast::Type type_var) {
 
     if (type_var.is_type_variable()) {
         ast::Type new_type_var = semantic::new_final_type_variable(context);
-        context.type_inference.labeled_type_constraints[new_type_var] =
-            Set<ast::Type>({type_var});
+        context.type_inference.labeled_type_constraints[new_type_var]
+            = Set<ast::Type>({type_var});
         return new_type_var;
     } else if (type_var.is_nominal_type()) {
         for (size_t i = 0; i < type_var.as_nominal_type().parameters.size();
              i++) {
-            type_var.as_nominal_type().parameters[i] =
-                semantic::get_unified_type(
-                    context, type_var.as_nominal_type().parameters[i]
+            type_var.as_nominal_type().parameters[i]
+                = semantic::get_unified_type(
+                    context,
+                    type_var.as_nominal_type().parameters[i]
                 );
         }
         return type_var;
@@ -260,18 +272,18 @@ void semantic::set_unified_type(
     auto it = context.type_inference.labeled_type_constraints.find(type_var);
 
     if (it == context.type_inference.labeled_type_constraints.end()) {
-        context.type_inference.labeled_type_constraints[new_type] =
-            Set<ast::Type>();
+        context.type_inference.labeled_type_constraints[new_type]
+            = Set<ast::Type>();
         context.type_inference.labeled_type_constraints[new_type].insert(
             type_var
         );
     } else {
-        Set<ast::Type> set =
-            context.type_inference.labeled_type_constraints[type_var];
+        Set<ast::Type> set
+            = context.type_inference.labeled_type_constraints[type_var];
         context.type_inference.labeled_type_constraints.erase(it);
 
-        if (context.type_inference.labeled_type_constraints.find(new_type) ==
-            context.type_inference.labeled_type_constraints.end()) {
+        if (context.type_inference.labeled_type_constraints.find(new_type)
+            == context.type_inference.labeled_type_constraints.end()) {
             context.type_inference.labeled_type_constraints[new_type] = set;
         } else {
             for (auto type : set.elements) {
@@ -285,16 +297,16 @@ void semantic::set_unified_type(
 static std::string as_letter(size_t type_var) {
     char letters[] = "abcdefghijklmnopqrstuvwxyz";
     if (type_var > 25) {
-        return letters[(type_var + 18) % 26] +
-               std::to_string(1 + type_var / 26);
+        return letters[(type_var + 18) % 26]
+               + std::to_string(1 + type_var / 26);
     } else {
         return std::string(1, letters[(type_var + 18) % 26]);
     }
 }
 
 ast::Type semantic::new_final_type_variable(Context& context) {
-    std::string letter =
-        as_letter(context.type_inference.current_type_variable_number);
+    std::string letter
+        = as_letter(context.type_inference.current_type_variable_number);
 
     if (context.current_function.has_value()) {
         while (true) {
@@ -312,8 +324,9 @@ ast::Type semantic::new_final_type_variable(Context& context) {
             }
 
             context.type_inference.current_type_variable_number++;
-            letter =
-                as_letter(context.type_inference.current_type_variable_number);
+            letter
+                = as_letter(context.type_inference.current_type_variable_number
+                );
         }
     }
 

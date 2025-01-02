@@ -53,6 +53,7 @@ struct Location {
 };
 
 #define todo() assert(false);
+#define unreachable() assert(false);
 
 template <typename V, typename T, size_t I = 0>
 constexpr size_t getIndex() {

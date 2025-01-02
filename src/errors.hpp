@@ -18,14 +18,16 @@ namespace errors {
         ast::IdentifierNode &identifier, std::filesystem::path file
     );
     std::string reassigning_immutable_variable(
-        ast::IdentifierNode &identifier, ast::DeclarationNode &declaration,
+        ast::IdentifierNode &identifier,
+        ast::DeclarationNode &declaration,
         std::filesystem::path file
     );
     std::string undefined_function(
         ast::CallNode &call, std::filesystem::path file
     );
     std::string undefined_function(
-        ast::CallNode &call, std::vector<ast::Type> args,
+        ast::CallNode &call,
+        std::vector<ast::Type> args,
         std::filesystem::path file
     );
     std::string unhandled_return_value(

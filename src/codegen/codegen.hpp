@@ -29,8 +29,8 @@ namespace codegen {
         llvm::Module *module;
         llvm::IRBuilder<> *builder;
         llvm::legacy::FunctionPassManager *function_pass_manager;
-        llvm::BasicBlock *current_entry_block =
-            nullptr;  // Needed for doing stack allocations
+        llvm::BasicBlock *current_entry_block
+            = nullptr;  // Needed for doing stack allocations
         llvm::BasicBlock *last_after_while_block = nullptr;  // Needed for break
         llvm::BasicBlock *last_while_block = nullptr;  // Needed for continue
 
@@ -78,8 +78,11 @@ namespace codegen {
             std::filesystem::path module, std::string identifier
         );
         std::string get_mangled_function_name(
-            std::filesystem::path module, std::string identifier,
-            std::vector<ast::Type> args, ast::Type return_type, bool is_extern
+            std::filesystem::path module,
+            std::string identifier,
+            std::vector<ast::Type> args,
+            ast::Type return_type,
+            bool is_extern
         );
 
         // Types
@@ -95,7 +98,8 @@ namespace codegen {
         );
         llvm::FunctionType *get_function_type(
             std::vector<ast::FunctionArgumentNode *> args,
-            std::vector<ast::Type> args_types, ast::Type return_type,
+            std::vector<ast::Type> args_types,
+            ast::Type return_type,
             bool is_extern_and_variadic
         );
         std::vector<llvm::Type *> as_llvm_types(std::vector<ast::Type> types);
@@ -137,17 +141,22 @@ namespace codegen {
             std::vector<ast::FunctionNode *> functions
         );
         void codegen_function_prototypes(
-            std::filesystem::path module_path, std::string identifier,
+            std::filesystem::path module_path,
+            std::string identifier,
             std::vector<ast::FunctionArgumentNode *> args,
-            std::vector<ast::Type> args_types, ast::Type return_type,
-            bool is_extern, bool is_extern_and_variadic
+            std::vector<ast::Type> args_types,
+            ast::Type return_type,
+            bool is_extern,
+            bool is_extern_and_variadic
         );
         void codegen_function_bodies(std::vector<ast::FunctionNode *> functions
         );
         void codegen_function_bodies(
-            std::filesystem::path module_path, std::string identifier,
+            std::filesystem::path module_path,
+            std::string identifier,
             std::vector<ast::FunctionArgumentNode *> args,
-            std::vector<ast::Type> args_types, ast::Type return_type,
+            std::vector<ast::Type> args_types,
+            ast::Type return_type,
             ast::Node *function_body
         );
         llvm::Value *codegen(ast::InterfaceNode &node);
