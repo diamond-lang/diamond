@@ -204,8 +204,9 @@ Result<Ok, Errors> semantic::FunctionsAndTypesScopes::add_module_functions(
 
         // Parse module and add it to the ast
         auto parsing_result = parse::module(ast, tokens, module_path);
-        if (parsing_result.is_error()) {
-            std::vector<Error> errors = parsing_result.get_errors();
+        if (std::holds_alternative<std::vector<Error>>(parsing_result)) {
+            std::vector<Error> errors
+                = std::get<std::vector<Error>>(parsing_result);
             for (size_t i = 0; i < errors.size(); i++) {
                 std::cout << errors[i].value << '\n';
             }

@@ -1,6 +1,8 @@
 #include <cassert>
 #include <iostream>
+#include <variant>
 
+#include "ast.hpp"
 #include "codegen.hpp"
 #include "errors.hpp"
 #include "lexer.hpp"
@@ -108,9 +110,10 @@ void build(Command command) {
 
     // Parse
     auto parsing_result = parse::program(tokens, command.file);
-    if (parsing_result.is_error())
-        print_errors_and_exit(parsing_result.get_error());
-    auto ast = parsing_result.get_value();
+    if (std::holds_alternative<std::vector<Error>>(parsing_result)) {
+        print_errors_and_exit(std::get<std::vector<Error>>(parsing_result));
+    }
+    auto ast = std::get<ast::Ast>(parsing_result);
 
     // Analyze
     auto analyze_result = semantic::analyze(ast);
@@ -144,9 +147,10 @@ void run(Command command) {
 
     // Parse
     auto parsing_result = parse::program(tokens, command.file);
-    if (parsing_result.is_error())
-        print_errors_and_exit(parsing_result.get_error());
-    auto ast = parsing_result.get_value();
+    if (std::holds_alternative<std::vector<Error>>(parsing_result)) {
+        print_errors_and_exit(std::get<std::vector<Error>>(parsing_result));
+    }
+    auto ast = std::get<ast::Ast>(parsing_result);
 
     // Analyze
     auto analyze_result = semantic::analyze(ast);
@@ -189,9 +193,10 @@ void emit(Command command) {
 
     // Parse
     auto parsing_result = parse::program(tokens, command.file);
-    if (parsing_result.is_error())
-        print_errors_and_exit(parsing_result.get_error());
-    auto ast = parsing_result.get_value();
+    if (std::holds_alternative<std::vector<Error>>(parsing_result)) {
+        print_errors_and_exit(std::get<std::vector<Error>>(parsing_result));
+    }
+    auto ast = std::get<ast::Ast>(parsing_result);
 
     // Emit AST
     if (command.options[0] == std::string("--ast")) {
