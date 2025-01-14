@@ -6,3 +6,4 @@ deps/llvm
 bindings
 .DS_Store
 .clangd
+*.dSYM

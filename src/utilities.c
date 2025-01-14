@@ -1,0 +1,28 @@
+#include "utilities.h"
+
+#include <assert.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+String readFile(char* path) {
+    char* content = NULL;
+    FILE* file = fopen(path, "r");
+    assert(file != NULL);
+
+    int result = fseek(file, 0, SEEK_END);
+    assert(result == 0);
+
+    long fileSize = ftell(file);
+    assert(fileSize != -1);
+
+    content = malloc(sizeof(char) * (fileSize + 1));
+    assert(fseek(file, 0, SEEK_SET) == 0);
+
+    fread(content, sizeof(char), fileSize, file);
+    content[fileSize] = '\0';
+
+    fclose(file);
+
+    String result2 = {content, fileSize - 1, fileSize - 1};
+    return result2;
+}
