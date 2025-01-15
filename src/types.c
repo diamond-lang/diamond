@@ -9,7 +9,7 @@ void string_append(String* string, char item) {
         } else {
             string->capacity *= 2;
         }
-        string->content = realloc(
+        string->content = arena_realloc(
             string->content,
             string->capacity * sizeof(*string->content)
         );
@@ -22,7 +22,7 @@ void string_append(String* string, char item) {
 String string_substring(String string, size_t start, size_t length) {
     String result = String();
     result.content
-        = realloc(result.content, (length + 1) * sizeof(*result.content));
+        = arena_realloc(result.content, (length + 1) * sizeof(*result.content));
     result.count = length;
     result.capacity = length;
     strncpy(result.content, string.content + start, length);

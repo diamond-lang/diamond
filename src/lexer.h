@@ -2,7 +2,7 @@
 #define lexer_h
 
 #include "common.h"
-#include "types.h"
+#include "token.h"
 
 TokenList lex(String source, ErrorList* errors);
 

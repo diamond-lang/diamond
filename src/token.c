@@ -37,173 +37,170 @@ void token_print(TokenList tokens) {
         printf("  ");
 
         switch_all_cases(tokens.items[i].kind, {
-            case LEFT_PAREN:
-                printf("LEFT_PAREN");
+            case TokenLeftParen:
+                printf("LeftParen");
                 break;
-            case RIGHT_PAREN:
-                printf("RIGHT_PAREN");
+            case TokenRightParen:
+                printf("RightParen");
                 break;
-            case LEFT_BRACKET:
-                printf("LEFT_BRACKET");
+            case TokenLeftBracket:
+                printf("LeftBracket");
                 break;
-            case RIGHT_BRACKET:
-                printf("RIGHT_BRACKET");
+            case TokenRightBracket:
+                printf("RightBracket");
                 break;
-            case LEFT_CURLY:
-                printf("LEFT_CURLY");
+            case TokenLeftCurly:
+                printf("LeftCurly");
                 break;
-            case RIGHT_CURLY:
-                printf("RIGHT_CURLY");
+            case TokenRightCurly:
+                printf("RightCurly");
                 break;
-            case COMMA:
-                printf("COMMA");
+            case TokenComma:
+                printf("Comma");
                 break;
-            case PLUS:
-                printf("PLUS");
+            case TokenPlus:
+                printf("Plus");
                 break;
-            case SLASH:
-                printf("SLASH");
+            case TokenSlash:
+                printf("Slash");
                 break;
-            case MODULO:
-                printf("MODULO");
+            case TokenModulo:
+                printf("Modulo");
                 break;
-            case STAR:
-                printf("STAR");
+            case TokenStar:
+                printf("Star");
                 break;
-            case MINUS:
-                printf("MINUS");
+            case TokenMinus:
+                printf("Minus");
                 break;
-            case COLON:
-                printf("COLON");
+            case TokenColon:
+                printf("Colon");
                 break;
-            case AMPERSAND:
-                printf("AMPERSAND");
+            case TokenAmpersand:
+                printf("Ampersand");
                 break;
-            case DOT:
-                printf("DOT");
+            case TokenDot:
+                printf("Dot");
                 break;
-            case NOT:
-                printf("NOT");
+            case TokenNot:
+                printf("Not");
                 break;
-            case NOT_EQUAL:
-                printf("NOT_EQUAL");
+            case TokenNotEqual:
+                printf("NotEqual");
                 break;
-            case GREATER:
-                printf("GREATER");
+            case TokenGreater:
+                printf("Greater");
                 break;
-            case GREATER_EQUAL:
-                printf("GREATER_EQUAL");
+            case TokenGreaterEqual:
+                printf("GreaterEqual");
                 break;
-            case LESS:
-                printf("LESS");
+            case TokenLess:
+                printf("Less");
                 break;
-            case LESS_EQUAL:
-                printf("LESS_EQUAL");
+            case TokenLessEqual:
+                printf("LessEqual");
                 break;
-            case COLON_EQUAL:
-                printf("COLON_EQUAL");
+            case TokenColonEqual:
+                printf("ColonEqual");
                 break;
-            case EQUAL:
-                printf("EQUAL");
+            case TokenEqual:
+                printf("Equal");
                 break;
-            case EQUAL_EQUAL:
-                printf("EQUAL_EQUAL");
+            case TokenEqualEqual:
+                printf("EqualEqual");
                 break;
-            case BE:
-                printf("BE");
+            case TokenBe:
+                printf("Be");
                 break;
-            case INTEGER:
-                printf("INTEGER(%s)", tokens.items[i].literal.content);
+            case TokenInteger:
+                printf("Integer(%s)", tokens.items[i].literal.content);
                 break;
-            case FLOAT:
-                printf("FLOAT(%s)", tokens.items[i].literal.content);
+            case TokenFloat:
+                printf("Float(%s)", tokens.items[i].literal.content);
                 break;
-            case IDENTIFIER:
-                printf("IDENTIFIER(%s)", tokens.items[i].literal.content);
+            case TokenIdentifier:
+                printf("Identifier(%s)", tokens.items[i].literal.content);
                 break;
-            case STRING:
-                printf("STRING(\"%s\")", tokens.items[i].literal.content);
+            case TokenString:
+                printf("String(\"%s\")", tokens.items[i].literal.content);
                 break;
-            case STRING_LEFT:
-                printf("STRING_LEFT(\"%s\")", tokens.items[i].literal.content);
+            case TokenStringLeft:
+                printf("StringLeft(\"%s\")", tokens.items[i].literal.content);
                 break;
-            case STRING_MIDDLE:
-                printf(
-                    "STRING_MIDDLE(\"%s\")",
-                    tokens.items[i].literal.content
-                );
+            case TokenStringMiddle:
+                printf("StringMiddle(\"%s\")", tokens.items[i].literal.content);
                 break;
-            case STRING_RIGHT:
-                printf("STRING_RIGHT(\"%s\")", tokens.items[i].literal.content);
+            case TokenStringRight:
+                printf("StringRight(\"%s\")", tokens.items[i].literal.content);
                 break;
-            case IF:
-                printf("IF");
+            case TokenIf:
+                printf("If");
                 break;
-            case ELSE:
-                printf("ELSE");
+            case TokenElse:
+                printf("Else");
                 break;
-            case WHILE:
-                printf("WHILE");
+            case TokenWhile:
+                printf("While");
                 break;
-            case FUNCTION:
-                printf("FUNCTION");
+            case TokenFunction:
+                printf("Function");
                 break;
-            case INTERFACE:
-                printf("INTERFACE");
+            case TokenInterface:
+                printf("Interface");
                 break;
-            case BUILTIN:
-                printf("BUILTIN");
+            case TokenBuiltin:
+                printf("Builtin");
                 break;
-            case TYPE:
-                printf("TYPE");
+            case TokenType:
+                printf("Type");
                 break;
-            case CASE:
-                printf("CASE");
+            case TokenCase:
+                printf("Case");
                 break;
-            case TRUE:
-                printf("TRUE");
+            case TokenTrue:
+                printf("True");
                 break;
-            case FALSE:
-                printf("FALSE");
+            case TokenFalse:
+                printf("False");
                 break;
-            case OR:
-                printf("OR");
+            case TokenOr:
+                printf("Or");
                 break;
-            case AND:
-                printf("AND");
+            case TokenAnd:
+                printf("And");
                 break;
-            case USE:
-                printf("USE");
+            case TokenUse:
+                printf("Use");
                 break;
-            case BREAK:
-                printf("BREAK");
+            case TokenBreak:
+                printf("Break");
                 break;
-            case CONTINUE:
-                printf("CONTINUE");
+            case TokenContinue:
+                printf("Continue");
                 break;
-            case RETURN:
-                printf("RETURN");
+            case TokenReturn:
+                printf("Return");
                 break;
-            case MUT:
-                printf("MUT");
+            case TokenMut:
+                printf("Mut");
                 break;
-            case NEW:
-                printf("NEW");
+            case TokenNew:
+                printf("New");
                 break;
-            case INCLUDE:
-                printf("INCLUDE");
+            case TokenInclude:
+                printf("Include");
                 break;
-            case EXTERN:
-                printf("EXTERN");
+            case TokenExtern:
+                printf("Extern");
                 break;
-            case LINK_WITH:
-                printf("LINK_WITH");
+            case TokenLinkWith:
+                printf("LinkWith");
                 break;
-            case NEW_LINE:
-                printf("NEW_LINE");
+            case TokenNewLine:
+                printf("NewLine");
                 break;
-            case END_OF_FILE:
-                printf("END_OF_FILE");
+            case TokenEndOfFile:
+                printf("EndOfFile");
                 break;
         });
         printf("\n");
