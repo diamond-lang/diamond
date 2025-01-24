@@ -25,6 +25,6 @@ String readFile(char* path) {
 
     fclose(file);
 
-    String result2 = {content, fileSize - 1, fileSize - 1};
+    String result2 = {content, fileSize, fileSize};
     return result2;
 }

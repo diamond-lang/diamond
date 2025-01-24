@@ -3,6 +3,7 @@
 
 #include "arena.h"
 #include "lexer.h"
+#include "parser.h"
 #include "token.h"
 #include "types.h"
 #include "utilities.h"
@@ -16,6 +17,9 @@ int main(int argc, char* argv[]) {
     ErrorList errors = List();
     TokenList tokens = lex(source, &errors);
     token_print(tokens);
+
+    Ast ast = parse(tokens, &errors);
+    ast_print(ast);
 
     arena_free();
 

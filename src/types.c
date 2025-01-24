@@ -21,8 +21,8 @@ void string_append(String* string, char item) {
 
 String string_substring(String string, size_t start, size_t length) {
     String result = String();
-    result.content
-        = arena_realloc(result.content, (length + 1) * sizeof(*result.content));
+    result.content =
+        arena_realloc(result.content, (length + 1) * sizeof(*result.content));
     result.count = length;
     result.capacity = length;
     strncpy(result.content, string.content + start, length);

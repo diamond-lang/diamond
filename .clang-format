@@ -11,5 +11,8 @@ BinPackParameters: false
 AllowAllArgumentsOnNextLine: false
 PenaltyReturnTypeOnItsOwnLine: 10000
 ReflowComments: false
-BreakBeforeBinaryOperators: All
+BreakBeforeBinaryOperators: false
+AllowShortIfStatementsOnASingleLine: AllIfsAndElse
+AlignOperands: AlignAfterOperator
+AllowShortCaseLabelsOnASingleLine: true
 ---

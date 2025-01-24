@@ -2,6 +2,7 @@
 #define types_h
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
 
@@ -68,6 +69,9 @@
 
 #define Stack() {NULL, 0, 0}
 
+typedef StackType(bool) BoolStack;
+typedef StackType(size_t) SizeStack;
+
 // String
 typedef struct {
     char* content;
@@ -88,7 +92,10 @@ typedef struct {
 
 typedef ListType(Error) ErrorList;
 
-// Stack types
-typedef StackType(bool) BoolStack;
+// Location
+typedef struct {
+    size_t line;
+    size_t column;
+} Location;
 
 #endif

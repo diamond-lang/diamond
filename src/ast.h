@@ -1,52 +1,62 @@
 #include "token.h"
 #include "types.h"
 
-typedef enum {
-    AstBlock,
-    AstFunctionArgument,
-    AstFunction,
-    AstInterface,
-    AstTypeDef,
-    AstDeclaration,
-    AstAssignment,
-    AstReturn,
-    AstBreak,
-    AstContinue,
-    AstIfElse,
-    AstWhile,
-    AstUse,
-    AstLinkWith,
-    AstCallArgument,
-    AstCall,
-    AstStructLiteral,
-    AstFloat,
-    AstInteger,
-    AstIdentifier,
-    AstBoolean,
-    AstString,
-    AstInterpolatedString,
-    AstArray,
-    AstFieldAccess,
-    AstAddressOf,
-    AstDereference,
-    AstNew
-} AstKind;
-
-typedef size_t NodeId;
-typedef ListType(NodeId) NodeIdList;
+typedef struct {
+    int32_t id;
+} Type;
 
 typedef struct {
-    bool isPresent;
-    NodeId nodeId;
-} OptionalNodeId;
+    int32_t id;
+} InterfaceType;
 
-struct AstNode {
+typedef enum {
+    AST_BLOCK,
+    AST_FUNCTION_ARGUMENT,
+    AST_FUNCTION,
+    AST_INTERFACE,
+    AST_BUILTIN,
+    AST_EXTERN,
+    AST_TYPE_DEF,
+    AST_DECLARATION,
+    AST_ASSIGNMENT,
+    AST_RETURN,
+    AST_BREAK,
+    AST_CONTINUE,
+    AST_IF_ELSE,
+    AST_WHILE,
+    AST_IMPORT,
+    AST_LINK_WITH,
+    AST_CALL_ARGUMENT,
+    AST_CALL,
+    AST_STRUCT_FIELD,
+    AST_STRUCT_LITERAL,
+    AST_FLOAT,
+    AST_INTEGER,
+    AST_IDENTIFIER,
+    AST_BOOLEAN,
+    AST_STRING,
+    AST_INTERPOLATED_STRING,
+    AST_ARRAY,
+    AST_FIELD_ACCESS,
+    AST_INDEX_ACCESS,
+    AST_ADDRESS_OF,
+    AST_DEREFERENCE,
+    AST_NEW
+} AstKind;
+
+typedef int32_t NodeId;
+typedef ListType(NodeId) NodeIdList;
+typedef int32_t OptionalNodeId;
+#define hasValue(optional) (optional >= 0)
+#define None() -1
+
+typedef struct {
     AstKind kind;
     union {
         struct {
-            NodeIdList statemnts;
+            NodeIdList statements;
             NodeIdList imports;
-            NodeIdList defintions;
+            NodeIdList definitions;
         } block;
 
         struct {
@@ -59,6 +69,18 @@ struct AstNode {
             NodeIdList arguments;
             NodeId body;
         } function;
+
+        struct {
+            NodeId identifier;
+            NodeIdList arguments;
+            NodeId body;
+        } builtin;
+
+        struct {
+            NodeId identifier;
+            NodeIdList arguments;
+            NodeId body;
+        } externDef;
 
         struct {
             NodeId identifier;
@@ -105,11 +127,8 @@ struct AstNode {
 
         struct {
             NodeId path;
+            bool includes;
         } importNode;
-
-        struct {
-            NodeId path;
-        } includeNode;
 
         struct {
             NodeId directives;
@@ -128,32 +147,37 @@ struct AstNode {
 
         struct {
             NodeId identifier;
+            NodeId expression;
+        } structField;
+
+        struct {
+            NodeId identifier;
             NodeIdList fields;
         } structLiteral;
 
         struct {
-            double value;
+            Token value;
         } floatNode;
 
         struct {
-            int64_t value;
-        } integerNode;
+            Token value;
+        } integer;
 
         struct {
-            Token identifier;
+            Token value;
         } identifier;
 
         struct {
-            bool value;
+            Token value;
         } boolean;
 
         struct {
-            String string;
+            Token value;
         } string;
 
         struct {
-            NodeIdList strings;
-            NodeIdList expression;
+            TokenList strings;
+            NodeIdList expressions;
         } interpolatedString;
 
         struct {
@@ -162,8 +186,13 @@ struct AstNode {
 
         struct {
             NodeId accessed;
-            NodeIdList fieldsAccessed;
+            NodeId identifier;
         } fieldAccess;
+
+        struct {
+            NodeId accessed;
+            NodeId index;
+        } indexAccess;
 
         struct {
             NodeId expression;
@@ -177,4 +206,16 @@ struct AstNode {
             NodeId expression;
         } newNode;
     };
-};
+} AstNode;
+
+typedef ListType(AstNode) AstNodeList;
+
+typedef struct {
+    AstNodeList nodes;
+} Ast;
+
+AstNode* ast_getNode(Ast ast, NodeId id);
+bool ast_isExpression(Ast ast, NodeId id);
+
+void ast_print(Ast ast);
+void ast_printNode(Ast ast, NodeId id, BoolStack isLast);

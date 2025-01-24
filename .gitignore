@@ -5,5 +5,4 @@ diamond.exe
 deps/llvm
 bindings
 .DS_Store
-.clangd
 *.dSYM
