@@ -11,19 +11,19 @@ typedef ListType(void *) PointerList;
 
 PointerList arena;
 
-#define arena_append(list, item)                                            \
-    do {                                                                    \
-        if (list.count >= list.capacity) {                                  \
-            if (list.capacity == 0) {                                       \
-                list.capacity = 256;                                        \
-            } else {                                                        \
-                list.capacity *= 2;                                         \
-            }                                                               \
-            list.items                                                      \
-                = realloc(list.items, list.capacity * sizeof(*list.items)); \
-        }                                                                   \
-        list.items[list.count] = item;                                      \
-        list.count += 1;                                                    \
+#define arena_append(list, item)                                          \
+    do {                                                                  \
+        if (list.count >= list.capacity) {                                \
+            if (list.capacity == 0) {                                     \
+                list.capacity = 256;                                      \
+            } else {                                                      \
+                list.capacity *= 2;                                       \
+            }                                                             \
+            list.items =                                                  \
+                realloc(list.items, list.capacity * sizeof(*list.items)); \
+        }                                                                 \
+        list.items[list.count] = item;                                    \
+        list.count += 1;                                                  \
     } while (false);
 
 void arena_init() { arena = (PointerList)List(); }
@@ -55,4 +55,5 @@ void arena_free() {
     for (size_t i = 0; i < arena.count; i++) {
         free(arena.items[i]);
     }
+    free(arena.items);
 }

@@ -5,6 +5,8 @@
 #include <string.h>
 
 #include "common.h"
+#include "error.h"
+#include "token.h"
 #include "types.h"
 
 typedef ListType(bool) ListBool;
@@ -32,6 +34,7 @@ char peekNext(Lexer lexer);
 void advanceUntilNewLine(Lexer* lexer);
 void addToken(Lexer* lexer, TokenKind kind);
 void addTokenWithLiteral(Lexer* lexer, TokenKind kind, String literal);
+static void addError(Lexer* lexer, Error error);
 
 TokenList lex(String source, ErrorList* errors) {
     Lexer lexer = {1, 1, 0, 0, source, Stack(), List(), errors};
@@ -98,10 +101,7 @@ void scanToken(Lexer* lexer) {
             advance(lexer);
         }
         if (atEnd(*lexer)) {
-            list_append(
-                (*lexer->errors),
-                (Error){"Error: Unclosed block comment\n"}
-            );
+            addError(lexer, (Error){UNCLOSE_BLOCK_COMMENT});
         }
         return scanToken(lexer);
     }
@@ -131,7 +131,7 @@ void scanToken(Lexer* lexer) {
     if (isdigit(peek(*lexer))) return scanNumber(lexer);
     if (isalpha(peek(*lexer))) return scanIdentifierOrKeyword(lexer);
 
-    list_append((*lexer->errors), (Error){"Error: Unrecognized character"});
+    addError(lexer, (Error){UNRECOGNIZED_CHARACTER});
 }
 
 void scanString(Lexer* lexer) {
@@ -322,4 +322,10 @@ void addTokenWithLiteral(Lexer* lexer, TokenKind kind, String literal) {
         lexer->column - (lexer->current - lexer->start)
     };
     list_append(lexer->tokens, token);
+}
+
+static void addError(Lexer* lexer, Error error) {
+    error.line = lexer->line;
+    error.column = lexer->column;
+    list_append((*lexer->errors), error);
 }

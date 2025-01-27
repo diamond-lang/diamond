@@ -207,12 +207,14 @@ void ast_printNode(Ast ast, NodeId id, BoolStack isLast) {
             break;
         case AST_CALL:
             printIndentation(isLast);
-            printf(
-                "%s\n",
-                token_getLiteral(
-                    ast_getNode(ast, node.call.identifier)->identifier.value
-                )
-            );
+            if (ast_getNode(ast, node.call.callable)->kind == AST_IDENTIFIER) {
+                char* literal = token_getLiteral(
+                    ast_getNode(ast, node.call.callable)->identifier.value
+                );
+                printf("%s\n", literal);
+            } else {
+                todo();
+            }
             for (size_t i = 0; i < node.call.arguments.count; i++) {
                 stack_push(isLast, i + 1 == node.call.arguments.count);
                 ast_printNode(ast, node.call.arguments.items[i], isLast);
@@ -225,11 +227,11 @@ void ast_printNode(Ast ast, NodeId id, BoolStack isLast) {
             break;
         case AST_INTEGER:
             printIndentation(isLast);
-            printf("%s\n", node.integer.value.literal.content);
+            printf("%s\n", node.floatNode.value.literal.content);
             break;
         case AST_IDENTIFIER:
             printIndentation(isLast);
-            printf("%s\n", node.integer.value.literal.content);
+            printf("%s\n", node.floatNode.value.literal.content);
             break;
         case AST_BOOLEAN:
             printIndentation(isLast);
@@ -237,7 +239,7 @@ void ast_printNode(Ast ast, NodeId id, BoolStack isLast) {
             break;
         case AST_STRING:
             printIndentation(isLast);
-            printf("\"%s\"\n", node.integer.value.literal.content);
+            printf("%s\n", node.floatNode.value.literal.content);
             break;
         case AST_INTERPOLATED_STRING: todo(); break;
         case AST_ARRAY: todo(); break;

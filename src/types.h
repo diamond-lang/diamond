@@ -5,6 +5,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "arena.h"
 
@@ -80,22 +81,9 @@ typedef struct {
 } String;
 
 void string_append(String* string, char item);
-String string_substring(String string, size_t start, size_t length);
 #define string_equals(buffer1, buffer2) strcmp(buffer1, buffer2) == 0
+String string_substring(String string, size_t start, size_t length);
 
 #define String() (String){NULL, 0, 0}
-
-// Error
-typedef struct {
-    const char* message;
-} Error;
-
-typedef ListType(Error) ErrorList;
-
-// Location
-typedef struct {
-    size_t line;
-    size_t column;
-} Location;
 
 #endif

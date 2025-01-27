@@ -1,5 +1,6 @@
 #include "types.h"
 
+#include <assert.h>
 #include <string.h>
 
 void string_append(String* string, char item) {

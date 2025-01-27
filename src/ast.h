@@ -1,3 +1,7 @@
+#ifndef ast_h
+#define ast_h
+
+#include "error.h"
 #include "token.h"
 #include "types.h"
 
@@ -141,7 +145,7 @@ typedef struct {
         } callArgument;
 
         struct {
-            NodeId identifier;
+            NodeId callable;
             NodeIdList arguments;
         } call;
 
@@ -211,7 +215,10 @@ typedef struct {
 typedef ListType(AstNode) AstNodeList;
 
 typedef struct {
+    char* filePath;
+    TokenList tokens;
     AstNodeList nodes;
+    ErrorList errors;
 } Ast;
 
 AstNode* ast_getNode(Ast ast, NodeId id);
@@ -219,3 +226,5 @@ bool ast_isExpression(Ast ast, NodeId id);
 
 void ast_print(Ast ast);
 void ast_printNode(Ast ast, NodeId id, BoolStack isLast);
+
+#endif

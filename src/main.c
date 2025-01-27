@@ -19,7 +19,13 @@ int main(int argc, char* argv[]) {
     token_print(tokens);
 
     Ast ast = parse(tokens, &errors);
-    ast_print(ast);
+    if (errors.count == 0) {
+        ast_print(ast);
+    } else {
+        for (size_t i = 0; i < errors.count; i++) {
+            printf("%d\n", errors.items[i].kind);
+        }
+    }
 
     arena_free();
 

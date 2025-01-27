@@ -15,4 +15,5 @@ BreakBeforeBinaryOperators: false
 AllowShortIfStatementsOnASingleLine: AllIfsAndElse
 AlignOperands: AlignAfterOperator
 AllowShortCaseLabelsOnASingleLine: true
+AllowShortEnumsOnASingleLine: true
 ---
