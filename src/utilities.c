@@ -28,3 +28,13 @@ String readFile(char* path) {
     String result2 = {content, fileSize, fileSize};
     return result2;
 }
+
+int numberOfDigits(size_t number) {
+    assert(number > 0);
+    int numberOfDigits = 0;
+    while (number > 0) {
+        number /= 10;
+        numberOfDigits += 1;
+    }
+    return numberOfDigits;
+}

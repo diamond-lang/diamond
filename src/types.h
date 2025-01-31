@@ -83,6 +83,7 @@ typedef struct {
 void string_append(String* string, char item);
 #define string_equals(buffer1, buffer2) strcmp(buffer1, buffer2) == 0
 String string_substring(String string, size_t start, size_t length);
+void string_free(String string);
 
 #define String() (String){NULL, 0, 0}
 

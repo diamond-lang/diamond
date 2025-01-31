@@ -5,16 +5,7 @@
 
 #include "common.h"
 #include "types.h"
-
-int numberOfDigits(size_t number) {
-    assert(number > 0);
-    int numberOfDigits = 0;
-    while (number > 0) {
-        number /= 10;
-        numberOfDigits += 1;
-    }
-    return numberOfDigits;
-}
+#include "utilities.h"
 
 void token_print(TokenList tokens) {
     size_t maxColumn = 0;

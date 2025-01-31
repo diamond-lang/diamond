@@ -30,3 +30,5 @@ String string_substring(String string, size_t start, size_t length) {
     result.content[length] = '\0';
     return result;
 }
+
+void string_free(String string) {}

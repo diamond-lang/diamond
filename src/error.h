@@ -1,8 +1,6 @@
 #ifndef error_h
 #define error_h
 
-#include <stddef.h>
-
 #include "types.h"
 
 typedef enum {
@@ -32,7 +30,5 @@ typedef struct {
 } Error;
 
 typedef ListType(Error) ErrorList;
-
-void reportError(Error error);
 
 #endif

@@ -51,9 +51,21 @@ void *arena_realloc(void *pointer, size_t newSize) {
     return result;
 }
 
-void arena_free() {
+void arena_free(void *pointer) {
     for (size_t i = 0; i < arena.count; i++) {
-        free(arena.items[i]);
+        if (arena.items[i] == pointer) {
+            free(arena.items[i]);
+            arena.items[i] = NULL;
+            break;
+        }
+    }
+}
+
+void arena_freeAll() {
+    for (size_t i = 0; i < arena.count; i++) {
+        if (arena.items[i] != NULL) {
+            free(arena.items[i]);
+        }
     }
     free(arena.items);
 }

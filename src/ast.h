@@ -227,4 +227,6 @@ bool ast_isExpression(Ast ast, NodeId id);
 void ast_print(Ast ast);
 void ast_printNode(Ast ast, NodeId id, BoolStack isLast);
 
+void reportErrors(Ast ast);
+
 #endif

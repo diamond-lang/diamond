@@ -2,6 +2,7 @@
 #include <stdio.h>
 
 #include "arena.h"
+#include "ast.h"
 #include "lexer.h"
 #include "parser.h"
 #include "token.h"
@@ -19,15 +20,16 @@ int main(int argc, char* argv[]) {
     token_print(tokens);
 
     Ast ast = parse(tokens, &errors);
+    ast.errors = errors;
+    ast.tokens = tokens;
+    ast.filePath = argv[1];
     if (errors.count == 0) {
         ast_print(ast);
     } else {
-        for (size_t i = 0; i < errors.count; i++) {
-            printf("%d\n", errors.items[i].kind);
-        }
+        reportErrors(ast);
     }
 
-    arena_free();
+    arena_freeAll();
 
     return 0;
 }
