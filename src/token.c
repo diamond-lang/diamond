@@ -3,7 +3,6 @@
 #include <stddef.h>
 #include <stdio.h>
 
-#include "common.h"
 #include "types.h"
 #include "utilities.h"
 
@@ -164,5 +163,4 @@ char* token_getLiteral(Token token) {
         case NEW_LINE: return "\\n";
         case END_OF_FILE: return "\\0";
     }
-    unreachable();
 }

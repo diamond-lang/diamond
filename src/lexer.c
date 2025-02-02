@@ -5,9 +5,9 @@
 #include <string.h>
 
 #include "common.h"
-#include "error.h"
 #include "token.h"
 #include "types.h"
+#include "utilities.h"
 
 typedef ListType(bool) ListBool;
 
@@ -36,14 +36,15 @@ void addToken(Lexer* lexer, TokenKind kind);
 void addTokenWithLiteral(Lexer* lexer, TokenKind kind, String literal);
 static void addError(Lexer* lexer, Error error);
 
-TokenList lex(String source, ErrorList* errors) {
-    Lexer lexer = {1, 1, 0, 0, source, Stack(), List(), errors};
+void lex(Ast* ast) {
+    String source = readFile(ast->filePath);
+    Lexer lexer = {1, 1, 0, 0, source, Stack(), List(), &ast->errors};
     while (!atEnd(lexer)) {
         scanToken(&lexer);
     }
     lexer.start = lexer.current;
     addToken(&lexer, END_OF_FILE);
-    return lexer.tokens;
+    ast->tokens = lexer.tokens;
 }
 
 void scanToken(Lexer* lexer) {
@@ -96,19 +97,11 @@ void scanToken(Lexer* lexer) {
     if (match(lexer, ".")) {
         return addToken(lexer, DOT);
     }
-    if (match(lexer, "---")) {
-        while (!(atEnd(*lexer) || match(lexer, "---"))) {
-            advance(lexer);
-        }
-        if (atEnd(*lexer)) {
-            addError(lexer, (Error){UNCLOSE_BLOCK_COMMENT});
-        }
-        return scanToken(lexer);
-    }
     if (match(lexer, "--")) {
         advanceUntilNewLine(lexer);
         advance(lexer);
-        return scanToken(lexer);
+        if (atEnd(*lexer)) return;
+        else return scanToken(lexer);
     }
     if (match(lexer, "-")) {
         return addToken(lexer, MINUS);
@@ -132,6 +125,7 @@ void scanToken(Lexer* lexer) {
     if (isalpha(peek(*lexer))) return scanIdentifierOrKeyword(lexer);
 
     addError(lexer, (Error){UNRECOGNIZED_CHARACTER});
+    advance(lexer);
 }
 
 void scanString(Lexer* lexer) {
@@ -299,7 +293,7 @@ char peekNext(Lexer lexer) {
 }
 
 void advanceUntilNewLine(Lexer* lexer) {
-    while (peek(*lexer) != '\n') {
+    while (peek(*lexer) != '\0' && peek(*lexer) != '\n') {
         advance(lexer);
     }
 }

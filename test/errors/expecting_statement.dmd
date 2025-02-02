@@ -1,8 +1,8 @@
 2 + 2
 
---- Output
-Expecting a statement
 
-1| 2 + 2
-   ^^^^^
----
+-- Expecting statement (test/errors/expecting_statement.dmd)
+-- 
+-- 1│ 2 + 2
+--    ^^^^^
+-- 

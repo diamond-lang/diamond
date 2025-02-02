@@ -7,26 +7,31 @@
 #include "parser.h"
 #include "token.h"
 #include "types.h"
-#include "utilities.h"
 
 int main(int argc, char* argv[]) {
     assert(argc == 2);
 
     arena_init();
 
-    String source = readFile(argv[1]);
-    ErrorList errors = List();
-    TokenList tokens = lex(source, &errors);
-    token_print(tokens);
-
-    Ast ast = parse(tokens, &errors);
-    ast.errors = errors;
-    ast.tokens = tokens;
+    // Create ast
+    Ast ast;
     ast.filePath = argv[1];
-    if (errors.count == 0) {
-        ast_print(ast);
-    } else {
+    ast.tokens = (TokenList)List();
+    ast.errors = (ErrorList)List();
+    ast.nodes = (AstNodeList)List();
+
+    // Lex
+    lex(&ast);
+    if (ast.errors.count != 0) {
         reportErrors(ast);
+        exit(EXIT_FAILURE);
+    }
+
+    // Parse
+    parse(&ast);
+    if (ast.errors.count != 0) {
+        reportErrors(ast);
+        exit(EXIT_FAILURE);
     }
 
     arena_freeAll();

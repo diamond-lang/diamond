@@ -1,9 +1,8 @@
 #ifndef lexer_h
 #define lexer_h
 
-#include "error.h"
-#include "token.h"
+#include "ast.h"
 
-TokenList lex(String source, ErrorList* errors);
+void lex(Ast* ast);
 
 #endif

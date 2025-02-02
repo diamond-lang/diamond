@@ -1,0 +1,9 @@
+    print(10)
+print(20)
+
+
+-- Unexpected indentation (test/errors/unexpected_indentation.dmd)
+-- 
+-- 1│     print(10)
+--    ^^^^
+-- 

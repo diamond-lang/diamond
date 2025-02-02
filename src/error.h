@@ -1,6 +1,7 @@
 #ifndef error_h
 #define error_h
 
+#include "token.h"
 #include "types.h"
 
 typedef enum {
@@ -8,25 +9,36 @@ typedef enum {
 
     // Lexer
     UNRECOGNIZED_CHARACTER,
-    UNCLOSE_BLOCK_COMMENT,
 
-    // Syntatic
-    UNEXPECTED_CHARACTER,
+    // Parser
+    EXPECTING_LINE_ENDING,
     UNEXPECTED_IDENTATION,
     EXPECTING_STATEMENT,
     EXPECTING_NEW_IDENTATION_LEVEL,
-    UDENFINED_VARIABLE,
+    UNEXPECTED_TOKEN,
 
     // Semantic
     REASSIGNING_IMMUTABLE_VARIABLE,
     UDENFINED_FUNCTION,
     UNHANDLED_RETURN_VALUE,
+    UDENFINED_VARIABLE,
 } ErrorKind;
 
 typedef struct {
     ErrorKind kind;
     size_t line;
     size_t column;
+
+    union {
+        struct {
+            Token actualToken;
+        } expectingLineEnding;
+        struct {
+            TokenKind expectedToken;
+            TokenKind actualToken;
+            char* beingParsed;
+        } unexpectedToken;
+    };
 } Error;
 
 typedef ListType(Error) ErrorList;

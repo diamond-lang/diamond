@@ -44,7 +44,7 @@ def get_all_files(folder):
 
 def test(file, expected, max_file_path_len):
     # Run program and check output
-    result = subprocess.run([get_command(), 'run', file], stdout=subprocess.PIPE, text=True, encoding=os.device_encoding(1))
+    result = subprocess.run([get_command(), file], stdout=subprocess.PIPE, text=True, encoding=os.device_encoding(1))
     result = result.stdout
     result = re.sub("\\x1b\\[.+?m", "", result) # Remove escape sequences for colored text
     result = result == expected
@@ -62,7 +62,10 @@ def read_file_and_test(file, max_file_path_len):
         content = content.read()
 
         try:
-            expected = re.search("(?<=--- Output\n)(.|\n)*(?=---)", content).group(0)
+            expected = re.search("(--.*\n)+", content).group(0)
+            expected = expected.split("\n")
+            expected = [line[3:] for line in expected]
+            expected = "\n".join(expected)
             return test(file, expected, max_file_path_len)
         
         except:

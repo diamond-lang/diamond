@@ -1,7 +1,6 @@
 #ifndef ast_h
 #define ast_h
 
-#include "error.h"
 #include "token.h"
 #include "types.h"
 
@@ -213,6 +212,8 @@ typedef struct {
 } AstNode;
 
 typedef ListType(AstNode) AstNodeList;
+
+#include "error.h"
 
 typedef struct {
     char* filePath;
