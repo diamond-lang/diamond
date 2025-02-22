@@ -116,7 +116,7 @@ char* token_getLiteral(Token token) {
         case COMMA: return ",";
         case PLUS: return "+";
         case SLASH: return "/";
-        case MODULO: return "%%";
+        case MODULO: return "%";
         case STAR: return "*";
         case MINUS: return "-";
         case COLON: return ":";

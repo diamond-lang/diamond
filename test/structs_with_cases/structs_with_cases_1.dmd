@@ -7,5 +7,5 @@ type Weekday
     case Saturday
     case Sunday
 
---day = Weekday::Monday
+day = Monday
 print(day)

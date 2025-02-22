@@ -57,8 +57,7 @@ static void advanceUntilNewline(Parser *parser) {
 }
 
 static NodeId createNode(Parser *parser, AstNode node) {
-    list_append(parser->ast->nodes, node);
-    return parser->ast->nodes.count - 1;
+    return ast_createNode(parser->ast, node);
 }
 
 static void addError(Parser *parser, Error error) {
@@ -93,6 +92,8 @@ static bool check(Parser parser, TokenKind kind) {
 OptionalNodeId program(Parser *parser);
 OptionalNodeId block(Parser *parser);
 OptionalNodeId function(Parser *parser, Token keyword);
+OptionalNodeId typeAnnotation(Parser *parser, Token colon);
+OptionalNodeId type(Parser *parser);
 OptionalNodeId functionArgument(Parser *parser);
 OptionalNodeId functionBody(Parser *parser);
 OptionalNodeId interface(Parser *parser, Token keyword);
@@ -110,7 +111,7 @@ OptionalNodeId indexAssignment(Parser *parser, NodeId indexAccess);
 OptionalNodeId return_stmt(Parser *parser, Token keyword);
 OptionalNodeId break_stmt(Parser *parser, Token keyword);
 OptionalNodeId continue_stmt(Parser *parser, Token keyword);
-OptionalNodeId if_else(Parser *parser, Token keyword);
+OptionalNodeId ifElse(Parser *parser, Token keyword);
 OptionalNodeId while_stmt(Parser *parser, Token keyword);
 OptionalNodeId useStmt(Parser *parser, Token keyword);
 OptionalNodeId call(Parser *parser, NodeId callable);
@@ -160,6 +161,7 @@ OptionalNodeId block(Parser *parser) {
     size_t initialErrorCount = parser->ast->errors.count;
 
     // Set new indentation level
+    advanceUntilNextStatement(parser);
     if (parser->indentationLevel.count == 0) {
         stack_push(parser->indentationLevel, 1);
     } else {
@@ -216,8 +218,30 @@ OptionalNodeId block(Parser *parser) {
     else return id;
 }
 
-// function → "function" IDENTIFIER type_parameters? "(" (functionArgument (":"
-// type)? ",")* ")" (":" type)? block_statement_or_expression
+// typeAnnotation → ":" type
+OptionalNodeId typeAnnotation(Parser *parser, Token colon) {
+    assert(colon.kind == COLON);
+    return type(parser);
+}
+
+// type → type ("[" type ("," type)* "]")*
+OptionalNodeId type(Parser *parser) {
+    NodeId id = createNode(parser, (AstNode){.kind = AST_TYPE});
+    AstNode *node = ast_getNode(*parser->ast, id);
+    consume(parser, IDENTIFIER, "a type");
+    node->type.token = previous(*parser);
+    if (match(parser, LEFT_BRACKET)) {
+        while (!atEnd(*parser)) {
+            bind(parameter, type(parser));
+            list_append(node->type.parameters, parameter);
+            if (!match(parser, COMMA)) break;
+        }
+        consume(parser, RIGHT_BRACKET, "a type");
+    }
+    return id;
+}
+
+// function → "function" IDENTIFIER type_parameters? "(" (functionArgument (":" type)? ",")* ")" (":" type)? block_statement_or_expression
 OptionalNodeId function(Parser *parser, Token keyword) {
     assert(keyword.kind == FUNCTION);
     NodeId id = createNode(parser, (AstNode){.kind = AST_FUNCTION});
@@ -225,12 +249,13 @@ OptionalNodeId function(Parser *parser, Token keyword) {
 
     // Parse identifier
     bind(name, identifier(parser));
+    node->function.identifier = name;
 
     // Parse left paren
     consume(parser, LEFT_PAREN, "a function");
 
     // Parse arguments
-    while (!check(*parser, RIGHT_PAREN)) {
+    while (!atEnd(*parser) && !check(*parser, RIGHT_PAREN)) {
         bind(argument, functionArgument(parser));
         list_append(node->function.arguments, argument);
         if (!match(parser, COMMA)) break;
@@ -241,6 +266,7 @@ OptionalNodeId function(Parser *parser, Token keyword) {
 
     // Parse body
     bind(body, functionBody(parser));
+    node->function.body = body;
 
     // Return
     return id;
@@ -281,7 +307,7 @@ OptionalNodeId interface(Parser *parser, Token keyword) {
     consume(parser, LEFT_PAREN, "an interface");
 
     // Parse arguments
-    while (!check(*parser, RIGHT_PAREN)) {
+    while (!atEnd(*parser) && !check(*parser, RIGHT_PAREN)) {
         bind(argument, functionArgument(parser));
         list_append(node->function.arguments, argument);
         if (!match(parser, COMMA)) break;
@@ -308,7 +334,7 @@ OptionalNodeId builtin(Parser *parser, Token keyword) {
     consume(parser, LEFT_PAREN, "a builtin");
 
     // Parse arguments
-    while (!check(*parser, RIGHT_PAREN)) {
+    while (!atEnd(*parser) && !check(*parser, RIGHT_PAREN)) {
         bind(argument, functionArgument(parser));
         list_append(node->function.arguments, argument);
         if (!match(parser, COMMA)) break;
@@ -335,7 +361,7 @@ OptionalNodeId extern_stmt(Parser *parser, Token keyword) {
     consume(parser, LEFT_PAREN, "a extern");
 
     // Parse arguments
-    while (!check(*parser, RIGHT_PAREN)) {
+    while (!atEnd(*parser) && !check(*parser, RIGHT_PAREN)) {
         bind(argument, functionArgument(parser));
         list_append(node->function.arguments, argument);
         if (!match(parser, COMMA)) break;
@@ -376,7 +402,7 @@ OptionalNodeId typeDefinition(Parser *parser, Token keyword) {
 
     // Parse indentifier
     bind(name, identifier(parser));
-    node->type.identifier = name;
+    node->typeDefinition.identifier = name;
 
     // Parse body
     bool result = typeDefinitionBody(parser, node);
@@ -397,7 +423,7 @@ bool typeDefinitionBody(Parser *parser, AstNode *node) { todo(); }
 //           | link_with
 //           | type_definition
 //           | return
-//           | if_else
+//           | ifElse
 //           | while
 //           | break
 //           | continue
@@ -417,7 +443,7 @@ OptionalNodeId statement(Parser *parser) {
     if (match(parser, LINK_WITH)) return link_with(parser, curr);
     if (match(parser, TYPE)) return typeDefinition(parser, curr);
     if (match(parser, RETURN)) return return_stmt(parser, curr);
-    if (match(parser, IF)) return if_else(parser, curr);
+    if (match(parser, IF)) return ifElse(parser, curr);
     if (match(parser, WHILE)) return while_stmt(parser, curr);
     if (match(parser, BREAK)) return break_stmt(parser, curr);
     if (match(parser, CONTINUE)) return continue_stmt(parser, curr);
@@ -443,14 +469,16 @@ OptionalNodeId declaration(Parser *parser, NodeId identifier, Token operator) {
     NodeId id = createNode(parser, (AstNode){AST_DECLARATION});
     AstNode *node = ast_getNode(*parser->ast, id);
     node->declaration.identifier = identifier;
+    node->declaration.isMutable = operator.kind == EQUAL;
 
     // Parse expression
     bind(result, expression(parser));
     node->declaration.expression = result;
 
     // Parse type annotation
-    if (check(*parser, COLON)) {
-        todo();
+    if (match(parser, COLON)) {
+        bind(annotation, typeAnnotation(parser, previous(*parser)));
+        ast_setType(*parser->ast, node->declaration.expression, annotation);
     }
 
     // Return
@@ -468,8 +496,9 @@ OptionalNodeId assignment(Parser *parser, NodeId assignable, Token operator) {
     node->assignment.expression = result;
 
     // Parse type annotation
-    if (check(*parser, COLON)) {
-        todo();
+    if (match(parser, COLON)) {
+        bind(annotation, typeAnnotation(parser, previous(*parser)));
+        ast_setType(*parser->ast, node->declaration.expression, annotation);
     }
 
     // Return
@@ -482,18 +511,19 @@ OptionalNodeId fieldAssignment(Parser *parser, NodeId identifier) {
     AstNode *node = ast_getNode(*parser->ast, id);
 
     // Parse identifier
-    node->declaration.identifier = identifier;
+    node->assignment.assignable = identifier;
 
     // Parse equal
     consume(parser, EQUAL, "an assignemnt");
 
     // Parse expression
     bind(result, expression(parser));
-    node->declaration.expression = result;
+    node->assignment.expression = result;
 
     // Parse type annotation
-    if (check(*parser, COLON)) {
-        todo();
+    if (match(parser, COLON)) {
+        bind(annotation, typeAnnotation(parser, previous(*parser)));
+        ast_setType(*parser->ast, node->declaration.expression, annotation);
     }
 
     // Return
@@ -514,11 +544,12 @@ OptionalNodeId dereferenceAssignment(Parser *parser, Token operator) {
 
     // Parse expression
     bind(result, expression(parser));
-    node->declaration.expression = result;
+    node->assignment.expression = result;
 
     // Parse type annotation
-    if (check(*parser, COLON)) {
-        todo();
+    if (match(parser, COLON)) {
+        bind(annotation, typeAnnotation(parser, previous(*parser)));
+        ast_setType(*parser->ast, node->declaration.expression, annotation);
     }
 
     // Return
@@ -538,11 +569,12 @@ OptionalNodeId indexAssignment(Parser *parser, NodeId indexAccess) {
 
     // Parse expression
     bind(result, expression(parser));
-    node->declaration.expression = result;
+    node->assignment.expression = result;
 
     // Parse type annotation
-    if (check(*parser, COLON)) {
-        todo();
+    if (match(parser, COLON)) {
+        bind(annotation, typeAnnotation(parser, previous(*parser)));
+        ast_setType(*parser->ast, node->declaration.expression, annotation);
     }
 
     // Return
@@ -554,7 +586,6 @@ OptionalNodeId return_stmt(Parser *parser, Token keyword) {
     assert(keyword.kind == RETURN);
     NodeId id = createNode(parser, (AstNode){AST_RETURN});
     AstNode *node = ast_getNode(*parser->ast, id);
-    node->returnNode.expression = None();
 
     // Parse expression
     if (!atEnd(*parser) && !check(*parser, NEW_LINE)) {
@@ -578,12 +609,11 @@ OptionalNodeId continue_stmt(Parser *parser, Token keyword) {
     return id;
 }
 
-// if_else → "if" expression block ("\n"* "else" block)
-OptionalNodeId if_else(Parser *parser, Token keyword) {
+// ifElse → "if" expression block ("\n"* "else" block)
+OptionalNodeId ifElse(Parser *parser, Token keyword) {
     assert(keyword.kind == IF);
     NodeId id = createNode(parser, (AstNode){AST_IF_ELSE});
     AstNode *node = ast_getNode(*parser->ast, id);
-    node->ifElse.elseNode = None();
 
     // Parse condition
     bind(condition, expression(parser));
@@ -675,7 +705,6 @@ OptionalNodeId callArgument(Parser *parser) {
     NodeId id = createNode(parser, (AstNode){AST_CALL_ARGUMENT});
     AstNode *node = ast_getNode(*parser->ast, id);
     node->callArgument.isMutable = false;
-    node->callArgument.identifier = None();
 
     // Parse expression
     bind(result, expression(parser));
@@ -700,16 +729,14 @@ OptionalNodeId expression(Parser *parser) {
 
 OptionalNodeId ifElseExpr(Parser *parser, Token keyword) {
     assert(keyword.kind == IF);
-    NodeId id = createNode(parser, (AstNode){AST_IF_ELSE});
+    NodeId id = createNode(parser, (AstNode){AST_IF_ELSE_EXPR});
     AstNode *node = ast_getNode(*parser->ast, id);
 
     // Parse condition
-    advanceUntilNextStatement(parser);
     bind(condition, expression(parser));
     node->ifElse.condition = condition;
 
     // Parse if branch
-    advanceUntilNextStatement(parser);
     bind(result, expression(parser));
     node->ifElse.ifNode = result;
 
@@ -718,9 +745,8 @@ OptionalNodeId ifElseExpr(Parser *parser, Token keyword) {
     consume(parser, ELSE, "an if else");
 
     // Parse else branch
-    advanceUntilNextStatement(parser);
     bind(result2, expression(parser));
-    node->ifElse.elseNode = result;
+    node->ifElse.elseNode = result2;
 
     // Return
     return id;
@@ -858,7 +884,8 @@ OptionalNodeId term(Parser *parser) {
 OptionalNodeId factor(Parser *parser) {
     bind(left, primary(parser));
 
-    while (match(parser, STAR) || match(parser, SLASH)) {
+    while (match(parser, STAR) || match(parser, SLASH) || match(parser, MODULO)
+    ) {
         NodeId operator= tokenAsIdentifier(parser, previous(*parser));
         bind(right, primary(parser));
 
@@ -897,7 +924,7 @@ OptionalNodeId primary(Parser *parser) {
     else if (match(parser, INTEGER)) return integer(parser, curr);
     else if (match(parser, TRUE)) return boolean(parser, curr);
     else if (match(parser, FALSE)) return boolean(parser, curr);
-    else if (match(parser, STRING)) return string(parser);
+    else if (check(*parser, STRING)) return string(parser);
     else if (match(parser, STRING_LEFT))
         return interpolatedString(parser, curr);
     else if (check(*parser, IDENTIFIER)) {
@@ -1149,7 +1176,6 @@ OptionalNodeId asCallArgument(Parser *parser, NodeId expression) {
     NodeId id = createNode(parser, (AstNode){AST_CALL_ARGUMENT});
     AstNode *node = ast_getNode(*parser->ast, id);
     node->callArgument.isMutable = false;
-    node->callArgument.identifier = None();
     node->callArgument.expression = expression;
     return id;
 }

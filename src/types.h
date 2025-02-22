@@ -87,4 +87,6 @@ void string_free(String string);
 
 #define String() (String){NULL, 0, 0}
 
+typedef ListType(String) StringList;
+
 #endif

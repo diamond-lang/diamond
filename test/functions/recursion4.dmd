@@ -1,15 +1,49 @@
-function is_even(n)
+function isEven(n)
     if n == 0 return true
-    else      return is_odd(n - 1)
+    else      return isOdd(n - 1)
 
-function is_odd(n)
+function isOdd(n)
     if n == 0 return false
-    else      return is_even(n - 1)
+    else      return isEven(n - 1)
 
-print(is_even(9))
-print(is_odd(9))
+print(isEven(9))
+print(isOdd(9))
 
---- Output
-false
-true
----
+-- Output
+-- program
+-- ├──print
+-- │  └──isEven
+-- │     └──9
+-- ├──print
+-- │  └──isOdd
+-- │     └──9
+-- ├──function isEven(n)
+-- │  ├──if
+-- │  │  ├──==
+-- │  │  │  ├──n
+-- │  │  │  └──0
+-- │  │  └──return
+-- │  │     └──true
+-- │  └──else
+-- │     └──return
+-- │        └──isOdd
+-- │           └──-
+-- │              ├──n
+-- │              └──1
+-- └──function isOdd(n)
+--    ├──if
+--    │  ├──==
+--    │  │  ├──n
+--    │  │  └──0
+--    │  └──return
+--    │     └──false
+--    └──else
+--       └──return
+--          └──isEven
+--             └──-
+--                ├──n
+--                └──1
+
+-- RealOutput
+-- false
+-- true

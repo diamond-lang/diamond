@@ -7,9 +7,10 @@ type Point
     y: Float64
     z: Float64
 
-
-This type is already defined.
-
-4| 
-5| type Point
-   ^
+-- Output
+-- This type is already defined.
+--
+-- 4| 
+-- 5| type Point
+--    ^
+--

@@ -1,32 +1,60 @@
-function is_four(n)
-    if n == 4.0
-        return true
-    else
-        return false
+function add20(a)
+    twenty be 20
+    return a + 20
 
-function is_four2(n)
-    if n == 4.0
-        true
-    else
-        false
+function add10(a)
+    ten be 10
+    return add20(a) - ten
 
-function is_four3(n) if n == 4.0 true
-                     else        false
+function say23()
+    print(23)
+    return
 
-print(is_four(4.0))
-print(is_four(7.0))
+function say76()
+    print(76)
 
-print(is_four2(4.0))
-print(is_four2(7.0))
+print(add10(50))
+print(add20(50))
+say23()
+say76()
 
-print(is_four3(4.0))
-print(is_four3(7.0))
+-- Output
+-- program
+-- ├──print
+-- │  └──add10
+-- │     └──50
+-- ├──print
+-- │  └──add20
+-- │     └──50
+-- ├──say23
+-- ├──say76
+-- ├──function add20(a)
+-- │  ├──be
+-- │  │  ├──twenty
+-- │  │  └──20
+-- │  └──return
+-- │     └──+
+-- │        ├──a
+-- │        └──20
+-- ├──function add10(a)
+-- │  ├──be
+-- │  │  ├──ten
+-- │  │  └──10
+-- │  └──return
+-- │     └──-
+-- │        ├──add20
+-- │        │  └──a
+-- │        └──ten
+-- ├──function say23()
+-- │  ├──print
+-- │  │  └──23
+-- │  └──return
+-- └──function say76()
+--    └──print
+--       └──76
 
---- Output
-true
-false
-true
-false
-true
-false
----
+-- RealOutput
+-- 60
+-- 70
+-- 23
+-- 76

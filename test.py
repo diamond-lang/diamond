@@ -62,7 +62,7 @@ def read_file_and_test(file, max_file_path_len):
         content = content.read()
 
         try:
-            expected = re.search("(--.*\n)+", content).group(0)
+            expected = re.search("(?<=-- Output\n)(--.*\n)+", content).group(0)
             expected = expected.split("\n")
             expected = [line[3:] for line in expected]
             expected = "\n".join(expected)

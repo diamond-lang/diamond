@@ -4,14 +4,6 @@
 #include "token.h"
 #include "types.h"
 
-typedef struct {
-    int32_t id;
-} Type;
-
-typedef struct {
-    int32_t id;
-} InterfaceType;
-
 typedef enum {
     AST_BLOCK,
     AST_FUNCTION_ARGUMENT,
@@ -31,8 +23,6 @@ typedef enum {
     AST_LINK_WITH,
     AST_CALL_ARGUMENT,
     AST_CALL,
-    AST_STRUCT_FIELD,
-    AST_STRUCT_LITERAL,
     AST_FLOAT,
     AST_INTEGER,
     AST_IDENTIFIER,
@@ -40,11 +30,15 @@ typedef enum {
     AST_STRING,
     AST_INTERPOLATED_STRING,
     AST_ARRAY,
+    AST_STRUCT_FIELD,
+    AST_STRUCT_LITERAL,
+    AST_IF_ELSE_EXPR,
     AST_FIELD_ACCESS,
     AST_INDEX_ACCESS,
     AST_ADDRESS_OF,
     AST_DEREFERENCE,
-    AST_NEW
+    AST_NEW,
+    AST_TYPE
 } AstKind;
 
 typedef int32_t NodeId;
@@ -65,13 +59,20 @@ typedef struct {
         struct {
             bool isMutable;
             NodeId identifier;
+            OptionalNodeId type;
         } functionArgument;
 
         struct {
             NodeId identifier;
             NodeIdList arguments;
             NodeId body;
+            OptionalNodeId type;
         } function;
+
+        struct {
+            NodeId identifier;
+            NodeIdList arguments;
+        } interface;
 
         struct {
             NodeId identifier;
@@ -87,14 +88,9 @@ typedef struct {
 
         struct {
             NodeId identifier;
-            NodeIdList arguments;
-        } interface;
-
-        struct {
-            NodeId identifier;
             NodeIdList fields;
             NodeIdList cases;
-        } type;
+        } typeDefinition;
 
         struct {
             bool isMutable;
@@ -146,7 +142,44 @@ typedef struct {
         struct {
             NodeId callable;
             NodeIdList arguments;
+            OptionalNodeId type;
         } call;
+
+        struct {
+            Token value;
+            OptionalNodeId type;
+        } floatNode;
+
+        struct {
+            Token value;
+            OptionalNodeId type;
+        } integer;
+
+        struct {
+            Token value;
+            OptionalNodeId type;
+        } identifier;
+
+        struct {
+            Token value;
+            OptionalNodeId type;
+        } boolean;
+
+        struct {
+            Token value;
+            OptionalNodeId type;
+        } string;
+
+        struct {
+            TokenList strings;
+            NodeIdList expressions;
+            OptionalNodeId type;
+        } interpolatedString;
+
+        struct {
+            NodeIdList elements;
+            OptionalNodeId type;
+        } arrayNode;
 
         struct {
             NodeId identifier;
@@ -156,58 +189,47 @@ typedef struct {
         struct {
             NodeId identifier;
             NodeIdList fields;
+            OptionalNodeId type;
         } structLiteral;
 
         struct {
-            Token value;
-        } floatNode;
-
-        struct {
-            Token value;
-        } integer;
-
-        struct {
-            Token value;
-        } identifier;
-
-        struct {
-            Token value;
-        } boolean;
-
-        struct {
-            Token value;
-        } string;
-
-        struct {
-            TokenList strings;
-            NodeIdList expressions;
-        } interpolatedString;
-
-        struct {
-            NodeIdList elements;
-        } arrayNode;
+            NodeId condition;
+            NodeId ifNode;
+            NodeId elseNode;
+            OptionalNodeId type;
+        } ifElseExpr;
 
         struct {
             NodeId accessed;
             NodeId identifier;
+            OptionalNodeId type;
         } fieldAccess;
 
         struct {
             NodeId accessed;
             NodeId index;
+            OptionalNodeId type;
         } indexAccess;
 
         struct {
             NodeId expression;
+            OptionalNodeId type;
         } addressOf;
 
         struct {
             NodeId expression;
-        } deference;
+            OptionalNodeId type;
+        } dereference;
 
         struct {
             NodeId expression;
+            OptionalNodeId type;
         } newNode;
+
+        struct {
+            Token token;
+            NodeIdList parameters;
+        } type;
     };
 } AstNode;
 
@@ -222,8 +244,10 @@ typedef struct {
     ErrorList errors;
 } Ast;
 
+NodeId ast_createNode(Ast* ast, AstNode nodeContent);
 AstNode* ast_getNode(Ast ast, NodeId id);
-bool ast_isExpression(Ast ast, NodeId id);
+bool ast_isExpression(AstKind kind);
+void ast_setType(Ast ast, NodeId id, NodeId type);
 
 void ast_print(Ast ast);
 void ast_printNode(Ast ast, NodeId id, BoolStack isLast);

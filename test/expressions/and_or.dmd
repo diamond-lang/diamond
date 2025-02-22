@@ -3,9 +3,27 @@ print(false and true)
 print(true or false)
 print(false or false)
 
---- Output
-true
-false
-true
-false
----
+-- Output
+-- program
+-- ├──print
+-- │  └──and
+-- │     ├──true
+-- │     └──true
+-- ├──print
+-- │  └──and
+-- │     ├──false
+-- │     └──true
+-- ├──print
+-- │  └──or
+-- │     ├──true
+-- │     └──false
+-- └──print
+--    └──or
+--       ├──false
+--       └──false
+
+-- RealOutput
+-- true
+-- false
+-- true
+-- false

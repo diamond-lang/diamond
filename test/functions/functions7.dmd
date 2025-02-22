@@ -1,8 +1,0 @@
-function genericPrint[t](value: t): None
-    print(value)
-
-genericPrint(3.4)
-
---- Output
-3.4
----

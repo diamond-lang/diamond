@@ -5,7 +5,23 @@ if a == 10
 
 print(a)
 
---- Output
-false
-10
----
+-- Output
+-- program
+-- ├──be
+-- │  ├──a
+-- │  └──10
+-- ├──if
+-- │  ├──==
+-- │  │  ├──a
+-- │  │  └──10
+-- │  ├──be
+-- │  │  ├──a
+-- │  │  └──false
+-- │  └──print
+-- │     └──a
+-- └──print
+--    └──a
+
+-- RealOutput
+-- false
+-- 10

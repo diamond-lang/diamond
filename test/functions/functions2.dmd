@@ -1,11 +1,20 @@
-function yeah(a)
-    b be 35
+function foo(a)
     print(a)
-    return b
+    return a
 
-print(yeah(16.6))
+print(foo(16.6))
 
---- Output
-16.6
-35
----
+-- Output
+-- program
+-- ├──print
+-- │  └──foo
+-- │     └──16.6
+-- └──function foo(a)
+--    ├──print
+--    │  └──a
+--    └──return
+--       └──a
+
+-- RealOutput
+-- 16.6
+-- 16.6

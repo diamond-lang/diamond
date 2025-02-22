@@ -1,26 +1,16 @@
-function add20(a)
-    twenty be 20
-    return a + 20
+function add[t](a: t, b: t): t
+    c = 10
+    print(c)
+    return a + b
 
-function add10(a)
-    ten be 10
-    return add20(a) - ten
+print(add(10, 20))
+print(add(4.5, 1.3))
 
-function say23()
-    print(23)
-    return
+-- Output
+--
 
-function say76()
-    print(76)
-
-print(add10(50))
-print(add20(50))
-say23()
-say76()
-
---- Output
-60
-70
-23
-76
----
+-- RealOutput
+-- 10
+-- 30
+-- 10
+-- 5.8

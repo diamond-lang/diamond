@@ -1,27 +1,51 @@
-function add1(a, b) a + b
-function add2(a, b) add1(a, b)
-
-function expression(a, b)
-    if a == true
-        add2(b, b)
+function isfor(n)
+    if n == 4
+        return true
     else
-        add2(b, 10 * b)
+        return false
 
-hello = expression(false, 10)
-print(hello)
-
-function log(a)
-    print(a)
-
-function statement(a, b)
-    if a == true
-        log(-b)
+function awesome(a)
+    if a == 4
+        print(7)
     else
-        log(b)
+        return 8
+    return 6
 
-statement(true, 36)
+print(isfor(5))
+print(awesome(4))
 
---- Output
-110
--36
----
+-- Output
+-- program
+-- ├──print
+-- │  └──isfor
+-- │     └──5
+-- ├──print
+-- │  └──awesome
+-- │     └──4
+-- ├──function isfor(n)
+-- │  ├──if
+-- │  │  ├──==
+-- │  │  │  ├──n
+-- │  │  │  └──4
+-- │  │  └──return
+-- │  │     └──true
+-- │  └──else
+-- │     └──return
+-- │        └──false
+-- └──function awesome(a)
+--    ├──if
+--    │  ├──==
+--    │  │  ├──a
+--    │  │  └──4
+--    │  └──print
+--    │     └──7
+--    ├──else
+--    │  └──return
+--    │     └──8
+--    └──return
+--       └──6
+
+-- RealOutput
+-- false
+-- 7
+-- 6

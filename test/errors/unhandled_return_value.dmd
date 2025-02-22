@@ -2,9 +2,9 @@ plus(4, 7)
 
 function plus(a, b) a + b
 
-
-Unhandled return value
-
-1| plus(4, 7)
-   ^^^^
-
+-- Output
+-- Unhandled return value
+-- 
+-- 1| plus(4, 7)
+--    ^^^^
+--

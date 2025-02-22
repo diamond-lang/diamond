@@ -1,8 +1,8 @@
 a be +
 
-
-Unexpected character
-
-1| a be +
-        ^
-
+-- Output
+-- Unexpected character
+-- 
+-- 1| a be +
+--         ^
+-- 

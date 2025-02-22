@@ -34,6 +34,8 @@ int main(int argc, char* argv[]) {
         exit(EXIT_FAILURE);
     }
 
+    ast_print(ast);
+
     arena_freeAll();
 
     return 0;

@@ -1,5 +1,10 @@
 print("Hello, World!")
 
---- Output
-Hello, World!
----
+-- Output
+-- program
+-- └──print
+--    └──"Hello, World!"
+
+-- RealOutput
+-- Hello, World!
+--
