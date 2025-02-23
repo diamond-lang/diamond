@@ -2,6 +2,7 @@
 
 #include <assert.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdio.h>
 
 #include "common.h"
@@ -20,6 +21,7 @@ NodeId ast_createNode(Ast* ast, AstNode nodeContent) {
             break;
         case AST_FUNCTION_ARGUMENT: node->functionArgument.type = None(); break;
         case AST_FUNCTION:
+            node->function.typeParameters = (NodeIdList)List();
             node->function.arguments = (NodeIdList)List();
             node->function.type = None();
             break;
@@ -164,7 +166,7 @@ void ast_print(Ast ast) {
     ast_printNode(ast, 0, isLast);
 }
 
-void printIndentation(BoolStack isLast) {
+static void printIndentation(BoolStack isLast) {
     if (isLast.count == 0) return;
     for (int i = 0; i < isLast.count - 1; i++) {
         bool value = isLast.items[i];
@@ -180,6 +182,12 @@ void printIndentation(BoolStack isLast) {
     } else {
         printf("├──");
     }
+}
+
+static void printTypeParameter(Ast ast, NodeId id) {
+    AstNode node = *ast_getNode(ast, id);
+    assert(node.kind == AST_IDENTIFIER);
+    printf("%s", node.identifier.value.literal.content);
 }
 
 void ast_printNode(Ast ast, NodeId id, BoolStack isLast) {
@@ -217,10 +225,24 @@ void ast_printNode(Ast ast, NodeId id, BoolStack isLast) {
         case AST_FUNCTION:
             printIndentation(isLast);
             printf(
-                "function %s(",
+                "function %s",
                 ast_getNode(ast, node.function.identifier)
                     ->identifier.value.literal.content
             );
+            if (node.function.typeParameters.count != 0) {
+                printf("[");
+                for (size_t i = 0; i < node.function.typeParameters.count;
+                     i++) {
+                    printTypeParameter(
+                        ast,
+                        node.function.typeParameters.items[i]
+                    );
+                    if (i + 1 != node.function.typeParameters.count)
+                        printf(", ");
+                }
+                printf("]");
+            }
+            printf("(");
             for (size_t i = 0; i < node.function.arguments.count; i++) {
                 AstNode* arg =
                     ast_getNode(ast, node.function.arguments.items[i]);
@@ -353,19 +375,19 @@ void ast_printNode(Ast ast, NodeId id, BoolStack isLast) {
             break;
         case AST_INTEGER:
             printIndentation(isLast);
-            printf("%s\n", node.floatNode.value.literal.content);
+            printf("%s\n", node.integer.value.literal.content);
             break;
         case AST_IDENTIFIER:
             printIndentation(isLast);
-            printf("%s\n", node.floatNode.value.literal.content);
+            printf("%s\n", node.identifier.value.literal.content);
             break;
         case AST_BOOLEAN:
             printIndentation(isLast);
-            printf("%s\n", node.integer.value.kind == TRUE ? "true" : "false");
+            printf("%s\n", node.boolean.value.kind == TRUE ? "true" : "false");
             break;
         case AST_STRING:
             printIndentation(isLast);
-            printf("\"%s\"\n", node.floatNode.value.literal.content);
+            printf("\"%s\"\n", node.string.value.literal.content);
             break;
         case AST_INTERPOLATED_STRING: todo(); break;
         case AST_ARRAY: todo(); break;

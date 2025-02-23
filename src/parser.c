@@ -94,6 +94,7 @@ OptionalNodeId block(Parser *parser);
 OptionalNodeId function(Parser *parser, Token keyword);
 OptionalNodeId typeAnnotation(Parser *parser, Token colon);
 OptionalNodeId type(Parser *parser);
+NodeIdList typeParameters(Parser *parser, Token leftBracket);
 OptionalNodeId functionArgument(Parser *parser);
 OptionalNodeId functionBody(Parser *parser);
 OptionalNodeId interface(Parser *parser, Token keyword);
@@ -241,6 +242,27 @@ OptionalNodeId type(Parser *parser) {
     return id;
 }
 
+// typeParameters → "[" identifier (, identifier)* "]"
+NodeIdList typeParameters(Parser *parser, Token leftBracket) {
+    assert(leftBracket.kind == LEFT_BRACKET);
+    NodeIdList list = (NodeIdList)List();
+
+    // Parse type parameters
+    while (!atEnd(*parser) && !check(*parser, RIGHT_BRACKET)) {
+        OptionalNodeId result = identifier(parser);
+        if (!hasValue(result)) todo();
+        list_append(list, result);
+
+        if (!match(parser, COMMA)) break;
+    }
+
+    // Parse right bracket
+    if (!match(parser, RIGHT_BRACKET)) todo();
+
+    // Return
+    return list;
+}
+
 // function → "function" IDENTIFIER type_parameters? "(" (functionArgument (":" type)? ",")* ")" (":" type)? block_statement_or_expression
 OptionalNodeId function(Parser *parser, Token keyword) {
     assert(keyword.kind == FUNCTION);
@@ -250,6 +272,13 @@ OptionalNodeId function(Parser *parser, Token keyword) {
     // Parse identifier
     bind(name, identifier(parser));
     node->function.identifier = name;
+
+    // Parse type parameters
+    if (match(parser, LEFT_BRACKET)) {
+        node->function.typeParameters =
+            typeParameters(parser, previous(*parser));
+        if (node->function.typeParameters.count == 0) todo();
+    }
 
     // Parse left paren
     consume(parser, LEFT_PAREN, "a function");
@@ -263,6 +292,12 @@ OptionalNodeId function(Parser *parser, Token keyword) {
 
     // Parse right paren
     consume(parser, RIGHT_PAREN, "a function");
+
+    // Parse type
+    if (match(parser, COLON)) {
+        bind(type, typeAnnotation(parser, previous(*parser)));
+        node->function.type = type;
+    }
 
     // Parse body
     bind(body, functionBody(parser));
@@ -286,6 +321,12 @@ OptionalNodeId functionArgument(Parser *parser) {
     bind(name, identifier(parser));
     node->functionArgument.identifier = name;
 
+    // Parse type
+    if (match(parser, COLON)) {
+        bind(result, typeAnnotation(parser, previous(*parser)));
+        node->functionArgument.type = result;
+    }
+
     // Return
     return id;
 }
@@ -302,6 +343,10 @@ OptionalNodeId interface(Parser *parser, Token keyword) {
 
     // Parse identifier
     bind(name, identifier(parser));
+
+    // Parse type parameters
+    consume(parser, LEFT_BRACKET, "an interface");
+    todo();
 
     // Parse left paren
     consume(parser, LEFT_PAREN, "an interface");

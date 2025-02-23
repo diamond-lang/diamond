@@ -64,6 +64,7 @@ typedef struct {
 
         struct {
             NodeId identifier;
+            NodeIdList typeParameters;
             NodeIdList arguments;
             NodeId body;
             OptionalNodeId type;
