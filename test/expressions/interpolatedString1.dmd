@@ -1,0 +1,34 @@
+fruit = "Watermelon"
+print("Hello, {fruit}!")
+
+number = 3
+print("{number} times 4 is {number * 4}")
+
+-- Output
+-- program
+-- ├──=
+-- │  ├──fruit
+-- │  └──"Watermelon"
+-- ├──()
+-- │  ├──print
+-- │  └──""
+-- │     ├──"Hello, "
+-- │     ├──fruit
+-- │     └──"!"
+-- ├──=
+-- │  ├──number
+-- │  └──3
+-- └──()
+--    ├──print
+--    └──""
+--       ├──""
+--       ├──number
+--       ├──" times 4 is "
+--       ├──*
+--       │  ├──number
+--       │  └──4
+--       └──""
+
+-- RealOutput
+-- Hello, Watermelon!
+-- 3 times 4 is 12

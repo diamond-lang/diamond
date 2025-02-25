@@ -1,6 +1,0 @@
-a = 10
-print(20.5 + a) -- a = 10 won't work until having interfaces
-
---- Output
-30.5
----

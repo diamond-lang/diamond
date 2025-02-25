@@ -1,8 +1,0 @@
-function add(a: Float64, b: Float64): Float64
-    return a + b
-
-print(add(2 + 2, 4))
-
---- Output
-8
----

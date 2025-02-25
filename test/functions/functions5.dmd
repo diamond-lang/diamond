@@ -5,10 +5,12 @@ genericPrint(3.4)
 
 -- Output
 -- program
--- ├──genericPrint
+-- ├──()
+-- │  ├──genericPrint
 -- │  └──3.4
 -- └──function genericPrint[t](value: t): None
---    └──print
+--    └──()
+--       ├──print
 --       └──value
 
 -- RealOutput

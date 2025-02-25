@@ -1,3 +1,5 @@
+#include "error.h"
+
 #include <stdio.h>
 
 #include "ast.h"
@@ -175,7 +177,14 @@ void reportError(Ast ast, Error error) {
             printCurrentLine(ast.filePath, error.line);
             underlineLine(ast.filePath, error.line);
             break;
-        case EXPECTING_NEW_IDENTATION_LEVEL: todo(); break;
+        case EXPECTING_NEW_IDENTATION_LEVEL:
+            printHeader("Expecting new indentation level", ast.filePath);
+            if (error.line > 1) {
+                printCurrentLine(ast.filePath, error.line - 1);
+            }
+            printCurrentLine(ast.filePath, error.line);
+            underlineLocation(ast.filePath, error.line, error.column);
+            break;
         case UNEXPECTED_TOKEN:
             printHeader("Unexpected token", ast.filePath);
             printf(
@@ -183,6 +192,15 @@ void reportError(Ast ast, Error error) {
                 error.unexpectedToken.beingParsed,
                 ast_tokenAsString(error.unexpectedToken.expectedToken),
                 ast_tokenAsString(error.unexpectedToken.actualToken)
+            );
+            printCurrentLine(ast.filePath, error.line);
+            underlineLocation(ast.filePath, error.line, error.column);
+            break;
+        case EXPECTING_EXPRESSION:
+            printHeader("Expected a expression", ast.filePath);
+            printf(
+                "Was expecting a expression, but found %s.\n\n",
+                ast_tokenAsString(error.expectingExpression.actualToken)
             );
             printCurrentLine(ast.filePath, error.line);
             underlineLocation(ast.filePath, error.line, error.column);

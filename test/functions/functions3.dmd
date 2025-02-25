@@ -16,11 +16,15 @@ print(awesome(4))
 
 -- Output
 -- program
--- ├──print
--- │  └──isfor
+-- ├──()
+-- │  ├──print
+-- │  └──()
+-- │     ├──isfor
 -- │     └──5
--- ├──print
--- │  └──awesome
+-- ├──()
+-- │  ├──print
+-- │  └──()
+-- │     ├──awesome
 -- │     └──4
 -- ├──function isfor(n)
 -- │  ├──if
@@ -37,7 +41,8 @@ print(awesome(4))
 --    │  ├──==
 --    │  │  ├──a
 --    │  │  └──4
---    │  └──print
+--    │  └──()
+--    │     ├──print
 --    │     └──7
 --    ├──else
 --    │  └──return

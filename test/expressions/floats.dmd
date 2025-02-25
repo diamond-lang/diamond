@@ -5,13 +5,17 @@ print(0.33333)
 
 -- Output
 -- program
--- ├──print
+-- ├──()
+-- │  ├──print
 -- │  └──4.3
--- ├──print
+-- ├──()
+-- │  ├──print
 -- │  └──6.0
--- ├──print
+-- ├──()
+-- │  ├──print
 -- │  └──.8
--- └──print
+-- └──()
+--    ├──print
 --    └──0.33333
 
 -- RealOutput

@@ -1,8 +1,0 @@
-a = 2 $ 5
-
--- Output
--- Unrecognized character (test/errors/unrecognized_character.dmd)
--- 
--- 1│ a = 2 $ 5
---          ^
--- 

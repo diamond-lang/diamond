@@ -16,6 +16,7 @@ typedef enum {
     EXPECTING_STATEMENT,
     EXPECTING_NEW_IDENTATION_LEVEL,
     UNEXPECTED_TOKEN,
+    EXPECTING_EXPRESSION,
 
     // Semantic
     REASSIGNING_IMMUTABLE_VARIABLE,
@@ -38,6 +39,9 @@ typedef struct {
             TokenKind actualToken;
             char* beingParsed;
         } unexpectedToken;
+        struct {
+            TokenKind actualToken;
+        } expectingExpression;
     };
 } Error;
 

@@ -1,8 +1,0 @@
-a = new 20
-b = new 30
-a = b
-print(*a)
-
---- Output
-30
----

@@ -15,10 +15,51 @@ print(x)
 print(x)
 print(addOne(x))
 print(x)
---- Output
-1
-2
-2
-3
-2
----
+
+-- Output
+-- program
+-- ├──=
+-- │  ├──x
+-- │  └──1
+-- ├──()
+-- │  ├──print
+-- │  └──x
+-- ├──()
+-- │  ├──addOneMut
+-- │  └──mut
+-- │     └──x
+-- ├──()
+-- │  ├──print
+-- │  └──x
+-- ├──()
+-- │  ├──print
+-- │  └──x
+-- ├──()
+-- │  ├──print
+-- │  └──()
+-- │     ├──addOne
+-- │     └──x
+-- ├──()
+-- │  ├──print
+-- │  └──x
+-- ├──function addOne(x: Int64): Int64
+-- │  ├──:=
+-- │  │  ├──x
+-- │  │  └──+
+-- │  │     ├──x
+-- │  │     └──1
+-- │  └──return
+-- │     └──x
+-- └──function addOneMut(mut x: Int64): None
+--    └──:=
+--       ├──x
+--       └──+
+--          ├──x
+--          └──1
+
+-- RealOutput
+-- 1
+-- 2
+-- 2
+-- 3
+-- 2

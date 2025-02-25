@@ -1,0 +1,32 @@
+function printSomethingTwoTimes(something)
+    print("{something} {something}")
+
+printSomethingTwoTimes(54)
+printSomethingTwoTimes(false)
+printSomethingTwoTimes("YEAH!")
+
+-- Output
+-- program
+-- ├──()
+-- │  ├──printSomethingTwoTimes
+-- │  └──54
+-- ├──()
+-- │  ├──printSomethingTwoTimes
+-- │  └──false
+-- ├──()
+-- │  ├──printSomethingTwoTimes
+-- │  └──"YEAH!"
+-- └──function printSomethingTwoTimes(something)
+--    └──()
+--       ├──print
+--       └──""
+--          ├──""
+--          ├──something
+--          ├──" "
+--          ├──something
+--          └──""
+
+-- RealOutput
+-- 54 54
+-- false false
+-- YEAH! YEAH!

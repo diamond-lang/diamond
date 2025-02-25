@@ -5,19 +5,23 @@ print(false or false)
 
 -- Output
 -- program
--- ├──print
+-- ├──()
+-- │  ├──print
 -- │  └──and
 -- │     ├──true
 -- │     └──true
--- ├──print
+-- ├──()
+-- │  ├──print
 -- │  └──and
 -- │     ├──false
 -- │     └──true
--- ├──print
+-- ├──()
+-- │  ├──print
 -- │  └──or
 -- │     ├──true
 -- │     └──false
--- └──print
+-- └──()
+--    ├──print
 --    └──or
 --       ├──false
 --       └──false

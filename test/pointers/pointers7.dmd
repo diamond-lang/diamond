@@ -10,6 +10,34 @@ p = Point{x: 10, y: &a}
 awesome(p)
 print(a)
 
---- Output
-400
----
+-- Output
+-- program
+-- ├──=
+-- │  ├──a
+-- │  └──10
+-- ├──=
+-- │  ├──p
+-- │  └──Point
+-- │     ├──x:
+-- │     │  └──10
+-- │     └──y:
+-- │        └──&
+-- │           └──a
+-- ├──()
+-- │  ├──awesome
+-- │  └──p
+-- ├──()
+-- │  ├──print
+-- │  └──a
+-- ├──type Point
+-- │  ├──x: Float64
+-- │  └──y: Pointer[Float64]
+-- └──function awesome(p)
+--    └──=
+--       ├──*
+--       │  └──.y
+--       │     └──p
+--       └──400
+
+-- RealOutput
+-- 400

@@ -4,14 +4,40 @@ type Point
     x: Float64
     y: Float64
 
-function make_point(x: Float64, y: Float64): Point
+function makePoint(x: Float64, y: Float64): Point
     return Point{x: x, y: y}
 
 p = make_point(42.0, 93.0)
 print(p.x)
 print(p.y)
 
---- Output
-42
-93
----
+-- Output
+program
+-- ├──=
+-- │  ├──p
+-- │  └──()
+-- │     ├──make_point
+-- │     ├──42.0
+-- │     └──93.0
+-- ├──()
+-- │  ├──print
+-- │  └──.x
+-- │     └──p
+-- ├──()
+-- │  ├──print
+-- │  └──.y
+-- │     └──p
+-- ├──type Point
+-- │  ├──x: Float64
+-- │  └──y: Float64
+-- └──function makePoint(x: Float64, y: Float64): Point
+--    └──return
+--       └──Point
+--          ├──x:
+--          │  └──x
+--          └──y:
+--             └──y
+
+-- RealOutput
+-- 42
+-- 93

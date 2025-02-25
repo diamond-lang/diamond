@@ -1,8 +1,0 @@
-my_var be 3 + my_undefined_var * 9
-
--- Ouput
--- Undefined variable
---
--- 1| my_var be 3 + my_undefined_var * 9
---                  ^^^^^^^^^^^^^^^^
--- 

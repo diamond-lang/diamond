@@ -24,9 +24,72 @@ print(rectangle.p1.y)
 print(rectangle.p2.x)
 print(rectangle.p2.y)
 
---- Output
-20
-20
-110
-60
----
+-- Output
+-- program
+-- ├──=
+-- │  ├──rectangle
+-- │  └──Rectangle
+-- │     ├──p1:
+-- │     │  └──Point
+-- │     │     ├──x:
+-- │     │     │  └──10
+-- │     │     └──y:
+-- │     │        └──10
+-- │     └──p2:
+-- │        └──Point
+-- │           ├──x:
+-- │           │  └──110
+-- │           └──y:
+-- │              └──60
+-- ├──=
+-- │  ├──rectangle2
+-- │  └──Rectangle
+-- │     ├──p1:
+-- │     │  └──Point
+-- │     │     ├──x:
+-- │     │     │  └──20
+-- │     │     └──y:
+-- │     │        └──20
+-- │     └──p2:
+-- │        └──Point
+-- │           ├──x:
+-- │           │  └──210
+-- │           └──y:
+-- │              └──260
+-- ├──=
+-- │  ├──.p1
+-- │  │  └──rectangle
+-- │  └──.p1
+-- │     └──rectangle2
+-- ├──()
+-- │  ├──print
+-- │  └──.x
+-- │     └──.p1
+-- │        └──rectangle
+-- ├──()
+-- │  ├──print
+-- │  └──.y
+-- │     └──.p1
+-- │        └──rectangle
+-- ├──()
+-- │  ├──print
+-- │  └──.x
+-- │     └──.p2
+-- │        └──rectangle
+-- ├──()
+-- │  ├──print
+-- │  └──.y
+-- │     └──.p2
+-- │        └──rectangle
+-- ├──type Point
+-- │  ├──x: Float64
+-- │  └──y: Float64
+-- └──type Rectangle
+--    ├──p1: Point
+--    └──p2: Point
+
+-- RealOutput
+-- 20
+-- 20
+-- 110
+-- 60

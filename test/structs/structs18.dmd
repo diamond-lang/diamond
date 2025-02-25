@@ -14,6 +14,32 @@ rectangle = Rectangle{
 
 print(rectangle)
 
---- Output
-Rectangle{p1: Point{x: 10, y: 10}, p2: Point{x: 110, y: 60}}
----
+-- Output
+-- program
+-- ├──=
+-- │  ├──rectangle
+-- │  └──Rectangle
+-- │     ├──p1:
+-- │     │  └──Point
+-- │     │     ├──x:
+-- │     │     │  └──10
+-- │     │     └──y:
+-- │     │        └──10
+-- │     └──p2:
+-- │        └──Point
+-- │           ├──x:
+-- │           │  └──110
+-- │           └──y:
+-- │              └──60
+-- ├──()
+-- │  ├──print
+-- │  └──rectangle
+-- ├──type Point
+-- │  ├──x: Float64
+-- │  └──y: Float64
+-- └──type Rectangle
+--    ├──p1: Point
+--    └──p2: Point
+
+-- RealOutput
+-- Rectangle{p1: Point{x: 10, y: 10}, p2: Point{x: 110, y: 60}}

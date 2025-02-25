@@ -1,7 +1,7 @@
 result = myFunction(a
 
 -- Output
--- Unexpected token (test/errors/unexpected_token.dmd)
+-- Unexpected token (test/errors/unexpectedToken.dmd)
 -- 
 -- Parsing a call. Was expecting ')', but found a new line.
 -- 

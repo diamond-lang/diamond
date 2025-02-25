@@ -1,7 +1,7 @@
 a be 5 + 7 false
 
 -- Output
--- Expecting line ending (test/errors/expecting_line_ending.dmd)
+-- Expecting line ending (test/errors/expectingLineEnding.dmd)
 -- 
 -- Finished parsing a statement. A new line was expected.
 -- 

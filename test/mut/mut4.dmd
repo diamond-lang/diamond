@@ -11,7 +11,38 @@ print(point.x)
 addOne(mut point.x)
 print(point.x)
 
---- Output
-1
-2
----
+-- Output
+-- program
+-- ├──=
+-- │  ├──point
+-- │  └──Point
+-- │     ├──x:
+-- │     │  └──1
+-- │     └──y:
+-- │        └──2
+-- ├──()
+-- │  ├──print
+-- │  └──.x
+-- │     └──point
+-- ├──()
+-- │  ├──addOne
+-- │  └──mut
+-- │     └──.x
+-- │        └──point
+-- ├──()
+-- │  ├──print
+-- │  └──.x
+-- │     └──point
+-- ├──type Point
+-- │  ├──x: Float64
+-- │  └──y: Float64
+-- └──function addOne(mut x: Float64): None
+--    └──:=
+--       ├──x
+--       └──+
+--          ├──x
+--          └──1
+
+-- RealOutput
+-- 1
+-- 2

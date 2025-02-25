@@ -9,3 +9,6 @@ type Weekday
 
 day = Monday
 print(day)
+
+-- Output
+--

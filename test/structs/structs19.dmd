@@ -6,6 +6,24 @@ type Point
 
 print(Point{x: 3, y: 10.5, z: 6, w: 5.5})
 
---- Output
-Point{x: 3, y: 10.5, z: 6, w: 5.5}
----
+-- Output
+-- program
+-- ├──()
+-- │  ├──print
+-- │  └──Point
+-- │     ├──x:
+-- │     │  └──3
+-- │     ├──y:
+-- │     │  └──10.5
+-- │     ├──z:
+-- │     │  └──6
+-- │     └──w:
+-- │        └──5.5
+-- └──type Point
+--    ├──x: Float64
+--    ├──y: Float64
+--    ├──z: Float64
+--    └──w: Float64
+
+-- RealOutput
+-- Point{x: 3, y: 10.5, z: 6, w: 5.5}

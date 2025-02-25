@@ -69,7 +69,7 @@ void scanToken(Lexer* lexer) {
             } else {
                 stack_pop(lexer->context);
                 advance(lexer);
-                return addToken(lexer, LEFT_CURLY);
+                return addToken(lexer, RIGHT_CURLY);
             }
         } else {
             advance(lexer);

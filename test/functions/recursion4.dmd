@@ -11,11 +11,15 @@ print(isOdd(9))
 
 -- Output
 -- program
--- ├──print
--- │  └──isEven
+-- ├──()
+-- │  ├──print
+-- │  └──()
+-- │     ├──isEven
 -- │     └──9
--- ├──print
--- │  └──isOdd
+-- ├──()
+-- │  ├──print
+-- │  └──()
+-- │     ├──isOdd
 -- │     └──9
 -- ├──function isEven(n)
 -- │  ├──if
@@ -26,7 +30,8 @@ print(isOdd(9))
 -- │  │     └──true
 -- │  └──else
 -- │     └──return
--- │        └──isOdd
+-- │        └──()
+-- │           ├──isOdd
 -- │           └──-
 -- │              ├──n
 -- │              └──1
@@ -39,7 +44,8 @@ print(isOdd(9))
 --    │     └──false
 --    └──else
 --       └──return
---          └──isEven
+--          └──()
+--             ├──isEven
 --             └──-
 --                ├──n
 --                └──1

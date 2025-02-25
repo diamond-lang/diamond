@@ -9,7 +9,37 @@ print(array[1])
 addTen(mut array[1])
 print(array[1])
 
---- Output
-1
-11
----
+-- Output
+-- program
+-- ├──=
+-- │  ├──array
+-- │  └──[]
+-- │     ├──1
+-- │     ├──2
+-- │     └──3
+-- ├──()
+-- │  ├──print
+-- │  └──[]
+-- │     ├──array
+-- │     └──1
+-- ├──()
+-- │  ├──addTen
+-- │  └──mut
+-- │     └──[]
+-- │        ├──array
+-- │        └──1
+-- ├──()
+-- │  ├──print
+-- │  └──[]
+-- │     ├──array
+-- │     └──1
+-- └──function addTen(mut x: Int64): None
+--    └──:=
+--       ├──x
+--       └──+
+--          ├──x
+--          └──10
+
+-- RealOutput
+-- 1
+-- 11

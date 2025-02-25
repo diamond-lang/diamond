@@ -17,9 +17,11 @@ print(a)
 -- │  ├──be
 -- │  │  ├──a
 -- │  │  └──false
--- │  └──print
+-- │  └──()
+-- │     ├──print
 -- │     └──a
--- └──print
+-- └──()
+--    ├──print
 --    └──a
 
 -- RealOutput

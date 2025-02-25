@@ -3,7 +3,7 @@ print(20)
 
 
 -- Output
--- Unexpected indentation (test/errors/unexpected_indentation.dmd)
+-- Unexpected indentation (test/errors/unexpectedIndentation.dmd)
 -- 
 -- 1│     print(10)
 --    ^^^^

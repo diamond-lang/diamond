@@ -2,7 +2,8 @@ print("Hello, World!")
 
 -- Output
 -- program
--- └──print
+-- └──()
+--    ├──print
 --    └──"Hello, World!"
 
 -- RealOutput

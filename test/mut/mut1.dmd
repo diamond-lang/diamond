@@ -6,7 +6,29 @@ print(x)
 addOne(mut x)
 print(x)
 
---- Output
-1
-2
----
+-- Output
+-- program
+-- ├──=
+-- │  ├──x
+-- │  └──1
+-- ├──()
+-- │  ├──print
+-- │  └──x
+-- ├──()
+-- │  ├──addOne
+-- │  └──mut
+-- │     └──x
+-- ├──()
+-- │  ├──print
+-- │  └──x
+-- └──function addOne(mut x: Int64): None
+--    └──:=
+--       ├──x
+--       └──+
+--          ├──x
+--          └──1
+
+-- RealOutput
+-- 1
+-- 2
+--

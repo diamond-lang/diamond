@@ -1,3 +1,0 @@
-extern add(a: Float64, b: Float64): Float64
-
-print(add(10, 20))

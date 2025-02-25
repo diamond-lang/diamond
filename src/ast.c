@@ -30,9 +30,13 @@ NodeId ast_createNode(Ast* ast, AstNode nodeContent) {
             break;
         case AST_BUILTIN: node->builtin.arguments = (NodeIdList)List(); break;
         case AST_EXTERN: node->externDef.arguments = (NodeIdList)List(); break;
-        case AST_TYPE_DEF:
+        case AST_TYPE_DEFINITION:
             node->typeDefinition.fields = (NodeIdList)List();
             node->typeDefinition.cases = (NodeIdList)List();
+            break;
+        case AST_CASE_DEFINITION:
+            node->caseDefinition.fields = (NodeIdList)List();
+            node->caseDefinition.cases = (NodeIdList)List();
             break;
         case AST_DECLARATION: break;
         case AST_ASSIGNMENT: break;
@@ -43,8 +47,13 @@ NodeId ast_createNode(Ast* ast, AstNode nodeContent) {
         case AST_WHILE: break;
         case AST_IMPORT: break;
         case AST_LINK_WITH: break;
-        case AST_CALL_ARGUMENT: node->callArgument.identifier = None(); break;
+        case AST_CALL_ARGUMENT:
+            node->callArgument.isMutable = false;
+            node->callArgument.identifier = None();
+            break;
         case AST_CALL: node->call.type = None(); break;
+        case AST_BINARY: node->binary.type = None(); break;
+        case AST_UNARY: node->unary.type = None(); break;
         case AST_FLOAT: node->floatNode.type = None(); break;
         case AST_INTEGER: node->integer.type = None(); break;
         case AST_IDENTIFIER: node->identifier.type = None(); break;
@@ -66,8 +75,6 @@ NodeId ast_createNode(Ast* ast, AstNode nodeContent) {
         case AST_IF_ELSE_EXPR: node->ifElseExpr.type = None(); break;
         case AST_FIELD_ACCESS: node->fieldAccess.type = None(); break;
         case AST_INDEX_ACCESS: node->indexAccess.type = None(); break;
-        case AST_ADDRESS_OF: node->addressOf.type = None(); break;
-        case AST_DEREFERENCE: node->dereference.type = None(); break;
         case AST_NEW: node->newNode.type = None(); break;
         case AST_TYPE: node->type.parameters = (NodeIdList)List(); break;
     }
@@ -87,7 +94,8 @@ bool ast_isExpression(AstKind kind) {
         case AST_INTERFACE: return false;
         case AST_BUILTIN: return false;
         case AST_EXTERN: return false;
-        case AST_TYPE_DEF: return false;
+        case AST_TYPE_DEFINITION: return false;
+        case AST_CASE_DEFINITION: return false;
         case AST_DECLARATION: return false;
         case AST_ASSIGNMENT: return false;
         case AST_RETURN: return false;
@@ -99,6 +107,8 @@ bool ast_isExpression(AstKind kind) {
         case AST_LINK_WITH: return false;
         case AST_CALL_ARGUMENT: return false;
         case AST_CALL: return true;
+        case AST_BINARY: return true;
+        case AST_UNARY: return true;
         case AST_FLOAT: return true;
         case AST_INTEGER: return true;
         case AST_IDENTIFIER: return true;
@@ -111,8 +121,6 @@ bool ast_isExpression(AstKind kind) {
         case AST_IF_ELSE_EXPR: return true;
         case AST_FIELD_ACCESS: return true;
         case AST_INDEX_ACCESS: return true;
-        case AST_ADDRESS_OF: return true;
-        case AST_DEREFERENCE: return true;
         case AST_NEW: return true;
         case AST_TYPE: return false;
     }
@@ -127,7 +135,8 @@ void ast_setType(Ast ast, NodeId id, NodeId type) {
         case AST_INTERFACE: unreachable();
         case AST_BUILTIN: unreachable();
         case AST_EXTERN: unreachable();
-        case AST_TYPE_DEF: unreachable();
+        case AST_TYPE_DEFINITION: unreachable();
+        case AST_CASE_DEFINITION: unreachable();
         case AST_DECLARATION: unreachable();
         case AST_ASSIGNMENT: unreachable();
         case AST_RETURN: unreachable();
@@ -139,6 +148,8 @@ void ast_setType(Ast ast, NodeId id, NodeId type) {
         case AST_LINK_WITH: unreachable();
         case AST_CALL_ARGUMENT: unreachable();
         case AST_CALL: node->call.type = type; break;
+        case AST_BINARY: node->binary.type = type; break;
+        case AST_UNARY: node->unary.type = type; break;
         case AST_FLOAT: node->floatNode.type = type; break;
         case AST_INTEGER: node->integer.type = type; break;
         case AST_IDENTIFIER: node->identifier.type = type; break;
@@ -153,8 +164,6 @@ void ast_setType(Ast ast, NodeId id, NodeId type) {
         case AST_IF_ELSE_EXPR: node->ifElseExpr.type = type; break;
         case AST_FIELD_ACCESS: node->fieldAccess.type = type; break;
         case AST_INDEX_ACCESS: node->indexAccess.type = type; break;
-        case AST_ADDRESS_OF: node->addressOf.type = type; break;
-        case AST_DEREFERENCE: node->dereference.type = type; break;
         case AST_NEW: node->newNode.type = type; break;
         case AST_TYPE: unreachable();
     }
@@ -271,7 +280,31 @@ void ast_printNode(Ast ast, NodeId id, BoolStack isLast) {
         case AST_INTERFACE: todo(); break;
         case AST_BUILTIN: todo(); break;
         case AST_EXTERN: todo(); break;
-        case AST_TYPE_DEF: todo(); break;
+        case AST_TYPE_DEFINITION:
+            printIndentation(isLast);
+            printf(
+                "type %s\n",
+                ast_getNode(ast, node.function.identifier)
+                    ->identifier.value.literal.content
+            );
+
+            size_t totalChilds = node.typeDefinition.fields.count +
+                                 node.typeDefinition.cases.count;
+            for (size_t i = 0; i < node.typeDefinition.fields.count; i++) {
+                stack_push(isLast, i + 1 == totalChilds);
+                ast_printNode(ast, node.typeDefinition.fields.items[i], isLast);
+                stack_pop(isLast);
+            }
+
+            totalChilds -= node.typeDefinition.fields.count;
+            for (size_t i = 0; i < node.typeDefinition.cases.count; i++) {
+                stack_push(isLast, i + 1 == totalChilds);
+                ast_printNode(ast, node.typeDefinition.cases.items[i], isLast);
+                stack_pop(isLast);
+            }
+
+            break;
+        case AST_CASE_DEFINITION: todo(); break;
         case AST_DECLARATION:
             printIndentation(isLast);
             printf("%s\n", node.declaration.isMutable ? "=" : "be");
@@ -284,7 +317,10 @@ void ast_printNode(Ast ast, NodeId id, BoolStack isLast) {
             break;
         case AST_ASSIGNMENT: {
             printIndentation(isLast);
-            printf(":=\n");
+            if (ast_getNode(ast, node.assignment.assignable)->kind ==
+                AST_IDENTIFIER)
+                printf(":=\n");
+            else printf("=\n");
             stack_push(isLast, false);
             ast_printNode(ast, node.assignment.assignable, isLast);
             stack_pop(isLast);
@@ -355,19 +391,47 @@ void ast_printNode(Ast ast, NodeId id, BoolStack isLast) {
             break;
         case AST_CALL:
             printIndentation(isLast);
-            if (ast_getNode(ast, node.call.callable)->kind == AST_IDENTIFIER) {
-                char* literal = token_getLiteral(
-                    ast_getNode(ast, node.call.callable)->identifier.value
-                );
-                printf("%s\n", literal);
-            } else {
-                todo();
+            printf("()");
+            if (hasValue(node.call.type)) {
+                printf(": ");
+                ast_printNode(ast, node.call.type, isLast);
             }
+            printf("\n");
+            stack_push(isLast, node.call.arguments.count == 0);
+            ast_printNode(ast, node.call.called, isLast);
+            stack_pop(isLast);
             for (size_t i = 0; i < node.call.arguments.count; i++) {
                 stack_push(isLast, i + 1 == node.call.arguments.count);
                 ast_printNode(ast, node.call.arguments.items[i], isLast);
                 stack_pop(isLast);
             }
+            break;
+        case AST_BINARY:
+            printIndentation(isLast);
+            printf("%s", token_getLiteral(node.binary.operator));
+            if (hasValue(node.binary.type)) {
+                printf(": ");
+                ast_printNode(ast, node.binary.type, isLast);
+            }
+            printf("\n");
+            stack_push(isLast, false);
+            ast_printNode(ast, node.binary.left, isLast);
+            stack_pop(isLast);
+            stack_push(isLast, true);
+            ast_printNode(ast, node.binary.right, isLast);
+            stack_pop(isLast);
+            break;
+        case AST_UNARY:
+            printIndentation(isLast);
+            printf("%s", token_getLiteral(node.unary.operator));
+            if (hasValue(node.unary.type)) {
+                printf(": ");
+                ast_printNode(ast, node.unary.type, isLast);
+            }
+            printf("\n");
+            stack_push(isLast, true);
+            ast_printNode(ast, node.unary.expression, isLast);
+            stack_pop(isLast);
             break;
         case AST_FLOAT:
             printIndentation(isLast);
@@ -379,7 +443,12 @@ void ast_printNode(Ast ast, NodeId id, BoolStack isLast) {
             break;
         case AST_IDENTIFIER:
             printIndentation(isLast);
-            printf("%s\n", node.identifier.value.literal.content);
+            printf("%s", token_getLiteral(node.identifier.value));
+            if (hasValue(node.identifier.type)) {
+                printf(": ");
+                ast_printNode(ast, node.identifier.type, isLast);
+            }
+            printf("\n");
             break;
         case AST_BOOLEAN:
             printIndentation(isLast);
@@ -389,10 +458,81 @@ void ast_printNode(Ast ast, NodeId id, BoolStack isLast) {
             printIndentation(isLast);
             printf("\"%s\"\n", node.string.value.literal.content);
             break;
-        case AST_INTERPOLATED_STRING: todo(); break;
-        case AST_ARRAY: todo(); break;
-        case AST_STRUCT_FIELD: todo(); break;
-        case AST_STRUCT_LITERAL: todo(); break;
+        case AST_INTERPOLATED_STRING:
+            printIndentation(isLast);
+            printf("\"\"\n");
+            if (hasValue(node.interpolatedString.type)) {
+                printf(": ");
+                ast_printNode(ast, node.interpolatedString.type, isLast);
+            }
+            for (size_t i = 0; i < node.interpolatedString.strings.count; i++) {
+                bool last = i + 1 == node.interpolatedString.strings.count;
+                stack_push(isLast, last);
+                printIndentation(isLast);
+                printf("\"");
+                if (node.interpolatedString.strings.items[i].literal.content)
+                    printf(
+                        "%s",
+                        node.interpolatedString.strings.items[i].literal.content
+                    );
+                printf("\"\n");
+                stack_pop(isLast);
+
+                if (!last) {
+                    stack_push(isLast, false);
+                    ast_printNode(
+                        ast,
+                        node.interpolatedString.expressions.items[i],
+                        isLast
+                    );
+                    stack_pop(isLast);
+                }
+            }
+            break;
+        case AST_ARRAY:
+            printIndentation(isLast);
+            printf("[]");
+            if (hasValue(node.arrayNode.type)) {
+                printf(": ");
+                ast_printNode(ast, node.arrayNode.type, isLast);
+            }
+            printf("\n");
+            for (size_t i = 0; i < node.arrayNode.elements.count; i++) {
+                stack_push(isLast, i + 1 == node.arrayNode.elements.count);
+                ast_printNode(ast, node.arrayNode.elements.items[i], isLast);
+                stack_pop(isLast);
+            }
+            break;
+        case AST_STRUCT_FIELD:
+            printIndentation(isLast);
+            printf(
+                "%s:\n",
+                ast_getNode(ast, node.structField.identifier)
+                    ->identifier.value.literal.content
+            );
+            stack_push(isLast, true);
+            ast_printNode(ast, node.structField.expression, isLast);
+            stack_pop(isLast);
+            break;
+        case AST_STRUCT_LITERAL: {
+            printIndentation(isLast);
+            printf(
+                "%s",
+                ast_getNode(ast, node.structLiteral.identifier)
+                    ->identifier.value.literal.content
+            );
+            if (hasValue(node.structLiteral.type)) {
+                printf(": ");
+                ast_printNode(ast, node.structLiteral.type, isLast);
+            }
+            printf("\n");
+            for (size_t i = 0; i < node.structLiteral.fields.count; i++) {
+                stack_push(isLast, i + 1 == node.structLiteral.fields.count);
+                ast_printNode(ast, node.structLiteral.fields.items[i], isLast);
+                stack_pop(isLast);
+            }
+            break;
+        }
         case AST_IF_ELSE_EXPR: {
             bool lastNode = isLast.items[isLast.count - 1];
             if (lastNode == true) {
@@ -423,14 +563,47 @@ void ast_printNode(Ast ast, NodeId id, BoolStack isLast) {
             }
             break;
         }
-        case AST_FIELD_ACCESS: todo(); break;
-        case AST_INDEX_ACCESS: todo(); break;
-        case AST_ADDRESS_OF: todo(); break;
-        case AST_DEREFERENCE: todo(); break;
+        case AST_FIELD_ACCESS:
+            printIndentation(isLast);
+            printf(
+                ".%s",
+                ast_getNode(ast, node.fieldAccess.identifier)
+                    ->identifier.value.literal.content
+            );
+            if (hasValue(node.fieldAccess.type)) {
+                printf(": ");
+                ast_printNode(ast, node.fieldAccess.type, isLast);
+            }
+            printf("\n");
+            stack_push(isLast, true);
+            ast_printNode(ast, node.fieldAccess.accessed, isLast);
+            stack_pop(isLast);
+            break;
+        case AST_INDEX_ACCESS:
+            printIndentation(isLast);
+            printf("[]");
+            if (hasValue(node.indexAccess.type)) {
+                printf(": ");
+                ast_printNode(ast, node.indexAccess.type, isLast);
+            }
+            printf("\n");
+            stack_push(isLast, false);
+            ast_printNode(ast, node.indexAccess.accessed, isLast);
+            stack_pop(isLast);
+            stack_push(isLast, true);
+            ast_printNode(ast, node.indexAccess.index, isLast);
+            stack_pop(isLast);
+            break;
         case AST_NEW: todo(); break;
         case AST_TYPE:
             printf("%s", token_getLiteral(node.type.token));
-            if (node.type.parameters.count > 0) todo();
+            if (node.type.parameters.count > 0) {
+                printf("[");
+                for (size_t i = 0; i < node.type.parameters.count; i++) {
+                    ast_printNode(ast, node.type.parameters.items[i], isLast);
+                }
+                printf("]");
+            }
             break;
     }
 }

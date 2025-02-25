@@ -6,6 +6,21 @@ type Point
 a = Point{x: 3, y: 10.5}
 print(a)
 
---- Output
-Point{x: 3, y: 10.5}
----
+-- Output
+-- program
+-- ├──=
+-- │  ├──a
+-- │  └──Point
+-- │     ├──x:
+-- │     │  └──3
+-- │     └──y:
+-- │        └──10.5
+-- ├──()
+-- │  ├──print
+-- │  └──a
+-- └──type Point
+--    ├──x: Float64
+--    └──y: Float64
+
+-- RealOutput
+-- Point{x: 3, y: 10.5}

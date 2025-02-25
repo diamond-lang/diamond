@@ -15,8 +15,46 @@ print(point.x)
 awesome(point)
 print(point.x)
 
---- Output
-10
-100
-10
----
+-- Output
+-- program
+-- ├──=
+-- │  ├──point
+-- │  └──Point
+-- │     ├──x:
+-- │     │  └──10
+-- │     ├──y:
+-- │     │  └──10
+-- │     ├──z:
+-- │     │  └──10
+-- │     └──w:
+-- │        └──10
+-- ├──()
+-- │  ├──print
+-- │  └──.x
+-- │     └──point
+-- ├──()
+-- │  ├──awesome
+-- │  └──point
+-- ├──()
+-- │  ├──print
+-- │  └──.x
+-- │     └──point
+-- ├──type Point
+-- │  ├──x: Float64
+-- │  ├──y: Float64
+-- │  ├──z: Float64
+-- │  └──w: Float64
+-- └──function awesome(point: Point): None
+--    ├──=
+--    │  ├──.x
+--    │  │  └──point
+--    │  └──100
+--    └──()
+--       ├──print
+--       └──.x
+--          └──point
+
+-- RealOutput
+-- 10
+-- 100
+-- 10

@@ -11,7 +11,8 @@ typedef enum {
     AST_INTERFACE,
     AST_BUILTIN,
     AST_EXTERN,
-    AST_TYPE_DEF,
+    AST_TYPE_DEFINITION,
+    AST_CASE_DEFINITION,
     AST_DECLARATION,
     AST_ASSIGNMENT,
     AST_RETURN,
@@ -23,6 +24,8 @@ typedef enum {
     AST_LINK_WITH,
     AST_CALL_ARGUMENT,
     AST_CALL,
+    AST_BINARY,
+    AST_UNARY,
     AST_FLOAT,
     AST_INTEGER,
     AST_IDENTIFIER,
@@ -35,8 +38,6 @@ typedef enum {
     AST_IF_ELSE_EXPR,
     AST_FIELD_ACCESS,
     AST_INDEX_ACCESS,
-    AST_ADDRESS_OF,
-    AST_DEREFERENCE,
     AST_NEW,
     AST_TYPE
 } AstKind;
@@ -94,6 +95,12 @@ typedef struct {
         } typeDefinition;
 
         struct {
+            NodeId identifier;
+            NodeIdList fields;
+            NodeIdList cases;
+        } caseDefinition;
+
+        struct {
             bool isMutable;
             NodeId identifier;
             NodeId expression;
@@ -141,10 +148,28 @@ typedef struct {
         } callArgument;
 
         struct {
-            NodeId callable;
+            NodeId called;
             NodeIdList arguments;
             OptionalNodeId type;
         } call;
+
+        struct {
+            NodeId expression;
+            OptionalNodeId type;
+        } addressOf;
+
+        struct {
+            Token operator;
+            NodeId left;
+            NodeId right;
+            OptionalNodeId type;
+        } binary;
+
+        struct {
+            Token operator;
+            NodeId expression;
+            OptionalNodeId type;
+        } unary;
 
         struct {
             Token value;
@@ -211,16 +236,6 @@ typedef struct {
             NodeId index;
             OptionalNodeId type;
         } indexAccess;
-
-        struct {
-            NodeId expression;
-            OptionalNodeId type;
-        } addressOf;
-
-        struct {
-            NodeId expression;
-            OptionalNodeId type;
-        } dereference;
 
         struct {
             NodeId expression;

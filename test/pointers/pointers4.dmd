@@ -4,6 +4,27 @@ o = &p : Pointer[Pointer[Int64]]
 **o = 30
 print(a)
 
---- Output
-30
----
+-- Output
+-- program
+-- ├──=
+-- │  ├──a
+-- │  └──10
+-- ├──=
+-- │  ├──p
+-- │  └──&: Pointer[Int64]
+-- │     └──a
+-- ├──=
+-- │  ├──o
+-- │  └──&: Pointer[Pointer[Int64]]
+-- │     └──p
+-- ├──=
+-- │  ├──*
+-- │  │  └──*
+-- │  │     └──o
+-- │  └──30
+-- └──()
+--    ├──print
+--    └──a
+
+-- RealOutput
+-- 30

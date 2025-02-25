@@ -8,7 +8,27 @@ a = Point{x: 20, y: 30}
 print(a.x)
 print(a.y)
 
---- Output
-20
-30
----
+-- Output
+-- program
+-- ├──=
+-- │  ├──a
+-- │  └──Point
+-- │     ├──x:
+-- │     │  └──20
+-- │     └──y:
+-- │        └──30
+-- ├──()
+-- │  ├──print
+-- │  └──.x
+-- │     └──a
+-- ├──()
+-- │  ├──print
+-- │  └──.y
+-- │     └──a
+-- └──type Point
+--    ├──x: Float64
+--    └──y: Float64
+
+-- RealOutput
+-- 20
+-- 30

@@ -6,11 +6,14 @@ print(foo(16.6))
 
 -- Output
 -- program
--- ├──print
--- │  └──foo
+-- ├──()
+-- │  ├──print
+-- │  └──()
+-- │     ├──foo
 -- │     └──16.6
 -- └──function foo(a)
---    ├──print
+--    ├──()
+--    │  ├──print
 --    │  └──a
 --    └──return
 --       └──a

@@ -23,7 +23,8 @@ while i < 10
 --    │  │  ├──i
 --    │  │  └──6
 --    │  └──continue
---    └──print
+--    └──()
+--       ├──print
 --       └──i
 
 -- RealOutput

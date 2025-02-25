@@ -12,25 +12,37 @@ function sub(a, b) return a - b
 
 -- Output
 -- program
--- ├──print
--- │  └──add
+-- ├──()
+-- │  ├──print
+-- │  └──()
+-- │     ├──add
 -- │     ├──4.0
 -- │     └──6.0
--- ├──print
--- │  └──div
+-- ├──()
+-- │  ├──print
+-- │  └──()
+-- │     ├──div
 -- │     ├──7.0
 -- │     └──8.0
--- ├──print
--- │  └──identity
+-- ├──()
+-- │  ├──print
+-- │  └──()
+-- │     ├──identity
 -- │     └──5.0
--- ├──print
--- │  └──identity
+-- ├──()
+-- │  ├──print
+-- │  └──()
+-- │     ├──identity
 -- │     └──false
--- ├──print
--- │  └──identity
+-- ├──()
+-- │  ├──print
+-- │  └──()
+-- │     ├──identity
 -- │     └──64
--- ├──print
--- │  └──sub
+-- ├──()
+-- │  ├──print
+-- │  └──()
+-- │     ├──sub
 -- │     ├──7
 -- │     └──4
 -- ├──function add(a, b)
