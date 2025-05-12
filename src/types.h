@@ -7,8 +7,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "arena.h"
-
 // List
 #define ListType(T)      \
     struct {             \
@@ -17,21 +15,40 @@
         size_t capacity; \
     }
 
-#define list_append(list, item)                     \
-    do {                                            \
-        if (list.count >= list.capacity) {          \
-            if (list.capacity == 0) {               \
-                list.capacity = 256;                \
-            } else {                                \
-                list.capacity *= 2;                 \
-            }                                       \
-            list.items = arena_realloc(             \
-                list.items,                         \
-                list.capacity * sizeof(*list.items) \
-            );                                      \
-        }                                           \
-        list.items[list.count] = item;              \
-        list.count += 1;                            \
+#define list_append(list, item)                                           \
+    do {                                                                  \
+        if (list.count >= list.capacity) {                                \
+            if (list.capacity == 0) {                                     \
+                list.capacity = 256;                                      \
+            } else {                                                      \
+                list.capacity *= 2;                                       \
+            }                                                             \
+            list.items =                                                  \
+                realloc(list.items, list.capacity * sizeof(*list.items)); \
+        }                                                                 \
+        list.items[list.count] = item;                                    \
+        list.count += 1;                                                  \
+    } while (false);
+
+#define list_setCapacity(list, newCapacity)                                    \
+    do {                                                                       \
+        list.capacity = newCapacity;                                           \
+        list.items = realloc(list.items, list.capacity * sizeof(*list.items)); \
+        if (list.capacity < list.count) list.count = list.capacity;            \
+    } while (false);
+
+#define list_appendCapacity(list, extraCapacity)                          \
+    do {                                                                  \
+        while (list.count + extraCapacity > list.capacity) {              \
+            if (list.capacity == 0) {                                     \
+                list.capacity = 256;                                      \
+            } else {                                                      \
+                list.capacity *= 2;                                       \
+            }                                                             \
+            list.items =                                                  \
+                realloc(list.items, list.capacity * sizeof(*list.items)); \
+            assert(list.items != NULL);                                   \
+        }                                                                 \
     } while (false);
 
 #define List() {NULL, 0, 0}
@@ -44,21 +61,19 @@
         size_t capacity; \
     }
 
-#define stack_push(stack, item)                       \
-    do {                                              \
-        if (stack.count >= stack.capacity) {          \
-            if (stack.capacity == 0) {                \
-                stack.capacity = 256;                 \
-            } else {                                  \
-                stack.capacity *= 2;                  \
-            }                                         \
-            stack.items = arena_realloc(              \
-                stack.items,                          \
-                stack.capacity * sizeof(*stack.items) \
-            );                                        \
-        }                                             \
-        stack.items[stack.count] = item;              \
-        stack.count += 1;                             \
+#define stack_push(stack, item)                                              \
+    do {                                                                     \
+        if (stack.count >= stack.capacity) {                                 \
+            if (stack.capacity == 0) {                                       \
+                stack.capacity = 256;                                        \
+            } else {                                                         \
+                stack.capacity *= 2;                                         \
+            }                                                                \
+            stack.items =                                                    \
+                realloc(stack.items, stack.capacity * sizeof(*stack.items)); \
+        }                                                                    \
+        stack.items[stack.count] = item;                                     \
+        stack.count += 1;                                                    \
     } while (false);
 
 #define stack_pop(stack)  \
@@ -70,8 +85,7 @@
 
 #define Stack() {NULL, 0, 0}
 
-typedef StackType(bool) BoolStack;
-typedef StackType(size_t) SizeStack;
+typedef StackType(size_t) SizeTStack;
 
 // String
 typedef struct {

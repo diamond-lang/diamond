@@ -5,321 +5,207 @@
 #include <string.h>
 
 #include "common.h"
+#include "error.h"
 #include "token.h"
 #include "types.h"
-#include "utilities.h"
 
-typedef ListType(bool) ListBool;
-
-typedef struct {
-    size_t line;
-    size_t column;
-    size_t start;
-    size_t current;
-    String source;
-    BoolStack context;
-    TokenList tokens;
-    ErrorList* errors;
-} Lexer;
-
-void scanToken(Lexer* lexer);
-void scanString(Lexer* lexer);
-void scanNumber(Lexer* lexer);
-void scanIdentifierOrKeyword(Lexer* lexer);
-bool atEnd(Lexer lexer);
-void advance(Lexer* lexer);
-bool match(Lexer* lexer, char* string);
-char peek(Lexer lexer);
-char peekNext(Lexer lexer);
-void advanceUntilNewLine(Lexer* lexer);
-void addToken(Lexer* lexer, TokenKind kind);
-void addTokenWithLiteral(Lexer* lexer, TokenKind kind, String literal);
-static void addError(Lexer* lexer, Error error);
-
-void lex(Ast* ast) {
-    String source = readFile(ast->filePath);
-    Lexer lexer = {1, 1, 0, 0, source, Stack(), List(), &ast->errors};
-    while (!atEnd(lexer)) {
-        scanToken(&lexer);
-    }
-    lexer.start = lexer.current;
-    addToken(&lexer, END_OF_FILE);
-    ast->tokens = lexer.tokens;
+static char nextChar(Lexer* lexer) {
+    char result = *lexer->source;
+    if (result != '\0') lexer->source += 1;
+    return result;
 }
 
-void scanToken(Lexer* lexer) {
-    lexer->start = lexer->current;
+static void advance(Lexer* lexer) {
+    lexer->current = lexer->next;
+    lexer->next = lexer->nextNext;
+    lexer->nextNext = nextChar(lexer);
+    string_append(&lexer->currentLiteral, lexer->current);
+    if (lexer->current == '\n') {
+        lexer->column = 1;
+        lexer->line += 1;
+    } else {
+        lexer->column += 1;
+    }
+}
 
-    if (match(lexer, "(")) return addToken(lexer, LEFT_PAREN);
-    if (match(lexer, ")")) return addToken(lexer, RIGHT_PAREN);
-    if (match(lexer, "[")) return addToken(lexer, LEFT_BRACKET);
-    if (match(lexer, "]")) return addToken(lexer, RIGHT_BRACKET);
-    if (peek(*lexer) == '{') {
-        if (lexer->context.count != 0) {
-            stack_push(lexer->context, false);
-        }
+static void advanceUntilNewLine(Lexer* lexer) {
+    while (lexer->current != '\0' && lexer->current != '\n') {
         advance(lexer);
-        return addToken(lexer, LEFT_CURLY);
     }
-    if (peek(*lexer) == '}') {
-        if (lexer->context.count != 0) {
-            if (stack_top(lexer->context)) {
-                stack_pop(lexer->context);
-                return scanString(lexer);
-            } else {
-                stack_pop(lexer->context);
-                advance(lexer);
-                return addToken(lexer, RIGHT_CURLY);
-            }
-        } else {
-            advance(lexer);
-            return addToken(lexer, RIGHT_CURLY);
-        }
-    }
-    if (match(lexer, "+")) return addToken(lexer, PLUS);
-    if (match(lexer, "*")) return addToken(lexer, STAR);
-    if (match(lexer, "/")) return addToken(lexer, SLASH);
-    if (match(lexer, "%")) return addToken(lexer, MODULO);
-    if (match(lexer, ":=")) return addToken(lexer, COLON_EQUAL);
-    if (match(lexer, ":")) return addToken(lexer, COLON);
-    if (match(lexer, ",")) return addToken(lexer, COMMA);
-    if (match(lexer, "!=")) return addToken(lexer, NOT_EQUAL);
-    if (match(lexer, "==")) return addToken(lexer, EQUAL_EQUAL);
-    if (match(lexer, "=")) return addToken(lexer, EQUAL);
-    if (match(lexer, ">=")) return addToken(lexer, GREATER_EQUAL);
-    if (match(lexer, ">")) return addToken(lexer, GREATER);
-    if (match(lexer, "<=")) return addToken(lexer, LESS_EQUAL);
-    if (match(lexer, "<")) return addToken(lexer, LESS);
-    if (match(lexer, "&")) return addToken(lexer, AMPERSAND);
-    if (peek(*lexer) == '.' && isdigit(peekNext(*lexer))) {
-        return scanNumber(lexer);
-    }
-    if (match(lexer, ".")) {
-        return addToken(lexer, DOT);
-    }
-    if (match(lexer, "--")) {
-        advanceUntilNewLine(lexer);
-        advance(lexer);
-        if (atEnd(*lexer)) return;
-        else return scanToken(lexer);
-    }
-    if (match(lexer, "-")) {
-        return addToken(lexer, MINUS);
-    }
-    if (match(lexer, "_")) {
-        return scanIdentifierOrKeyword(lexer);
-    }
-    if (match(lexer, " ") || match(lexer, "\t")) {
-        return;
-    }
-    if (peek(*lexer) == '\n' ||
-        (peek(*lexer) == '\r' && peekNext(*lexer) == '\n')) {
-        addToken(lexer, NEW_LINE);
-        advance(lexer);
-        return;
-    }
-    if (peek(*lexer) == '\"') {
-        return scanString(lexer);
-    }
-    if (isdigit(peek(*lexer))) return scanNumber(lexer);
-    if (isalpha(peek(*lexer))) return scanIdentifierOrKeyword(lexer);
+}
 
-    addError(lexer, (Error){UNRECOGNIZED_CHARACTER});
+static bool match(Lexer* lexer, char c) {
+    if (lexer->next == c) {
+        advance(lexer);
+        advance(lexer);
+        return true;
+    }
+    return false;
+}
+
+static Token createToken(Lexer* lexer, TokenKind kind) {
+    Token token = {
+        .kind = kind,
+        .line = lexer->line,
+        .column = lexer->column - lexer->currentLiteral.count
+    };
+    return token;
+}
+
+static Token createTokenWithLiteral(Lexer* lexer, TokenKind kind) {
+    // Add literal to literals
+    uint32_t literalId = lexer->literals->count;
+    size_t length = lexer->currentLiteral.count;
+    list_appendCapacity((*lexer->literals), length + 1);
+    strncpy(
+        (char*)lexer->literals->items + literalId,
+        lexer->currentLiteral.content,
+        length
+    );
+    lexer->literals->count += length + 1;
+    lexer->literals->items[lexer->literals->count - 1] = '\0';
+
+    // Creat token
+    Token token = {
+        .kind = kind,
+        .line = lexer->line,
+        .column = lexer->column - lexer->currentLiteral.count,
+        .literal = literalId
+    };
+    return token;
+}
+
+void initLexer(
+    Lexer* lexer, char* source, Uint8List* literals, ErrorList* errors
+) {
+    lexer->line = 1;
+    lexer->column = 1;
+    lexer->source = source;
+    lexer->literals = literals;
+    lexer->errors = errors;
+    lexer->currentLiteral = String();
+    lexer->next = nextChar(lexer);
+    lexer->nextNext = nextChar(lexer);
+}
+
+static Token scanNumber(Lexer* lexer);
+static Token scanIdentifierOrKeyword(Lexer* lexer);
+
+Token scanToken(Lexer* lexer) {
+start:
+    lexer->currentLiteral.count = 0;
     advance(lexer);
-}
-
-void scanString(Lexer* lexer) {
-    String literal = {NULL, 0, 0};
-    bool isRight = false;
-
-    if (peek(*lexer) == '}') {
-        isRight = true;
-    }
-
-    advance(lexer);
-    while (!(atEnd(*lexer) || match(lexer, "\n"))) {
-        if (match(lexer, "\\n")) {
-            string_append(&literal, '\n');
-        } else if (match(lexer, "\\\"")) {
-            string_append(&literal, '\"');
-        } else if (match(lexer, "\"")) {
-            if (isRight) {
-                return addTokenWithLiteral(lexer, STRING_RIGHT, literal);
-            } else {
-                return addTokenWithLiteral(lexer, STRING, literal);
+    switch (lexer->current) {
+        case '(': return createToken(lexer, LEFT_PAREN);
+        case ')': return createToken(lexer, RIGHT_PAREN);
+        case '{': return createToken(lexer, LEFT_CURLY);
+        case '}': return createToken(lexer, RIGHT_CURLY);
+        case '[': return createToken(lexer, LEFT_BRACKET);
+        case ']': return createToken(lexer, RIGHT_BRACKET);
+        case '&': return createToken(lexer, AMPERSAND);
+        case '.':
+            if (isdigit(lexer->next)) return scanNumber(lexer);
+            return createToken(lexer, DOT);
+        case '+': return createToken(lexer, PLUS);
+        case '-':
+            if (match(lexer, '-')) {
+                advanceUntilNewLine(lexer);
+                goto start;
             }
-        } else if (match(lexer, "\\{")) {
-            string_append(&literal, '{');
-        } else if (match(lexer, "{")) {
-            stack_push(lexer->context, true);
-            if (isRight) {
-                return addTokenWithLiteral(lexer, STRING_MIDDLE, literal);
-            } else {
-                return addTokenWithLiteral(lexer, STRING_LEFT, literal);
-            }
-        } else {
-            string_append(&literal, peek(*lexer));
-            advance(lexer);
+            return createToken(lexer, MINUS);
+        case '*': return createToken(lexer, STAR);
+        case '%': return createToken(lexer, MODULO);
+        case ':': {
+            if (match(lexer, '=')) return createToken(lexer, COLON_EQUAL);
+            return createToken(lexer, COLON);
+        }
+        case ',': return createToken(lexer, COMMA);
+        case '!': {
+            if (match(lexer, '=')) return createToken(lexer, NOT_EQUAL);
+            unreachable();
+        }
+        case '=': {
+            if (match(lexer, '=')) return createToken(lexer, EQUAL_EQUAL);
+            return createToken(lexer, EQUAL);
+        }
+        case '>': {
+            if (match(lexer, '=')) return createToken(lexer, GREATER_EQUAL);
+            return createToken(lexer, GREATER);
+        }
+        case '<': {
+            if (match(lexer, '=')) return createToken(lexer, LESS_EQUAL);
+            return createToken(lexer, LESS);
+        }
+        case ' ':
+        case '\t': goto start;
+        case '\n': return createToken(lexer, NEW_LINE);
+        case '\0': return createToken(lexer, END_OF_FILE);
+        default: {
+            if (isdigit(lexer->current)) return scanNumber(lexer);
+            if (isalpha(lexer->current)) return scanIdentifierOrKeyword(lexer);
         }
     }
 
-    todo();
+    advance(lexer);
+    Token result = createTokenWithLiteral(lexer, UNKNOWN_TOKEN);
+    return result;
 }
 
-void scanNumber(Lexer* lexer) {
+static Token scanNumber(Lexer* lexer) {
     // consume digits
-    while (isdigit(peek(*lexer))) advance(lexer);
+    while (isdigit(lexer->next)) advance(lexer);
 
     // eg: .8
-    if (peek(*lexer) == '.' && isdigit(peekNext(*lexer))) {
-        // consume "."
+    if (lexer->next == '.' && isdigit(lexer->nextNext)) {
+        // consume "." and first digit
+        advance(lexer);
         advance(lexer);
 
         // consume digits
-        while (isdigit(peek(*lexer))) advance(lexer);
+        while (isdigit(lexer->next)) advance(lexer);
 
-        // Add token
-        String literal = string_substring(
-            lexer->source,
-            lexer->start,
-            lexer->current - lexer->start
-        );
-        return addTokenWithLiteral(lexer, FLOAT, literal);
+        //Add token
+        return createTokenWithLiteral(lexer, FLOAT);
     }
 
-    // Add token
-    String literal = string_substring(
-        lexer->source,
-        lexer->start,
-        lexer->current - lexer->start
-    );
-    return addTokenWithLiteral(lexer, INTEGER, literal);
+    return createTokenWithLiteral(lexer, FLOAT);
 }
 
-void scanIdentifierOrKeyword(Lexer* lexer) {
-    while (isalnum(peek(*lexer)) || peek(*lexer) == '_') advance(lexer);
-
-    String literal = string_substring(
-        lexer->source,
-        lexer->start,
-        lexer->current - lexer->start
-    );
-
-    if (string_equals(literal.content, "if")) return addToken(lexer, IF);
-    if (string_equals(literal.content, "else")) return addToken(lexer, ELSE);
-    if (string_equals(literal.content, "while")) return addToken(lexer, WHILE);
-    if (string_equals(literal.content, "function"))
-        return addToken(lexer, FUNCTION);
-    if (string_equals(literal.content, "interface"))
-        return addToken(lexer, INTERFACE);
-    if (string_equals(literal.content, "builtin"))
-        return addToken(lexer, BUILTIN);
-    if (string_equals(literal.content, "type")) return addToken(lexer, TYPE);
-    if (string_equals(literal.content, "case")) return addToken(lexer, CASE);
-    if (string_equals(literal.content, "be")) return addToken(lexer, BE);
-    if (string_equals(literal.content, "true")) return addToken(lexer, TRUE);
-    if (string_equals(literal.content, "false")) return addToken(lexer, FALSE);
-    if (string_equals(literal.content, "and")) return addToken(lexer, AND);
-    if (string_equals(literal.content, "or")) return addToken(lexer, OR);
-    if (string_equals(literal.content, "use")) return addToken(lexer, USE);
-    if (string_equals(literal.content, "include"))
-        return addToken(lexer, INCLUDE);
-    if (string_equals(literal.content, "break")) return addToken(lexer, BREAK);
-    if (string_equals(literal.content, "continue"))
-        return addToken(lexer, CONTINUE);
-    if (string_equals(literal.content, "return"))
-        return addToken(lexer, RETURN);
-    if (string_equals(literal.content, "mut")) return addToken(lexer, MUT);
-    if (string_equals(literal.content, "new")) return addToken(lexer, NEW);
-    if (string_equals(literal.content, "not")) return addToken(lexer, NOT);
-    if (string_equals(literal.content, "extern"))
-        return addToken(lexer, EXTERN);
-    if (string_equals(literal.content, "link_with"))
-        return addToken(lexer, LINK_WITH);
-
-    return addTokenWithLiteral(lexer, IDENTIFIER, literal);
-}
-
-bool atEnd(Lexer lexer) { return lexer.current >= lexer.source.count; }
-
-void advance(Lexer* lexer) {
-    if (peek(*lexer) == '\n') {
-        lexer->column = 1;
-        lexer->line += 1;
-        lexer->current += 1;
-    } else if (peek(*lexer) == '\r' && peekNext(*lexer) == '\n') {
-        lexer->column = 1;
-        lexer->line += 1;
-        lexer->current += 2;
-    } else {
-        lexer->column += 1;
-        lexer->current += 1;
+static bool identifierEquals(Lexer* lexer, char* literal) {
+    size_t length = lexer->currentLiteral.count;
+    for (size_t i = 0; i < length; i++) {
+        if (lexer->currentLiteral.content[i] != literal[i]) return false;
     }
+    if (literal[length] != '\0') return false;
+    return true;
 }
 
-bool match(Lexer* lexer, char* string) {
-    bool match = true;
-    int i = 0;
-    size_t line = lexer->line;
-    size_t column = lexer->column;
-    while (!atEnd(*lexer) && string[i] != '\0') {
-        if (peek(*lexer) != string[i]) {
-            match = false;
-            lexer->current -= i;
-            lexer->line = line;
-            lexer->column = column;
-            break;
-        }
-        advance(lexer);
-        i++;
-    }
-    if (atEnd(*lexer) && string[i] != '\0') {
-        match = false;
-        lexer->current -= i;
-        lexer->line = line;
-        lexer->column = column;
-    }
-    return match;
-}
+static Token scanIdentifierOrKeyword(Lexer* lexer) {
+    while (isalnum(lexer->next) || lexer->next == '_') advance(lexer);
 
-char peek(Lexer lexer) {
-    if (atEnd(lexer)) return '\0';
-    return lexer.source.content[lexer.current];
-}
+    if (identifierEquals(lexer, "if")) return createToken(lexer, IF);
+    if (identifierEquals(lexer, "else")) return createToken(lexer, ELSE);
+    if (identifierEquals(lexer, "while")) return createToken(lexer, WHILE);
+    if (identifierEquals(lexer, "function"))
+        return createToken(lexer, FUNCTION);
+    if (identifierEquals(lexer, "interface"))
+        return createToken(lexer, INTERFACE);
+    if (identifierEquals(lexer, "type")) return createToken(lexer, TYPE);
+    if (identifierEquals(lexer, "case")) return createToken(lexer, CASE);
+    if (identifierEquals(lexer, "be")) return createToken(lexer, BE);
+    if (identifierEquals(lexer, "true")) return createToken(lexer, TRUE);
+    if (identifierEquals(lexer, "false")) return createToken(lexer, FALSE);
+    if (identifierEquals(lexer, "and")) return createToken(lexer, AND);
+    if (identifierEquals(lexer, "or")) return createToken(lexer, OR);
+    if (identifierEquals(lexer, "use")) return createToken(lexer, USE);
+    if (identifierEquals(lexer, "include")) return createToken(lexer, INCLUDE);
+    if (identifierEquals(lexer, "break")) return createToken(lexer, BREAK);
+    if (identifierEquals(lexer, "continue"))
+        return createToken(lexer, CONTINUE);
+    if (identifierEquals(lexer, "return")) return createToken(lexer, RETURN);
+    if (identifierEquals(lexer, "mut")) return createToken(lexer, MUT);
+    if (identifierEquals(lexer, "not")) return createToken(lexer, NOT);
+    if (identifierEquals(lexer, "extern")) return createToken(lexer, EXTERN);
 
-char peekNext(Lexer lexer) {
-    if (lexer.current + 1 >= lexer.source.count) return '\0';
-    return lexer.source.content[lexer.current + 1];
-}
-
-void advanceUntilNewLine(Lexer* lexer) {
-    while (peek(*lexer) != '\0' && peek(*lexer) != '\n') {
-        advance(lexer);
-    }
-}
-
-void addToken(Lexer* lexer, TokenKind kind) {
-    Token token = {
-        kind,
-        String(),
-        lexer->line,
-        lexer->column - (lexer->current - lexer->start)
-    };
-    list_append(lexer->tokens, token);
-}
-
-void addTokenWithLiteral(Lexer* lexer, TokenKind kind, String literal) {
-    Token token = {
-        kind,
-        literal,
-        lexer->line,
-        lexer->column - (lexer->current - lexer->start)
-    };
-    list_append(lexer->tokens, token);
-}
-
-static void addError(Lexer* lexer, Error error) {
-    error.line = lexer->line;
-    error.column = lexer->column;
-    list_append((*lexer->errors), error);
+    return createTokenWithLiteral(lexer, IDENTIFIER);
 }

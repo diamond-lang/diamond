@@ -3,6 +3,6 @@
 
 #include "ast.h"
 
-void parse(Ast* ast);
+Ast parse(char* filePath);
 
 #endif

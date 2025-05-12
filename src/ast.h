@@ -1,272 +1,144 @@
 #ifndef ast_h
 #define ast_h
 
-#include "token.h"
+#include <stdbool.h>
+#include <stdint.h>
+
 #include "types.h"
 
 typedef enum {
-    AST_BLOCK,
-    AST_FUNCTION_ARGUMENT,
+    AST_INCLUDE,
+    AST_USE,
     AST_FUNCTION,
     AST_INTERFACE,
-    AST_BUILTIN,
     AST_EXTERN,
     AST_TYPE_DEFINITION,
-    AST_CASE_DEFINITION,
+    AST_BLOCK,
+
+    // Statements
     AST_DECLARATION,
     AST_ASSIGNMENT,
     AST_RETURN,
+    AST_RETURN_WITH_EXPRESSION,
     AST_BREAK,
     AST_CONTINUE,
     AST_IF_ELSE,
     AST_WHILE,
-    AST_IMPORT,
-    AST_LINK_WITH,
-    AST_CALL_ARGUMENT,
+
+    // Expressions
+    AST_EXPRESSION,
     AST_CALL,
-    AST_BINARY,
-    AST_UNARY,
+    AST_IF_ELSE_EXPRESSION,
+    AST_NOT,
+    AST_OR,
+    AST_AND,
+    AST_EQUAL_EQUAL,
+    AST_NOT_EQUAL,
+    AST_LESS,
+    AST_LESS_EQUAL,
+    AST_GREATER,
+    AST_GREATER_EQUAL,
+    AST_ADD,
+    AST_SUBTRACT,
+    AST_MUL,
+    AST_DIV,
+    AST_MOD,
+    AST_NEGATION,
+    AST_ADDRESS_OF,
+    AST_DEREFERENCE,
+    AST_FIELD_ACCESS,
+    AST_INDEX_ACCESS,
+
+    // Literals
     AST_FLOAT,
     AST_INTEGER,
     AST_IDENTIFIER,
     AST_BOOLEAN,
     AST_STRING,
-    AST_INTERPOLATED_STRING,
     AST_ARRAY,
-    AST_STRUCT_FIELD,
     AST_STRUCT_LITERAL,
-    AST_IF_ELSE_EXPR,
-    AST_FIELD_ACCESS,
-    AST_INDEX_ACCESS,
-    AST_NEW,
+
+    // Type
     AST_TYPE
 } AstKind;
 
-typedef int32_t NodeId;
-typedef ListType(NodeId) NodeIdList;
-typedef int32_t OptionalNodeId;
-#define hasValue(optional) (optional >= 0)
-#define None() -1
+typedef uint32_t Data;
+typedef Data NodeId;  // UINT32_MAX value is used to indicate none
+typedef Data LiteralId;
+typedef Data NodeCount;
+
+#define None() UINT32_MAX
+#define hasValue(nodeId) (nodeId != UINT32_MAX)
 
 typedef struct {
-    AstKind kind;
-    union {
-        struct {
-            NodeIdList statements;
-            NodeIdList imports;
-            NodeIdList definitions;
-        } block;
+    NodeCount numberOfTypeParameters;
+    NodeCount numberOfArguments;
+    Data argumentsMutability;
+} AstFunction;
 
-        struct {
-            bool isMutable;
-            NodeId identifier;
-            OptionalNodeId type;
-        } functionArgument;
+typedef struct {
+    NodeId start;
+} AstExpression;
 
-        struct {
-            NodeId identifier;
-            NodeIdList typeParameters;
-            NodeIdList arguments;
-            NodeId body;
-            OptionalNodeId type;
-        } function;
+typedef struct {
+    NodeCount numberOfArguments;
+    Data argumentsMutability;
+} AstCall;
 
-        struct {
-            NodeId identifier;
-            NodeIdList arguments;
-        } interface;
+typedef struct {
+    LiteralId literal;
+} AstFloat;
 
-        struct {
-            NodeId identifier;
-            NodeIdList arguments;
-            NodeId body;
-        } builtin;
+typedef struct {
+    LiteralId literal;
+} AstInteger;
 
-        struct {
-            NodeId identifier;
-            NodeIdList arguments;
-            NodeId body;
-        } externDef;
+typedef struct {
+    LiteralId literal;
+} AstIdentifier;
 
-        struct {
-            NodeId identifier;
-            NodeIdList fields;
-            NodeIdList cases;
-        } typeDefinition;
+typedef struct {
+    Data value;
+} AstBoolean;
 
-        struct {
-            NodeId identifier;
-            NodeIdList fields;
-            NodeIdList cases;
-        } caseDefinition;
+typedef struct {
+    LiteralId literal;
+} AstString;
 
-        struct {
-            bool isMutable;
-            NodeId identifier;
-            NodeId expression;
-        } declaration;
-
-        struct {
-            NodeId assignable;
-            NodeId expression;
-        } assignment;
-
-        struct {
-            OptionalNodeId expression;
-        } returnNode;
-
-        struct {
-        } breakNode;
-
-        struct {
-        } continuekNode;
-
-        struct {
-            NodeId condition;
-            NodeId ifNode;
-            OptionalNodeId elseNode;
-        } ifElse;
-
-        struct {
-            NodeId condition;
-            NodeId body;
-        } whileNode;
-
-        struct {
-            NodeId path;
-            bool includes;
-        } importNode;
-
-        struct {
-            NodeId directives;
-        } linkWith;
-
-        struct {
-            bool isMutable;
-            OptionalNodeId identifier;
-            NodeId expression;
-        } callArgument;
-
-        struct {
-            NodeId called;
-            NodeIdList arguments;
-            OptionalNodeId type;
-        } call;
-
-        struct {
-            NodeId expression;
-            OptionalNodeId type;
-        } addressOf;
-
-        struct {
-            Token operator;
-            NodeId left;
-            NodeId right;
-            OptionalNodeId type;
-        } binary;
-
-        struct {
-            Token operator;
-            NodeId expression;
-            OptionalNodeId type;
-        } unary;
-
-        struct {
-            Token value;
-            OptionalNodeId type;
-        } floatNode;
-
-        struct {
-            Token value;
-            OptionalNodeId type;
-        } integer;
-
-        struct {
-            Token value;
-            OptionalNodeId type;
-        } identifier;
-
-        struct {
-            Token value;
-            OptionalNodeId type;
-        } boolean;
-
-        struct {
-            Token value;
-            OptionalNodeId type;
-        } string;
-
-        struct {
-            TokenList strings;
-            NodeIdList expressions;
-            OptionalNodeId type;
-        } interpolatedString;
-
-        struct {
-            NodeIdList elements;
-            OptionalNodeId type;
-        } arrayNode;
-
-        struct {
-            NodeId identifier;
-            NodeId expression;
-        } structField;
-
-        struct {
-            NodeId identifier;
-            NodeIdList fields;
-            OptionalNodeId type;
-        } structLiteral;
-
-        struct {
-            NodeId condition;
-            NodeId ifNode;
-            NodeId elseNode;
-            OptionalNodeId type;
-        } ifElseExpr;
-
-        struct {
-            NodeId accessed;
-            NodeId identifier;
-            OptionalNodeId type;
-        } fieldAccess;
-
-        struct {
-            NodeId accessed;
-            NodeId index;
-            OptionalNodeId type;
-        } indexAccess;
-
-        struct {
-            NodeId expression;
-            OptionalNodeId type;
-        } newNode;
-
-        struct {
-            Token token;
-            NodeIdList parameters;
-        } type;
-    };
-} AstNode;
-
-typedef ListType(AstNode) AstNodeList;
+typedef struct {
+} AstType;
 
 #include "error.h"
 
+typedef Data DataId;
+typedef ListType(uint8_t) Uint8List;
+typedef ListType(Data) DataList;
+typedef ListType(DataId) DataIdList;
+typedef ListType(NodeId) NodeIdList;
+
 typedef struct {
-    char* filePath;
-    TokenList tokens;
-    AstNodeList nodes;
+    char *filePath;
+    Uint8List nodes;
+    DataList dataOrIndex;
+    DataList data;
+    Uint8List literals;
     ErrorList errors;
 } Ast;
 
-NodeId ast_createNode(Ast* ast, AstNode nodeContent);
-AstNode* ast_getNode(Ast ast, NodeId id);
+void initAst(Ast *ast, char *filePath);
+NodeId ast_createNode(Ast *ast, AstKind kind);
 bool ast_isExpression(AstKind kind);
 void ast_setType(Ast ast, NodeId id, NodeId type);
+void ast_setBit(Data *data, NodeCount position);
+#define ast_appendData(ast, toAppend, id)                                     \
+    do {                                                                      \
+        ast.dataOrIndex.items[id] = ast.data.count;                           \
+        list_appendCapacity(ast.data, sizeof(toAppend));                      \
+        memcpy(ast.data.items + ast.data.count, &toAppend, sizeof(toAppend)); \
+    } while (false);
 
+void *ast_getNode(Ast ast, NodeId id);
 void ast_print(Ast ast);
-void ast_printNode(Ast ast, NodeId id, BoolStack isLast);
 
 void reportErrors(Ast ast);
 

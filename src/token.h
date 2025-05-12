@@ -44,7 +44,6 @@ typedef enum {
     WHILE,
     FUNCTION,
     INTERFACE,
-    BUILTIN,
     TYPE,
     CASE,
     TRUE,
@@ -56,26 +55,22 @@ typedef enum {
     CONTINUE,
     RETURN,
     MUT,
-    NEW,
     INCLUDE,
     EXTERN,
-    LINK_WITH,
     NEW_LINE,
-    END_OF_FILE
+    END_OF_FILE,
+    UNKNOWN_TOKEN
 } TokenKind;
 
 typedef ListType(TokenKind) TokenKindList;
 
 typedef struct {
     TokenKind kind;
-    String literal;
     size_t line;
     size_t column;
+    uint32_t literal;
 } Token;
 
 typedef ListType(Token) TokenList;
-
-void token_print(TokenList tokens);
-char* token_getLiteral(Token token);
 
 #endif

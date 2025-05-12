@@ -1,0 +1,28 @@
+function add(a, b) return a + b
+
+a = add(
+    10
+    add(
+        50
+        30
+    )
+    30
+    40
+)
+
+b = 3 + 20 - 30
+
+if a == b
+and b < 4
+    print("Yeah")
+
+function intersects(ball: Ball, paddle: Paddle): Bool
+    return
+        not ball.x + ball.size < paddle.x 
+        or  ball.x > paddle.x + paddle.width
+        or  ball.y + ball.size < paddle.y
+        or  ball.y > paddle.y + paddle.height
+
+function intersects(ball: Ball, paddle: Paddle): Bool
+    return
+        log()

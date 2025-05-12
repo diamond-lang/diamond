@@ -1,34 +1,15 @@
 #include <assert.h>
+#include <stddef.h>
 #include <stdio.h>
 
-#include "arena.h"
 #include "ast.h"
-#include "lexer.h"
 #include "parser.h"
-#include "token.h"
-#include "types.h"
 
 int main(int argc, char* argv[]) {
     assert(argc == 2);
 
-    arena_init();
-
-    // Create ast
-    Ast ast;
-    ast.filePath = argv[1];
-    ast.tokens = (TokenList)List();
-    ast.errors = (ErrorList)List();
-    ast.nodes = (AstNodeList)List();
-
-    // Lex
-    lex(&ast);
-    if (ast.errors.count != 0) {
-        reportErrors(ast);
-        exit(EXIT_FAILURE);
-    }
-
     // Parse
-    parse(&ast);
+    Ast ast = parse(argv[1]);
     if (ast.errors.count != 0) {
         reportErrors(ast);
         exit(EXIT_FAILURE);
@@ -36,7 +17,14 @@ int main(int argc, char* argv[]) {
 
     ast_print(ast);
 
-    arena_freeAll();
+    // for (size_t i = 0; i < ast.literals.count; i++) {
+    //     if (ast.literals.items[i] == '\0' && i + 1 != ast.literals.count) {
+    //         printf("•");
+    //     } else {
+    //         printf("%c", ast.literals.items[i]);
+    //     }
+    // }
+    // printf("\n");
 
     return 0;
 }

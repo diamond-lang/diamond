@@ -7,9 +7,6 @@
 typedef enum {
     FILE_NOT_FOUND,
 
-    // Lexer
-    UNRECOGNIZED_CHARACTER,
-
     // Parser
     EXPECTING_LINE_ENDING,
     UNEXPECTED_IDENTATION,

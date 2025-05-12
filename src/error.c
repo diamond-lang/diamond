@@ -7,6 +7,136 @@
 #include "token.h"
 #include "utilities.h"
 
+static char* token_getLiteral(Ast ast, Token token) {
+    switch (token.kind) {
+        case LEFT_PAREN: return "(";
+        case RIGHT_PAREN: return ")";
+        case LEFT_BRACKET: return "[";
+        case RIGHT_BRACKET: return "]";
+        case LEFT_CURLY: return "{";
+        case RIGHT_CURLY: return "}";
+        case COMMA: return ",";
+        case PLUS: return "+";
+        case SLASH: return "/";
+        case MODULO: return "%";
+        case STAR: return "*";
+        case MINUS: return "-";
+        case COLON: return ":";
+        case AMPERSAND: return "&";
+        case DOT: return ".";
+        case NOT: return "not";
+        case NOT_EQUAL: return "!=";
+        case GREATER: return ">";
+        case GREATER_EQUAL: return ">=";
+        case LESS: return "<";
+        case LESS_EQUAL: return "<=";
+        case COLON_EQUAL: return ":=";
+        case EQUAL: return "=";
+        case EQUAL_EQUAL: return "==";
+        case BE: return "be";
+        case INTEGER: todo();
+        case FLOAT: todo();
+        case IDENTIFIER: todo();
+        case STRING: todo();
+        case STRING_LEFT: todo();
+        case STRING_MIDDLE: todo();
+        case STRING_RIGHT: todo();
+        case IF: return "if";
+        case ELSE: return "else";
+        case WHILE: return "while";
+        case FUNCTION: return "function";
+        case INTERFACE: return "interface";
+        case TYPE: return "type";
+        case CASE: return "case";
+        case TRUE: return "true";
+        case FALSE: return "false";
+        case OR: return "or";
+        case AND: return "and";
+        case USE: return "use";
+        case BREAK: return "break";
+        case CONTINUE: return "continue";
+        case RETURN: return "return";
+        case MUT: return "and";
+        case INCLUDE: return "include";
+        case EXTERN: return "extern";
+        case NEW_LINE: return "\\n";
+        case END_OF_FILE: return "\\0";
+        case UNKNOWN_TOKEN: return (char*)ast.literals.items + token.literal;
+    }
+}
+
+static char* ast_tokenAsString(TokenKind kind) {
+    switch (kind) {
+        case LEFT_PAREN: return "'('";
+        case RIGHT_PAREN: return "')'";
+        case LEFT_BRACKET: return "'['";
+        case RIGHT_BRACKET: return "']'";
+        case LEFT_CURLY: return "'{'";
+        case RIGHT_CURLY: return "'}'";
+        case COMMA: return "','";
+        case PLUS: return "'+'";
+        case SLASH: return "'/'";
+        case MODULO: return "'%%'";
+        case STAR: return "'*'";
+        case MINUS: return "'-'";
+        case COLON: return "':'";
+        case AMPERSAND: return "'&'";
+        case DOT: return "'.'";
+        case NOT: return "'not'";
+        case NOT_EQUAL: return "'!='";
+        case GREATER: return "'>'";
+        case GREATER_EQUAL: return "'>='";
+        case LESS: return "'<'";
+        case LESS_EQUAL: return "'<='";
+        case COLON_EQUAL: return "':='";
+        case EQUAL: return "'='";
+        case EQUAL_EQUAL: return "'=='";
+        case BE: return "be";
+        case INTEGER: return "an integer";
+        case FLOAT: return "a float";
+        case IDENTIFIER: return "an identifier";
+        case STRING: return "a string";
+        case STRING_LEFT: return "the start of an interpolated string";
+        case STRING_MIDDLE: return "the middle of an interpolated string";
+        case STRING_RIGHT: return "the end of an interpolated string";
+        case IF: return "if";
+        case ELSE: return "else";
+        case WHILE: return "while";
+        case FUNCTION: return "function";
+        case INTERFACE: return "interface";
+        case TYPE: return "type";
+        case CASE: return "case";
+        case TRUE: return "true";
+        case FALSE: return "false";
+        case OR: return "or";
+        case AND: return "and";
+        case USE: return "use";
+        case BREAK: return "break";
+        case CONTINUE: return "continue";
+        case RETURN: return "return";
+        case MUT: return "and";
+        case INCLUDE: return "include";
+        case EXTERN: return "extern";
+        case NEW_LINE: return "a new line";
+        case END_OF_FILE: return "end of file";
+        case UNKNOWN_TOKEN: return "an unknown character";
+    }
+}
+
+void printCurrentLine(char* filePath, size_t line) {
+    printf("%zu│ ", line);
+    String file = readFile(filePath);
+    for (size_t i = 0; i < file.count && line >= 1; i++) {
+        if (file.content[i] == '\n') {
+            line -= 1;
+        } else if (line == 1) {
+            printf("%c", file.content[i]);
+        }
+    }
+    free(file.content);
+    printf("\n");
+}
+
 void printBold(char* str) { printf("\x1b[1m%s\x1b[0m", str); }
 
 void printUnderline(char* str) { printf("\x1b[4m%s\x1b[0m", str); }
@@ -46,7 +176,7 @@ void underlineLocation(char* filePath, size_t line, size_t column) {
     printRed("^");
 }
 
-void underlineToken(char* filePath, Token token) {
+void underlineToken(Ast ast, Token token) {
     for (size_t i = 0; i < numberOfDigits(token.line); i++) {
         printf(" ");
     }
@@ -54,7 +184,7 @@ void underlineToken(char* filePath, Token token) {
     for (size_t i = 0; i < token.column - 1; i++) {
         printf(" ");
     }
-    char* literal = token_getLiteral(token);
+    char* literal = token_getLiteral(ast, token);
     while (*literal != '\0') {
         printRed("^");
         literal += 1;
@@ -75,97 +205,18 @@ void underlineLine(char* filePath, size_t line) {
             printRed("^");
         }
     }
-    arena_free(file.content);
-}
-
-void printCurrentLine(char* filePath, size_t line) {
-    printf("%zu│ ", line);
-    String file = readFile(filePath);
-    for (size_t i = 0; i < file.count && line >= 1; i++) {
-        if (file.content[i] == '\n') {
-            line -= 1;
-        } else if (line == 1) {
-            printf("%c", file.content[i]);
-        }
-    }
-    arena_free(file.content);
-    printf("\n");
-}
-
-char* ast_tokenAsString(TokenKind kind) {
-    switch (kind) {
-        case LEFT_PAREN: return "'('";
-        case RIGHT_PAREN: return "')'";
-        case LEFT_BRACKET: return "'['";
-        case RIGHT_BRACKET: return "']'";
-        case LEFT_CURLY: return "'{'";
-        case RIGHT_CURLY: return "'}'";
-        case COMMA: return "','";
-        case PLUS: return "'+'";
-        case SLASH: return "'/'";
-        case MODULO: return "'%%'";
-        case STAR: return "'*'";
-        case MINUS: return "'-'";
-        case COLON: return "':'";
-        case AMPERSAND: return "'&'";
-        case DOT: return "'.'";
-        case NOT: return "'not'";
-        case NOT_EQUAL: return "'!='";
-        case GREATER: return "'>'";
-        case GREATER_EQUAL: return "'>='";
-        case LESS: return "'<'";
-        case LESS_EQUAL: return "'<='";
-        case COLON_EQUAL: return "':='";
-        case EQUAL: return "'='";
-        case EQUAL_EQUAL: return "'=='";
-        case BE: return "be";
-        case INTEGER: return "an integer";
-        case FLOAT: return "a float";
-        case IDENTIFIER: return "an identifier";
-        case STRING: return "a string";
-        case STRING_LEFT: return "the start of an interpolated string";
-        case STRING_MIDDLE: return "the middle of an interpolated string";
-        case STRING_RIGHT: return "the end of an interpolated string";
-        case IF: return "if";
-        case ELSE: return "else";
-        case WHILE: return "while";
-        case FUNCTION: return "function";
-        case INTERFACE: return "interface";
-        case BUILTIN: return "builtin";
-        case TYPE: return "type";
-        case CASE: return "case";
-        case TRUE: return "true";
-        case FALSE: return "false";
-        case OR: return "or";
-        case AND: return "and";
-        case USE: return "use";
-        case BREAK: return "break";
-        case CONTINUE: return "continue";
-        case RETURN: return "return";
-        case MUT: return "and";
-        case NEW: return "new";
-        case INCLUDE: return "include";
-        case EXTERN: return "extern";
-        case LINK_WITH: return "link_with";
-        case NEW_LINE: return "a new line";
-        case END_OF_FILE: return "end of file";
-    }
+    free(file.content);
 }
 
 void reportError(Ast ast, Error error) {
     switch (error.kind) {
         case FILE_NOT_FOUND: todo(); break;
-        case UNRECOGNIZED_CHARACTER:
-            printHeader("Unrecognized character", ast.filePath);
-            printCurrentLine(ast.filePath, error.line);
-            underlineLocation(ast.filePath, error.line, error.column);
-            break;
         case EXPECTING_LINE_ENDING:
             printHeader("Expecting line ending", ast.filePath);
             printf("Finished parsing a statement. A new line was expected.\n\n"
             );
             printCurrentLine(ast.filePath, error.line);
-            underlineToken(ast.filePath, error.expectingLineEnding.actualToken);
+            underlineToken(ast, error.expectingLineEnding.actualToken);
             break;
         case UNEXPECTED_IDENTATION:
             printHeader("Unexpected indentation", ast.filePath);

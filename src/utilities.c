@@ -4,8 +4,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "arena.h"
-
 String readFile(char* path) {
     char* content = NULL;
     FILE* file = fopen(path, "r");
@@ -17,7 +15,7 @@ String readFile(char* path) {
     long fileSize = ftell(file);
     assert(fileSize != -1);
 
-    content = arena_alloc(sizeof(char) * (fileSize + 1));
+    content = malloc(sizeof(char) * (fileSize + 1));
     assert(fseek(file, 0, SEEK_SET) == 0);
 
     fread(content, sizeof(char), fileSize, file);
