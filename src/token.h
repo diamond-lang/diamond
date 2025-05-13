@@ -57,7 +57,7 @@ typedef enum {
     MUT,
     INCLUDE,
     EXTERN,
-    NEW_LINE,
+    NEW_LINES,
     END_OF_FILE,
     UNKNOWN_TOKEN
 } TokenKind;

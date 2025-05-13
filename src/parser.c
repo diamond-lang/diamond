@@ -21,7 +21,11 @@ typedef struct {
     Ast ast;
 } Parser;
 
-static bool atEnd(Parser parser) { return parser.current.kind == END_OF_FILE; }
+static bool atEnd(Parser parser) {
+    return parser.current.kind == END_OF_FILE ||
+           (parser.current.kind == NEW_LINES && parser.next.kind == END_OF_FILE
+           );
+}
 
 static bool check(Parser parser, TokenKind kind) {
     return parser.current.kind == kind;
@@ -43,21 +47,21 @@ static bool match(Parser *parser, TokenKind token) {
     return false;
 }
 
-static void advanceUntilNextStatement(Parser *parser) {
-    if (!match(parser, NEW_LINE)) return;
-    while (!atEnd(*parser) && parser->current.kind == NEW_LINE) {
-        advance(parser);
-    }
+static void consumeIfExists(Parser *parser, TokenKind kind) {
+    if (check(*parser, kind)) advance(parser);
 }
 
 static void advanceUntilNewLine(Parser *parser) {
-    while (!atEnd(*parser) && parser->current.kind != NEW_LINE) {
+    while (!atEnd(*parser) && parser->current.kind != NEW_LINES) {
         advance(parser);
     }
 }
 
 #define consume(parser, tokenKind, beingParsed)                  \
-    if (parser->current.kind != tokenKind) {                     \
+    if (parser->current.kind == UNKNOWN_TOKEN) {                 \
+        addError(parser, UNKNOWN_CHARACTER);                     \
+        return None();                                           \
+    } else if (parser->current.kind != tokenKind) {              \
         addUnexpectedTokenError(parser, tokenKind, beingParsed); \
         return None();                                           \
     }                                                            \
@@ -71,7 +75,7 @@ static void advanceUntilNewLine(Parser *parser) {
     if (!hasValue(expression)) return None();
 
 static bool couldBeExpression(Parser parser) {
-    if (check(parser, NEW_LINE)) {
+    if (check(parser, NEW_LINES)) {
         if (parser.next.column > stack_top(parser.indentationLevel)) {
             return true;
         } else return false;
@@ -156,7 +160,6 @@ Ast parse(char *filePath) {
 
     // Init parser
     Parser parser = {.indentationLevel = Stack()};
-    stack_push(parser.indentationLevel, 1);
     initAst(&parser.ast, filePath);
     initLexer(
         &parser.lexer,
@@ -179,26 +182,31 @@ static void program(Parser *parser) {
     stack_push(parser->indentationLevel, 1);
 
     // Parse statements of definitions
-    while (true) {
-        // Advance until next statement
-        advanceUntilNextStatement(parser);
-        if (atEnd(*parser)) break;
-
+    while (!atEnd(*parser)) {
         // Check indentation
-        size_t currentColumn = parser->current.column;
-        if (currentColumn < stack_top(parser->indentationLevel)) break;
-        else if (currentColumn > stack_top(parser->indentationLevel)) {
+        size_t indentationLevel = parser->current.column;
+        if (check(*parser, NEW_LINES)) indentationLevel = parser->next.column;
+
+        if (indentationLevel < stack_top(parser->indentationLevel)) break;
+        else if (indentationLevel > stack_top(parser->indentationLevel)) {
             addError(parser, UNEXPECTED_IDENTATION);
             advanceUntilNewLine(parser);
             continue;
         }
+        consumeIfExists(parser, NEW_LINES);
+        if (atEnd(*parser)) break;
 
         // Parse statement of definition
         NodeId result = statementOrDefinition(parser);
         if (!hasValue(result)) advanceUntilNewLine(parser);
 
+        // Check of unknown token
+        if (check(*parser, UNKNOWN_TOKEN)) {
+            addError(parser, UNKNOWN_CHARACTER);
+            advanceUntilNewLine(parser);
+        }
         // Check were at the end of a line
-        if (!atEnd(*parser) && !check(*parser, NEW_LINE)) {
+        else if (!atEnd(*parser) && !check(*parser, NEW_LINES)) {
             addError(parser, EXPECTING_LINE_ENDING);
             advanceUntilNewLine(parser);
         }
@@ -309,32 +317,37 @@ static NodeId block(Parser *parser) {
     size_t initialErrorCount = parser->ast.errors.count;
 
     // Set new indentation level
-    advanceUntilNextStatement(parser);
+    consumeIfExists(parser, NEW_LINES);
     if (stack_top(parser->indentationLevel) >= parser->current.column) {
         addError(parser, EXPECTING_NEW_IDENTATION_LEVEL);
     }
     stack_push(parser->indentationLevel, parser->current.column);
 
-    while (true) {
-        // Advance until next statement
-        advanceUntilNextStatement(parser);
-        if (atEnd(*parser)) break;
-
+    while (!atEnd(*parser)) {
         // Check indentation
-        size_t currentColumn = parser->current.column;
-        if (currentColumn < stack_top(parser->indentationLevel)) break;
-        else if (currentColumn > stack_top(parser->indentationLevel)) {
+        size_t indentationLevel = parser->current.column;
+        if (check(*parser, NEW_LINES)) indentationLevel = parser->next.column;
+
+        if (indentationLevel < stack_top(parser->indentationLevel)) break;
+        else if (indentationLevel > stack_top(parser->indentationLevel)) {
             addError(parser, UNEXPECTED_IDENTATION);
             advanceUntilNewLine(parser);
             continue;
         }
+        consumeIfExists(parser, NEW_LINES);
+        if (atEnd(*parser)) break;
 
         // Parse statement of definition
         NodeId result = statement(parser);
         if (!hasValue(result)) advanceUntilNewLine(parser);
 
+        // Check of unknown token
+        if (check(*parser, UNKNOWN_TOKEN)) {
+            addError(parser, UNKNOWN_CHARACTER);
+            advanceUntilNewLine(parser);
+        }
         // Check were at the end of a line
-        if (!atEnd(*parser) && !check(*parser, NEW_LINE)) {
+        else if (!atEnd(*parser) && !check(*parser, NEW_LINES)) {
             addError(parser, EXPECTING_LINE_ENDING);
             advanceUntilNewLine(parser);
         }
@@ -438,12 +451,12 @@ static NodeId ifElse(Parser *parser, Token keyword) {
     expect(block(parser));
 
     // Parse else block
-    Parser backup = *parser;
-    advanceUntilNextStatement(parser);
-
-    size_t indentationLevel = parser->current.column;
-    if (match(parser, ELSE)) {
+    if (parser->next.kind == ELSE) {
+        advance(parser);
+        size_t indentationLevel = parser->current.column;
+        advance(parser);
         parser->ast.dataOrIndex.items[id] = true;
+
         if (stack_top(parser->indentationLevel) == indentationLevel) {
             expect(block(parser));
         } else if (stack_top(parser->indentationLevel) < indentationLevel) {
@@ -451,8 +464,6 @@ static NodeId ifElse(Parser *parser, Token keyword) {
         } else if (stack_top(parser->indentationLevel) > indentationLevel) {
             todo();
         }
-    } else {
-        *parser = backup;
     }
 
     // Return
@@ -472,7 +483,7 @@ static NodeId whileStatement(Parser *parser, Token keyword) {
 //            | not
 //            | or
 static NodeId expression(Parser *parser) {
-    if (check(*parser, NEW_LINE)) {
+    if (check(*parser, NEW_LINES)) {
         if (!couldBeExpression(*parser)) {
             addError(parser, EXPECTING_NEW_IDENTATION_LEVEL);
             return None();
@@ -490,7 +501,7 @@ static NodeId ifElseExpression(Parser *parser, Token keyword) {
     assert(keyword.kind == IF);
     expect(expression(parser));
     expect(expression(parser));
-    if (check(*parser, NEW_LINE) && parser->next.kind == ELSE) advance(parser);
+    if (check(*parser, NEW_LINES) && parser->next.kind == ELSE) advance(parser);
     consume(parser, ELSE, "an if else");
     expect(expression(parser));
     return ast_createNode(&parser->ast, AST_IF_ELSE_EXPRESSION);
@@ -652,13 +663,14 @@ static NodeId call(Parser *parser, NodeId accessed, Token leftParen) {
     assert(leftParen.kind == LEFT_PAREN);
     AstCall callData = {.numberOfArguments = 0, .argumentsMutability = 0};
 
-    if (check(*parser, NEW_LINE) && couldBeExpression(*parser)) advance(parser);
-    while (!check(*parser, RIGHT_PAREN) && !check(*parser, NEW_LINE)) {
+    if (check(*parser, NEW_LINES) && couldBeExpression(*parser))
+        advance(parser);
+    while (!check(*parser, RIGHT_PAREN) && !check(*parser, NEW_LINES)) {
         expect(callArgument(parser, &callData));
         if (check(*parser, COMMA)) advance(parser);
-        else if (check(*parser, NEW_LINE) && couldBeExpression(*parser))
+        else if (check(*parser, NEW_LINES) && couldBeExpression(*parser))
             advance(parser);
-        else if (check(*parser, NEW_LINE) && parser->next.kind == RIGHT_PAREN)
+        else if (check(*parser, NEW_LINES) && parser->next.kind == RIGHT_PAREN)
             advance(parser);
     }
     consume(parser, RIGHT_PAREN, "a call");
@@ -764,11 +776,11 @@ static NodeId structLiteral(Parser *parser, NodeId name, Token leftCurly) {
     assert(parser->ast.nodes.items[name] == AST_IDENTIFIER);
     assert(leftCurly.kind == LEFT_CURLY);
     while (!atEnd(*parser) && !check(*parser, RIGHT_CURLY)) {
-        advanceUntilNextStatement(parser);
+        consumeIfExists(parser, NEW_LINES);
         expect(identifier(parser));
         consume(parser, COLON, "a struct literal");
         expect(expression(parser));
-        if (!match(parser, COMMA) && !match(parser, NEW_LINE)) break;
+        if (!match(parser, COMMA) && !match(parser, NEW_LINES)) break;
     }
     consume(parser, RIGHT_CURLY, "a struct literal");
     return ast_createNode(&parser->ast, AST_STRUCT_LITERAL);
@@ -778,9 +790,9 @@ static NodeId structLiteral(Parser *parser, NodeId name, Token leftCurly) {
 static NodeId array(Parser *parser, Token leftBracket) {
     assert(leftBracket.kind == LEFT_BRACKET);
     while (!check(*parser, RIGHT_BRACKET) && !atEnd(*parser)) {
-        advanceUntilNextStatement(parser);
+        consumeIfExists(parser, NEW_LINES);
         expect(expression(parser));
-        if (!match(parser, COMMA) && !match(parser, NEW_LINE)) break;
+        if (!match(parser, COMMA) && !match(parser, NEW_LINES)) break;
     }
     consume(parser, RIGHT_BRACKET, "an array");
     return ast_createNode(&parser->ast, AST_ARRAY);

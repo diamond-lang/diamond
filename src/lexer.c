@@ -1,6 +1,8 @@
 #include "lexer.h"
 
 #include <ctype.h>
+#include <stdbool.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -16,16 +18,15 @@ static char nextChar(Lexer* lexer) {
 }
 
 static void advance(Lexer* lexer) {
+    if (lexer->current == '\n') {
+        lexer->column = 1;
+        lexer->line += 1;
+    }
+    lexer->column += 1;
     lexer->current = lexer->next;
     lexer->next = lexer->nextNext;
     lexer->nextNext = nextChar(lexer);
     string_append(&lexer->currentLiteral, lexer->current);
-    if (lexer->current == '\n') {
-        lexer->column = 1;
-        lexer->line += 1;
-    } else {
-        lexer->column += 1;
-    }
 }
 
 static void advanceUntilNewLine(Lexer* lexer) {
@@ -41,6 +42,19 @@ static bool match(Lexer* lexer, char c) {
         return true;
     }
     return false;
+}
+
+static void advanceUntilNextNoneLineToken(Lexer* lexer) {
+    while (true) {
+        if (lexer->next == '\n') {
+            advance(lexer);
+        } else if (lexer->next == '-' && lexer->nextNext == '-') {
+            advance(lexer);
+            advanceUntilNewLine(lexer);
+        } else {
+            break;
+        }
+    }
 }
 
 static Token createToken(Lexer* lexer, TokenKind kind) {
@@ -65,7 +79,7 @@ static Token createTokenWithLiteral(Lexer* lexer, TokenKind kind) {
     lexer->literals->count += length + 1;
     lexer->literals->items[lexer->literals->count - 1] = '\0';
 
-    // Creat token
+    // Create token
     Token token = {
         .kind = kind,
         .line = lexer->line,
@@ -84,6 +98,7 @@ void initLexer(
     lexer->literals = literals;
     lexer->errors = errors;
     lexer->currentLiteral = String();
+    lexer->current = '\0';
     lexer->next = nextChar(lexer);
     lexer->nextNext = nextChar(lexer);
 }
@@ -114,6 +129,7 @@ start:
             }
             return createToken(lexer, MINUS);
         case '*': return createToken(lexer, STAR);
+        case '/': return createToken(lexer, SLASH);
         case '%': return createToken(lexer, MODULO);
         case ':': {
             if (match(lexer, '=')) return createToken(lexer, COLON_EQUAL);
@@ -138,7 +154,11 @@ start:
         }
         case ' ':
         case '\t': goto start;
-        case '\n': return createToken(lexer, NEW_LINE);
+        case '\n': {
+            Token token = createToken(lexer, NEW_LINES);
+            advanceUntilNextNoneLineToken(lexer);
+            return token;
+        }
         case '\0': return createToken(lexer, END_OF_FILE);
         default: {
             if (isdigit(lexer->current)) return scanNumber(lexer);
@@ -146,8 +166,8 @@ start:
         }
     }
 
-    advance(lexer);
     Token result = createTokenWithLiteral(lexer, UNKNOWN_TOKEN);
+    advance(lexer);
     return result;
 }
 

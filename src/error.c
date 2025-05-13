@@ -59,7 +59,7 @@ static char* token_getLiteral(Ast ast, Token token) {
         case MUT: return "and";
         case INCLUDE: return "include";
         case EXTERN: return "extern";
-        case NEW_LINE: return "\\n";
+        case NEW_LINES: return "\\n";
         case END_OF_FILE: return "\\0";
         case UNKNOWN_TOKEN: return (char*)ast.literals.items + token.literal;
     }
@@ -117,7 +117,7 @@ static char* ast_tokenAsString(TokenKind kind) {
         case MUT: return "and";
         case INCLUDE: return "include";
         case EXTERN: return "extern";
-        case NEW_LINE: return "a new line";
+        case NEW_LINES: return "a new line";
         case END_OF_FILE: return "end of file";
         case UNKNOWN_TOKEN: return "an unknown character";
     }
@@ -211,6 +211,11 @@ void underlineLine(char* filePath, size_t line) {
 void reportError(Ast ast, Error error) {
     switch (error.kind) {
         case FILE_NOT_FOUND: todo(); break;
+        case UNKNOWN_CHARACTER:
+            printHeader("Unknown character", ast.filePath);
+            printCurrentLine(ast.filePath, error.line);
+            underlineLocation(ast.filePath, error.line, error.column);
+            break;
         case EXPECTING_LINE_ENDING:
             printHeader("Expecting line ending", ast.filePath);
             printf("Finished parsing a statement. A new line was expected.\n\n"
