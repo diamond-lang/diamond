@@ -66,6 +66,7 @@ typedef uint32_t Data;
 typedef Data NodeId;  // UINT32_MAX value is used to indicate none
 typedef Data LiteralId;
 typedef Data NodeCount;
+typedef Data Boolean;
 
 #define None() UINT32_MAX
 #define hasValue(nodeId) (nodeId != UINT32_MAX)
@@ -75,6 +76,10 @@ typedef struct {
     NodeCount numberOfArguments;
     Data argumentsMutability;
 } AstFunction;
+
+typedef struct {
+    Boolean hasElse;
+} AstIfElse;
 
 typedef struct {
     NodeId start;
@@ -98,7 +103,7 @@ typedef struct {
 } AstIdentifier;
 
 typedef struct {
-    Data value;
+    Boolean value;
 } AstBoolean;
 
 typedef struct {
@@ -106,6 +111,7 @@ typedef struct {
 } AstString;
 
 typedef struct {
+    NodeCount parameters;
 } AstType;
 
 #include "error.h"
@@ -127,17 +133,11 @@ typedef struct {
 
 void initAst(Ast *ast, char *filePath);
 NodeId ast_createNode(Ast *ast, AstKind kind);
-bool ast_isExpression(AstKind kind);
+Data *_ast_getData(Ast *ast, NodeId node, size_t sizeOfData);
+#define ast_getData(type, ast, node) \
+    ((type *)_ast_getData(&(ast), id, sizeof(type)))
 void ast_setType(Ast ast, NodeId id, NodeId type);
 void ast_setBit(Data *data, NodeCount position);
-#define ast_appendData(ast, toAppend, id)                                     \
-    do {                                                                      \
-        ast.dataOrIndex.items[id] = ast.data.count;                           \
-        list_appendCapacity(ast.data, sizeof(toAppend));                      \
-        memcpy(ast.data.items + ast.data.count, &toAppend, sizeof(toAppend)); \
-    } while (false);
-
-void *ast_getNode(Ast ast, NodeId id);
 void ast_print(Ast ast);
 
 void reportErrors(Ast ast);

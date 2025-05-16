@@ -19,12 +19,22 @@ void initAst(Ast* ast, char* filePath) {
 NodeId ast_createNode(Ast* ast, AstKind kind) {
     list_append(ast->nodes, kind);
     list_setCapacity(ast->dataOrIndex, ast->nodes.capacity);
+    ast->dataOrIndex.items[ast->nodes.count - 1] = None();
     return ast->nodes.count - 1;
 }
 
-void* ast_getNode(Ast ast, NodeId id) { todo(); }
-
-bool ast_isExpression(AstKind kind) { todo(); }
+Data* _ast_getData(Ast* ast, NodeId node, size_t sizeOfData) {
+    bool justOneField = sizeOfData == sizeof(Data);
+    if (justOneField) {
+        return &ast->dataOrIndex.items[node];
+    } else {
+        if (ast->dataOrIndex.items[node] == None()) {
+            ast->dataOrIndex.items[node] = ast->data.count;
+            list_appendCapacity(ast->data, sizeOfData);
+        }
+        return ast->data.items + ast->dataOrIndex.items[node];
+    }
+}
 
 void ast_setType(Ast ast, NodeId id, NodeId type) { todo(); }
 
@@ -130,6 +140,7 @@ void ast_print(Ast ast) {
                     "type(%s)\n",
                     &ast.literals.items[ast.dataOrIndex.items[i]]
                 );
+                break;
         }
     }
 }

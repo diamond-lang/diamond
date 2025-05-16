@@ -1,3 +1,4 @@
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -241,7 +242,7 @@ static NodeId type(Parser *parser) {
         }
         consume(parser, RIGHT_BRACKET, "a type");
     }
-    parser->ast.dataOrIndex.items[id] = parameters;
+    ast_getData(AstType, parser->ast, id)->parameters = parameters;
     return id;
 }
 
@@ -455,7 +456,7 @@ static NodeId ifElse(Parser *parser, Token keyword) {
         advance(parser);
         size_t indentationLevel = parser->current.column;
         advance(parser);
-        parser->ast.dataOrIndex.items[id] = true;
+        ast_getData(AstIfElse, parser->ast, id)->hasElse = true;
 
         if (stack_top(parser->indentationLevel) == indentationLevel) {
             expect(block(parser));
@@ -676,7 +677,7 @@ static NodeId call(Parser *parser, NodeId accessed, Token leftParen) {
     consume(parser, RIGHT_PAREN, "a call");
 
     NodeId id = ast_createNode(&parser->ast, AST_CALL);
-    ast_appendData(parser->ast, callData, id);
+    *ast_getData(AstCall, parser->ast, node) = callData;
     return id;
 }
 
@@ -735,7 +736,7 @@ NodeId grouping(Parser *parser, Token leftParen) {
 NodeId floatLiteral(Parser *parser, Token token) {
     assert(token.kind == FLOAT);
     NodeId id = ast_createNode(&parser->ast, AST_FLOAT);
-    parser->ast.dataOrIndex.items[id] = token.literal;
+    ast_getData(AstFloat, parser->ast, id)->literal = token.literal;
     return id;
 }
 
@@ -743,7 +744,7 @@ NodeId floatLiteral(Parser *parser, Token token) {
 static NodeId integer(Parser *parser, Token token) {
     assert(token.kind == INTEGER);
     NodeId id = ast_createNode(&parser->ast, AST_INTEGER);
-    parser->ast.dataOrIndex.items[id] = token.literal;
+    ast_getData(AstInteger, parser->ast, id)->literal = token.literal;
     return id;
 }
 
@@ -751,7 +752,7 @@ static NodeId integer(Parser *parser, Token token) {
 static NodeId boolean(Parser *parser, Token token) {
     assert(token.kind == TRUE || token.kind == FALSE);
     NodeId id = ast_createNode(&parser->ast, AST_BOOLEAN);
-    parser->ast.dataOrIndex.items[id] = token.literal;
+    ast_getData(AstBoolean, parser->ast, id)->value = token.kind == TRUE;
     return id;
 }
 
@@ -759,7 +760,8 @@ static NodeId boolean(Parser *parser, Token token) {
 static NodeId identifier(Parser *parser) {
     consume(parser, IDENTIFIER, "an identifier");
     NodeId id = ast_createNode(&parser->ast, AST_IDENTIFIER);
-    parser->ast.dataOrIndex.items[id] = parser->previous.literal;
+    ast_getData(AstIdentifier, parser->ast, id)->literal =
+        parser->previous.literal;
     return id;
 }
 
@@ -767,7 +769,7 @@ static NodeId identifier(Parser *parser) {
 static NodeId string(Parser *parser) {
     consume(parser, STRING, "a string");
     NodeId id = ast_createNode(&parser->ast, AST_FLOAT);
-    parser->ast.dataOrIndex.items[id] = parser->previous.literal;
+    ast_getData(AstString, parser->ast, id)->literal = parser->previous.literal;
     return id;
 }
 
