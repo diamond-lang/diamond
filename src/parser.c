@@ -174,6 +174,9 @@ Ast parse(char *filePath) {
     // Parse
     program(&parser);
 
+    // Free source
+    string_free(source);
+
     // Return
     return parser.ast;
 }
@@ -395,12 +398,14 @@ static NodeId declaration(Parser *parser, NodeId identifier, Token operator) {
     assert(parser->ast.nodes.items[identifier] == AST_IDENTIFIER);
     assert(operator.kind == EQUAL || operator.kind == BE);
     NodeId id = ast_createNode(&parser->ast, AST_DECLARATION);
+    AstDeclaration *data = ast_getData(AstDeclaration, parser->ast, id);
     expect(expression(parser));
+    data->lastExpressionNode = parser->ast.nodes.count - 1;
 
     // Parse type annotation
     if (match(parser, COLON)) {
         expect(typeAnnotation(parser, parser->previous));
-        todo();
+        data->lastTypeNode = parser->ast.nodes.count - 1;
     }
 
     // Return
@@ -410,10 +415,12 @@ static NodeId declaration(Parser *parser, NodeId identifier, Token operator) {
 static NodeId assignment(Parser *parser, NodeId assignable, Token operator) {
     assert(operator.kind == COLON_EQUAL || operator.kind == EQUAL);
     NodeId id = ast_createNode(&parser->ast, AST_ASSIGNMENT);
+    AstAssignment *data = ast_getData(AstAssignment, parser->ast, id);
     bind(result, expression(parser));
+    data->lastExpressionNode = parser->ast.nodes.count - 1;
     if (match(parser, COLON)) {
         bind(annotation, typeAnnotation(parser, parser->previous));
-        ast_setType(parser->ast, result, annotation);
+        data->lastTypeNode = parser->ast.nodes.count - 1;
     }
 
     // Return
@@ -448,18 +455,21 @@ static NodeId continueStatement(Parser *parser, Token keyword) {
 static NodeId ifElse(Parser *parser, Token keyword) {
     assert(keyword.kind == IF);
     NodeId id = ast_createNode(&parser->ast, AST_IF_ELSE);
+    AstIfElse *data = ast_getData(AstIfElse, parser->ast, id);
     expect(expression(parser));
+    data->lastConditionNode = parser->ast.nodes.count - 1;
     expect(block(parser));
+    data->lastIfNode = parser->ast.nodes.count - 1;
 
     // Parse else block
     if (parser->next.kind == ELSE) {
         advance(parser);
         size_t indentationLevel = parser->current.column;
         advance(parser);
-        ast_getData(AstIfElse, parser->ast, id)->hasElse = true;
 
         if (stack_top(parser->indentationLevel) == indentationLevel) {
             expect(block(parser));
+            data->lastElseNode = parser->ast.nodes.count - 1;
         } else if (stack_top(parser->indentationLevel) < indentationLevel) {
             todo();
         } else if (stack_top(parser->indentationLevel) > indentationLevel) {
@@ -677,7 +687,7 @@ static NodeId call(Parser *parser, NodeId accessed, Token leftParen) {
     consume(parser, RIGHT_PAREN, "a call");
 
     NodeId id = ast_createNode(&parser->ast, AST_CALL);
-    *ast_getData(AstCall, parser->ast, node) = callData;
+    *ast_getData(AstCall, parser->ast, id) = callData;
     return id;
 }
 

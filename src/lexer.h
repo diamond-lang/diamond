@@ -7,7 +7,7 @@ typedef struct {
     size_t line;
     size_t column;
     char* source;
-    Uint8List* literals;
+    DataList* literals;
     ErrorList* errors;
     char current;
     char next;
@@ -16,7 +16,7 @@ typedef struct {
 } Lexer;
 
 void initLexer(
-    Lexer* lexer, char* source, Uint8List* literals, ErrorList* errors
+    Lexer* lexer, char* source, DataList* literals, ErrorList* errors
 );
 Token scanToken(Lexer* lexer);
 

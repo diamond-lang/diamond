@@ -37,7 +37,7 @@
         if (list.capacity < list.count) list.count = list.capacity;            \
     } while (false);
 
-#define list_appendCapacity(list, extraCapacity)                          \
+#define list_ensureCapacity(list, extraCapacity)                          \
     do {                                                                  \
         while (list.count + extraCapacity > list.capacity) {              \
             if (list.capacity == 0) {                                     \
@@ -102,5 +102,21 @@ void string_free(String string);
 #define String() (String){NULL, 0, 0}
 
 typedef ListType(String) StringList;
+
+// HashTable
+typedef struct {
+    int32_t key;
+    int32_t value;
+} Bucket;
+
+typedef struct {
+    Bucket* content;
+    size_t count;
+    size_t capacity;
+} HashTable;
+
+#define HashTable() (HashTable){NULL, 0, 0};
+int32_t* hashtable_get(HashTable hastable, int32_t key);
+void hashtable_set(HashTable* hastable, int32_t key, int32_t value);
 
 #endif

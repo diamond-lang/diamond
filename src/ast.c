@@ -18,9 +18,63 @@ void initAst(Ast* ast, char* filePath) {
 
 NodeId ast_createNode(Ast* ast, AstKind kind) {
     list_append(ast->nodes, kind);
+    list_append(ast->dataOrIndex, None());
     list_setCapacity(ast->dataOrIndex, ast->nodes.capacity);
-    ast->dataOrIndex.items[ast->nodes.count - 1] = None();
-    return ast->nodes.count - 1;
+    NodeId id = ast->nodes.count - 1;
+    switch (kind) {
+        case AST_INCLUDE: break;
+        case AST_USE: break;
+        case AST_FUNCTION: ast_getData(AstFunction, *ast, id); break;
+        case AST_INTERFACE: break;
+        case AST_EXTERN: break;
+        case AST_TYPE_DEFINITION: break;
+        case AST_DECLARATION: {
+            AstDeclaration* data = ast_getData(AstDeclaration, *ast, id);
+            data->lastTypeNode = None();
+            break;
+        }
+        case AST_ASSIGNMENT: break;
+        case AST_RETURN: break;
+        case AST_RETURN_WITH_EXPRESSION: break;
+        case AST_BREAK: break;
+        case AST_CONTINUE: break;
+        case AST_IF_ELSE: {
+            AstIfElse* data = ast_getData(AstIfElse, *ast, id);
+            data->lastElseNode = None();
+            break;
+        }
+        case AST_WHILE: break;
+        case AST_CALL: ast_getData(AstCall, *ast, id); break;
+        case AST_IF_ELSE_EXPRESSION: break;
+        case AST_NOT: break;
+        case AST_OR: break;
+        case AST_AND: break;
+        case AST_EQUAL_EQUAL: break;
+        case AST_NOT_EQUAL: break;
+        case AST_LESS: break;
+        case AST_LESS_EQUAL: break;
+        case AST_GREATER: break;
+        case AST_GREATER_EQUAL: break;
+        case AST_ADD: break;
+        case AST_SUBTRACT: break;
+        case AST_MUL: break;
+        case AST_DIV: break;
+        case AST_MOD: break;
+        case AST_NEGATION: break;
+        case AST_DEREFERENCE: break;
+        case AST_ADDRESS_OF: break;
+        case AST_FIELD_ACCESS: break;
+        case AST_INDEX_ACCESS: break;
+        case AST_FLOAT: ast_getData(AstFloat, *ast, id); break;
+        case AST_INTEGER: ast_getData(AstInteger, *ast, id); break;
+        case AST_IDENTIFIER: ast_getData(AstIdentifier, *ast, id); break;
+        case AST_BOOLEAN: ast_getData(AstBoolean, *ast, id); break;
+        case AST_STRING: ast_getData(AstString, *ast, id); break;
+        case AST_ARRAY: break;
+        case AST_STRUCT_LITERAL: break;
+        case AST_TYPE: ast_getData(AstType, *ast, id); break;
+    }
+    return id;
 }
 
 Data* _ast_getData(Ast* ast, NodeId node, size_t sizeOfData) {
@@ -30,7 +84,8 @@ Data* _ast_getData(Ast* ast, NodeId node, size_t sizeOfData) {
     } else {
         if (ast->dataOrIndex.items[node] == None()) {
             ast->dataOrIndex.items[node] = ast->data.count;
-            list_appendCapacity(ast->data, sizeOfData);
+            list_ensureCapacity(ast->data, sizeOfData / sizeof(Data));
+            ast->data.count += sizeOfData / sizeof(Data);
         }
         return ast->data.items + ast->dataOrIndex.items[node];
     }
@@ -68,18 +123,67 @@ void ast_print(Ast ast) {
             case AST_INTERFACE: printf("interface\n"); break;
             case AST_EXTERN: printf("extern\n"); break;
             case AST_TYPE_DEFINITION: printf("typeDefinitionm\n"); break;
-            case AST_BLOCK: printf("block\n"); break;
-            case AST_DECLARATION: printf("declaration\n"); break;
-            case AST_ASSIGNMENT: printf("assignment\n"); break;
+            case AST_DECLARATION: {
+                if (ast_getData(AstDeclaration, ast, i)->lastTypeNode !=
+                    None()) {
+                    printf(
+                        "declaration(lastExpressionNode: %u, lastTypeNode: "
+                        "%u)\n",
+                        ast_getData(AstDeclaration, ast, i)->lastExpressionNode,
+                        ast_getData(AstDeclaration, ast, i)->lastTypeNode
+                    );
+                } else {
+                    printf(
+                        "declaration(lastExpressionNode: %u, lastTypeNode: "
+                        "none)\n",
+                        ast_getData(AstDeclaration, ast, i)->lastExpressionNode
+                    );
+                }
+                break;
+            }
+            case AST_ASSIGNMENT: {
+                if (ast_getData(AstAssignment, ast, i)->lastTypeNode !=
+                    None()) {
+                    printf(
+                        "assignment(lastExpressionNode: %u, lastTypeNode: "
+                        "%u)\n",
+                        ast_getData(AstAssignment, ast, i)->lastExpressionNode,
+                        ast_getData(AstAssignment, ast, i)->lastTypeNode
+                    );
+                } else {
+                    printf(
+                        "assignment(lastExpressionNode: %u, lastTypeNode: "
+                        "none)\n",
+                        ast_getData(AstAssignment, ast, i)->lastExpressionNode
+                    );
+                }
+                break;
+            }
             case AST_RETURN: printf("return\n"); break;
             case AST_RETURN_WITH_EXPRESSION:
                 printf("returnWithExpression\n");
                 break;
             case AST_BREAK: printf("break\n"); break;
             case AST_CONTINUE: printf("continue\n"); break;
-            case AST_IF_ELSE: printf("ifElse\n"); break;
+            case AST_IF_ELSE:
+                if (ast_getData(AstIfElse, ast, i)->lastElseNode != None()) {
+                    printf(
+                        "ifElse(lastConditionNode: %u, lastIfNode: %u, "
+                        "lastElseNode: %u)\n",
+                        ast_getData(AstIfElse, ast, i)->lastConditionNode,
+                        ast_getData(AstIfElse, ast, i)->lastIfNode,
+                        ast_getData(AstIfElse, ast, i)->lastElseNode
+                    );
+                } else {
+                    printf(
+                        "ifElse(lastConditionNode: %u, lastIfNode: %u, "
+                        "lastElseNode: none)\n",
+                        ast_getData(AstIfElse, ast, i)->lastConditionNode,
+                        ast_getData(AstIfElse, ast, i)->lastIfNode
+                    );
+                }
+                break;
             case AST_WHILE: printf("while\n"); break;
-            case AST_EXPRESSION: printf("expression\n"); break;
             case AST_CALL: printf("call\n"); break;
             case AST_IF_ELSE_EXPRESSION: printf("ifElseExpression\n"); break;
             case AST_NOT: printf("not\n"); break;
@@ -105,40 +209,52 @@ void ast_print(Ast ast) {
             case AST_INDEX_ACCESS: printf("indexAccess\n"); break;
             case AST_FLOAT:
                 printf(
-                    "float(%s)\n",
-                    &ast.literals.items[ast.dataOrIndex.items[i]]
+                    "float(value: %.*s)\n",
+                    ast_literalExpand(
+                        ast,
+                        ast_getData(AstFloat, ast, i)->literal
+                    )
                 );
                 break;
             case AST_INTEGER:
                 printf(
-                    "integer(%s)\n",
-                    &ast.literals.items[ast.dataOrIndex.items[i]]
+                    "integer(value: %.*s)\n",
+                    ast_literalExpand(
+                        ast,
+                        ast_getData(AstInteger, ast, i)->literal
+                    )
                 );
                 break;
             case AST_IDENTIFIER:
                 printf(
-                    "identifier(%s)\n",
-                    &ast.literals.items[ast.dataOrIndex.items[i]]
+                    "identifier(value: %.*s)\n",
+                    ast_literalExpand(
+                        ast,
+                        ast_getData(AstIdentifier, ast, i)->literal
+                    )
                 );
                 break;
             case AST_BOOLEAN:
                 printf(
-                    "boolean(%s)\n",
-                    &ast.literals.items[ast.dataOrIndex.items[i]]
+                    "boolean(value: %s)\n",
+                    ast_getData(AstBoolean, ast, i)->value ? "true" : "false"
                 );
                 break;
             case AST_STRING:
                 printf(
-                    "string(\"%s\")\n",
-                    &ast.literals.items[ast.dataOrIndex.items[i]]
+                    "string(value: \"%.*s\")\n",
+                    ast_literalExpand(
+                        ast,
+                        ast_getData(AstString, ast, i)->literal
+                    )
                 );
                 break;
             case AST_ARRAY: printf("arrayLiteral\n"); break;
             case AST_STRUCT_LITERAL: printf("structLiteral\n"); break;
             case AST_TYPE:
                 printf(
-                    "type(%s)\n",
-                    &ast.literals.items[ast.dataOrIndex.items[i]]
+                    "type (parameters: %d)\n",
+                    ast_getData(AstType, ast, i)->parameters
                 );
                 break;
         }

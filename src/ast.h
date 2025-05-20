@@ -13,7 +13,6 @@ typedef enum {
     AST_INTERFACE,
     AST_EXTERN,
     AST_TYPE_DEFINITION,
-    AST_BLOCK,
 
     // Statements
     AST_DECLARATION,
@@ -26,7 +25,6 @@ typedef enum {
     AST_WHILE,
 
     // Expressions
-    AST_EXPRESSION,
     AST_CALL,
     AST_IF_ELSE_EXPRESSION,
     AST_NOT,
@@ -64,9 +62,9 @@ typedef enum {
 
 typedef uint32_t Data;
 typedef Data NodeId;  // UINT32_MAX value is used to indicate none
-typedef Data LiteralId;
 typedef Data NodeCount;
 typedef Data Boolean;
+typedef Data LiteralId;
 
 #define None() UINT32_MAX
 #define hasValue(nodeId) (nodeId != UINT32_MAX)
@@ -78,12 +76,20 @@ typedef struct {
 } AstFunction;
 
 typedef struct {
-    Boolean hasElse;
-} AstIfElse;
+    NodeId lastExpressionNode;
+    NodeId lastTypeNode;
+} AstDeclaration;
 
 typedef struct {
-    NodeId start;
-} AstExpression;
+    NodeId lastExpressionNode;
+    NodeId lastTypeNode;
+} AstAssignment;
+
+typedef struct {
+    NodeId lastConditionNode;
+    NodeId lastIfNode;
+    NodeId lastElseNode;
+} AstIfElse;
 
 typedef struct {
     NodeCount numberOfArguments;
@@ -123,20 +129,29 @@ typedef ListType(DataId) DataIdList;
 typedef ListType(NodeId) NodeIdList;
 
 typedef struct {
+    Uint8List nodes;
+    DataList dataOrIndex;
+    DataList data;
+} Code;
+
+typedef DataList Literals;
+#define ast_literalExpand(ast, id) \
+    ast.literals.items[id], (char *)&ast.literals.items[id + 1]
+
+typedef struct {
     char *filePath;
     Uint8List nodes;
     DataList dataOrIndex;
     DataList data;
-    Uint8List literals;
+    Literals literals;
     ErrorList errors;
 } Ast;
 
 void initAst(Ast *ast, char *filePath);
 NodeId ast_createNode(Ast *ast, AstKind kind);
 Data *_ast_getData(Ast *ast, NodeId node, size_t sizeOfData);
-#define ast_getData(type, ast, node) \
-    ((type *)_ast_getData(&(ast), id, sizeof(type)))
-void ast_setType(Ast ast, NodeId id, NodeId type);
+#define ast_getData(type, ast, nodeId) \
+    ((type *)_ast_getData(&(ast), nodeId, sizeof(type)))
 void ast_setBit(Data *data, NodeCount position);
 void ast_print(Ast ast);
 

@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "ast.h"
 #include "common.h"
 #include "error.h"
 #include "token.h"
@@ -66,31 +67,55 @@ static Token createToken(Lexer* lexer, TokenKind kind) {
     return token;
 }
 
+static inline Data numberOfSlotsNeeded(Data length) {
+    return 1 + length / sizeof(Data) + (length % sizeof(Data) != 0);
+}
+
 static Token createTokenWithLiteral(Lexer* lexer, TokenKind kind) {
+    const size_t literalsCount = lexer->literals->count;
+    const Data length = lexer->currentLiteral.count;
+    const char* currentLiteral = lexer->currentLiteral.content;
+
+    // Check if literal already exist
+    Data literalId = None();
+    for (Data i = 0; i < lexer->literals->count;
+         i += numberOfSlotsNeeded(lexer->literals->items[i])) {
+        if (lexer->literals->items[i] == length &&
+            memcmp(&lexer->literals->items[i + 1], currentLiteral, length) ==
+                0) {
+            literalId = i;
+            break;
+        }
+    }
+
     // Add literal to literals
-    uint32_t literalId = lexer->literals->count;
-    size_t length = lexer->currentLiteral.count;
-    list_appendCapacity((*lexer->literals), length + 1);
-    strncpy(
-        (char*)lexer->literals->items + literalId,
-        lexer->currentLiteral.content,
-        length
-    );
-    lexer->literals->count += length + 1;
-    lexer->literals->items[lexer->literals->count - 1] = '\0';
+    if (literalId == None()) {
+        literalId = literalsCount;
+
+        Data extraCapacityNeeded = numberOfSlotsNeeded(length);
+        list_ensureCapacity((*lexer->literals), extraCapacityNeeded);
+
+        lexer->literals->items[literalId] = length;
+        strncpy(
+            (char*)&lexer->literals->items[literalId + 1],
+            currentLiteral,
+            length
+        );
+        lexer->literals->count += extraCapacityNeeded;
+    }
 
     // Create token
     Token token = {
         .kind = kind,
         .line = lexer->line,
-        .column = lexer->column - lexer->currentLiteral.count,
+        .column = lexer->column - length,
         .literal = literalId
     };
     return token;
 }
 
 void initLexer(
-    Lexer* lexer, char* source, Uint8List* literals, ErrorList* errors
+    Lexer* lexer, char* source, DataList* literals, ErrorList* errors
 ) {
     lexer->line = 1;
     lexer->column = 1;
