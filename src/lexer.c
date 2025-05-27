@@ -11,10 +11,11 @@
 #include "error.h"
 #include "token.h"
 #include "types.h"
+#include "utilities.h"
 
 static char nextChar(Lexer* lexer) {
-    char result = *lexer->source;
-    if (result != '\0') lexer->source += 1;
+    char result = *lexer->sourcePointer;
+    if (result != '\0') lexer->sourcePointer += 1;
     return result;
 }
 
@@ -64,6 +65,7 @@ static Token createToken(Lexer* lexer, TokenKind kind) {
         .line = lexer->line,
         .column = lexer->column - lexer->currentLiteral.count
     };
+    lexer->previousWasUseOrInclude = kind == USE || kind == INCLUDE;
     return token;
 }
 
@@ -115,21 +117,29 @@ static Token createTokenWithLiteral(Lexer* lexer, TokenKind kind) {
 }
 
 void initLexer(
-    Lexer* lexer, char* source, DataList* literals, ErrorList* errors
+    Lexer* lexer, char* filePath, DataList* literals, ErrorList* errors
 ) {
     lexer->line = 1;
     lexer->column = 1;
-    lexer->source = source;
+    lexer->source = readFile(filePath);
+    lexer->sourcePointer = lexer->source.content;
     lexer->literals = literals;
     lexer->errors = errors;
     lexer->currentLiteral = String();
     lexer->current = '\0';
     lexer->next = nextChar(lexer);
     lexer->nextNext = nextChar(lexer);
+    lexer->previousWasUseOrInclude = false;
+}
+
+void lexer_free(Lexer* lexer) {
+    string_free(lexer->source);
+    string_free(lexer->currentLiteral);
 }
 
 static Token scanNumber(Lexer* lexer);
 static Token scanIdentifierOrKeyword(Lexer* lexer);
+static Token scanImport(Lexer* lexer);
 
 Token scanToken(Lexer* lexer) {
 start:
@@ -145,6 +155,7 @@ start:
         case '&': return createToken(lexer, AMPERSAND);
         case '.':
             if (isdigit(lexer->next)) return scanNumber(lexer);
+            if (lexer->previousWasUseOrInclude) return scanImport(lexer);
             return createToken(lexer, DOT);
         case '+': return createToken(lexer, PLUS);
         case '-':
@@ -226,6 +237,8 @@ static bool identifierEquals(Lexer* lexer, char* literal) {
 }
 
 static Token scanIdentifierOrKeyword(Lexer* lexer) {
+    if (lexer->previousWasUseOrInclude) return scanImport(lexer);
+
     while (isalnum(lexer->next) || lexer->next == '_') advance(lexer);
 
     if (identifierEquals(lexer, "if")) return createToken(lexer, IF);
@@ -242,8 +255,6 @@ static Token scanIdentifierOrKeyword(Lexer* lexer) {
     if (identifierEquals(lexer, "false")) return createToken(lexer, FALSE);
     if (identifierEquals(lexer, "and")) return createToken(lexer, AND);
     if (identifierEquals(lexer, "or")) return createToken(lexer, OR);
-    if (identifierEquals(lexer, "use")) return createToken(lexer, USE);
-    if (identifierEquals(lexer, "include")) return createToken(lexer, INCLUDE);
     if (identifierEquals(lexer, "break")) return createToken(lexer, BREAK);
     if (identifierEquals(lexer, "continue"))
         return createToken(lexer, CONTINUE);
@@ -251,6 +262,26 @@ static Token scanIdentifierOrKeyword(Lexer* lexer) {
     if (identifierEquals(lexer, "mut")) return createToken(lexer, MUT);
     if (identifierEquals(lexer, "not")) return createToken(lexer, NOT);
     if (identifierEquals(lexer, "extern")) return createToken(lexer, EXTERN);
+    if (identifierEquals(lexer, "use")) return createToken(lexer, USE);
+    if (identifierEquals(lexer, "include")) return createToken(lexer, INCLUDE);
 
     return createTokenWithLiteral(lexer, IDENTIFIER);
+}
+
+static Token scanImport(Lexer* lexer) {
+    while (true) {
+        if (lexer->current == '/') advance(lexer);
+        if (lexer->current == '.' && lexer->next != '.') {
+            advance(lexer);
+        } else if (lexer->current == '.' && lexer->next == '.' &&
+                   lexer->nextNext != '.') {
+            advance(lexer);
+            advance(lexer);
+        } else if (isalnum(lexer->current) || lexer->current == '_') {
+            while (isalnum(lexer->next) || lexer->next == '_') advance(lexer);
+        }
+        if (lexer->next != '/') break;
+        advance(lexer);
+    }
+    return createTokenWithLiteral(lexer, IMPORT_PATH);
 }

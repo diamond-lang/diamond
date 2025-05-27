@@ -1,6 +1,7 @@
 #include "types.h"
 
 #include <assert.h>
+#include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -21,6 +22,12 @@ void string_append(String* string, char item) {
     string->count += 1;
 }
 
+void string_concat(String* string, StringView toConcat) {
+    for (size_t i = 0; i < toConcat.length; i++) {
+        string_append(string, toConcat.pointer[i]);
+    }
+}
+
 String string_substring(String string, size_t start, size_t length) {
     String result = String();
     result.content =
@@ -33,6 +40,10 @@ String string_substring(String string, size_t start, size_t length) {
 }
 
 void string_free(String string) { free(string.content); }
+
+StringView string_asView(String string) {
+    return (StringView){string.count, string.content};
+}
 
 // HashTable
 static int32_t hash(int32_t x) {

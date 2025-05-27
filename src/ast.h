@@ -2,13 +2,14 @@
 #define ast_h
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 #include "types.h"
 
 typedef enum {
-    AST_INCLUDE,
     AST_USE,
+    AST_INCLUDE,
     AST_FUNCTION,
     AST_INTERFACE,
     AST_EXTERN,
@@ -68,6 +69,14 @@ typedef Data LiteralId;
 
 #define None() UINT32_MAX
 #define hasValue(nodeId) (nodeId != UINT32_MAX)
+
+typedef struct {
+    LiteralId path;
+} AstUse;
+
+typedef struct {
+    LiteralId path;
+} AstInclude;
 
 typedef struct {
     NodeCount numberOfTypeParameters;
@@ -137,21 +146,31 @@ typedef struct {
 typedef DataList Literals;
 #define ast_literalExpand(ast, id) \
     ast.literals.items[id], (char *)&ast.literals.items[id + 1]
+#define ast_literalAsStringView(ast, id)                              \
+    (StringView) {                                                    \
+        ast->literals.items[id], (char *)&ast->literals.items[id + 1] \
+    }
+
+typedef size_t AstId;
+typedef ListType(AstId) Imports;
 
 typedef struct {
-    char *filePath;
+    String canonicalPath;
     Uint8List nodes;
     DataList dataOrIndex;
     DataList data;
     Literals literals;
     ErrorList errors;
+    Imports imports;
 } Ast;
 
-void initAst(Ast *ast, char *filePath);
+typedef ListType(Ast) AstList;
+
+void initAst(Ast *ast, String canonicalPath);
 NodeId ast_createNode(Ast *ast, AstKind kind);
 Data *_ast_getData(Ast *ast, NodeId node, size_t sizeOfData);
 #define ast_getData(type, ast, nodeId) \
-    ((type *)_ast_getData(&(ast), nodeId, sizeof(type)))
+    ((type *)_ast_getData(ast, nodeId, sizeof(type)))
 void ast_setBit(Data *data, NodeCount position);
 void ast_print(Ast ast);
 

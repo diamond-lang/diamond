@@ -41,6 +41,7 @@ static char* token_getLiteral(Ast ast, Token token) {
         case STRING_LEFT: todo();
         case STRING_MIDDLE: todo();
         case STRING_RIGHT: todo();
+        case IMPORT_PATH: todo();
         case IF: return "if";
         case ELSE: return "else";
         case WHILE: return "while";
@@ -99,6 +100,7 @@ static char* ast_tokenAsString(TokenKind kind) {
         case STRING_LEFT: return "the start of an interpolated string";
         case STRING_MIDDLE: return "the middle of an interpolated string";
         case STRING_RIGHT: return "the end of an interpolated string";
+        case IMPORT_PATH: return "an import path";
         case IF: return "if";
         case ELSE: return "else";
         case WHILE: return "while";
@@ -123,9 +125,9 @@ static char* ast_tokenAsString(TokenKind kind) {
     }
 }
 
-void printCurrentLine(char* filePath, size_t line) {
+void printCurrentLine(String filePath, size_t line) {
     printf("%zu│ ", line);
-    String file = readFile(filePath);
+    String file = readFile(filePath.content);
     for (size_t i = 0; i < file.count && line >= 1; i++) {
         if (file.content[i] == '\n') {
             line -= 1;
@@ -151,11 +153,11 @@ void printMagenta(char* str) { printf("\x1b[35m%s\x1b[0m", str); }
 
 void printBrightMagenta(char* str) { printf("\x1b[95m%s\x1b[0m", str); }
 
-void printHeader(char* title, char* filePath) {
-    printf("\x1b[96m%s (%s)\x1b[0m\n\n", title, filePath);
+void printHeader(char* title, String filePath) {
+    printf("\x1b[96m%s (%s)\x1b[0m\n\n", title, filePath.content);
 }
 
-void underlineUntilLocation(char* filePath, size_t line, size_t column) {
+void underlineUntilLocation(String filePath, size_t line, size_t column) {
     for (size_t i = 0; i < numberOfDigits(line); i++) {
         printf(" ");
     }
@@ -165,7 +167,7 @@ void underlineUntilLocation(char* filePath, size_t line, size_t column) {
     }
 }
 
-void underlineLocation(char* filePath, size_t line, size_t column) {
+void underlineLocation(String filePath, size_t line, size_t column) {
     for (size_t i = 0; i < numberOfDigits(line); i++) {
         printf(" ");
     }
@@ -191,13 +193,13 @@ void underlineToken(Ast ast, Token token) {
     }
 }
 
-void underlineLine(char* filePath, size_t line) {
+void underlineLine(String filePath, size_t line) {
     for (size_t i = 0; i < numberOfDigits(line); i++) {
         printf(" ");
     }
     printf("  ");
 
-    String file = readFile(filePath);
+    String file = readFile(filePath.content);
     for (size_t i = 0; i < file.count && line >= 1; i++) {
         if (file.content[i] == '\n') {
             line -= 1;
@@ -212,54 +214,54 @@ void reportError(Ast ast, Error error) {
     switch (error.kind) {
         case FILE_NOT_FOUND: todo(); break;
         case UNKNOWN_CHARACTER:
-            printHeader("Unknown character", ast.filePath);
-            printCurrentLine(ast.filePath, error.line);
-            underlineLocation(ast.filePath, error.line, error.column);
+            printHeader("Unknown character", ast.canonicalPath);
+            printCurrentLine(ast.canonicalPath, error.line);
+            underlineLocation(ast.canonicalPath, error.line, error.column);
             break;
         case EXPECTING_LINE_ENDING:
-            printHeader("Expecting line ending", ast.filePath);
+            printHeader("Expecting line ending", ast.canonicalPath);
             printf("Finished parsing a statement. A new line was expected.\n\n"
             );
-            printCurrentLine(ast.filePath, error.line);
+            printCurrentLine(ast.canonicalPath, error.line);
             underlineToken(ast, error.expectingLineEnding.actualToken);
             break;
         case UNEXPECTED_IDENTATION:
-            printHeader("Unexpected indentation", ast.filePath);
-            printCurrentLine(ast.filePath, error.line);
-            underlineUntilLocation(ast.filePath, error.line, error.column);
+            printHeader("Unexpected indentation", ast.canonicalPath);
+            printCurrentLine(ast.canonicalPath, error.line);
+            underlineUntilLocation(ast.canonicalPath, error.line, error.column);
             break;
         case EXPECTING_STATEMENT:
-            printHeader("Expecting statement", ast.filePath);
-            printCurrentLine(ast.filePath, error.line);
-            underlineLine(ast.filePath, error.line);
+            printHeader("Expecting statement", ast.canonicalPath);
+            printCurrentLine(ast.canonicalPath, error.line);
+            underlineLine(ast.canonicalPath, error.line);
             break;
         case EXPECTING_NEW_IDENTATION_LEVEL:
-            printHeader("Expecting new indentation level", ast.filePath);
+            printHeader("Expecting new indentation level", ast.canonicalPath);
             if (error.line > 1) {
-                printCurrentLine(ast.filePath, error.line - 1);
+                printCurrentLine(ast.canonicalPath, error.line - 1);
             }
-            printCurrentLine(ast.filePath, error.line);
-            underlineLocation(ast.filePath, error.line, error.column);
+            printCurrentLine(ast.canonicalPath, error.line);
+            underlineLocation(ast.canonicalPath, error.line, error.column);
             break;
         case UNEXPECTED_TOKEN:
-            printHeader("Unexpected token", ast.filePath);
+            printHeader("Unexpected token", ast.canonicalPath);
             printf(
                 "Parsing %s. Was expecting %s, but found %s.\n\n",
                 error.unexpectedToken.beingParsed,
                 ast_tokenAsString(error.unexpectedToken.expectedToken),
                 ast_tokenAsString(error.unexpectedToken.actualToken)
             );
-            printCurrentLine(ast.filePath, error.line);
-            underlineLocation(ast.filePath, error.line, error.column);
+            printCurrentLine(ast.canonicalPath, error.line);
+            underlineLocation(ast.canonicalPath, error.line, error.column);
             break;
         case EXPECTING_EXPRESSION:
-            printHeader("Expected a expression", ast.filePath);
+            printHeader("Expected a expression", ast.canonicalPath);
             printf(
                 "Was expecting a expression, but found %s.\n\n",
                 ast_tokenAsString(error.expectingExpression.actualToken)
             );
-            printCurrentLine(ast.filePath, error.line);
-            underlineLocation(ast.filePath, error.line, error.column);
+            printCurrentLine(ast.canonicalPath, error.line);
+            underlineLocation(ast.canonicalPath, error.line, error.column);
             break;
         case UDENFINED_VARIABLE: todo(); break;
         case REASSIGNING_IMMUTABLE_VARIABLE: todo(); break;

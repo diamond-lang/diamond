@@ -30,6 +30,21 @@
         list.count += 1;                                                  \
     } while (false);
 
+#define list_append2(list, item)                                             \
+    do {                                                                     \
+        if (list->count >= list->capacity) {                                 \
+            if (list->capacity == 0) {                                       \
+                list->capacity = 256;                                        \
+            } else {                                                         \
+                list->capacity *= 2;                                         \
+            }                                                                \
+            list->items =                                                    \
+                realloc(list->items, list->capacity * sizeof(*list->items)); \
+        }                                                                    \
+        list->items[list->count] = item;                                     \
+        list->count += 1;                                                    \
+    } while (false);
+
 #define list_setCapacity(list, newCapacity)                                    \
     do {                                                                       \
         list.capacity = newCapacity;                                           \
@@ -49,6 +64,25 @@
                 realloc(list.items, list.capacity * sizeof(*list.items)); \
             assert(list.items != NULL);                                   \
         }                                                                 \
+    } while (false);
+
+#define list_removeFirstMatch(list, item)                            \
+    do {                                                             \
+        if (list.count > 0) {                                        \
+            size_t i##item;                                          \
+            for (i##item = 0; i##item < list.count; i##item++) {     \
+                if (list.items[i##item] == item) {                   \
+                    break;                                           \
+                }                                                    \
+            }                                                        \
+            for (size_t j##item = i##item; j##item < list.count - 1; \
+                 j##item++) {                                        \
+                list.items[j##item] = list.items[j##item + 1];       \
+            }                                                        \
+            if (i##item < list.count) {                              \
+                list.count--;                                        \
+            }                                                        \
+        }                                                            \
     } while (false);
 
 #define List() {NULL, 0, 0}
@@ -94,10 +128,17 @@ typedef struct {
     size_t capacity;
 } String;
 
+typedef struct {
+    size_t length;
+    char* pointer;
+} StringView;
+
 void string_append(String* string, char item);
+void string_concat(String* string, StringView toConcat);
 #define string_equals(buffer1, buffer2) strcmp(buffer1, buffer2) == 0
 String string_substring(String string, size_t start, size_t length);
 void string_free(String string);
+StringView string_asView(String string);
 
 #define String() (String){NULL, 0, 0}
 
