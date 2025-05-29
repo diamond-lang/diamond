@@ -63,7 +63,7 @@ static Token createToken(Lexer* lexer, TokenKind kind) {
     Token token = {
         .kind = kind,
         .line = lexer->line,
-        .column = lexer->column - lexer->currentLiteral.count
+        .column = lexer->column - string_size(lexer->currentLiteral)
     };
     lexer->previousWasUseOrInclude = kind == USE || kind == INCLUDE;
     return token;
@@ -74,16 +74,16 @@ static inline Data numberOfSlotsNeeded(Data length) {
 }
 
 static Token createTokenWithLiteral(Lexer* lexer, TokenKind kind) {
-    const size_t literalsCount = lexer->literals->count;
-    const Data length = lexer->currentLiteral.count;
-    const char* currentLiteral = lexer->currentLiteral.content;
+    const size_t literalsCount = list_size(*lexer->literals);
+    const Data length = string_size(lexer->currentLiteral);
+    const char* currentLiteral = string_pointer(lexer->currentLiteral);
 
     // Check if literal already exist
     Data literalId = None();
-    for (Data i = 0; i < lexer->literals->count;
-         i += numberOfSlotsNeeded(lexer->literals->items[i])) {
-        if (lexer->literals->items[i] == length &&
-            memcmp(&lexer->literals->items[i + 1], currentLiteral, length) ==
+    for (Data i = 0; i < list_size(*lexer->literals);
+         i += numberOfSlotsNeeded(*list_get(*lexer->literals, i))) {
+        if (*list_get(*lexer->literals, i) == length &&
+            memcmp(list_get(*lexer->literals, i + 1), currentLiteral, length) ==
                 0) {
             literalId = i;
             break;
@@ -95,15 +95,15 @@ static Token createTokenWithLiteral(Lexer* lexer, TokenKind kind) {
         literalId = literalsCount;
 
         Data extraCapacityNeeded = numberOfSlotsNeeded(length);
-        list_ensureCapacity((*lexer->literals), extraCapacityNeeded);
+        list_ensureExtraCapacity((*lexer->literals), extraCapacityNeeded);
 
-        lexer->literals->items[literalId] = length;
+        list_size(*lexer->literals) += extraCapacityNeeded;
+        *list_get(*lexer->literals, literalId) = length;
         strncpy(
-            (char*)&lexer->literals->items[literalId + 1],
+            (char*)list_get(*lexer->literals, literalId + 1),
             currentLiteral,
             length
         );
-        lexer->literals->count += extraCapacityNeeded;
     }
 
     // Create token
@@ -122,7 +122,7 @@ void initLexer(
     lexer->line = 1;
     lexer->column = 1;
     lexer->source = readFile(filePath);
-    lexer->sourcePointer = lexer->source.content;
+    lexer->sourcePointer = string_pointer(lexer->source);
     lexer->literals = literals;
     lexer->errors = errors;
     lexer->currentLiteral = String();
@@ -132,18 +132,13 @@ void initLexer(
     lexer->previousWasUseOrInclude = false;
 }
 
-void lexer_free(Lexer* lexer) {
-    string_free(lexer->source);
-    string_free(lexer->currentLiteral);
-}
-
 static Token scanNumber(Lexer* lexer);
 static Token scanIdentifierOrKeyword(Lexer* lexer);
 static Token scanImport(Lexer* lexer);
 
 Token scanToken(Lexer* lexer) {
 start:
-    lexer->currentLiteral.count = 0;
+    string_clear(&lexer->currentLiteral);
     advance(lexer);
     switch (lexer->current) {
         case '(': return createToken(lexer, LEFT_PAREN);
@@ -228,9 +223,9 @@ static Token scanNumber(Lexer* lexer) {
 }
 
 static bool identifierEquals(Lexer* lexer, char* literal) {
-    size_t length = lexer->currentLiteral.count;
+    size_t length = string_size(lexer->currentLiteral);
     for (size_t i = 0; i < length; i++) {
-        if (lexer->currentLiteral.content[i] != literal[i]) return false;
+        if (string_get(lexer->currentLiteral, i) != literal[i]) return false;
     }
     if (literal[length] != '\0') return false;
     return true;
@@ -270,18 +265,16 @@ static Token scanIdentifierOrKeyword(Lexer* lexer) {
 
 static Token scanImport(Lexer* lexer) {
     while (true) {
-        if (lexer->current == '/') advance(lexer);
-        if (lexer->current == '.' && lexer->next != '.') {
-            advance(lexer);
-        } else if (lexer->current == '.' && lexer->next == '.' &&
-                   lexer->nextNext != '.') {
+        if (lexer->next == '/') advance(lexer);
+        if (lexer->next == '.' && lexer->nextNext == '.') {
             advance(lexer);
             advance(lexer);
-        } else if (isalnum(lexer->current) || lexer->current == '_') {
+        } else if (lexer->next == '.') {
+            advance(lexer);
+        } else {
             while (isalnum(lexer->next) || lexer->next == '_') advance(lexer);
         }
         if (lexer->next != '/') break;
-        advance(lexer);
     }
     return createTokenWithLiteral(lexer, IMPORT_PATH);
 }

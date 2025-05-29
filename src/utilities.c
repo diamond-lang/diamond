@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "arena.h"
 #include "types.h"
 
 #ifdef WIN32
@@ -24,135 +25,91 @@ bool isAbsolutePath(StringView path) {
     }
 }
 
-void appendToPath(String* path1, StringView toAppend) {
+void appendToPath(String* path, StringView toAppend) {
     if (toAppend.length == 0) return;
-    if (path1->content[path1->count - 1] != '/' && toAppend.pointer[0] != '/') {
-        string_append(path1, '/');
+    if (string_get(*path, string_size(*path) - 1) != '/' &&
+        toAppend.pointer[0] != '/') {
+        string_append(path, '/');
     }
-    for (size_t i = 0; i < toAppend.length; i++) {
-        string_append(path1, toAppend.pointer[i]);
-    }
+    string_concat(path, toAppend);
 }
 
-typedef struct {
-    size_t index;
-    size_t length;
-} PathComponent;
-
-typedef ListType(PathComponent) ComponentList;
-typedef ListType(PathComponent) ComponentStack;
+typedef ListType(StringView) PartList;
+typedef StackType(StringView) PartStack;
 
 void normalizePath(String* path) {
-    char* newBuffer = malloc(path->capacity);
-    assert(newBuffer != NULL);
+    arena_newLifetime();
 
-    ComponentList parts = (ComponentList)List();
-    ComponentStack normalizedParts = (ComponentStack)Stack();
-    for (size_t i = 0; i < path->count;) {
-        if (path->content[i] == '/') {
-            i += 1;
-        }
+    // Create a copy of the input and clear path
+    String copy = String();
+    string_concat(&copy, string_asView(*path));
+    string_clear(path);
+
+    // Get parts in path
+    PartList parts = (PartList)List();
+    for (size_t i = 0; i < string_size(copy);) {
+        if (string_get(copy, i) == '/') i += 1;
         size_t j = i;
-        while (path->content[j] != '/' && path->content[j] != '\0') j++;
-        PathComponent component = (PathComponent){i, j - i};
-        if (component.length == 1) {
-            if (path->content[component.index] != '.') {
-                list_append(parts, component);
-            }
-        } else {
-            list_append(parts, component);
-        }
+        while (string_get(copy, j) != '/' && string_get(copy, j) != '\0') j++;
+        StringView part = (StringView){j - i, string_pointer(copy) + i};
+        if (!string_equal(part, cStringAsView("."))) list_append(parts, part);
         i = j;
     }
 
-    for (size_t i = 0; i < parts.count; i++) {
-        bool partIsTwoDots = parts.items[i].length == 2 &&
-                             (memcmp(
-                                  path->content + parts.items[i].index,
-                                  "..",
-                                  parts.items[i].length
-                              ) == 0);
-        if (partIsTwoDots) {
-            bool previousNormalizedPartIsTwoDots =
-                normalizedParts.count != 0 &&
-                normalizedParts.items[normalizedParts.count - 1].length == 2 &&
-                (memcmp(
-                     path->content +
-                         normalizedParts.items[normalizedParts.count - 1].index,
-                     "..",
-                     normalizedParts.items[normalizedParts.count - 1].length
-                 ) == 0);
-            ;
-            if (normalizedParts.count != 0 &&
-                !previousNormalizedPartIsTwoDots) {
+    // Get normalized parts
+    PartStack normalizedParts = (PartStack)Stack();
+    for (size_t i = 0; i < list_size(parts); i++) {
+        bool partIsTwoDots =
+            string_equal(*list_get(parts, i), cStringAsView(".."));
+        if (partIsTwoDots && stack_size(normalizedParts) != 0) {
+            bool previousNormalizedPartIsTwoDots = string_equal(
+                *stack_get(normalizedParts, i - 1),
+                cStringAsView("..")
+            );
+            if (!previousNormalizedPartIsTwoDots) {
                 stack_pop(normalizedParts);
             } else if (!isAbsolutePath(string_asView(*path))) {
-                stack_push(normalizedParts, parts.items[i]);
+                stack_push(normalizedParts, *list_get(parts, i));
             }
         } else {
-            stack_push(normalizedParts, parts.items[i]);
+            stack_push(normalizedParts, *list_get(parts, i));
         }
     }
 
     // Construct normalized path
-    size_t normalizedSize = 0;
-    if (isAbsolutePath(string_asView(*path))) {
-        newBuffer[0] = '/';
-        normalizedSize += 1;
+    if (isAbsolutePath(string_asView(copy))) string_append(path, '/');
+    for (size_t i = 0; i < stack_size(normalizedParts); i++) {
+        StringView part = *stack_get(normalizedParts, i);
+        string_concat(path, part);
+        if (i + 1 != stack_size(normalizedParts)) string_append(path, '/');
     }
-    for (size_t i = 0; i < normalizedParts.count; i++) {
-        PathComponent part = normalizedParts.items[i];
-        memcpy(
-            newBuffer + normalizedSize,
-            path->content + part.index,
-            part.length
-        );
-        normalizedSize += part.length;
-        if (i + 1 != normalizedParts.count) {
-            newBuffer[normalizedSize] = '/';
-            normalizedSize += 1;
-        }
-    }
-    newBuffer[normalizedSize] = '\0';
 
-    // Free resources
-    free(parts.items);
-    free(normalizedParts.items);
-    free(path->content);
-
-    // Return
-    path->content = newBuffer;
-    path->count = normalizedSize;
+    arena_destroyCurrentLifetime();
 }
 
 String getWorkingDirectory() {
-    size_t bufferSize = 256;
-    char* buffer = malloc(bufferSize);
-    assert(buffer != NULL);
-
+    CharList buffer = List();
+    list_ensureExtraCapacity(buffer, 256);
     do {
-        char* workingDirectory = getcwd(buffer, bufferSize);
+        char* workingDirectory = getcwd(buffer.buffer, buffer.capacity);
         if (workingDirectory == NULL && errno == ERANGE) {
-            bufferSize *= 2;
+            list_ensureExtraCapacity(buffer, list_size(buffer));
         } else {
             break;
         }
     } while (true);
-
-    return (String){buffer, strlen(buffer), bufferSize};
+    list_setSize(buffer, strlen(buffer.buffer) + 1);
+    return (String){buffer};
 }
 
 String getCanonicalPath(StringView path) {
-    String canonicalPath = String();
     if (isAbsolutePath(path)) {
-        size_t bufferSize = 256;
-        canonicalPath.content = malloc(bufferSize);
-        canonicalPath.count = path.length;
-        canonicalPath.capacity = bufferSize;
+        String canonicalPath = String();
+        appendToPath(&canonicalPath, path);
         normalizePath(&canonicalPath);
         return canonicalPath;
     } else {
-        canonicalPath = getWorkingDirectory();
+        String canonicalPath = getWorkingDirectory();
         appendToPath(&canonicalPath, path);
         normalizePath(&canonicalPath);
         return canonicalPath;
@@ -160,25 +117,31 @@ String getCanonicalPath(StringView path) {
 }
 
 String readFile(char* path) {
-    char* content = NULL;
+    // Open file
     FILE* file = fopen(path, "r");
     assert(file != NULL);
 
+    // Get file length
     int result = fseek(file, 0, SEEK_END);
     assert(result == 0);
 
     long fileSize = ftell(file);
     assert(fileSize != -1);
 
-    content = malloc(sizeof(char) * (fileSize + 1));
+    // Create buffer
+    CharList buffer = List();
+    list_ensureExtraCapacity(buffer, fileSize + 1);
+
+    // Go to beginning
     assert(fseek(file, 0, SEEK_SET) == 0);
+    fread(buffer.buffer, sizeof(char), fileSize, file);
+    buffer.buffer[fileSize] = '\0';
 
-    fread(content, sizeof(char), fileSize, file);
-    content[fileSize] = '\0';
-
+    // Close
     fclose(file);
 
-    return (String){content, fileSize, fileSize};
+    // Return file
+    return (String){buffer};
 }
 
 int numberOfDigits(size_t number) {

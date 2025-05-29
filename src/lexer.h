@@ -21,6 +21,5 @@ void initLexer(
     Lexer* lexer, char* filePath, DataList* literals, ErrorList* errors
 );
 Token scanToken(Lexer* lexer);
-void lexer_free(Lexer* lexer);
 
 #endif

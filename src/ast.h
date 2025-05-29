@@ -145,10 +145,10 @@ typedef struct {
 
 typedef DataList Literals;
 #define ast_literalExpand(ast, id) \
-    ast.literals.items[id], (char *)&ast.literals.items[id + 1]
-#define ast_literalAsStringView(ast, id)                              \
-    (StringView) {                                                    \
-        ast->literals.items[id], (char *)&ast->literals.items[id + 1] \
+    *list_get(ast.literals, id), (char *)list_get(ast.literals, id + 1)
+#define ast_literalAsStringView(ast, id)                                      \
+    (StringView) {                                                            \
+        *list_get(ast->literals, id), (char *)list_get(ast->literals, id + 1) \
     }
 
 typedef size_t AstId;

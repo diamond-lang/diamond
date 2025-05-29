@@ -11,25 +11,25 @@
 #include "utilities.h"
 
 static void findImports(AstList* asts, AstId current) {
-    Ast* currentAst = &asts->items[current];
+    Ast* currentAst = list_get(*asts, current);
 
     // Parse imports
     parseImports(currentAst);
 
     // Check for errors
-    if (currentAst->errors.count != 0) {
+    if (list_size(currentAst->errors) != 0) {
         reportErrors(*currentAst);
         exit(EXIT_FAILURE);
     }
 
     // Parse imported files
-    for (size_t i = 0; i < currentAst->nodes.count; i++) {
+    for (size_t i = 0; i < list_size(currentAst->nodes); i++) {
         assert(
-            currentAst->nodes.items[i] == AST_USE ||
-            currentAst->nodes.items[i] == AST_INCLUDE
+            *list_get(currentAst->nodes, i) == AST_USE ||
+            *list_get(currentAst->nodes, i) == AST_INCLUDE
         );
         LiteralId literal;
-        if (currentAst->nodes.items[i] == AST_USE) {
+        if (list_get(currentAst->nodes, i) == AST_USE) {
             literal = ast_getData(AstUse, currentAst, i)->path;
         } else {
             literal = ast_getData(AstInclude, currentAst, i)->path;
@@ -40,10 +40,10 @@ static void findImports(AstList* asts, AstId current) {
 
         // Check that it has not been added
         bool founded = false;
-        for (size_t j = 0; j < asts->count; j++) {
-            if (string_equals(
-                    asts->items[j].canonicalPath.content,
-                    canonicalPath.content
+        for (size_t j = 0; j < list_size(*asts); j++) {
+            if (string_equal(
+                    string_asView(list_get(*asts, j)->canonicalPath),
+                    string_asView(canonicalPath)
                 )) {
                 founded = true;
                 break;
@@ -51,9 +51,9 @@ static void findImports(AstList* asts, AstId current) {
         }
 
         if (!founded) {
-            AstId newAst = asts->count;
-            list_append2(asts, (Ast){});
-            initAst(&asts->items[newAst], canonicalPath);
+            AstId newAst = list_size(*asts);
+            list_append(*asts, (Ast){});
+            initAst(list_get(*asts, newAst), canonicalPath);
             list_append(currentAst->imports, newAst);
             findImports(asts, newAst);
         }
@@ -71,12 +71,12 @@ static DependencyGraph findDependencyGraph(AstList* asts) {
     while (true) {
         AstIdList list = (AstIdList)List();
         // For each ast
-        for (size_t i = 0; i < asts->count; i++) {
+        for (size_t i = 0; i < list_size(*asts); i++) {
             // If it doens't have imports
-            if (asts->items[i].imports.count == 0) {
+            if (list_size(list_get(*asts, i)->imports) == 0) {
                 bool already = false;
-                for (size_t j = 0; j < alreadyAdded.count; j++) {
-                    if (alreadyAdded.items[j] == i) {
+                for (size_t j = 0; j < list_size(alreadyAdded); j++) {
+                    if (*list_get(alreadyAdded, j) == i) {
                         already = true;
                     }
                 }
@@ -86,15 +86,14 @@ static DependencyGraph findDependencyGraph(AstList* asts) {
                 list_append(list, i);
                 list_append(alreadyAdded, i);
                 // Remove from others lists of imports
-                for (size_t j = 0; j < asts->count; j++) {
-                    list_removeFirstMatch(asts->items[j].imports, i);
+                for (size_t j = 0; j < list_size(*asts); j++) {
+                    list_removeFirstMatch(list_get(*asts, j)->imports, i);
                 }
             }
         }
-        if (list.count == 0) break;
+        if (list_size(list) == 0) break;
         list_append(graph, list);
     }
-    free(alreadyAdded.items);
 
     return graph;
 }
@@ -103,17 +102,21 @@ Program compile(char* file) {
     Program program = (Program){List()};
     list_append(program.asts, (Ast){});
     initAst(
-        &program.asts.items[0],
+        list_get(program.asts, 0),
         getCanonicalPath((StringView){strlen(file), file})
     );
 
     // Find dependecy graph
     program.dependencyGraph = findDependencyGraph(&program.asts);
 
-    for (size_t i = 0; i < program.dependencyGraph.count; i++) {
-        for (size_t j = 0; j < program.dependencyGraph.items[i].count; j++) {
-            AstId ast = program.dependencyGraph.items[i].items[j];
-            printf("%s\n", program.asts.items[ast].canonicalPath.content);
+    for (size_t i = 0; i < list_size(program.dependencyGraph); i++) {
+        for (size_t j = 0; j < list_size(*list_get(program.dependencyGraph, i));
+             j++) {
+            AstId ast = *list_get(*list_get(program.dependencyGraph, i), j);
+            printf(
+                "%s\n",
+                string_pointer(list_get(program.asts, ast)->canonicalPath)
+            );
         }
         printf("\n");
     }

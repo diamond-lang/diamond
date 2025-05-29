@@ -2,9 +2,11 @@
 
 #include <stdio.h>
 
+#include "arena.h"
 #include "ast.h"
 #include "common.h"
 #include "token.h"
+#include "types.h"
 #include "utilities.h"
 
 static char* token_getLiteral(Ast ast, Token token) {
@@ -62,7 +64,7 @@ static char* token_getLiteral(Ast ast, Token token) {
         case EXTERN: return "extern";
         case NEW_LINES: return "\\n";
         case END_OF_FILE: return "\\0";
-        case UNKNOWN_TOKEN: return (char*)ast.literals.items + token.literal;
+        case UNKNOWN_TOKEN: todo();
     }
 }
 
@@ -127,15 +129,16 @@ static char* ast_tokenAsString(TokenKind kind) {
 
 void printCurrentLine(String filePath, size_t line) {
     printf("%zu│ ", line);
-    String file = readFile(filePath.content);
-    for (size_t i = 0; i < file.count && line >= 1; i++) {
-        if (file.content[i] == '\n') {
+    arena_newLifetime();
+    String file = readFile(string_pointer(filePath));
+    for (size_t i = 0; i < string_size(file) && line >= 1; i++) {
+        if (string_get(file, i) == '\n') {
             line -= 1;
         } else if (line == 1) {
-            printf("%c", file.content[i]);
+            printf("%c", string_get(file, i));
         }
     }
-    free(file.content);
+    arena_destroyCurrentLifetime();
     printf("\n");
 }
 
@@ -154,7 +157,7 @@ void printMagenta(char* str) { printf("\x1b[35m%s\x1b[0m", str); }
 void printBrightMagenta(char* str) { printf("\x1b[95m%s\x1b[0m", str); }
 
 void printHeader(char* title, String filePath) {
-    printf("\x1b[96m%s (%s)\x1b[0m\n\n", title, filePath.content);
+    printf("\x1b[96m%s (%s)\x1b[0m\n\n", title, string_pointer(filePath));
 }
 
 void underlineUntilLocation(String filePath, size_t line, size_t column) {
@@ -198,16 +201,16 @@ void underlineLine(String filePath, size_t line) {
         printf(" ");
     }
     printf("  ");
-
-    String file = readFile(filePath.content);
-    for (size_t i = 0; i < file.count && line >= 1; i++) {
-        if (file.content[i] == '\n') {
+    arena_newLifetime();
+    String file = readFile(string_pointer(filePath));
+    for (size_t i = 0; i < string_size(file) && line >= 1; i++) {
+        if (string_get(file, i) == '\n') {
             line -= 1;
         } else if (line == 1) {
             printRed("^");
         }
     }
-    free(file.content);
+    arena_destroyCurrentLifetime();
 }
 
 void reportError(Ast ast, Error error) {
@@ -272,7 +275,7 @@ void reportError(Ast ast, Error error) {
 }
 
 void reportErrors(Ast ast) {
-    for (size_t i = 0; i < ast.errors.count; i++) {
-        reportError(ast, ast.errors.items[i]);
+    for (size_t i = 0; i < list_size(ast.errors); i++) {
+        reportError(ast, *list_get(ast.errors, i));
     }
 }

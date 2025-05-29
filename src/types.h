@@ -7,125 +7,117 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "arena.h"  // IWYU pragma: keep
+
 // List
 #define ListType(T)      \
     struct {             \
-        T* items;        \
-        size_t count;    \
+        T* buffer;       \
+        size_t size;     \
         size_t capacity; \
+        size_t lifetime; \
     }
 
-#define list_append(list, item)                                           \
-    do {                                                                  \
-        if (list.count >= list.capacity) {                                \
-            if (list.capacity == 0) {                                     \
-                list.capacity = 256;                                      \
-            } else {                                                      \
-                list.capacity *= 2;                                       \
-            }                                                             \
-            list.items =                                                  \
-                realloc(list.items, list.capacity * sizeof(*list.items)); \
-        }                                                                 \
-        list.items[list.count] = item;                                    \
-        list.count += 1;                                                  \
+#define List() {NULL, 0, 0, arena_currentLifetime()}
+
+void _list_get(void* buffer, size_t size, size_t index, int sizeOfItem);
+
+#define list_get(list, index)                    \
+    (index < (list).size ? &(list).buffer[index] \
+                         : (assert(index < (list).size), &(list).buffer[0]))
+
+#define list_size(list) ((list).size)
+
+#define list_append(list, item)                          \
+    do {                                                 \
+        if ((list).size >= (list).capacity) {            \
+            if ((list).capacity == 0) {                  \
+                (list).capacity = 256;                   \
+            } else {                                     \
+                (list).capacity *= 2;                    \
+            }                                            \
+            (list).buffer = arena_realloc(               \
+                (list).lifetime,                         \
+                (list).buffer,                           \
+                (list).capacity * sizeof(*(list).buffer) \
+            );                                           \
+        }                                                \
+        (list).buffer[(list).size] = item;               \
+        (list).size += 1;                                \
     } while (false);
 
-#define list_append2(list, item)                                             \
-    do {                                                                     \
-        if (list->count >= list->capacity) {                                 \
-            if (list->capacity == 0) {                                       \
-                list->capacity = 256;                                        \
-            } else {                                                         \
-                list->capacity *= 2;                                         \
-            }                                                                \
-            list->items =                                                    \
-                realloc(list->items, list->capacity * sizeof(*list->items)); \
-        }                                                                    \
-        list->items[list->count] = item;                                     \
-        list->count += 1;                                                    \
+#define list_setSize(list, newSize)         \
+    do {                                    \
+        assert(newSize <= (list).capacity); \
+        (list).size = newSize;              \
     } while (false);
 
-#define list_setCapacity(list, newCapacity)                                    \
-    do {                                                                       \
-        list.capacity = newCapacity;                                           \
-        list.items = realloc(list.items, list.capacity * sizeof(*list.items)); \
-        if (list.capacity < list.count) list.count = list.capacity;            \
+#define list_ensureExtraCapacity(list, extraCapacity)                       \
+    do {                                                                    \
+        if ((list).capacity == 0) (list).capacity = 256;                    \
+        while ((list).size + extraCapacity > (list).capacity)               \
+            (list).capacity *= 2;                                           \
+        (list).buffer =                                                     \
+            arena_realloc((list).lifetime, (list).buffer, (list).capacity); \
+        assert((list).buffer != NULL);                                      \
     } while (false);
 
-#define list_ensureCapacity(list, extraCapacity)                          \
-    do {                                                                  \
-        while (list.count + extraCapacity > list.capacity) {              \
-            if (list.capacity == 0) {                                     \
-                list.capacity = 256;                                      \
-            } else {                                                      \
-                list.capacity *= 2;                                       \
-            }                                                             \
-            list.items =                                                  \
-                realloc(list.items, list.capacity * sizeof(*list.items)); \
-            assert(list.items != NULL);                                   \
-        }                                                                 \
+#define list_removeFirstMatch(list, item)                          \
+    do {                                                           \
+        if ((list).size > 0) {                                     \
+            size_t i__;                                            \
+            for (i__ = 0; i__ < (list).size; i__) {                \
+                if ((list).buffer[i__] == item) {                  \
+                    break;                                         \
+                }                                                  \
+            }                                                      \
+            for (size_t j__ = i__; j__ < (list).size - 1; j__++) { \
+                (list).buffer[j__] = (list).buffer[j__ + 1];       \
+            }                                                      \
+            if (i__ < (list).size) {                               \
+                (list).size--;                                     \
+            }                                                      \
+        }                                                          \
     } while (false);
 
-#define list_removeFirstMatch(list, item)                            \
-    do {                                                             \
-        if (list.count > 0) {                                        \
-            size_t i##item;                                          \
-            for (i##item = 0; i##item < list.count; i##item++) {     \
-                if (list.items[i##item] == item) {                   \
-                    break;                                           \
-                }                                                    \
-            }                                                        \
-            for (size_t j##item = i##item; j##item < list.count - 1; \
-                 j##item++) {                                        \
-                list.items[j##item] = list.items[j##item + 1];       \
-            }                                                        \
-            if (i##item < list.count) {                              \
-                list.count--;                                        \
-            }                                                        \
-        }                                                            \
+#define list_clear(list) \
+    do {                 \
+        (list).size = 0; \
     } while (false);
 
-#define List() {NULL, 0, 0}
+#define list_concat(list, otherListPointer, otherListSize) \
+    do {                                                   \
+        list_ensureExtraCapacity(list, otherListSize);     \
+        memcpy(                                            \
+            (list).buffer + list_size(list),               \
+            otherListPointer,                              \
+            otherListSize                                  \
+        );                                                 \
+        (list).size += otherListSize;                      \
+    } while (false);
 
 // Stack
-#define StackType(T)     \
-    struct {             \
-        T* items;        \
-        size_t count;    \
-        size_t capacity; \
-    }
+#define StackType(T) ListType(T)
 
-#define stack_push(stack, item)                                              \
-    do {                                                                     \
-        if (stack.count >= stack.capacity) {                                 \
-            if (stack.capacity == 0) {                                       \
-                stack.capacity = 256;                                        \
-            } else {                                                         \
-                stack.capacity *= 2;                                         \
-            }                                                                \
-            stack.items =                                                    \
-                realloc(stack.items, stack.capacity * sizeof(*stack.items)); \
-        }                                                                    \
-        stack.items[stack.count] = item;                                     \
-        stack.count += 1;                                                    \
-    } while (false);
+#define stack_size(stack) list_size(stack)
 
-#define stack_pop(stack)  \
-    do {                  \
-        stack.count -= 1; \
-    } while (false);
+#define stack_get(stack, index) list_get(stack, index)
 
-#define stack_top(stack) stack.items[stack.count - 1]
+#define stack_push(stack, item) list_append(stack, item)
 
-#define Stack() {NULL, 0, 0}
+#define stack_pop(stack) list_setSize(stack, list_size(stack) - 1)
+
+#define stack_top(stack) list_get(stack, list_size(stack) - 1)
+
+#define Stack() List()
 
 typedef StackType(size_t) SizeTStack;
 
 // String
+typedef ListType(char) CharList;
+
 typedef struct {
-    char* content;
-    size_t count;
-    size_t capacity;
+    CharList buffer;
 } String;
 
 typedef struct {
@@ -133,31 +125,21 @@ typedef struct {
     char* pointer;
 } StringView;
 
+#define cStringAsView(string) \
+    (StringView) { sizeof(string) - 1, string }
+
+size_t string_size(String string);
+void string_clear(String* string);
+char* string_pointer(String string);
+char string_get(String string, size_t index);
 void string_append(String* string, char item);
 void string_concat(String* string, StringView toConcat);
-#define string_equals(buffer1, buffer2) strcmp(buffer1, buffer2) == 0
-String string_substring(String string, size_t start, size_t length);
-void string_free(String string);
+bool string_equal(StringView a, StringView b);
 StringView string_asView(String string);
 
-#define String() (String){NULL, 0, 0}
+#define String() \
+    (String) { (CharList) List() }
 
 typedef ListType(String) StringList;
-
-// HashTable
-typedef struct {
-    int32_t key;
-    int32_t value;
-} Bucket;
-
-typedef struct {
-    Bucket* content;
-    size_t count;
-    size_t capacity;
-} HashTable;
-
-#define HashTable() (HashTable){NULL, 0, 0};
-int32_t* hashtable_get(HashTable hastable, int32_t key);
-void hashtable_set(HashTable* hastable, int32_t key, int32_t value);
 
 #endif

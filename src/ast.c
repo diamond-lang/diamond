@@ -7,7 +7,6 @@
 
 #include "common.h"
 #include "types.h"
-#include "utilities.h"
 
 void initAst(Ast* ast, String canonicalPath) {
     ast->canonicalPath = canonicalPath;
@@ -21,8 +20,7 @@ void initAst(Ast* ast, String canonicalPath) {
 NodeId ast_createNode(Ast* ast, AstKind kind) {
     list_append(ast->nodes, kind);
     list_append(ast->dataOrIndex, None());
-    list_setCapacity(ast->dataOrIndex, ast->nodes.capacity);
-    NodeId id = ast->nodes.count - 1;
+    NodeId id = list_size(ast->nodes) - 1;
     switch (kind) {
         case AST_INCLUDE: break;
         case AST_USE: break;
@@ -82,14 +80,17 @@ NodeId ast_createNode(Ast* ast, AstKind kind) {
 Data* _ast_getData(Ast* ast, NodeId node, size_t sizeOfData) {
     bool justOneField = sizeOfData == sizeof(Data);
     if (justOneField) {
-        return &ast->dataOrIndex.items[node];
+        return list_get(ast->dataOrIndex, node);
     } else {
-        if (ast->dataOrIndex.items[node] == None()) {
-            ast->dataOrIndex.items[node] = ast->data.count;
-            list_ensureCapacity(ast->data, sizeOfData / sizeof(Data));
-            ast->data.count += sizeOfData / sizeof(Data);
+        if (*list_get(ast->dataOrIndex, node) == None()) {
+            *list_get(ast->dataOrIndex, node) = list_size(ast->data);
+            list_ensureExtraCapacity(ast->data, sizeOfData / sizeof(Data));
+            list_setSize(
+                ast->data,
+                list_size(ast->data) + sizeOfData / sizeof(Data)
+            );
         }
-        return ast->data.items + ast->dataOrIndex.items[node];
+        return list_get(ast->data, *list_get(ast->dataOrIndex, node));
     }
 }
 
@@ -115,9 +116,9 @@ static char* getBinaryOp(AstKind kind) {
 }
 
 void ast_print(Ast ast) {
-    for (size_t i = 0; i < ast.nodes.count; i += 1) {
-        AstKind kind = ast.nodes.items[i];
-        printf("%02lu│ ", i);
+    for (size_t i = 0; i < list_size(ast.nodes); i += 1) {
+        AstKind kind = *list_get(ast.nodes, i);
+        printf("%02zu│ ", i);
         switch (kind) {
             case AST_USE:
                 printf(
@@ -215,9 +216,7 @@ void ast_print(Ast ast) {
             case AST_SUBTRACT:
             case AST_MUL:
             case AST_DIV:
-            case AST_MOD:
-                printf("%s\n", getBinaryOp(ast.nodes.items[i]));
-                break;
+            case AST_MOD: printf("%s\n", getBinaryOp(kind)); break;
             case AST_NEGATION: printf("-\n"); break;
             case AST_DEREFERENCE: printf("dereference\n"); break;
             case AST_ADDRESS_OF: printf("addressOf\n"); break;
