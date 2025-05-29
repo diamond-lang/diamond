@@ -54,7 +54,7 @@ static void findImports(AstList* asts, AstId current) {
         if (!founded) {
             AstId newAst = list_size(*asts);
             list_append(*asts, (Ast){});
-            initAst(list_get(*asts, newAst), canonicalPath);
+            ast_init(list_get(*asts, newAst), canonicalPath);
             list_append(currentAst->imports, newAst);
             findImports(asts, newAst);
         }
@@ -118,7 +118,7 @@ Program compile(StringView file) {
     Program program;
     program.asts = (AstList)List();
     list_append(program.asts, (Ast){});
-    initAst(list_get(program.asts, 0), getCanonicalPath(file));
+    ast_init(list_get(program.asts, 0), getCanonicalPath(file));
     findImports(&program.asts, 0);
 
     // Find dependecy graph
@@ -136,7 +136,31 @@ Program compile(StringView file) {
         printf("\n");
     }
 
-    // Parse files reverse dependecy graph order
+    // Parse following dependecy graph
+    for (size_t i = 0; i < list_size(program.dependencyGraph); i++) {
+        // Get stage
+        AstIdList stage = *list_get(program.dependencyGraph, i);
+
+        // For each AST
+        for (size_t j = 0; j < list_size(stage); j++) {
+            // Parse AST
+            Ast* ast = list_get(program.asts, *list_get(stage, j));
+            ast_clear(ast);
+            parse(ast);
+
+            // Report errors if they are
+            if (list_size(ast->errors) != 0) {
+                reportErrors(*ast);
+                exit(EXIT_FAILURE);
+            }
+        }
+    }
+
+    for (size_t i = 0; i < list_size(program.asts); i++) {
+        ast_print(*list_get(program.asts, i));
+        if (i + 1 < list_size(program.asts))
+            printf("----------------------------------------------\n\n");
+    }
 
     // Find interface for each module following reverse dependecy graph order
 

@@ -8,13 +8,21 @@
 #include "common.h"
 #include "types.h"
 
-void initAst(Ast* ast, String canonicalPath) {
+void ast_init(Ast* ast, String canonicalPath) {
     ast->canonicalPath = canonicalPath;
     ast->nodes = (Uint8List)List();
     ast->dataOrIndex = (DataList)List();
     ast->data = (DataList)List();
     ast->errors = (ErrorList)List();
     ast->imports = (Imports)List();
+}
+
+void ast_clear(Ast* ast) {
+    list_clear(ast->nodes);
+    list_clear(ast->dataOrIndex);
+    list_clear(ast->data);
+    list_clear(ast->errors);
+    list_clear(ast->imports);
 }
 
 NodeId ast_createNode(Ast* ast, AstKind kind) {

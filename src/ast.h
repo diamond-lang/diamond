@@ -166,7 +166,8 @@ typedef struct {
 
 typedef ListType(Ast) AstList;
 
-void initAst(Ast *ast, String canonicalPath);
+void ast_init(Ast *ast, String canonicalPath);
+void ast_clear(Ast *ast);
 NodeId ast_createNode(Ast *ast, AstKind kind);
 Data *_ast_getData(Ast *ast, NodeId node, size_t sizeOfData);
 #define ast_getData(type, ast, nodeId) \

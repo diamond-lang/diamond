@@ -24,18 +24,7 @@ int main(int argc, char* argv[]) {
     // parse(list_get(program.asts, 0));
 
     // Compile program
-    Program program = compile(cStringAsView(argv[1]));
-    if (list_size(list_get(program.asts, 0)->errors) != 0) {
-        reportErrors(*list_get(program.asts, 0));
-        exit(EXIT_FAILURE);
-    }
-
-    ast_print(*list_get(program.asts, 0));
-
-    CharList list = List();
-    list_append(list, '6');
-    list_append(list, '6');
-    list_append(list, '6');
+    (void)compile(cStringAsView(argv[1]));
 
     // for (size_t i = 0; i < ast.literals.count; i++) {
     //     if (ast.literals.items[i] == '\0' && i + 1 != ast.literals.count) {
