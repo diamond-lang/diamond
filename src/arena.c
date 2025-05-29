@@ -5,8 +5,6 @@
 #include <stddef.h>
 #include <stdlib.h>
 
-#define inside_arena_c
-
 typedef struct {
     void** items;
     size_t count;
@@ -96,4 +94,4 @@ void arena_destroyAllLifetimes() {
     free(lifetimes.items);
 }
 
-#undef inside_arena_c
+void arena_assertNoLifetimesRemaining() { assert(lifetimes.count == 0); }

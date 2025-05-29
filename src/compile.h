@@ -5,6 +5,6 @@
 
 #include "program.h"
 
-Program compile(char* file);
+Program compile(StringView file);
 
 #endif

@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <stddef.h>
 
+#include "arena.h"
 #include "ast.h"
 #include "parser.h"
 #include "program.h"
@@ -60,51 +61,65 @@ static void findImports(AstList* asts, AstId current) {
     }
 }
 
+typedef struct {
+    bool added;
+    Imports imports;
+} ImportsForGraph;
+
+typedef ListType(ImportsForGraph) ImportsList;
+
 static DependencyGraph findDependencyGraph(AstList* asts) {
     DependencyGraph graph = (DependencyGraph)List();
 
-    // Find imports rercursively
-    findImports(asts, 0);
+    arena_newLifetime();
+
+    // Copy imports
+    ImportsList importsList = List();
+    for (size_t i = 0; i < asts->size; i++) {
+        Imports astImports = list_get(*asts, i)->imports;
+        Imports copy = List();
+        for (size_t j = 0; j < list_size(astImports); j++) {
+            list_append(copy, *list_get(astImports, j));
+        }
+        ImportsForGraph importsForGraph = (ImportsForGraph){false, copy};
+        list_append(importsList, importsForGraph);
+    }
 
     // Construct dependency graph
-    AstIdList alreadyAdded = (AstIdList)List();
     while (true) {
-        AstIdList list = (AstIdList)List();
-        // For each ast
-        for (size_t i = 0; i < list_size(*asts); i++) {
-            // If it doens't have imports
-            if (list_size(list_get(*asts, i)->imports) == 0) {
-                bool already = false;
-                for (size_t j = 0; j < list_size(alreadyAdded); j++) {
-                    if (*list_get(alreadyAdded, j) == i) {
-                        already = true;
-                    }
-                }
-                if (already) continue;
-
+        AstIdList list = (AstIdList)ListWithLifetime(graph.lifetime);
+        // For the imports of each AST
+        for (AstId i = 0; i < list_size(importsList); i++) {
+            // If AST doesn't have imports
+            ImportsForGraph* imports = list_get(importsList, i);
+            if (!imports->added && list_size(imports->imports) == 0) {
                 // Add to current stage of dependecy graph
                 list_append(list, i);
-                list_append(alreadyAdded, i);
-                // Remove from others lists of imports
-                for (size_t j = 0; j < list_size(*asts); j++) {
-                    list_removeFirstMatch(list_get(*asts, j)->imports, i);
+
+                // Remove from imports list from other ASTs
+                for (size_t j = 0; j < list_size(importsList); j++) {
+                    list_removeFirstMatch(list_get(importsList, j)->imports, i);
                 }
+
+                // Set as added
+                imports->added = true;
             }
         }
         if (list_size(list) == 0) break;
         list_append(graph, list);
     }
 
+    arena_destroyCurrentLifetime();
     return graph;
 }
 
-Program compile(char* file) {
-    Program program = (Program){List()};
+Program compile(StringView file) {
+    // Initialize program
+    Program program;
+    program.asts = (AstList)List();
     list_append(program.asts, (Ast){});
-    initAst(
-        list_get(program.asts, 0),
-        getCanonicalPath((StringView){strlen(file), file})
-    );
+    initAst(list_get(program.asts, 0), getCanonicalPath(file));
+    findImports(&program.asts, 0);
 
     // Find dependecy graph
     program.dependencyGraph = findDependencyGraph(&program.asts);

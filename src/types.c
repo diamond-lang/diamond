@@ -5,6 +5,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+StringView cStringAsView(char* string) {
+    return (StringView){strlen(string), string};
+}
+
 size_t string_size(String string) {
     size_t bufferSize = list_size(string.buffer);
     return bufferSize == 0 ? 0 : bufferSize - 1;

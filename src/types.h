@@ -19,6 +19,7 @@
     }
 
 #define List() {NULL, 0, 0, arena_currentLifetime()}
+#define ListWithLifetime(lifetime) {NULL, 0, 0, lifetime}
 
 void _list_get(void* buffer, size_t size, size_t index, int sizeOfItem);
 
@@ -62,22 +63,35 @@ void _list_get(void* buffer, size_t size, size_t index, int sizeOfItem);
         assert((list).buffer != NULL);                                      \
     } while (false);
 
-#define list_removeFirstMatch(list, item)                          \
-    do {                                                           \
-        if ((list).size > 0) {                                     \
-            size_t i__;                                            \
-            for (i__ = 0; i__ < (list).size; i__) {                \
-                if ((list).buffer[i__] == item) {                  \
-                    break;                                         \
-                }                                                  \
-            }                                                      \
-            for (size_t j__ = i__; j__ < (list).size - 1; j__++) { \
-                (list).buffer[j__] = (list).buffer[j__ + 1];       \
-            }                                                      \
-            if (i__ < (list).size) {                               \
-                (list).size--;                                     \
-            }                                                      \
-        }                                                          \
+#define list_removeItemAtIndex(list, index)                            \
+    do {                                                               \
+        assert(index < (list).size);                                   \
+        size_t sizeMinusOne__ = (list).size > 0 ? (list).size - 1 : 0; \
+        for (size_t i__ = index; i__ < sizeMinusOne__; i__++) {        \
+            (list).buffer[i__] = (list).buffer[i__ + 1];               \
+        }                                                              \
+        if (index < (list).size) {                                     \
+            (list).size--;                                             \
+        }                                                              \
+    } while (false);
+
+#define list_removeFirstMatch(list, item)                                  \
+    do {                                                                   \
+        if ((list).size > 0) {                                             \
+            size_t i__;                                                    \
+            for (i__ = 0; i__ < (list).size; i__) {                        \
+                if ((list).buffer[i__] == item) {                          \
+                    break;                                                 \
+                }                                                          \
+            }                                                              \
+            size_t sizeMinusOne__ = (list).size > 0 ? (list).size - 1 : 0; \
+            for (size_t j__ = i__; j__ < sizeMinusOne__; j__++) {          \
+                (list).buffer[j__] = (list).buffer[j__ + 1];               \
+            }                                                              \
+            if (i__ < (list).size) {                                       \
+                (list).size--;                                             \
+            }                                                              \
+        }                                                                  \
     } while (false);
 
 #define list_clear(list) \
@@ -125,8 +139,7 @@ typedef struct {
     char* pointer;
 } StringView;
 
-#define cStringAsView(string) \
-    (StringView) { sizeof(string) - 1, string }
+StringView cStringAsView(char* string);
 
 size_t string_size(String string);
 void string_clear(String* string);

@@ -15,20 +15,20 @@ int main(int argc, char* argv[]) {
 
     arena_newLifetime();
 
-    Program program = (Program){List()};
-    list_append(program.asts, (Ast){});
-    initAst(
-        list_get(program.asts, 0),
-        getCanonicalPath((StringView){strlen(argv[1]), argv[1]})
-    );
-    parse(list_get(program.asts, 0));
+    // Program program = (Program){List()};
+    // list_append(program.asts, (Ast){});
+    // initAst(
+    //     list_get(program.asts, 0),
+    //     getCanonicalPath((StringView){strlen(argv[1]), argv[1]})
+    // );
+    // parse(list_get(program.asts, 0));
 
     // Compile program
-    // Program program = compile(argv[1]);
-    // if (list_size(list_get(program.asts, 0)->errors) != 0) {
-    //     reportErrors(*list_get(program.asts, 0));
-    //     exit(EXIT_FAILURE);
-    // }
+    Program program = compile(cStringAsView(argv[1]));
+    if (list_size(list_get(program.asts, 0)->errors) != 0) {
+        reportErrors(*list_get(program.asts, 0));
+        exit(EXIT_FAILURE);
+    }
 
     ast_print(*list_get(program.asts, 0));
 
@@ -46,7 +46,8 @@ int main(int argc, char* argv[]) {
     // }
     // printf("\n");
 
-    arena_destroyAllLifetimes();
+    arena_destroyCurrentLifetime();
+    arena_assertNoLifetimesRemaining();
 
     return 0;
 }
