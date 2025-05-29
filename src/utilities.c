@@ -136,6 +136,7 @@ String readFile(char* path) {
     assert(fseek(file, 0, SEEK_SET) == 0);
     fread(buffer.buffer, sizeof(char), fileSize, file);
     buffer.buffer[fileSize] = '\0';
+    list_setSize(buffer, fileSize + 1);
 
     // Close
     fclose(file);
