@@ -158,8 +158,7 @@ Program compile(StringView file) {
 
     for (size_t i = 0; i < list_size(program.asts); i++) {
         ast_print(*list_get(program.asts, i));
-        if (i + 1 < list_size(program.asts))
-            printf("----------------------------------------------\n\n");
+        if (i + 1 < list_size(program.asts)) printf("\n\n");
     }
 
     // Find interface for each module following reverse dependecy graph order

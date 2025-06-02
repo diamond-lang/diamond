@@ -10,6 +10,7 @@
 typedef enum {
     AST_USE,
     AST_INCLUDE,
+    AST_FUNCTION_ARGUMENT,
     AST_FUNCTION,
     AST_INTERFACE,
     AST_EXTERN,
@@ -79,10 +80,21 @@ typedef struct {
 } AstInclude;
 
 typedef struct {
+    LiteralId literal;
+} AstFunctionArgument;
+
+typedef struct {
+    LiteralId literal;
     NodeCount numberOfTypeParameters;
     NodeCount numberOfArguments;
     Data argumentsMutability;
+    NodeId lastNode;
 } AstFunction;
+
+typedef struct {
+    LiteralId literal;
+    NodeId lastNode;
+} AstTypeDefinition;
 
 typedef struct {
     NodeId lastExpressionNode;
@@ -126,7 +138,8 @@ typedef struct {
 } AstString;
 
 typedef struct {
-    NodeCount parameters;
+    LiteralId literal;
+    NodeId lastNode;
 } AstType;
 
 #include "error.h"

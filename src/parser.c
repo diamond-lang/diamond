@@ -7,6 +7,7 @@
 #include <unistd.h>
 
 #include "arena.h"
+#include "ast.h"
 #include "common.h"
 #include "error.h"
 #include "lexer.h"
@@ -282,17 +283,18 @@ static NodeId import(Parser *parser, Token keyword) {
 // type → type ("[" type ("," type)* "]")*
 static NodeId type(Parser *parser) {
     NodeId id = ast_createNode(parser->ast, AST_TYPE);
-    expect(identifier(parser));
-    NodeCount parameters = 0;
+    consume(parser, IDENTIFIER, "a type");
+    ast_getData(AstType, parser->ast, id)->literal = parser->previous.literal;
+
     if (match(parser, LEFT_BRACKET)) {
         while (!atEnd(*parser)) {
             expect(type(parser));
-            parameters += 1;
             if (!match(parser, COMMA)) break;
         }
         consume(parser, RIGHT_BRACKET, "a type");
     }
-    ast_getData(AstType, parser->ast, id)->parameters = parameters;
+    ast_getData(AstType, parser->ast, id)->lastNode =
+        list_size(parser->ast->nodes) - 1;
     return id;
 }
 
@@ -322,12 +324,16 @@ static NodeId functionArgument(Parser *parser, AstFunction *functionData) {
         advance(parser);
     }
     functionData->numberOfArguments += 1;
-    bind(result, identifier(parser));
+
+    consume(parser, IDENTIFIER, "a function argument");
+    NodeId id = ast_createNode(parser->ast, AST_FUNCTION_ARGUMENT);
+    ast_getData(AstFunctionArgument, parser->ast, id)->literal =
+        parser->previous.literal;
+
     if (match(parser, COLON)) {
         expect(typeAnnotation(parser, parser->previous));
-        todo();
     }
-    return result;
+    return id;
 }
 
 // function → "function" IDENTIFIER type_parameters? "(" (functionArgument (":" type)? ",")* ")" (":" type)? block
@@ -335,7 +341,8 @@ static NodeId function(Parser *parser, Token keyword) {
     assert(keyword.kind == FUNCTION);
     NodeId id = ast_createNode(parser->ast, AST_FUNCTION);
     AstFunction functionData;
-    expect(identifier(parser));
+    consume(parser, IDENTIFIER, "a function");
+    functionData.literal = parser->previous.literal;
     if (match(parser, LEFT_BRACKET)) {
         todo();
     }
@@ -346,10 +353,11 @@ static NodeId function(Parser *parser, Token keyword) {
     }
     consume(parser, RIGHT_PAREN, "a function");
     if (match(parser, COLON)) {
-        bind(type, typeAnnotation(parser, parser->previous));
-        todo();
+        expect(typeAnnotation(parser, parser->previous));
     }
     bind(body, block(parser));
+    functionData.lastNode = list_size(parser->ast->nodes) - 1;
+    *ast_getData(AstFunction, parser->ast, id) = functionData;
     return id;
 }
 
@@ -359,8 +367,34 @@ static NodeId interface(Parser *parser, Token keyword) { todo(); }
 // extern → "extern" IDENTIFIER "(" (IDENTIFIER ":" type "..."? ("," IDENTIFIER ":" type "..."?)*)? ")" ":" type
 static NodeId externDefinition(Parser *parser, Token keyword) { todo(); }
 
-// typeDefinitionOrCase → ("type"|"case") IDENTIFIER (("\n"+ IDENTIFIER typeAnnoation)|(CASE IDENTIFIER typeDefinitionOrCase))*
-static NodeId typeDefinition(Parser *parser, Token keyword) { todo(); }
+// typeDefinition → "type" IDENTIFIER ("\n"+ IDENTIFIER typeAnnoation)*
+static NodeId typeDefinition(Parser *parser, Token keyword) {
+    assert(keyword.kind == TYPE);
+    NodeId id = ast_createNode(parser->ast, AST_TYPE_DEFINITION);
+    consume(parser, IDENTIFIER, "a type definition");
+    ast_getData(AstTypeDefinition, parser->ast, id)->literal =
+        parser->previous.literal;
+
+    // Set new indentation level
+    if (check(*parser, NEW_LINES)) {
+        if (*stack_top(parser->indentationLevel) >= parser->next.column) {
+            return id;
+        }
+        consumeIfExists(parser, NEW_LINES);
+        stack_push(parser->indentationLevel, parser->current.column);
+
+        // Parse fields
+        while (!atEnd(*parser)) {
+            checkIndentation();
+            expect(identifier(parser));
+            consume(parser, COLON, "a type definition");
+            expect(typeAnnotation(parser, parser->previous));
+        }
+    }
+    ast_getData(AstTypeDefinition, parser->ast, id)->lastNode =
+        list_size(parser->ast->nodes) - 1;
+    return id;
+}
 
 static NodeId block(Parser *parser) {
     size_t initialErrorCount = list_size(parser->ast->errors);

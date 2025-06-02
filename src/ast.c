@@ -5,6 +5,7 @@
 #include <stddef.h>
 #include <stdio.h>
 
+#include "arena.h"
 #include "common.h"
 #include "types.h"
 
@@ -32,6 +33,9 @@ NodeId ast_createNode(Ast* ast, AstKind kind) {
     switch (kind) {
         case AST_INCLUDE: break;
         case AST_USE: break;
+        case AST_FUNCTION_ARGUMENT:
+            ast_getData(AstFunctionArgument, ast, id);
+            break;
         case AST_FUNCTION: ast_getData(AstFunction, ast, id); break;
         case AST_INTERFACE: break;
         case AST_EXTERN: break;
@@ -124,9 +128,18 @@ static char* getBinaryOp(AstKind kind) {
 }
 
 void ast_print(Ast ast) {
+    arena_newLifetime();
+    SizeTStack indentationLevel = Stack();
+    SizeTStack separations = Stack();
     for (size_t i = 0; i < list_size(ast.nodes); i += 1) {
         AstKind kind = *list_get(ast.nodes, i);
+
         printf("%02zu│ ", i);
+
+        for (size_t j = 0; j < stack_size(indentationLevel); j++) {
+            printf("    ");
+        }
+
         switch (kind) {
             case AST_USE:
                 printf(
@@ -143,10 +156,43 @@ void ast_print(Ast ast) {
                     )
                 );
                 break;
-            case AST_FUNCTION: printf("function\n"); break;
+            case AST_FUNCTION_ARGUMENT:
+                printf(
+                    "argument(%.*s)\n",
+                    ast_literalExpand(
+                        ast,
+                        ast_getData(AstFunctionArgument, &ast, i)->literal
+                    )
+                );
+                break;
+            case AST_FUNCTION:
+                printf(
+                    "function %.*s\n",
+                    ast_literalExpand(
+                        ast,
+                        ast_getData(AstFunction, &ast, i)->literal
+                    )
+                );
+                stack_push(
+                    indentationLevel,
+                    ast_getData(AstFunction, &ast, i)->lastNode
+                );
+                break;
             case AST_INTERFACE: printf("interface\n"); break;
             case AST_EXTERN: printf("extern\n"); break;
-            case AST_TYPE_DEFINITION: printf("typeDefinition\n"); break;
+            case AST_TYPE_DEFINITION:
+                printf(
+                    "type %.*s\n",
+                    ast_literalExpand(
+                        ast,
+                        ast_getData(AstTypeDefinition, &ast, i)->literal
+                    )
+                );
+                stack_push(
+                    indentationLevel,
+                    ast_getData(AstTypeDefinition, &ast, i)->lastNode
+                );
+                break;
             case AST_DECLARATION: {
                 if (ast_getData(AstDeclaration, &ast, i)->lastTypeNode !=
                     None()) {
@@ -191,19 +237,23 @@ void ast_print(Ast ast) {
             case AST_BREAK: printf("break\n"); break;
             case AST_CONTINUE: printf("continue\n"); break;
             case AST_IF_ELSE:
+                stack_push(
+                    separations,
+                    ast_getData(AstIfElse, &ast, i)->lastIfNode
+                );
+                stack_push(
+                    separations,
+                    ast_getData(AstIfElse, &ast, i)->lastConditionNode
+                );
+                printf("ifElse\n");
                 if (ast_getData(AstIfElse, &ast, i)->lastElseNode != None()) {
-                    printf(
-                        "ifElse(lastConditionNode: %u, lastIfNode: %u, "
-                        "lastElseNode: %u)\n",
-                        ast_getData(AstIfElse, &ast, i)->lastConditionNode,
-                        ast_getData(AstIfElse, &ast, i)->lastIfNode,
+                    stack_push(
+                        indentationLevel,
                         ast_getData(AstIfElse, &ast, i)->lastElseNode
                     );
                 } else {
-                    printf(
-                        "ifElse(lastConditionNode: %u, lastIfNode: %u, "
-                        "lastElseNode: none)\n",
-                        ast_getData(AstIfElse, &ast, i)->lastConditionNode,
+                    stack_push(
+                        indentationLevel,
                         ast_getData(AstIfElse, &ast, i)->lastIfNode
                     );
                 }
@@ -232,7 +282,7 @@ void ast_print(Ast ast) {
             case AST_INDEX_ACCESS: printf("indexAccess\n"); break;
             case AST_FLOAT:
                 printf(
-                    "float(value: %.*s)\n",
+                    "float(%.*s)\n",
                     ast_literalExpand(
                         ast,
                         ast_getData(AstFloat, &ast, i)->literal
@@ -241,7 +291,7 @@ void ast_print(Ast ast) {
                 break;
             case AST_INTEGER:
                 printf(
-                    "integer(value: %.*s)\n",
+                    "integer(%.*s)\n",
                     ast_literalExpand(
                         ast,
                         ast_getData(AstInteger, &ast, i)->literal
@@ -250,7 +300,7 @@ void ast_print(Ast ast) {
                 break;
             case AST_IDENTIFIER:
                 printf(
-                    "identifier(value: %.*s)\n",
+                    "identifier(%.*s)\n",
                     ast_literalExpand(
                         ast,
                         ast_getData(AstIdentifier, &ast, i)->literal
@@ -259,13 +309,13 @@ void ast_print(Ast ast) {
                 break;
             case AST_BOOLEAN:
                 printf(
-                    "boolean(value: %s)\n",
+                    "boolean(%s)\n",
                     ast_getData(AstBoolean, &ast, i)->value ? "true" : "false"
                 );
                 break;
             case AST_STRING:
                 printf(
-                    "string(value: \"%.*s\")\n",
+                    "string(\"%.*s\")\n",
                     ast_literalExpand(
                         ast,
                         ast_getData(AstString, &ast, i)->literal
@@ -276,12 +326,34 @@ void ast_print(Ast ast) {
             case AST_STRUCT_LITERAL: printf("structLiteral\n"); break;
             case AST_TYPE:
                 printf(
-                    "type (parameters: %d)\n",
-                    ast_getData(AstType, &ast, i)->parameters
+                    "type(%.*s)\n",
+                    ast_literalExpand(
+                        ast,
+                        ast_getData(AstType, &ast, i)->literal
+                    )
+                );
+                stack_push(
+                    indentationLevel,
+                    ast_getData(AstType, &ast, i)->lastNode
                 );
                 break;
         }
+
+        while (stack_size(indentationLevel) != 0 &&
+               i == *stack_top(indentationLevel)) {
+            stack_pop(indentationLevel);
+        }
+
+        if (stack_size(separations) != 0 && *stack_top(separations) == i) {
+            printf("  │");
+            for (size_t j = 0; j < stack_size(indentationLevel); j++) {
+                printf("    ");
+            }
+            printf(" ────────────\n");
+            stack_pop(separations);
+        }
     }
+    arena_destroyCurrentLifetime();
 }
 
 void ast_setBit(Data* data, NodeCount position) {
