@@ -8,8 +8,7 @@
 #include "types.h"
 
 typedef enum {
-    AST_USE,
-    AST_INCLUDE,
+    AST_IMPORT,
     AST_FUNCTION_ARGUMENT,
     AST_FUNCTION,
     AST_INTERFACE,
@@ -73,11 +72,7 @@ typedef Data LiteralId;
 
 typedef struct {
     LiteralId path;
-} AstUse;
-
-typedef struct {
-    LiteralId path;
-} AstInclude;
+} AstImport;
 
 typedef struct {
     LiteralId literal;
@@ -150,12 +145,6 @@ typedef ListType(Data) DataList;
 typedef ListType(DataId) DataIdList;
 typedef ListType(NodeId) NodeIdList;
 
-typedef struct {
-    Uint8List nodes;
-    DataList dataOrIndex;
-    DataList data;
-} Code;
-
 typedef DataList Literals;
 #define ast_literalExpand(ast, id) \
     *list_get(ast.literals, id), (char *)list_get(ast.literals, id + 1)
@@ -167,6 +156,15 @@ typedef DataList Literals;
 typedef size_t AstId;
 typedef ListType(AstId) Imports;
 
+typedef enum { FUNCTION_DEFINITION, TYPE_DEFINITION } DefinitionKind;
+
+typedef struct {
+    DefinitionKind kind;
+    NodeId id;
+} Definition;
+
+typedef ListType(Definition) Definitions;
+
 typedef struct {
     String canonicalPath;
     Uint8List nodes;
@@ -175,6 +173,7 @@ typedef struct {
     Literals literals;
     ErrorList errors;
     Imports imports;
+    Definitions definitions;
 } Ast;
 
 typedef ListType(Ast) AstList;

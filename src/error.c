@@ -55,12 +55,11 @@ static char* token_getLiteral(Ast ast, Token token) {
         case FALSE: return "false";
         case OR: return "or";
         case AND: return "and";
-        case USE: return "use";
+        case IMPORT: return "import";
         case BREAK: return "break";
         case CONTINUE: return "continue";
         case RETURN: return "return";
         case MUT: return "and";
-        case INCLUDE: return "include";
         case EXTERN: return "extern";
         case NEW_LINES: return "\\n";
         case END_OF_FILE: return "\\0";
@@ -114,12 +113,11 @@ static char* ast_tokenAsString(TokenKind kind) {
         case FALSE: return "false";
         case OR: return "or";
         case AND: return "and";
-        case USE: return "use";
+        case IMPORT: return "import";
         case BREAK: return "break";
         case CONTINUE: return "continue";
         case RETURN: return "return";
         case MUT: return "and";
-        case INCLUDE: return "include";
         case EXTERN: return "extern";
         case NEW_LINES: return "a new line";
         case END_OF_FILE: return "end of file";

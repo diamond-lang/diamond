@@ -13,7 +13,7 @@ typedef struct {
     char current;
     char next;
     char nextNext;
-    bool previousWasUseOrInclude;
+    bool previousWasImport;
     String currentLiteral;
 } Lexer;
 

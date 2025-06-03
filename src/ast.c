@@ -31,8 +31,7 @@ NodeId ast_createNode(Ast* ast, AstKind kind) {
     list_append(ast->dataOrIndex, None());
     NodeId id = list_size(ast->nodes) - 1;
     switch (kind) {
-        case AST_INCLUDE: break;
-        case AST_USE: break;
+        case AST_IMPORT: break;
         case AST_FUNCTION_ARGUMENT:
             ast_getData(AstFunctionArgument, ast, id);
             break;
@@ -141,18 +140,12 @@ void ast_print(Ast ast) {
         }
 
         switch (kind) {
-            case AST_USE:
+            case AST_IMPORT:
                 printf(
-                    "use %.*s\n",
-                    ast_literalExpand(ast, ast_getData(AstUse, &ast, i)->path)
-                );
-                break;
-            case AST_INCLUDE:
-                printf(
-                    "include %.*s\n",
+                    "import %.*s\n",
                     ast_literalExpand(
                         ast,
-                        ast_getData(AstInclude, &ast, i)->path
+                        ast_getData(AstImport, &ast, i)->path
                     )
                 );
                 break;

@@ -65,7 +65,7 @@ static Token createToken(Lexer* lexer, TokenKind kind) {
         .line = lexer->line,
         .column = lexer->column - string_size(lexer->currentLiteral)
     };
-    lexer->previousWasUseOrInclude = kind == USE || kind == INCLUDE;
+    lexer->previousWasImport = kind == IMPORT;
     return token;
 }
 
@@ -129,7 +129,7 @@ void initLexer(
     lexer->current = '\0';
     lexer->next = nextChar(lexer);
     lexer->nextNext = nextChar(lexer);
-    lexer->previousWasUseOrInclude = false;
+    lexer->previousWasImport = false;
 }
 
 static Token scanNumber(Lexer* lexer);
@@ -150,7 +150,7 @@ start:
         case '&': return createToken(lexer, AMPERSAND);
         case '.':
             if (isdigit(lexer->next)) return scanNumber(lexer);
-            if (lexer->previousWasUseOrInclude) return scanImport(lexer);
+            if (lexer->previousWasImport) return scanImport(lexer);
             return createToken(lexer, DOT);
         case '+': return createToken(lexer, PLUS);
         case '-':
@@ -232,7 +232,7 @@ static bool identifierEquals(Lexer* lexer, char* literal) {
 }
 
 static Token scanIdentifierOrKeyword(Lexer* lexer) {
-    if (lexer->previousWasUseOrInclude) return scanImport(lexer);
+    if (lexer->previousWasImport) return scanImport(lexer);
 
     while (isalnum(lexer->next) || lexer->next == '_') advance(lexer);
 
@@ -257,8 +257,7 @@ static Token scanIdentifierOrKeyword(Lexer* lexer) {
     if (identifierEquals(lexer, "mut")) return createToken(lexer, MUT);
     if (identifierEquals(lexer, "not")) return createToken(lexer, NOT);
     if (identifierEquals(lexer, "extern")) return createToken(lexer, EXTERN);
-    if (identifierEquals(lexer, "use")) return createToken(lexer, USE);
-    if (identifierEquals(lexer, "include")) return createToken(lexer, INCLUDE);
+    if (identifierEquals(lexer, "import")) return createToken(lexer, IMPORT);
 
     return createTokenWithLiteral(lexer, IDENTIFIER);
 }

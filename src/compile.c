@@ -25,16 +25,8 @@ static void findImports(AstList* asts, AstId current) {
 
     // Parse imported files
     for (size_t i = 0; i < list_size(currentAst->nodes); i++) {
-        assert(
-            *list_get(currentAst->nodes, i) == AST_USE ||
-            *list_get(currentAst->nodes, i) == AST_INCLUDE
-        );
-        LiteralId literal;
-        if (list_get(currentAst->nodes, i) == AST_USE) {
-            literal = ast_getData(AstUse, currentAst, i)->path;
-        } else {
-            literal = ast_getData(AstInclude, currentAst, i)->path;
-        }
+        assert(*list_get(currentAst->nodes, i) == AST_IMPORT);
+        LiteralId literal = ast_getData(AstImport, currentAst, i)->path;
         StringView view = ast_literalAsStringView(currentAst, literal);
         String canonicalPath = getCanonicalPath(view);
         string_concat(&canonicalPath, (StringView){strlen(".dmd"), ".dmd"});

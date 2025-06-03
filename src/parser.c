@@ -112,6 +112,27 @@ static void addUnexpectedTokenError(
     list_append(parser->ast->errors, error);
 }
 
+static NodeId addDefinition(Parser *parser, NodeId node, LiteralId literal) {
+    for (size_t i = 0; i < list_size(parser->ast->definitions); i++) {
+        Definition def = *list_get(parser->ast->definitions, i);
+        LiteralId id;
+        switch (def.kind) {
+            case FUNCTION_DEFINITION:
+                id = ast_getData(AstFunction, parser->ast, def.id)->literal;
+                break;
+            case TYPE_DEFINITION:
+                id = ast_getData(AstTypeDefinition, parser->ast, def.id)
+                         ->literal;
+                break;
+        }
+        if (id == literal) {
+            todo();
+            return None();
+        }
+    }
+    return node;
+}
+
 static void program(Parser *parser, bool justImports);
 static NodeId import(Parser *parser, Token keyword);
 static NodeId type(Parser *parse);
@@ -206,6 +227,7 @@ void parseImports(Ast *ast) {
     if (indentationLevel < *stack_top(parser->indentationLevel)) break;    \
     else if (indentationLevel > *stack_top(parser->indentationLevel)) {    \
         addError(parser, UNEXPECTED_IDENTATION);                           \
+        consumeIfExists(parser, NEW_LINES);                                \
         advanceUntilNewLine(parser);                                       \
         continue;                                                          \
     }                                                                      \
@@ -233,7 +255,7 @@ static void program(Parser *parser, bool justImports) {
         checkIndentation();
 
         // Check we are at the start of a use or include
-        if (!match(parser, USE) && !match(parser, INCLUDE)) break;
+        if (!match(parser, IMPORT)) break;
 
         // Parse import
         NodeId result = import(parser, parser->previous);
@@ -265,18 +287,13 @@ static void program(Parser *parser, bool justImports) {
     return;
 }
 
-// import → ("use"|"include") IMPORT_PATH
+// import → "import" IMPORT_PATH
 static NodeId import(Parser *parser, Token keyword) {
-    assert(keyword.kind == USE || keyword.kind == INCLUDE);
-    AstKind node = keyword.kind == USE ? AST_USE : AST_INCLUDE;
+    assert(keyword.kind == IMPORT);
+    AstKind node = AST_IMPORT;
     NodeId id = ast_createNode(parser->ast, node);
     consume(parser, IMPORT_PATH, "an import");
-    if (keyword.kind == USE) {
-        ast_getData(AstUse, parser->ast, id)->path = parser->previous.literal;
-    } else {
-        ast_getData(AstInclude, parser->ast, id)->path =
-            parser->previous.literal;
-    }
+    ast_getData(AstImport, parser->ast, id)->path = parser->previous.literal;
     return id;
 }
 
@@ -340,15 +357,15 @@ static NodeId functionArgument(Parser *parser, AstFunction *functionData) {
 static NodeId function(Parser *parser, Token keyword) {
     assert(keyword.kind == FUNCTION);
     NodeId id = ast_createNode(parser->ast, AST_FUNCTION);
-    AstFunction functionData;
+    AstFunction data;
     consume(parser, IDENTIFIER, "a function");
-    functionData.literal = parser->previous.literal;
+    data.literal = parser->previous.literal;
     if (match(parser, LEFT_BRACKET)) {
         todo();
     }
     consume(parser, LEFT_PAREN, "a function");
     while (!atEnd(*parser) && !check(*parser, RIGHT_PAREN)) {
-        expect(functionArgument(parser, &functionData));
+        expect(functionArgument(parser, &data));
         if (!match(parser, COMMA)) break;
     }
     consume(parser, RIGHT_PAREN, "a function");
@@ -356,9 +373,9 @@ static NodeId function(Parser *parser, Token keyword) {
         expect(typeAnnotation(parser, parser->previous));
     }
     bind(body, block(parser));
-    functionData.lastNode = list_size(parser->ast->nodes) - 1;
-    *ast_getData(AstFunction, parser->ast, id) = functionData;
-    return id;
+    data.lastNode = list_size(parser->ast->nodes) - 1;
+    *ast_getData(AstFunction, parser->ast, id) = data;
+    return addDefinition(parser, id, data.literal);
 }
 
 // interface → "interface" IDENTIFIER type_parameters "(" (function_argument ":" type) ",")* ")" ":" type
@@ -371,9 +388,9 @@ static NodeId externDefinition(Parser *parser, Token keyword) { todo(); }
 static NodeId typeDefinition(Parser *parser, Token keyword) {
     assert(keyword.kind == TYPE);
     NodeId id = ast_createNode(parser->ast, AST_TYPE_DEFINITION);
+    AstTypeDefinition data;
     consume(parser, IDENTIFIER, "a type definition");
-    ast_getData(AstTypeDefinition, parser->ast, id)->literal =
-        parser->previous.literal;
+    data.literal = parser->previous.literal;
 
     // Set new indentation level
     if (check(*parser, NEW_LINES)) {
@@ -391,9 +408,9 @@ static NodeId typeDefinition(Parser *parser, Token keyword) {
             expect(typeAnnotation(parser, parser->previous));
         }
     }
-    ast_getData(AstTypeDefinition, parser->ast, id)->lastNode =
-        list_size(parser->ast->nodes) - 1;
-    return id;
+    data.lastNode = list_size(parser->ast->nodes) - 1;
+    *ast_getData(AstTypeDefinition, parser->ast, id) = data;
+    return addDefinition(parser, id, data.literal);
 }
 
 static NodeId block(Parser *parser) {
