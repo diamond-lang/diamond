@@ -133,6 +133,11 @@ static NodeId addDefinition(Parser *parser, NodeId node, LiteralId literal) {
     return node;
 }
 
+typedef struct {
+    NodeId insertNodes;
+    DataId insertData;
+} InsertLocation;
+
 static void program(Parser *parser, bool justImports);
 static NodeId import(Parser *parser, Token keyword);
 static NodeId type(Parser *parse);
@@ -144,8 +149,12 @@ static NodeId externDefinition(Parser *parser, Token keyword);
 static NodeId typeDefinition(Parser *parser, Token keyword);
 static NodeId block(Parser *parser);
 static NodeId statement(Parser *parser);
-static NodeId declaration(Parser *parser, NodeId identifier, Token operator);
-static NodeId assignment(Parser *parser, NodeId assignable, Token operator);
+static NodeId declaration(
+    Parser *parser, NodeId identifier, Token operator, InsertLocation location
+);
+static NodeId assignment(
+    Parser *parser, NodeId assignable, Token operator, InsertLocation location
+);
 static NodeId returnStatement(Parser *parser, Token keyword);
 static NodeId breakStatement(Parser *parser, Token keyword);
 static NodeId continueStatement(Parser *parser, Token keyword);
@@ -188,8 +197,7 @@ void parse(Ast *ast) {
     initLexer(
         &parser.lexer,
         string_pointer(ast->canonicalPath),
-        &parser.ast->literals,
-        &parser.ast->errors
+        &parser.ast->literals
     );
     parser.next = scanToken(&parser.lexer);
     advance(&parser);
@@ -209,8 +217,7 @@ void parseImports(Ast *ast) {
     initLexer(
         &parser.lexer,
         string_pointer(ast->canonicalPath),
-        &parser.ast->literals,
-        &parser.ast->errors
+        &parser.ast->literals
     );
     parser.next = scanToken(&parser.lexer);
     advance(&parser);
@@ -453,18 +460,28 @@ static NodeId statement(Parser *parser) {
     if (match(parser, BREAK)) return breakStatement(parser, prev);
     if (match(parser, CONTINUE)) return continueStatement(parser, prev);
 
+    // Rememember position to insert
+    NodeId insertLocationNodes = list_size(parser->ast->nodes);
+    NodeId insertLocationData = list_size(parser->ast->data);
+    InsertLocation loc = {insertLocationNodes, insertLocationData};
+
+    // Parser tentatively
     bind(result, unary(parser));
     prev = parser->current;
     AstKind node = *list_get(parser->ast->nodes, result);
     if (node == AST_IDENTIFIER) {
-        if (match(parser, EQUAL)) return declaration(parser, result, prev);
-        if (match(parser, BE)) return declaration(parser, result, prev);
-        if (match(parser, COLON_EQUAL)) return assignment(parser, result, prev);
+        if (match(parser, EQUAL)) return declaration(parser, result, prev, loc);
+        if (match(parser, BE)) return declaration(parser, result, prev, loc);
+        if (match(parser, COLON_EQUAL))
+            return assignment(parser, result, prev, loc);
     } else if (match(parser, EQUAL)) {
-        if (node == AST_DEREFERENCE) return assignment(parser, result, prev);
-        if (node == AST_FIELD_ACCESS) return assignment(parser, result, prev);
-        if (node == AST_INDEX_ACCESS) return assignment(parser, result, prev);
-        if (node == AST_CALL) return assignment(parser, result, prev);
+        if (node == AST_DEREFERENCE)
+            return assignment(parser, result, prev, loc);
+        if (node == AST_FIELD_ACCESS)
+            return assignment(parser, result, prev, loc);
+        if (node == AST_INDEX_ACCESS)
+            return assignment(parser, result, prev, loc);
+        if (node == AST_CALL) return assignment(parser, result, prev, loc);
     } else if (node == AST_CALL) return result;
 
     addError(parser, EXPECTING_STATEMENT);
@@ -472,28 +489,50 @@ static NodeId statement(Parser *parser) {
 }
 
 // declaration → identifier ("be"|"=") expression (": " type)?
-static NodeId declaration(Parser *parser, NodeId identifier, Token operator) {
+static NodeId declaration(
+    Parser *parser, NodeId identifier, Token operator, InsertLocation location
+) {
     assert(*list_get(parser->ast->nodes, identifier) == AST_IDENTIFIER);
     assert(operator.kind == EQUAL || operator.kind == BE);
-    NodeId id = ast_createNode(parser->ast, AST_DECLARATION);
+    NodeId id = ast_insertNode(
+        parser->ast,
+        AST_DECLARATION,
+        location.insertNodes,
+        location.insertData
+    );
+    ast_getData(AstDeclaration, parser->ast, id)->mutable = operator.kind ==
+                                                            EQUAL;
     expect(expression(parser));
     ast_getData(AstDeclaration, parser->ast, id)->lastExpressionNode =
         list_size(parser->ast->nodes) - 1;
-
-    // Parse type annotation
     if (match(parser, COLON)) {
         expect(typeAnnotation(parser, parser->previous));
         ast_getData(AstDeclaration, parser->ast, id)->lastTypeNode =
             list_size(parser->ast->nodes) - 1;
     }
-
-    // Return
     return id;
 }
 
-static NodeId assignment(Parser *parser, NodeId assignable, Token operator) {
+// assignment → assignable ("="|":=") expression (": " type)?
+static NodeId assignment(
+    Parser *parser, NodeId assignable, Token operator, InsertLocation location
+) {
+    AstKind kind = *list_get(parser->ast->nodes, assignable);
+    assert(
+        kind == AST_IDENTIFIER || kind == AST_DEREFERENCE ||
+        kind == AST_FIELD_ACCESS || kind == AST_INDEX_ACCESS || kind == AST_CALL
+    );
     assert(operator.kind == COLON_EQUAL || operator.kind == EQUAL);
-    NodeId id = ast_createNode(parser->ast, AST_ASSIGNMENT);
+    NodeId id = ast_insertNode(
+        parser->ast,
+        AST_ASSIGNMENT,
+        location.insertNodes,
+        location.insertData
+    );
+    ast_getData(AstAssignment, parser->ast, id)->nonlocal = operator.kind ==
+                                                            COLON_EQUAL;
+    ast_getData(AstAssignment, parser->ast, id)->lastAssignableNode =
+        list_size(parser->ast->nodes) - 1;
     bind(result, expression(parser));
     ast_getData(AstAssignment, parser->ast, id)->lastExpressionNode =
         list_size(parser->ast->nodes) - 1;
@@ -502,8 +541,6 @@ static NodeId assignment(Parser *parser, NodeId assignable, Token operator) {
         ast_getData(AstAssignment, parser->ast, id)->lastTypeNode =
             list_size(parser->ast->nodes) - 1;
     }
-
-    // Return
     return id;
 }
 

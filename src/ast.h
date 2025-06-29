@@ -87,19 +87,40 @@ typedef struct {
 } AstFunction;
 
 typedef struct {
+} AstInterface;
+
+typedef struct {
+} AstExtern;
+
+typedef struct {
     LiteralId literal;
     NodeId lastNode;
 } AstTypeDefinition;
 
 typedef struct {
+    Boolean mutable;
     NodeId lastExpressionNode;
     NodeId lastTypeNode;
 } AstDeclaration;
 
 typedef struct {
+    Boolean nonlocal;
+    NodeId lastAssignableNode;
     NodeId lastExpressionNode;
     NodeId lastTypeNode;
 } AstAssignment;
+
+typedef struct {
+} AstReturn;
+
+typedef struct {
+} AstReturnWithExpression;
+
+typedef struct {
+} AstBreak;
+
+typedef struct {
+} AstContinue;
 
 typedef struct {
     NodeId lastConditionNode;
@@ -108,9 +129,72 @@ typedef struct {
 } AstIfElse;
 
 typedef struct {
+} AstWhile;
+
+typedef struct {
     NodeCount numberOfArguments;
     Data argumentsMutability;
 } AstCall;
+
+typedef struct {
+} AstIfElseExpression;
+
+typedef struct {
+} AstNot;
+
+typedef struct {
+} AstOr;
+
+typedef struct {
+} AstAnd;
+
+typedef struct {
+} AstEqualEqual;
+
+typedef struct {
+} AstNotEqual;
+
+typedef struct {
+} AstLess;
+
+typedef struct {
+} AstLessEqual;
+
+typedef struct {
+} AstGreater;
+
+typedef struct {
+} AstGreaterEqual;
+
+typedef struct {
+} AstAdd;
+
+typedef struct {
+} AstSubtract;
+
+typedef struct {
+} AstMul;
+
+typedef struct {
+} AstDiv;
+
+typedef struct {
+} AstMod;
+
+typedef struct {
+} AstNegation;
+
+typedef struct {
+} AstAddressOf;
+
+typedef struct {
+} AstDereference;
+
+typedef struct {
+} AstFieldAccess;
+
+typedef struct {
+} AstIndexAccess;
 
 typedef struct {
     LiteralId literal;
@@ -131,6 +215,12 @@ typedef struct {
 typedef struct {
     LiteralId literal;
 } AstString;
+
+typedef struct {
+} AstArray;
+
+typedef struct {
+} AstStructLiteral;
 
 typedef struct {
     LiteralId literal;
@@ -181,9 +271,12 @@ typedef ListType(Ast) AstList;
 void ast_init(Ast *ast, String canonicalPath);
 void ast_clear(Ast *ast);
 NodeId ast_createNode(Ast *ast, AstKind kind);
-Data *_ast_getData(Ast *ast, NodeId node, size_t sizeOfData);
-#define ast_getData(type, ast, nodeId) \
-    ((type *)_ast_getData(ast, nodeId, sizeof(type)))
+NodeId ast_insertNode(
+    Ast *ast, AstKind kind, NodeId location, DataId dataLocation
+);
+size_t ast_numberOfSlotsUsedInData(AstKind kind);
+Data *_ast_getData(Ast *ast, NodeId node);
+#define ast_getData(type, ast, nodeId) ((type *)_ast_getData(ast, nodeId))
 void ast_setBit(Data *data, NodeCount position);
 void ast_print(Ast ast);
 

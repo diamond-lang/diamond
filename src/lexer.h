@@ -9,7 +9,6 @@ typedef struct {
     String source;
     char* sourcePointer;
     DataList* literals;
-    ErrorList* errors;
     char current;
     char next;
     char nextNext;
@@ -17,9 +16,7 @@ typedef struct {
     String currentLiteral;
 } Lexer;
 
-void initLexer(
-    Lexer* lexer, char* filePath, DataList* literals, ErrorList* errors
-);
+void initLexer(Lexer* lexer, char* filePath, DataList* literals);
 Token scanToken(Lexer* lexer);
 
 #endif

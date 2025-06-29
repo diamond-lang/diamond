@@ -8,7 +8,6 @@
 
 #include "ast.h"
 #include "common.h"
-#include "error.h"
 #include "token.h"
 #include "types.h"
 #include "utilities.h"
@@ -116,15 +115,12 @@ static Token createTokenWithLiteral(Lexer* lexer, TokenKind kind) {
     return token;
 }
 
-void initLexer(
-    Lexer* lexer, char* filePath, DataList* literals, ErrorList* errors
-) {
+void initLexer(Lexer* lexer, char* filePath, DataList* literals) {
     lexer->line = 1;
     lexer->column = 1;
     lexer->source = readFile(filePath);
     lexer->sourcePointer = string_pointer(lexer->source);
     lexer->literals = literals;
-    lexer->errors = errors;
     lexer->currentLiteral = String();
     lexer->current = '\0';
     lexer->next = nextChar(lexer);

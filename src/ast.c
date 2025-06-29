@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "arena.h"
 #include "common.h"
@@ -30,12 +31,11 @@ NodeId ast_createNode(Ast* ast, AstKind kind) {
     list_append(ast->nodes, kind);
     list_append(ast->dataOrIndex, None());
     NodeId id = list_size(ast->nodes) - 1;
+    _ast_getData(ast, id);  // Assure data for the node is added
     switch (kind) {
         case AST_IMPORT: break;
-        case AST_FUNCTION_ARGUMENT:
-            ast_getData(AstFunctionArgument, ast, id);
-            break;
-        case AST_FUNCTION: ast_getData(AstFunction, ast, id); break;
+        case AST_FUNCTION_ARGUMENT: break;
+        case AST_FUNCTION: break;
         case AST_INTERFACE: break;
         case AST_EXTERN: break;
         case AST_TYPE_DEFINITION: break;
@@ -44,7 +44,11 @@ NodeId ast_createNode(Ast* ast, AstKind kind) {
             data->lastTypeNode = None();
             break;
         }
-        case AST_ASSIGNMENT: break;
+        case AST_ASSIGNMENT: {
+            AstAssignment* data = ast_getData(AstAssignment, ast, id);
+            data->lastTypeNode = None();
+            break;
+        }
         case AST_RETURN: break;
         case AST_RETURN_WITH_EXPRESSION: break;
         case AST_BREAK: break;
@@ -55,7 +59,7 @@ NodeId ast_createNode(Ast* ast, AstKind kind) {
             break;
         }
         case AST_WHILE: break;
-        case AST_CALL: ast_getData(AstCall, ast, id); break;
+        case AST_CALL: break;
         case AST_IF_ELSE_EXPRESSION: break;
         case AST_NOT: break;
         case AST_OR: break;
@@ -76,30 +80,133 @@ NodeId ast_createNode(Ast* ast, AstKind kind) {
         case AST_ADDRESS_OF: break;
         case AST_FIELD_ACCESS: break;
         case AST_INDEX_ACCESS: break;
-        case AST_FLOAT: ast_getData(AstFloat, ast, id); break;
-        case AST_INTEGER: ast_getData(AstInteger, ast, id); break;
-        case AST_IDENTIFIER: ast_getData(AstIdentifier, ast, id); break;
-        case AST_BOOLEAN: ast_getData(AstBoolean, ast, id); break;
-        case AST_STRING: ast_getData(AstString, ast, id); break;
+        case AST_FLOAT: break;
+        case AST_INTEGER: break;
+        case AST_IDENTIFIER: break;
+        case AST_BOOLEAN: break;
+        case AST_STRING: break;
         case AST_ARRAY: break;
         case AST_STRUCT_LITERAL: break;
-        case AST_TYPE: ast_getData(AstType, ast, id); break;
+        case AST_TYPE: break;
     }
     return id;
 }
 
-Data* _ast_getData(Ast* ast, NodeId node, size_t sizeOfData) {
-    bool justOneField = sizeOfData == sizeof(Data);
-    if (justOneField) {
+NodeId ast_insertNode(
+    Ast* ast, AstKind kind, NodeId location, DataId dataLocation
+) {
+    size_t numberOfSlotsUsed = ast_numberOfSlotsUsedInData(kind);
+
+    // Make space for insertation
+    list_ensureExtraCapacity(ast->nodes, 1);
+    list_ensureExtraCapacity(ast->dataOrIndex, 1);
+    ast->nodes.size += 1;
+    ast->dataOrIndex.size += 1;
+    for (size_t i = list_size(ast->nodes) - 2;
+         location <= i && i <= list_size(ast->nodes) - 2;
+         i--) {
+        *list_get(ast->nodes, i + 1) = *list_get(ast->nodes, i);
+        *list_get(ast->dataOrIndex, i + 1) = *list_get(ast->dataOrIndex, i);
+        size_t slotsUsed =
+            ast_numberOfSlotsUsedInData(*list_get(ast->nodes, i));
+        if (slotsUsed > 1) {
+            *list_get(ast->dataOrIndex, i + 1) += numberOfSlotsUsed;
+        }
+    }
+    list_ensureExtraCapacity(ast->data, numberOfSlotsUsed);
+    ast->data.size += numberOfSlotsUsed;
+    for (size_t i = list_size(ast->data) - 1 - numberOfSlotsUsed;
+         dataLocation <= i && i <= list_size(ast->data) - 1 - numberOfSlotsUsed;
+         i--) {
+        *list_get(ast->data, i + numberOfSlotsUsed) = *list_get(ast->data, i);
+    }
+
+    // Remember sizes
+    size_t actualSize = ast->nodes.size;
+    size_t actualSizeData = ast->data.size;
+
+    // Set size
+    ast->nodes.size = location;
+    ast->dataOrIndex.size = location;
+    ast->data.size = dataLocation;
+
+    // Add node
+    NodeId node = ast_createNode(ast, kind);
+
+    // Restore size;
+    ast->nodes.size = actualSize;
+    ast->dataOrIndex.size = actualSize;
+    ast->data.size = actualSizeData;
+
+    // Returm
+    return node;
+}
+
+size_t ast_numberOfSlotsUsedInData(AstKind kind) {
+    size_t result;
+    switch (kind) {
+        case AST_IMPORT: result = sizeof(AstImport); break;
+        case AST_FUNCTION_ARGUMENT: result = sizeof(AstFunctionArgument); break;
+        case AST_FUNCTION: result = sizeof(AstFunction); break;
+        case AST_INTERFACE: result = sizeof(AstInterface); break;
+        case AST_EXTERN: result = sizeof(AstExtern); break;
+        case AST_TYPE_DEFINITION: result = sizeof(AstTypeDefinition); break;
+        case AST_DECLARATION: result = sizeof(AstDeclaration); break;
+        case AST_ASSIGNMENT: result = sizeof(AstAssignment); break;
+        case AST_RETURN: result = sizeof(AstReturn); break;
+        case AST_RETURN_WITH_EXPRESSION:
+            result = sizeof(AstReturnWithExpression);
+            break;
+        case AST_BREAK: result = sizeof(AstBreak); break;
+        case AST_CONTINUE: result = sizeof(AstContinue); break;
+        case AST_IF_ELSE: result = sizeof(AstIfElse); break;
+        case AST_WHILE: result = sizeof(AstWhile); break;
+        case AST_CALL: result = sizeof(AstCall); break;
+        case AST_IF_ELSE_EXPRESSION:
+            result = sizeof(AstIfElseExpression);
+            break;
+        case AST_NOT: result = sizeof(AstNot); break;
+        case AST_OR: result = sizeof(AstOr); break;
+        case AST_AND: result = sizeof(AstAnd); break;
+        case AST_EQUAL_EQUAL: result = sizeof(AstEqualEqual); break;
+        case AST_NOT_EQUAL: result = sizeof(AstNotEqual); break;
+        case AST_LESS: result = sizeof(AstLess); break;
+        case AST_LESS_EQUAL: result = sizeof(AstLessEqual); break;
+        case AST_GREATER: result = sizeof(AstGreater); break;
+        case AST_GREATER_EQUAL: result = sizeof(AstGreaterEqual); break;
+        case AST_ADD: result = sizeof(AstAdd); break;
+        case AST_SUBTRACT: result = sizeof(AstSubtract); break;
+        case AST_MUL: result = sizeof(AstMul); break;
+        case AST_DIV: result = sizeof(AstDiv); break;
+        case AST_MOD: result = sizeof(AstMod); break;
+        case AST_NEGATION: result = sizeof(AstNegation); break;
+        case AST_DEREFERENCE: result = sizeof(AstDereference); break;
+        case AST_ADDRESS_OF: result = sizeof(AstAddressOf); break;
+        case AST_FIELD_ACCESS: result = sizeof(AstFieldAccess); break;
+        case AST_INDEX_ACCESS: result = sizeof(AstIndexAccess); break;
+        case AST_FLOAT: result = sizeof(AstFloat); break;
+        case AST_INTEGER: result = sizeof(AstInteger); break;
+        case AST_IDENTIFIER: result = sizeof(AstIdentifier); break;
+        case AST_BOOLEAN: result = sizeof(AstBoolean); break;
+        case AST_STRING: result = sizeof(AstString); break;
+        case AST_ARRAY: result = sizeof(AstArray); break;
+        case AST_STRUCT_LITERAL: result = sizeof(AstStructLiteral); break;
+        case AST_TYPE: result = sizeof(AstType); break;
+    }
+    return result / sizeof(Data);
+}
+
+Data* _ast_getData(Ast* ast, NodeId node) {
+    size_t numberOfSlotsUsed =
+        ast_numberOfSlotsUsedInData(*list_get(ast->nodes, node));
+    if (numberOfSlotsUsed == 0) return NULL;
+    if (numberOfSlotsUsed == 1) {
         return list_get(ast->dataOrIndex, node);
     } else {
         if (*list_get(ast->dataOrIndex, node) == None()) {
             *list_get(ast->dataOrIndex, node) = list_size(ast->data);
-            list_ensureExtraCapacity(ast->data, sizeOfData / sizeof(Data));
-            list_setSize(
-                ast->data,
-                list_size(ast->data) + sizeOfData / sizeof(Data)
-            );
+            list_ensureExtraCapacity(ast->data, numberOfSlotsUsed);
+            list_setSize(ast->data, list_size(ast->data) + numberOfSlotsUsed);
         }
         return list_get(ast->data, *list_get(ast->dataOrIndex, node));
     }
@@ -187,37 +294,48 @@ void ast_print(Ast ast) {
                 );
                 break;
             case AST_DECLARATION: {
+                printf("declaration\n");
                 if (ast_getData(AstDeclaration, &ast, i)->lastTypeNode !=
                     None()) {
-                    printf(
-                        "declaration(lastExpressionNode: %u, lastTypeNode: "
-                        "%u)\n",
-                        ast_getData(AstDeclaration, &ast, i)
-                            ->lastExpressionNode,
+                    stack_push(
+                        separations,
+                        ast_getData(AstDeclaration, &ast, i)->lastExpressionNode
+                    );
+                    stack_push(
+                        indentationLevel,
                         ast_getData(AstDeclaration, &ast, i)->lastTypeNode
                     );
                 } else {
-                    printf(
-                        "declaration(lastExpressionNode: %u, lastTypeNode: "
-                        "none)\n",
+                    stack_push(
+                        indentationLevel,
                         ast_getData(AstDeclaration, &ast, i)->lastExpressionNode
                     );
                 }
                 break;
             }
             case AST_ASSIGNMENT: {
+                printf("assignment\n");
                 if (ast_getData(AstAssignment, &ast, i)->lastTypeNode !=
                     None()) {
-                    printf(
-                        "assignment(lastExpressionNode: %u, lastTypeNode: "
-                        "%u)\n",
-                        ast_getData(AstAssignment, &ast, i)->lastExpressionNode,
+                    stack_push(
+                        separations,
+                        ast_getData(AstAssignment, &ast, i)->lastAssignableNode
+                    );
+                    stack_push(
+                        separations,
+                        ast_getData(AstAssignment, &ast, i)->lastExpressionNode
+                    );
+                    stack_push(
+                        indentationLevel,
                         ast_getData(AstAssignment, &ast, i)->lastTypeNode
                     );
                 } else {
-                    printf(
-                        "assignment(lastExpressionNode: %u, lastTypeNode: "
-                        "none)\n",
+                    stack_push(
+                        separations,
+                        ast_getData(AstAssignment, &ast, i)->lastAssignableNode
+                    );
+                    stack_push(
+                        indentationLevel,
                         ast_getData(AstAssignment, &ast, i)->lastExpressionNode
                     );
                 }
