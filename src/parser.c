@@ -72,10 +72,10 @@ static void advanceUntilNewLine(Parser *parser) {
 
 #define bind(name, expression) \
     NodeId name = expression;  \
-    if (!hasValue(name)) return None();
+    if (name == None()) return None();
 
 #define expect(expression) \
-    if (!hasValue(expression)) return None();
+    if (expression == None()) return None();
 
 static bool couldBeExpression(Parser parser) {
     if (check(parser, NEW_LINES)) {
@@ -266,7 +266,7 @@ static void program(Parser *parser, bool justImports) {
 
         // Parse import
         NodeId result = import(parser, parser->previous);
-        if (!hasValue(result)) advanceUntilNewLine(parser);
+        if (result == None()) advanceUntilNewLine(parser);
 
         // Check were at the end of a line and unknown token
         checkEndOfLineAndUnknownToken();
@@ -280,7 +280,7 @@ static void program(Parser *parser, bool justImports) {
 
             // Parse statement of definition
             NodeId result = statementOrDefinition(parser);
-            if (!hasValue(result)) advanceUntilNewLine(parser);
+            if (result == None()) advanceUntilNewLine(parser);
 
             // Check were at the end of a line and unknown token
             checkEndOfLineAndUnknownToken();
@@ -436,7 +436,7 @@ static NodeId block(Parser *parser) {
 
         // Parse statement of definition
         NodeId result = statement(parser);
-        if (!hasValue(result)) advanceUntilNewLine(parser);
+        if (result == None()) advanceUntilNewLine(parser);
 
         // Check were at the end of a line and unknown token
         checkEndOfLineAndUnknownToken();

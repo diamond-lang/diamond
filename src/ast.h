@@ -68,7 +68,6 @@ typedef Data Boolean;
 typedef Data LiteralId;
 
 #define None() UINT32_MAX
-#define hasValue(nodeId) (nodeId != UINT32_MAX)
 
 typedef struct {
     LiteralId path;

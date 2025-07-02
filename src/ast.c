@@ -295,6 +295,7 @@ void ast_print(Ast ast) {
                 break;
             case AST_DECLARATION: {
                 printf("declaration\n");
+                stack_push(separations, i + 1);
                 if (ast_getData(AstDeclaration, &ast, i)->lastTypeNode !=
                     None()) {
                     stack_push(
@@ -319,10 +320,6 @@ void ast_print(Ast ast) {
                     None()) {
                     stack_push(
                         separations,
-                        ast_getData(AstAssignment, &ast, i)->lastAssignableNode
-                    );
-                    stack_push(
-                        separations,
                         ast_getData(AstAssignment, &ast, i)->lastExpressionNode
                     );
                     stack_push(
@@ -331,14 +328,14 @@ void ast_print(Ast ast) {
                     );
                 } else {
                     stack_push(
-                        separations,
-                        ast_getData(AstAssignment, &ast, i)->lastAssignableNode
-                    );
-                    stack_push(
                         indentationLevel,
                         ast_getData(AstAssignment, &ast, i)->lastExpressionNode
                     );
                 }
+                stack_push(
+                    separations,
+                    ast_getData(AstAssignment, &ast, i)->lastAssignableNode
+                );
                 break;
             }
             case AST_RETURN: printf("return\n"); break;
