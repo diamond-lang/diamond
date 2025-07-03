@@ -7,6 +7,8 @@
 
 #include "types.h"
 
+#define None() UINT32_MAX
+
 typedef enum {
     AST_IMPORT,
     AST_FUNCTION_ARGUMENT,
@@ -61,28 +63,20 @@ typedef enum {
     AST_TYPE
 } AstKind;
 
-typedef uint32_t Data;
-typedef Data NodeId;  // UINT32_MAX value is used to indicate none
-typedef Data NodeCount;
-typedef Data Boolean;
-typedef Data LiteralId;
-
-#define None() UINT32_MAX
-
 typedef struct {
-    LiteralId path;
+    uint32_t path;
 } AstImport;
 
 typedef struct {
-    LiteralId literal;
+    uint32_t literal;
 } AstFunctionArgument;
 
 typedef struct {
-    LiteralId literal;
-    NodeCount numberOfTypeParameters;
-    NodeCount numberOfArguments;
-    Data argumentsMutability;
-    NodeId lastNode;
+    uint32_t literal;
+    uint32_t numberOfTypeParameters;
+    uint32_t numberOfArguments;
+    uint32_t argumentsMutability;
+    uint32_t lastNode;
 } AstFunction;
 
 typedef struct {
@@ -92,21 +86,21 @@ typedef struct {
 } AstExtern;
 
 typedef struct {
-    LiteralId literal;
-    NodeId lastNode;
+    uint32_t literal;
+    uint32_t lastNode;
 } AstTypeDefinition;
 
 typedef struct {
-    Boolean mutable;
-    NodeId lastExpressionNode;
-    NodeId lastTypeNode;
+    uint32_t mutable;
+    uint32_t lastExpressionNode;
+    uint32_t lastTypeNode;
 } AstDeclaration;
 
 typedef struct {
-    Boolean nonlocal;
-    NodeId lastAssignableNode;
-    NodeId lastExpressionNode;
-    NodeId lastTypeNode;
+    uint32_t nonlocal;
+    uint32_t lastAssignableNode;
+    uint32_t lastExpressionNode;
+    uint32_t lastTypeNode;
 } AstAssignment;
 
 typedef struct {
@@ -122,17 +116,17 @@ typedef struct {
 } AstContinue;
 
 typedef struct {
-    NodeId lastConditionNode;
-    NodeId lastIfNode;
-    NodeId lastElseNode;
+    uint32_t lastConditionNode;
+    uint32_t lastIfNode;
+    uint32_t lastElseNode;
 } AstIfElse;
 
 typedef struct {
 } AstWhile;
 
 typedef struct {
-    NodeCount numberOfArguments;
-    Data argumentsMutability;
+    uint32_t numberOfArguments;
+    uint32_t argumentsMutability;
 } AstCall;
 
 typedef struct {
@@ -196,23 +190,23 @@ typedef struct {
 } AstIndexAccess;
 
 typedef struct {
-    LiteralId literal;
+    uint32_t literal;
 } AstFloat;
 
 typedef struct {
-    LiteralId literal;
+    uint32_t literal;
 } AstInteger;
 
 typedef struct {
-    LiteralId literal;
+    uint32_t literal;
 } AstIdentifier;
 
 typedef struct {
-    Boolean value;
+    uint32_t value;
 } AstBoolean;
 
 typedef struct {
-    LiteralId literal;
+    uint32_t literal;
 } AstString;
 
 typedef struct {
@@ -222,19 +216,12 @@ typedef struct {
 } AstStructLiteral;
 
 typedef struct {
-    LiteralId literal;
-    NodeId lastNode;
+    uint32_t literal;
+    uint32_t lastNode;
 } AstType;
 
 #include "error.h"
 
-typedef Data DataId;
-typedef ListType(uint8_t) Uint8List;
-typedef ListType(Data) DataList;
-typedef ListType(DataId) DataIdList;
-typedef ListType(NodeId) NodeIdList;
-
-typedef DataList Literals;
 #define ast_literalExpand(ast, id) \
     *list_get(ast.literals, id), (char *)list_get(ast.literals, id + 1)
 #define ast_literalAsStringView(ast, id)                                      \
@@ -242,14 +229,11 @@ typedef DataList Literals;
         *list_get(ast->literals, id), (char *)list_get(ast->literals, id + 1) \
     }
 
-typedef size_t AstId;
-typedef ListType(AstId) Imports;
-
 typedef enum { FUNCTION_DEFINITION, TYPE_DEFINITION } DefinitionKind;
 
 typedef struct {
     DefinitionKind kind;
-    NodeId id;
+    uint32_t id;
 } Definition;
 
 typedef ListType(Definition) Definitions;
@@ -257,11 +241,11 @@ typedef ListType(Definition) Definitions;
 typedef struct {
     String canonicalPath;
     Uint8List nodes;
-    DataList dataOrIndex;
-    DataList data;
-    Literals literals;
+    Uint32List dataOrIndex;
+    Uint32List data;
+    Uint32List literals;
     ErrorList errors;
-    Imports imports;
+    Uint32List imports;
     Definitions definitions;
 } Ast;
 
@@ -269,14 +253,14 @@ typedef ListType(Ast) AstList;
 
 void ast_init(Ast *ast, String canonicalPath);
 void ast_clear(Ast *ast);
-NodeId ast_createNode(Ast *ast, AstKind kind);
-NodeId ast_insertNode(
-    Ast *ast, AstKind kind, NodeId location, DataId dataLocation
+uint32_t ast_createNode(Ast *ast, AstKind kind);
+uint32_t ast_insertNode(
+    Ast *ast, AstKind kind, uint32_t location, uint32_t dataLocation
 );
 size_t ast_numberOfSlotsUsedInData(AstKind kind);
-Data *_ast_getData(Ast *ast, NodeId node);
+uint32_t *_ast_getData(Ast *ast, uint32_t node);
 #define ast_getData(type, ast, nodeId) ((type *)_ast_getData(ast, nodeId))
-void ast_setBit(Data *data, NodeCount position);
+void ast_setBit(uint32_t *data, uint32_t position);
 void ast_print(Ast ast);
 
 void reportErrors(Ast ast);

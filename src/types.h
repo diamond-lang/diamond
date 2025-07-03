@@ -110,6 +110,10 @@ void _list_get(void* buffer, size_t size, size_t index, int sizeOfItem);
         (list).size += otherListSize;                      \
     } while (false);
 
+typedef ListType(uint8_t) Uint8List;
+typedef ListType(uint32_t) Uint32List;
+typedef ListType(Uint32List) Uint32ListList;
+
 // Stack
 #define StackType(T) ListType(T)
 

@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -13,10 +14,11 @@
 void ast_init(Ast* ast, String canonicalPath) {
     ast->canonicalPath = canonicalPath;
     ast->nodes = (Uint8List)List();
-    ast->dataOrIndex = (DataList)List();
-    ast->data = (DataList)List();
+    ast->dataOrIndex = (Uint32List)List();
+    ast->data = (Uint32List)List();
+    ast->literals = (Uint32List)List();
     ast->errors = (ErrorList)List();
-    ast->imports = (Imports)List();
+    ast->imports = (Uint32List)List();
 }
 
 void ast_clear(Ast* ast) {
@@ -27,10 +29,10 @@ void ast_clear(Ast* ast) {
     list_clear(ast->imports);
 }
 
-NodeId ast_createNode(Ast* ast, AstKind kind) {
+uint32_t ast_createNode(Ast* ast, AstKind kind) {
     list_append(ast->nodes, kind);
     list_append(ast->dataOrIndex, None());
-    NodeId id = list_size(ast->nodes) - 1;
+    uint32_t id = list_size(ast->nodes) - 1;
     _ast_getData(ast, id);  // Assure data for the node is added
     switch (kind) {
         case AST_IMPORT: break;
@@ -92,8 +94,8 @@ NodeId ast_createNode(Ast* ast, AstKind kind) {
     return id;
 }
 
-NodeId ast_insertNode(
-    Ast* ast, AstKind kind, NodeId location, DataId dataLocation
+uint32_t ast_insertNode(
+    Ast* ast, AstKind kind, uint32_t location, uint32_t dataLocation
 ) {
     size_t numberOfSlotsUsed = ast_numberOfSlotsUsedInData(kind);
 
@@ -131,7 +133,7 @@ NodeId ast_insertNode(
     ast->data.size = dataLocation;
 
     // Add node
-    NodeId node = ast_createNode(ast, kind);
+    uint32_t node = ast_createNode(ast, kind);
 
     // Restore size;
     ast->nodes.size = actualSize;
@@ -193,10 +195,10 @@ size_t ast_numberOfSlotsUsedInData(AstKind kind) {
         case AST_STRUCT_LITERAL: result = sizeof(AstStructLiteral); break;
         case AST_TYPE: result = sizeof(AstType); break;
     }
-    return result / sizeof(Data);
+    return result / sizeof(uint32_t);
 }
 
-Data* _ast_getData(Ast* ast, NodeId node) {
+uint32_t* _ast_getData(Ast* ast, uint32_t node) {
     size_t numberOfSlotsUsed =
         ast_numberOfSlotsUsedInData(*list_get(ast->nodes, node));
     if (numberOfSlotsUsed == 0) return NULL;
@@ -212,7 +214,7 @@ Data* _ast_getData(Ast* ast, NodeId node) {
     }
 }
 
-void ast_setType(Ast ast, NodeId id, NodeId type) { todo(); }
+void ast_setType(Ast ast, uint32_t id, uint32_t type) { todo(); }
 
 static char* getBinaryOp(AstKind kind) {
     switch ((uint8_t)kind) {
@@ -464,6 +466,6 @@ void ast_print(Ast ast) {
     arena_destroyCurrentLifetime();
 }
 
-void ast_setBit(Data* data, NodeCount position) {
+void ast_setBit(uint32_t* data, uint32_t position) {
     *data = *data | 1 << position;
 }

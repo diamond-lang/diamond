@@ -1,15 +1,11 @@
 #ifndef scopes_h
 #define scopes_h
 
-#include "ast.h"
-#include "types.h"
-
-typedef ListType(NodeId) Scope;
-typedef StackType(Scope) Scopes;
+#include <stdint.h>
 
 void scopes_addScope();
 void scopes_removeScope();
-NodeId scopes_getBinding(LiteralId identifier);
-void scopes_importModule(LiteralId identifier);
+uint32_t scopes_getBinding(uint32_t identifier);
+void scopes_importModule(uint32_t identifier);
 
 #endif

@@ -68,18 +68,18 @@ static Token createToken(Lexer* lexer, TokenKind kind) {
     return token;
 }
 
-static inline Data numberOfSlotsNeeded(Data length) {
-    return 1 + length / sizeof(Data) + (length % sizeof(Data) != 0);
+static inline uint32_t numberOfSlotsNeeded(uint32_t length) {
+    return 1 + length / sizeof(uint32_t) + (length % sizeof(uint32_t) != 0);
 }
 
 static Token createTokenWithLiteral(Lexer* lexer, TokenKind kind) {
     const size_t literalsCount = list_size(*lexer->literals);
-    const Data length = string_size(lexer->currentLiteral);
+    const uint32_t length = string_size(lexer->currentLiteral);
     const char* currentLiteral = string_pointer(lexer->currentLiteral);
 
     // Check if literal already exist
-    Data literalId = None();
-    for (Data i = 0; i < list_size(*lexer->literals);
+    uint32_t literalId = None();
+    for (uint32_t i = 0; i < list_size(*lexer->literals);
          i += numberOfSlotsNeeded(*list_get(*lexer->literals, i))) {
         if (*list_get(*lexer->literals, i) == length &&
             memcmp(list_get(*lexer->literals, i + 1), currentLiteral, length) ==
@@ -93,7 +93,7 @@ static Token createTokenWithLiteral(Lexer* lexer, TokenKind kind) {
     if (literalId == None()) {
         literalId = literalsCount;
 
-        Data extraCapacityNeeded = numberOfSlotsNeeded(length);
+        uint32_t extraCapacityNeeded = numberOfSlotsNeeded(length);
         list_ensureExtraCapacity((*lexer->literals), extraCapacityNeeded);
 
         list_size(*lexer->literals) += extraCapacityNeeded;
@@ -115,7 +115,7 @@ static Token createTokenWithLiteral(Lexer* lexer, TokenKind kind) {
     return token;
 }
 
-void initLexer(Lexer* lexer, char* filePath, DataList* literals) {
+void initLexer(Lexer* lexer, char* filePath, Uint32List* literals) {
     lexer->line = 1;
     lexer->column = 1;
     lexer->source = readFile(filePath);

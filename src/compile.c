@@ -11,7 +11,7 @@
 #include "types.h"
 #include "utilities.h"
 
-static void findImports(AstList* asts, AstId current) {
+static void findImports(AstList* asts, uint32_t current) {
     Ast* currentAst = list_get(*asts, current);
 
     // Parse imports
@@ -26,7 +26,7 @@ static void findImports(AstList* asts, AstId current) {
     // Parse imported files
     for (size_t i = 0; i < list_size(currentAst->nodes); i++) {
         assert(*list_get(currentAst->nodes, i) == AST_IMPORT);
-        LiteralId literal = ast_getData(AstImport, currentAst, i)->path;
+        uint32_t literal = ast_getData(AstImport, currentAst, i)->path;
         StringView view = ast_literalAsStringView(currentAst, literal);
         String canonicalPath = getCanonicalPath(view);
         string_concat(&canonicalPath, (StringView){strlen(".dmd"), ".dmd"});
@@ -44,7 +44,7 @@ static void findImports(AstList* asts, AstId current) {
         }
 
         if (!founded) {
-            AstId newAst = list_size(*asts);
+            uint32_t newAst = list_size(*asts);
             list_append(*asts, (Ast){});
             ast_init(list_get(*asts, newAst), canonicalPath);
             list_append(currentAst->imports, newAst);
@@ -55,21 +55,21 @@ static void findImports(AstList* asts, AstId current) {
 
 typedef struct {
     bool added;
-    Imports imports;
+    Uint32List imports;
 } ImportsForGraph;
 
 typedef ListType(ImportsForGraph) ImportsList;
 
-static DependencyGraph findDependencyGraph(AstList* asts) {
-    DependencyGraph graph = (DependencyGraph)List();
+static Uint32ListList findDependencyGraph(AstList* asts) {
+    Uint32ListList graph = (Uint32ListList)List();
 
     arena_newLifetime();
 
     // Copy imports
     ImportsList importsList = List();
     for (size_t i = 0; i < asts->size; i++) {
-        Imports astImports = list_get(*asts, i)->imports;
-        Imports copy = List();
+        Uint32List astImports = list_get(*asts, i)->imports;
+        Uint32List copy = List();
         for (size_t j = 0; j < list_size(astImports); j++) {
             list_append(copy, *list_get(astImports, j));
         }
@@ -79,9 +79,9 @@ static DependencyGraph findDependencyGraph(AstList* asts) {
 
     // Construct dependency graph
     while (true) {
-        AstIdList list = (AstIdList)ListWithLifetime(graph.lifetime);
+        Uint32List list = (Uint32List)ListWithLifetime(graph.lifetime);
         // For the imports of each AST
-        for (AstId i = 0; i < list_size(importsList); i++) {
+        for (uint32_t i = 0; i < list_size(importsList); i++) {
             // If AST doesn't have imports
             ImportsForGraph* imports = list_get(importsList, i);
             if (!imports->added && list_size(imports->imports) == 0) {
@@ -119,7 +119,7 @@ Program compile(StringView file) {
     for (size_t i = 0; i < list_size(program.dependencyGraph); i++) {
         for (size_t j = 0; j < list_size(*list_get(program.dependencyGraph, i));
              j++) {
-            AstId ast = *list_get(*list_get(program.dependencyGraph, i), j);
+            uint32_t ast = *list_get(*list_get(program.dependencyGraph, i), j);
             printf(
                 "%s\n",
                 string_pointer(list_get(program.asts, ast)->canonicalPath)
@@ -131,7 +131,7 @@ Program compile(StringView file) {
     // Parse following dependecy graph
     for (size_t i = 0; i < list_size(program.dependencyGraph); i++) {
         // Get stage
-        AstIdList stage = *list_get(program.dependencyGraph, i);
+        Uint32List stage = *list_get(program.dependencyGraph, i);
 
         // For each AST
         for (size_t j = 0; j < list_size(stage); j++) {
