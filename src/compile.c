@@ -24,9 +24,8 @@ static void findImports(AstList* asts, uint32_t current) {
     }
 
     // Parse imported files
-    for (size_t i = 0; i < list_size(currentAst->nodes); i++) {
-        assert(*list_get(currentAst->nodes, i) == AST_IMPORT);
-        uint32_t literal = ast_getData(AstImport, currentAst, i)->path;
+    for (size_t i = 0; i < list_size(currentAst->imports); i++) {
+        uint32_t literal = list_get(currentAst->imports, i)->path;
         StringView view = ast_literalAsStringView(currentAst, literal);
         String canonicalPath = getCanonicalPath(view);
         string_concat(&canonicalPath, (StringView){strlen(".dmd"), ".dmd"});
@@ -47,7 +46,7 @@ static void findImports(AstList* asts, uint32_t current) {
             uint32_t newAst = list_size(*asts);
             list_append(*asts, (Ast){});
             ast_init(list_get(*asts, newAst), canonicalPath);
-            list_append(currentAst->imports, newAst);
+            list_append(currentAst->importedAsts, newAst);
             findImports(asts, newAst);
         }
     }
@@ -68,7 +67,7 @@ static Uint32ListList findDependencyGraph(AstList* asts) {
     // Copy imports
     ImportsList importsList = List();
     for (size_t i = 0; i < asts->size; i++) {
-        Uint32List astImports = list_get(*asts, i)->imports;
+        Uint32List astImports = list_get(*asts, i)->importedAsts;
         Uint32List copy = List();
         for (size_t j = 0; j < list_size(astImports); j++) {
             list_append(copy, *list_get(astImports, j));

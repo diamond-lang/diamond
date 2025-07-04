@@ -130,6 +130,7 @@ typedef ListType(Uint32List) Uint32ListList;
 #define Stack() List()
 
 typedef StackType(size_t) SizeTStack;
+typedef StackType(Uint32List) Uint32ListStack;
 
 // String
 typedef ListType(char) CharList;
