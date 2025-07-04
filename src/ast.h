@@ -15,7 +15,7 @@ typedef enum {
     AST_DECLARATION,
     AST_ASSIGNMENT,
     AST_RETURN,
-    AST_RETURN_WITH_EXPRESSION,
+    AST_RETURN_EXPRESSION,
     AST_BREAK,
     AST_CONTINUE,
     AST_IF_ELSE,
@@ -62,6 +62,7 @@ typedef struct {
 
 typedef struct {
     bool mutable;
+    uint32_t identifier;
     uint32_t type;
 } AstDeclaration;
 
@@ -74,7 +75,7 @@ typedef struct {
 } AstReturn;
 
 typedef struct {
-} AstReturnWithExpression;
+} AstReturnExpression;
 
 typedef struct {
 } AstBreak;
@@ -83,14 +84,16 @@ typedef struct {
 } AstContinue;
 
 typedef struct {
-    uint32_t elseBlock;
+    uint32_t ifBlockEnd;
+    uint32_t elseBlockEnd;
 } AstIfElse;
 
 typedef struct {
+    uint32_t whileEnd;
 } AstWhile;
 
 typedef struct {
-    uint32_t numberOfArguments;
+    uint32_t argumentsCount;
     uint32_t argumentsMutability;
 } AstCall;
 
@@ -253,10 +256,7 @@ typedef ListType(Ast) AstList;
 
 void ast_init(Ast *ast, String canonicalPath);
 void ast_clear(Ast *ast);
-uint32_t ast_createNode(Code *code, CodeKind kind);
-uint32_t ast_insertNode(
-    Code *code, CodeKind kind, uint32_t location, uint32_t dataLocation
-);
+uint32_t ast_addCode(Code *code, CodeKind kind);
 uint32_t *_ast_getData(Code *code, uint32_t node);
 #define ast_getData(type, code, nodeId) ((type *)_ast_getData(code, nodeId))
 uint32_t ast_createType(Ast *ast, TypeKind kind);

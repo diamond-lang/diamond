@@ -60,113 +60,12 @@ void ast_clear(Ast* ast) {
     list_clear(ast->errors);
 }
 
-uint32_t ast_createNode(Code* code, CodeKind kind) {
+uint32_t ast_addCode(Code* code, CodeKind kind) {
     list_append(code->code, kind);
     list_append(code->dataOrIndex, None());
     uint32_t id = list_size(code->code) - 1;
-    _ast_getData(code, id);  // Assure data for the node is added
-    switch (kind) {
-        case AST_DECLARATION: {
-            AstDeclaration* data = ast_getData(AstDeclaration, code, id);
-            data->type = None();
-            break;
-        }
-        case AST_ASSIGNMENT: {
-            AstAssignment* data = ast_getData(AstAssignment, code, id);
-            data->type = None();
-            break;
-        }
-        case AST_RETURN: break;
-        case AST_RETURN_WITH_EXPRESSION: break;
-        case AST_BREAK: break;
-        case AST_CONTINUE: break;
-        case AST_IF_ELSE: {
-            AstIfElse* data = ast_getData(AstIfElse, code, id);
-            data->elseBlock = None();
-            break;
-        }
-        case AST_WHILE: break;
-        case AST_CALL: break;
-        case AST_IF_ELSE_EXPRESSION: break;
-        case AST_NOT: break;
-        case AST_OR: break;
-        case AST_AND: break;
-        case AST_EQUAL_EQUAL: break;
-        case AST_NOT_EQUAL: break;
-        case AST_LESS: break;
-        case AST_LESS_EQUAL: break;
-        case AST_GREATER: break;
-        case AST_GREATER_EQUAL: break;
-        case AST_ADD: break;
-        case AST_SUBTRACT: break;
-        case AST_MUL: break;
-        case AST_DIV: break;
-        case AST_MOD: break;
-        case AST_NEGATION: break;
-        case AST_DEREFERENCE: break;
-        case AST_ADDRESS_OF: break;
-        case AST_FIELD_ACCESS: break;
-        case AST_INDEX_ACCESS: break;
-        case AST_FLOAT: break;
-        case AST_INTEGER: break;
-        case AST_IDENTIFIER: break;
-        case AST_BOOLEAN: break;
-        case AST_STRING: break;
-        case AST_ARRAY: break;
-        case AST_STRUCT_LITERAL: break;
-    }
+    (void)_ast_getData(code, id);  // Assure data for the node is added
     return id;
-}
-
-uint32_t ast_insertNode(
-    Code* code, CodeKind kind, uint32_t location, uint32_t dataLocation
-) {
-    size_t numberOfSlotsUsed = ast_numberOfSlotsUsedInData(kind);
-
-    // Make space for insertation
-    list_ensureExtraCapacity(code->code, 1);
-    list_ensureExtraCapacity(code->dataOrIndex, 1);
-    code->code.size += 1;
-    code->dataOrIndex.size += 1;
-    for (size_t i = list_size(code->code) - 2;
-         location <= i && i <= list_size(code->code) - 2;
-         i--) {
-        *list_get(code->code, i + 1) = *list_get(code->code, i);
-        *list_get(code->dataOrIndex, i + 1) = *list_get(code->dataOrIndex, i);
-        size_t slotsUsed =
-            ast_numberOfSlotsUsedInData(*list_get(code->code, i));
-        if (slotsUsed > 1) {
-            *list_get(code->dataOrIndex, i + 1) += numberOfSlotsUsed;
-        }
-    }
-    list_ensureExtraCapacity(code->data, numberOfSlotsUsed);
-    code->data.size += numberOfSlotsUsed;
-    for (size_t i = list_size(code->data) - 1 - numberOfSlotsUsed;
-         dataLocation <= i &&
-         i <= list_size(code->data) - 1 - numberOfSlotsUsed;
-         i--) {
-        *list_get(code->data, i + numberOfSlotsUsed) = *list_get(code->data, i);
-    }
-
-    // Remember sizes
-    size_t actualSize = code->code.size;
-    size_t actualSizeData = code->data.size;
-
-    // Set size
-    code->code.size = location;
-    code->dataOrIndex.size = location;
-    code->data.size = dataLocation;
-
-    // Add node
-    uint32_t node = ast_createNode(code, kind);
-
-    // Restore size;
-    code->code.size = actualSize;
-    code->dataOrIndex.size = actualSize;
-    code->data.size = actualSizeData;
-
-    // Returm
-    return node;
 }
 
 static size_t ast_numberOfSlotsUsedInData(CodeKind kind) {
@@ -175,9 +74,7 @@ static size_t ast_numberOfSlotsUsedInData(CodeKind kind) {
         case AST_DECLARATION: result = sizeof(AstDeclaration); break;
         case AST_ASSIGNMENT: result = sizeof(AstAssignment); break;
         case AST_RETURN: result = sizeof(AstReturn); break;
-        case AST_RETURN_WITH_EXPRESSION:
-            result = sizeof(AstReturnWithExpression);
-            break;
+        case AST_RETURN_EXPRESSION: result = sizeof(AstReturnExpression); break;
         case AST_BREAK: result = sizeof(AstBreak); break;
         case AST_CONTINUE: result = sizeof(AstContinue); break;
         case AST_IF_ELSE: result = sizeof(AstIfElse); break;
@@ -271,22 +168,86 @@ static void ast_printIndentation(uint32_t indentatioLevel) {
     for (uint32_t i = 0; i < indentatioLevel; i++) printf("   ");
 }
 
-static void ast_printCode(Ast ast, Code code, uint32_t indentatioLevel) {
+static void ast_printType(Ast ast, uint32_t typeId) {
+    Type type = *list_get(ast.types, typeId);
+    switch (type.kind) {
+        case TYPE_VARIABLE: printf("%d", type.variable.id); break;
+        case TYPE_APPLICATION:
+            printf("%.*s", ast_literalExpand(ast, type.application.identifier));
+            if (type.application.parameterCount != 0) {
+                printf("[");
+                for (size_t i = 0; i < type.application.parameterCount; i++) {
+                    ast_printType(ast, typeId + 1 + i);
+                }
+                printf("]");
+            }
+            break;
+    }
+}
+
+static void ast_printCode(Ast ast, Code code, uint32_t indentationLevel) {
+    arena_newLifetime();
+    SizeTStack indentation = Stack();
+    SizeTStack separations = Stack();
+
     for (uint32_t i = 0; i < list_size(code.code); i += 1) {
-        ast_printIndentation(indentatioLevel);
+        ast_printIndentation(indentationLevel + stack_size(indentation));
         CodeKind kind = *list_get(code.code, i);
         switch (kind) {
-            case AST_DECLARATION: printf("declaration\n"); break;
+            case AST_DECLARATION: {
+                AstDeclaration data = *ast_getData(AstDeclaration, &code, i);
+                if (data.type != None()) {
+                    printf(
+                        "declaration(%.*s, expectedType: ",
+                        ast_literalExpand(ast, data.identifier)
+                    );
+                    ast_printType(ast, data.type);
+                    printf(", mutable: %s)\n", data.mutable ? "true" : "false");
+                } else {
+                    printf(
+                        "declaration(%.*s, mutable: %s)\n",
+                        ast_literalExpand(ast, data.identifier),
+                        data.mutable ? "true" : "false"
+                    );
+                }
+                break;
+            }
             case AST_ASSIGNMENT: printf("assignment\n"); break;
             case AST_RETURN: printf("return\n"); break;
-            case AST_RETURN_WITH_EXPRESSION:
-                printf("returnWithExpression\n");
-                break;
+            case AST_RETURN_EXPRESSION: printf("returnWithExpression\n"); break;
             case AST_BREAK: printf("break\n"); break;
             case AST_CONTINUE: printf("continue\n"); break;
-            case AST_IF_ELSE: printf("ifElse\n"); break;
-            case AST_WHILE: printf("while\n"); break;
-            case AST_CALL: printf("call\n"); break;
+            case AST_IF_ELSE:
+                printf("ifElse\n");
+                if (ast_getData(AstIfElse, &code, i)->elseBlockEnd != None()) {
+                    stack_push(
+                        separations,
+                        ast_getData(AstIfElse, &code, i)->ifBlockEnd
+                    );
+                    stack_push(
+                        indentation,
+                        ast_getData(AstIfElse, &code, i)->elseBlockEnd
+                    );
+                } else {
+                    stack_push(
+                        indentation,
+                        ast_getData(AstIfElse, &code, i)->ifBlockEnd
+                    );
+                }
+                break;
+            case AST_WHILE:
+                printf("while\n");
+                stack_push(
+                    indentation,
+                    ast_getData(AstWhile, &code, i)->whileEnd
+                );
+                break;
+            case AST_CALL:
+                printf(
+                    "call(arguments: %d)\n",
+                    ast_getData(AstCall, &code, i)->argumentsCount
+                );
+                break;
             case AST_IF_ELSE_EXPRESSION: printf("ifElseExpression\n"); break;
             case AST_NOT: printf("not\n"); break;
             case AST_OR:
@@ -352,24 +313,19 @@ static void ast_printCode(Ast ast, Code code, uint32_t indentatioLevel) {
             case AST_ARRAY: printf("arrayLiteral\n"); break;
             case AST_STRUCT_LITERAL: printf("structLiteral\n"); break;
         }
-    }
-}
 
-static void ast_printType(Ast ast, uint32_t typeId) {
-    Type type = *list_get(ast.types, typeId);
-    switch (type.kind) {
-        case TYPE_VARIABLE: printf("%d", type.variable.id); break;
-        case TYPE_APPLICATION:
-            printf("%.*s", ast_literalExpand(ast, type.application.identifier));
-            if (type.application.parameterCount != 0) {
-                printf("[");
-                for (size_t i = 0; i < type.application.parameterCount; i++) {
-                    ast_printType(ast, typeId + 1 + i);
-                }
-                printf("]");
-            }
-            break;
+        while (stack_size(indentation) != 0 && i == *stack_top(indentation)) {
+            stack_pop(indentation);
+        }
+
+        if (stack_size(separations) != 0 && *stack_top(separations) == i) {
+            ast_printIndentation(indentationLevel + stack_size(indentation));
+            printf("─────────────────\n");
+            stack_pop(separations);
+        }
     }
+
+    arena_destroyCurrentLifetime();
 }
 
 static void ast_printTypeDefinition(
