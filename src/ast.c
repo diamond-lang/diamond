@@ -11,16 +11,16 @@
 #include "common.h"
 #include "types.h"
 
-static size_t ast_numberOfSlotsUsedInData(CodeKind kind);
+static size_t ast_numberOfSlotsUsedInData(AstInstructionKind kind);
 
 static void ast_initCode(Code* code, uint32_t lifetime) {
-    code->code = (Uint8List)ListWithLifetime(lifetime);
+    code->instructions = (Uint8List)ListWithLifetime(lifetime);
     code->dataOrIndex = (Uint32List)ListWithLifetime(lifetime);
     code->data = (Uint32List)ListWithLifetime(lifetime);
 }
 
 static void ast_clearCode(Code* code) {
-    code->code = (Uint8List)List();
+    code->instructions = (Uint8List)List();
     code->dataOrIndex = (Uint32List)List();
     code->data = (Uint32List)List();
 }
@@ -60,15 +60,15 @@ void ast_clear(Ast* ast) {
     list_clear(ast->errors);
 }
 
-uint32_t ast_addCode(Code* code, CodeKind kind) {
-    list_append(code->code, kind);
+uint32_t ast_addInstruction(Code* code, AstInstructionKind kind) {
+    list_append(code->instructions, kind);
     list_append(code->dataOrIndex, None());
-    uint32_t id = list_size(code->code) - 1;
-    (void)_ast_getData(code, id);  // Assure data for the node is added
+    uint32_t id = list_size(code->instructions) - 1;
+    (void)_ast_getData(code, id);  // Assure data for the instruction is added
     return id;
 }
 
-static size_t ast_numberOfSlotsUsedInData(CodeKind kind) {
+static size_t ast_numberOfSlotsUsedInData(AstInstructionKind kind) {
     size_t result;
     switch (kind) {
         case AST_DECLARATION: result = sizeof(AstDeclaration); break;
@@ -113,19 +113,19 @@ static size_t ast_numberOfSlotsUsedInData(CodeKind kind) {
     return result / sizeof(uint32_t);
 }
 
-uint32_t* _ast_getData(Code* code, uint32_t node) {
+uint32_t* _ast_getData(Code* code, uint32_t instruction) {
     size_t numberOfSlotsUsed =
-        ast_numberOfSlotsUsedInData(*list_get(code->code, node));
+        ast_numberOfSlotsUsedInData(*list_get(code->instructions, instruction));
     if (numberOfSlotsUsed == 0) return NULL;
     if (numberOfSlotsUsed == 1) {
-        return list_get(code->dataOrIndex, node);
+        return list_get(code->dataOrIndex, instruction);
     } else {
-        if (*list_get(code->dataOrIndex, node) == None()) {
-            *list_get(code->dataOrIndex, node) = list_size(code->data);
+        if (*list_get(code->dataOrIndex, instruction) == None()) {
+            *list_get(code->dataOrIndex, instruction) = list_size(code->data);
             list_ensureExtraCapacity(code->data, numberOfSlotsUsed);
             list_setSize(code->data, list_size(code->data) + numberOfSlotsUsed);
         }
-        return list_get(code->data, *list_get(code->dataOrIndex, node));
+        return list_get(code->data, *list_get(code->dataOrIndex, instruction));
     }
 }
 
@@ -141,7 +141,7 @@ uint32_t ast_createType(Ast* ast, TypeKind kind) {
     return list_size(ast->types) - 1;
 }
 
-static char* getBinaryOp(CodeKind kind) {
+static char* getBinaryOp(AstInstructionKind kind) {
     switch ((uint8_t)kind) {
         case AST_OR: return "or";
         case AST_AND: return "and";
@@ -190,9 +190,9 @@ static void ast_printCode(Ast ast, Code code, uint32_t indentationLevel) {
     SizeTStack indentation = Stack();
     SizeTStack separations = Stack();
 
-    for (uint32_t i = 0; i < list_size(code.code); i += 1) {
+    for (uint32_t i = 0; i < list_size(code.instructions); i += 1) {
         ast_printIndentation(indentationLevel + stack_size(indentation));
-        CodeKind kind = *list_get(code.code, i);
+        AstInstructionKind kind = *list_get(code.instructions, i);
         switch (kind) {
             case AST_DECLARATION: {
                 AstDeclaration data = *ast_getData(AstDeclaration, &code, i);
@@ -214,7 +214,7 @@ static void ast_printCode(Ast ast, Code code, uint32_t indentationLevel) {
             }
             case AST_ASSIGNMENT: printf("assignment\n"); break;
             case AST_RETURN: printf("return\n"); break;
-            case AST_RETURN_EXPRESSION: printf("returnWithExpression\n"); break;
+            case AST_RETURN_EXPRESSION: printf("returnExpression\n"); break;
             case AST_BREAK: printf("break\n"); break;
             case AST_CONTINUE: printf("continue\n"); break;
             case AST_IF_ELSE:
@@ -378,6 +378,13 @@ static void ast_printFunction(
 
 void ast_print(Ast ast) {
     printf("%s\n", ast.canonicalPath.buffer.buffer);
+    for (size_t i = 0; i < list_size(ast.imports); i++) {
+        ast_printIndentation(1);
+        printf(
+            "import %.*s\n",
+            ast_literalExpand(ast, list_get(ast.imports, i)->path)
+        );
+    }
     ast_printCode(ast, ast.code, 1);
     for (size_t i = 0; i < list_size(ast.typeDefinitions); i++) {
         ast_printTypeDefinition(ast, *list_get(ast.typeDefinitions, i), 1);

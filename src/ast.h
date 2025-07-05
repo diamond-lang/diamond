@@ -52,13 +52,7 @@ typedef enum {
     AST_STRING,
     AST_ARRAY,
     AST_STRUCT_LITERAL,
-} CodeKind;
-
-typedef struct {
-    Uint8List code;
-    Uint32List dataOrIndex;
-    Uint32List data;
-} Code;
+} AstInstructionKind;
 
 typedef struct {
     bool mutable;
@@ -183,6 +177,12 @@ typedef struct {
 typedef struct {
 } AstStructLiteral;
 
+typedef struct {
+    Uint8List instructions;
+    Uint32List dataOrIndex;
+    Uint32List data;
+} Code;
+
 // Definitions
 typedef struct {
     uint32_t path;
@@ -256,9 +256,10 @@ typedef ListType(Ast) AstList;
 
 void ast_init(Ast *ast, String canonicalPath);
 void ast_clear(Ast *ast);
-uint32_t ast_addCode(Code *code, CodeKind kind);
-uint32_t *_ast_getData(Code *code, uint32_t node);
-#define ast_getData(type, code, nodeId) ((type *)_ast_getData(code, nodeId))
+uint32_t ast_addInstruction(Code *code, AstInstructionKind kind);
+uint32_t *_ast_getData(Code *code, uint32_t instruction);
+#define ast_getData(type, code, instruction) \
+    ((type *)_ast_getData(code, instruction))
 uint32_t ast_createType(Ast *ast, TypeKind kind);
 #define ast_literalExpand(ast, id) \
     *list_get(ast.literals, id), (char *)list_get(ast.literals, id + 1)
