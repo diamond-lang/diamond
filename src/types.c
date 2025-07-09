@@ -2,15 +2,19 @@
 
 #include <assert.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
+#include "ast.h"
+
+// String
 StringView cStringAsView(char* string) {
     return (StringView){strlen(string), string};
 }
 
-size_t string_size(String string) {
-    size_t bufferSize = list_size(string.buffer);
+uint32_t string_size(String string) {
+    uint32_t bufferSize = list_size(string.buffer);
     return bufferSize == 0 ? 0 : bufferSize - 1;
 }
 
@@ -18,7 +22,7 @@ void string_clear(String* string) { list_clear(string->buffer); }
 
 char* string_pointer(String string) { return string.buffer.buffer; }
 
-char string_get(String string, size_t index) {
+char string_get(String string, uint32_t index) {
     return *list_get(string.buffer, index);
 }
 
@@ -48,4 +52,36 @@ bool string_equal(StringView a, StringView b) {
 
 StringView string_asView(String string) {
     return (StringView){string_size(string), list_get(string.buffer, 0)};
+}
+
+// HashMap
+static uint32_t hash(uint32_t x) {
+    x = ((x >> 16) ^ x) * 0x45d9f3b;
+    x = ((x >> 16) ^ x) * 0x45d9f3b;
+    x = (x >> 16) ^ x;
+    return x;
+}
+
+uint32_t _findLocation(uint32_t* keys, uint32_t key, uint32_t capacity) {
+    assert(keys);
+    uint32_t index = hash(key) % capacity;
+    while (true) {
+        uint32_t keyFound = keys[index];
+        if (keyFound == key || keyFound == None()) {
+            return index;
+        }
+        index = (index + 1) % capacity;
+    }
+}
+
+void* _hashtable_get(
+    uint32_t* keys,
+    void* values,
+    uint32_t sizeOfValue,
+    uint32_t capacity,
+    uint32_t key
+) {
+    size_t location = _findLocation(keys, key, capacity);
+    if (location == None()) return NULL;
+    return ((uint8_t*)values) + location * sizeOfValue;
 }

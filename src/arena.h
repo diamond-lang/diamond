@@ -5,8 +5,11 @@
 #include <stdlib.h>
 
 void arena_newLifetime();
-size_t arena_currentLifetime();
-void* arena_realloc(size_t lifetime, void* pointer, size_t numberOfBytes);
+uint32_t arena_currentLifetime();
+void* arena_realloc(uint32_t lifetime, void* pointer, uint32_t numberOfBytes);
+void arena_swapAllocations(
+    uint32_t lifetime, void** allocation, void* newAllocation
+);
 void arena_destroyCurrentLifetime();
 void arena_assertNoLifetimesRemaining();
 

@@ -7,6 +7,6 @@ void normalizePath(String* path);
 String getWorkingDirectory();
 String getCanonicalPath(StringView string);
 String readFile(char* path);
-int numberOfDigits(size_t number);
+int numberOfDigits(uint32_t number);
 
 #endif

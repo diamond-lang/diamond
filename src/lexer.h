@@ -5,8 +5,8 @@
 #include "types.h"
 
 typedef struct {
-    size_t line;
-    size_t column;
+    uint32_t line;
+    uint32_t column;
     String source;
     char* sourcePointer;
     Uint32List* literals;

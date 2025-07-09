@@ -11,7 +11,7 @@
 #include "common.h"
 #include "types.h"
 
-static size_t ast_numberOfSlotsUsedInData(AstInstructionKind kind);
+static uint32_t ast_numberOfSlotsUsedInData(AstInstructionKind kind);
 
 static void ast_initCode(Code* code, uint32_t lifetime) {
     code->instructions = (Uint8List)ListWithLifetime(lifetime);
@@ -68,8 +68,8 @@ uint32_t ast_addInstruction(Code* code, AstInstructionKind kind) {
     return id;
 }
 
-static size_t ast_numberOfSlotsUsedInData(AstInstructionKind kind) {
-    size_t result;
+static uint32_t ast_numberOfSlotsUsedInData(AstInstructionKind kind) {
+    uint32_t result;
     switch (kind) {
         case AST_DECLARATION: result = sizeof(AstDeclaration); break;
         case AST_ASSIGNMENT: result = sizeof(AstAssignment); break;
@@ -114,7 +114,7 @@ static size_t ast_numberOfSlotsUsedInData(AstInstructionKind kind) {
 }
 
 uint32_t* _ast_getData(Code* code, uint32_t instruction) {
-    size_t numberOfSlotsUsed =
+    uint32_t numberOfSlotsUsed =
         ast_numberOfSlotsUsedInData(*list_get(code->instructions, instruction));
     if (numberOfSlotsUsed == 0) return NULL;
     if (numberOfSlotsUsed == 1) {
@@ -176,7 +176,7 @@ static void ast_printType(Ast ast, uint32_t typeId) {
             printf("%.*s", ast_literalExpand(ast, type.application.identifier));
             if (type.application.parameterCount != 0) {
                 printf("[");
-                for (size_t i = 0; i < type.application.parameterCount; i++) {
+                for (uint32_t i = 0; i < type.application.parameterCount; i++) {
                     ast_printType(ast, typeId + 1 + i);
                 }
                 printf("]");
@@ -187,8 +187,8 @@ static void ast_printType(Ast ast, uint32_t typeId) {
 
 static void ast_printCode(Ast ast, Code code, uint32_t indentationLevel) {
     arena_newLifetime();
-    SizeTStack indentation = Stack();
-    SizeTStack separations = Stack();
+    Uint32Stack indentation = Stack();
+    Uint32Stack separations = Stack();
 
     for (uint32_t i = 0; i < list_size(code.instructions); i += 1) {
         ast_printIndentation(indentationLevel + stack_size(indentation));
@@ -336,7 +336,7 @@ static void ast_printTypeDefinition(
     assert(
         list_size(typeDefinition.fields) == list_size(typeDefinition.fieldTypes)
     );
-    for (size_t i = 0; i < list_size(typeDefinition.fields); i++) {
+    for (uint32_t i = 0; i < list_size(typeDefinition.fields); i++) {
         ast_printIndentation(indentationLevel + 1);
         printf(
             "%.*s: ",
@@ -353,7 +353,7 @@ static void ast_printFunction(
     ast_printIndentation(indentationLevel);
     printf("function %.*s", ast_literalExpand(ast, function.identifier));
     printf("(");
-    for (size_t i = 0; i < list_size(function.arguments); i++) {
+    for (uint32_t i = 0; i < list_size(function.arguments); i++) {
         FunctionArgument argument = *list_get(function.arguments, i);
         if (argument.mutable) {
             printf("mut ");
@@ -378,7 +378,7 @@ static void ast_printFunction(
 
 void ast_print(Ast ast) {
     printf("%s\n", ast.canonicalPath.buffer.buffer);
-    for (size_t i = 0; i < list_size(ast.imports); i++) {
+    for (uint32_t i = 0; i < list_size(ast.imports); i++) {
         ast_printIndentation(1);
         printf(
             "import %.*s\n",
@@ -386,10 +386,10 @@ void ast_print(Ast ast) {
         );
     }
     ast_printCode(ast, ast.code, 1);
-    for (size_t i = 0; i < list_size(ast.typeDefinitions); i++) {
+    for (uint32_t i = 0; i < list_size(ast.typeDefinitions); i++) {
         ast_printTypeDefinition(ast, *list_get(ast.typeDefinitions, i), 1);
     }
-    for (size_t i = 0; i < list_size(ast.functions); i++) {
+    for (uint32_t i = 0; i < list_size(ast.functions); i++) {
         ast_printFunction(ast, *list_get(ast.functions, i), 1);
     }
 }

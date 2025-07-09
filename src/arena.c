@@ -4,11 +4,12 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdlib.h>
+#include <string.h>
 
 typedef struct {
     void** items;
-    size_t count;
-    size_t capacity;
+    uint32_t count;
+    uint32_t capacity;
 } Lifetime;
 
 #define Lifetime() (Lifetime){NULL, 0, 0}
@@ -29,8 +30,8 @@ static void append(Lifetime* lifetime, void* allocation) {
 
 typedef struct {
     Lifetime* items;
-    size_t count;
-    size_t capacity;
+    uint32_t count;
+    uint32_t capacity;
 } LifetimeStack;
 
 static void push(LifetimeStack* lifetimes, Lifetime lifetime) {
@@ -55,11 +56,11 @@ static LifetimeStack lifetimes = {NULL, 0, 0};
 
 void arena_newLifetime() { push(&lifetimes, Lifetime()); }
 
-size_t arena_currentLifetime() {
+uint32_t arena_currentLifetime() {
     return lifetimes.count > 0 ? lifetimes.count - 1 : 0;
 }
 
-void* arena_realloc(size_t lifetime, void* pointer, size_t numberOfBytes) {
+void* arena_realloc(uint32_t lifetime, void* pointer, uint32_t numberOfBytes) {
     assert(lifetime < lifetimes.count);
     Lifetime* currentLifetime = &lifetimes.items[lifetime];
     if (pointer == NULL) {
@@ -68,7 +69,7 @@ void* arena_realloc(size_t lifetime, void* pointer, size_t numberOfBytes) {
         append(currentLifetime, newAllocation);
         return newAllocation;
     } else {
-        for (size_t i = 0; i < currentLifetime->count; i++) {
+        for (uint32_t i = 0; i < currentLifetime->count; i++) {
             if (currentLifetime->items[i] == pointer) {
                 currentLifetime->items[i] = realloc(pointer, numberOfBytes);
                 return currentLifetime->items[i];
@@ -78,9 +79,27 @@ void* arena_realloc(size_t lifetime, void* pointer, size_t numberOfBytes) {
     }
 }
 
+void arena_swapAllocations(
+    uint32_t lifetime, void** allocation, void* newAllocation
+) {
+    assert(lifetime < lifetimes.count);
+    Lifetime* currentLifetime = &lifetimes.items[lifetime];
+    if (allocation == NULL) {
+        append(currentLifetime, newAllocation);
+    } else {
+        for (uint32_t i = 0; i < currentLifetime->count; i++) {
+            if (currentLifetime->items[i] == allocation) {
+                free(currentLifetime->items[i]);
+                currentLifetime->items[i] = newAllocation;
+            }
+        }
+    }
+    *allocation = newAllocation;
+}
+
 void arena_destroyCurrentLifetime() {
     Lifetime currentLifetime = stack_top(lifetimes);
-    for (size_t i = 0; i < currentLifetime.count; i++) {
+    for (uint32_t i = 0; i < currentLifetime.count; i++) {
         free(currentLifetime.items[i]);
     }
     free(currentLifetime.items);

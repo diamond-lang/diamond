@@ -19,7 +19,7 @@ typedef struct {
     Token previous;
     Token current;
     Token next;
-    SizeTStack indentationLevel;
+    Uint32Stack indentationLevel;
     Lexer lexer;
     Ast *ast;
     Code *code;
@@ -209,7 +209,7 @@ void parseImports(Ast *ast) {
 }
 
 #define checkIndentation()                                                 \
-    size_t indentationLevel = parser->current.column;                      \
+    uint32_t indentationLevel = parser->current.column;                    \
     if (check(*parser, NEW_LINES)) indentationLevel = parser->next.column; \
     if (indentationLevel < *stack_top(parser->indentationLevel)) break;    \
     else if (indentationLevel > *stack_top(parser->indentationLevel)) {    \
@@ -403,7 +403,7 @@ end:
 }
 
 static uint32_t block(Parser *parser) {
-    size_t initialErrorCount = list_size(parser->ast->errors);
+    uint32_t initialErrorCount = list_size(parser->ast->errors);
 
     // Set new indentation level
     consumeIfExists(parser, NEW_LINES);
@@ -537,7 +537,7 @@ static uint32_t ifElse(Parser *parser, Token keyword) {
     // Parse else block
     if (parser->next.kind == ELSE) {
         advance(parser);
-        size_t indentationLevel = parser->current.column;
+        uint32_t indentationLevel = parser->current.column;
         advance(parser);
 
         if (*stack_top(parser->indentationLevel) == indentationLevel) {

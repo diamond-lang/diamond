@@ -24,7 +24,7 @@ static void findImports(AstList* asts, uint32_t current) {
     }
 
     // Parse imported files
-    for (size_t i = 0; i < list_size(currentAst->imports); i++) {
+    for (uint32_t i = 0; i < list_size(currentAst->imports); i++) {
         uint32_t literal = list_get(currentAst->imports, i)->path;
         StringView view = ast_literalAsStringView(currentAst, literal);
         String canonicalPath = getCanonicalPath(view);
@@ -32,7 +32,7 @@ static void findImports(AstList* asts, uint32_t current) {
 
         // Check that it has not been added
         bool founded = false;
-        for (size_t j = 0; j < list_size(*asts); j++) {
+        for (uint32_t j = 0; j < list_size(*asts); j++) {
             if (string_equal(
                     string_asView(list_get(*asts, j)->canonicalPath),
                     string_asView(canonicalPath)
@@ -66,10 +66,10 @@ static Uint32ListList findDependencyGraph(AstList* asts) {
 
     // Copy imports
     ImportsList importsList = List();
-    for (size_t i = 0; i < asts->size; i++) {
+    for (uint32_t i = 0; i < asts->size; i++) {
         Uint32List astImports = list_get(*asts, i)->importedAsts;
         Uint32List copy = List();
-        for (size_t j = 0; j < list_size(astImports); j++) {
+        for (uint32_t j = 0; j < list_size(astImports); j++) {
             list_append(copy, *list_get(astImports, j));
         }
         ImportsForGraph importsForGraph = (ImportsForGraph){false, copy};
@@ -88,7 +88,7 @@ static Uint32ListList findDependencyGraph(AstList* asts) {
                 list_append(list, i);
 
                 // Remove from imports list from other ASTs
-                for (size_t j = 0; j < list_size(importsList); j++) {
+                for (uint32_t j = 0; j < list_size(importsList); j++) {
                     list_removeFirstMatch(list_get(importsList, j)->imports, i);
                 }
 
@@ -115,8 +115,9 @@ Program compile(StringView file) {
     // Find dependecy graph
     program.dependencyGraph = findDependencyGraph(&program.asts);
 
-    for (size_t i = 0; i < list_size(program.dependencyGraph); i++) {
-        for (size_t j = 0; j < list_size(*list_get(program.dependencyGraph, i));
+    for (uint32_t i = 0; i < list_size(program.dependencyGraph); i++) {
+        for (uint32_t j = 0;
+             j < list_size(*list_get(program.dependencyGraph, i));
              j++) {
             uint32_t ast = *list_get(*list_get(program.dependencyGraph, i), j);
             printf(
@@ -128,12 +129,12 @@ Program compile(StringView file) {
     }
 
     // Parse following dependecy graph
-    for (size_t i = 0; i < list_size(program.dependencyGraph); i++) {
+    for (uint32_t i = 0; i < list_size(program.dependencyGraph); i++) {
         // Get stage
         Uint32List stage = *list_get(program.dependencyGraph, i);
 
         // For each AST
-        for (size_t j = 0; j < list_size(stage); j++) {
+        for (uint32_t j = 0; j < list_size(stage); j++) {
             // Parse AST
             Ast* ast = list_get(program.asts, *list_get(stage, j));
             ast_clear(ast);
@@ -147,7 +148,7 @@ Program compile(StringView file) {
         }
     }
 
-    for (size_t i = 0; i < list_size(program.asts); i++) {
+    for (uint32_t i = 0; i < list_size(program.asts); i++) {
         ast_print(*list_get(program.asts, i));
         if (i + 1 < list_size(program.asts)) printf("\n\n");
     }

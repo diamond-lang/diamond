@@ -25,8 +25,8 @@ typedef enum {
 
 typedef struct {
     ErrorKind kind;
-    size_t line;
-    size_t column;
+    uint32_t line;
+    uint32_t column;
 
     union {
         struct {

@@ -1,11 +1,30 @@
 #ifndef scopes_h
 #define scopes_h
 
-// #include "types.h"
+#include <stdint.h>
 
-// void scopes_addScope(Uint32ListStack scopes);
-// void scopes_removeScope();
-// uint32_t scopes_getBinding(uint32_t literalId);  // returns a node id
-// void scopes_importModule(uint32_t literalId);
+#include "types.h"
+
+typedef enum {
+    FunctionBiding,
+    TypeBinding,
+    VariableBinding,
+    ArgumentBinding
+} BindingKind;
+
+typedef struct {
+    BindingKind kind;
+    uint32_t literalId;
+    uint32_t module;
+    uint32_t id;
+} Binding;
+
+typedef HashmapType(Binding) BindingMap;
+typedef StackType(BindingMap) BindingMapStack;
+
+void scopes_addScope(BindingMapStack* scopes);
+void scopes_removeScope(BindingMapStack* scopes);
+Binding* scopes_getBinding(BindingMapStack* scopes, uint32_t literalId);
+void scopes_addBinding(BindingMap* scope, uint32_t literalId, Binding binding);
 
 #endif

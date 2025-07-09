@@ -66,8 +66,8 @@ typedef ListType(TokenKind) TokenKindList;
 
 typedef struct {
     TokenKind kind;
-    size_t line;
-    size_t column;
+    uint32_t line;
+    uint32_t column;
     uint32_t literal;
 } Token;
 

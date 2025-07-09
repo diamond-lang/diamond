@@ -125,11 +125,11 @@ static char* ast_tokenAsString(TokenKind kind) {
     }
 }
 
-void printCurrentLine(String filePath, size_t line) {
-    printf("%zu│ ", line);
+void printCurrentLine(String filePath, uint32_t line) {
+    printf("%u│ ", line);
     arena_newLifetime();
     String file = readFile(string_pointer(filePath));
-    for (size_t i = 0; i < string_size(file) && line >= 1; i++) {
+    for (uint32_t i = 0; i < string_size(file) && line >= 1; i++) {
         if (string_get(file, i) == '\n') {
             line -= 1;
         } else if (line == 1) {
@@ -158,33 +158,33 @@ void printHeader(char* title, String filePath) {
     printf("\x1b[96m%s (%s)\x1b[0m\n\n", title, string_pointer(filePath));
 }
 
-void underlineUntilLocation(String filePath, size_t line, size_t column) {
-    for (size_t i = 0; i < numberOfDigits(line); i++) {
+void underlineUntilLocation(String filePath, uint32_t line, uint32_t column) {
+    for (uint32_t i = 0; i < numberOfDigits(line); i++) {
         printf(" ");
     }
     printf("  ");
-    for (size_t i = 0; i < column - 1; i++) {
+    for (uint32_t i = 0; i < column - 1; i++) {
         printRed("^");
     }
 }
 
-void underlineLocation(String filePath, size_t line, size_t column) {
-    for (size_t i = 0; i < numberOfDigits(line); i++) {
+void underlineLocation(String filePath, uint32_t line, uint32_t column) {
+    for (uint32_t i = 0; i < numberOfDigits(line); i++) {
         printf(" ");
     }
     printf("  ");
-    for (size_t i = 0; i < column - 1; i++) {
+    for (uint32_t i = 0; i < column - 1; i++) {
         printf(" ");
     }
     printRed("^");
 }
 
 void underlineToken(Ast ast, Token token) {
-    for (size_t i = 0; i < numberOfDigits(token.line); i++) {
+    for (uint32_t i = 0; i < numberOfDigits(token.line); i++) {
         printf(" ");
     }
     printf("  ");
-    for (size_t i = 0; i < token.column - 1; i++) {
+    for (uint32_t i = 0; i < token.column - 1; i++) {
         printf(" ");
     }
     char* literal = token_getLiteral(ast, token);
@@ -194,14 +194,14 @@ void underlineToken(Ast ast, Token token) {
     }
 }
 
-void underlineLine(String filePath, size_t line) {
-    for (size_t i = 0; i < numberOfDigits(line); i++) {
+void underlineLine(String filePath, uint32_t line) {
+    for (uint32_t i = 0; i < numberOfDigits(line); i++) {
         printf(" ");
     }
     printf("  ");
     arena_newLifetime();
     String file = readFile(string_pointer(filePath));
-    for (size_t i = 0; i < string_size(file) && line >= 1; i++) {
+    for (uint32_t i = 0; i < string_size(file) && line >= 1; i++) {
         if (string_get(file, i) == '\n') {
             line -= 1;
         } else if (line == 1) {
@@ -273,7 +273,7 @@ void reportError(Ast ast, Error error) {
 }
 
 void reportErrors(Ast ast) {
-    for (size_t i = 0; i < list_size(ast.errors); i++) {
+    for (uint32_t i = 0; i < list_size(ast.errors); i++) {
         reportError(ast, *list_get(ast.errors, i));
     }
 }

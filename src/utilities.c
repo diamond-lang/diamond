@@ -47,9 +47,9 @@ void normalizePath(String* path) {
 
     // Get parts in path
     PartList parts = (PartList)List();
-    for (size_t i = 0; i < string_size(copy);) {
+    for (uint32_t i = 0; i < string_size(copy);) {
         if (string_get(copy, i) == '/') i += 1;
-        size_t j = i;
+        uint32_t j = i;
         while (string_get(copy, j) != '/' && string_get(copy, j) != '\0') j++;
         StringView part = (StringView){j - i, string_pointer(copy) + i};
         if (!string_equal(part, cStringAsView("."))) list_append(parts, part);
@@ -58,7 +58,7 @@ void normalizePath(String* path) {
 
     // Get normalized parts
     PartStack normalizedParts = (PartStack)Stack();
-    for (size_t i = 0; i < list_size(parts); i++) {
+    for (uint32_t i = 0; i < list_size(parts); i++) {
         bool partIsTwoDots =
             string_equal(*list_get(parts, i), cStringAsView(".."));
         if (partIsTwoDots && stack_size(normalizedParts) != 0) {
@@ -78,7 +78,7 @@ void normalizePath(String* path) {
 
     // Construct normalized path
     if (isAbsolutePath(string_asView(copy))) string_append(path, '/');
-    for (size_t i = 0; i < stack_size(normalizedParts); i++) {
+    for (uint32_t i = 0; i < stack_size(normalizedParts); i++) {
         StringView part = *stack_get(normalizedParts, i);
         string_concat(path, part);
         if (i + 1 != stack_size(normalizedParts)) string_append(path, '/');
@@ -145,7 +145,7 @@ String readFile(char* path) {
     return (String){buffer};
 }
 
-int numberOfDigits(size_t number) {
+int numberOfDigits(uint32_t number) {
     assert(number > 0);
     int numberOfDigits = 0;
     while (number > 0) {

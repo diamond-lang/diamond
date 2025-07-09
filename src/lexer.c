@@ -73,7 +73,7 @@ static inline uint32_t numberOfSlotsNeeded(uint32_t length) {
 }
 
 static Token createTokenWithLiteral(Lexer* lexer, TokenKind kind) {
-    const size_t literalsCount = list_size(*lexer->literals);
+    const uint32_t literalsCount = list_size(*lexer->literals);
     const uint32_t length = string_size(lexer->currentLiteral);
     const char* currentLiteral = string_pointer(lexer->currentLiteral);
 
@@ -219,8 +219,8 @@ static Token scanNumber(Lexer* lexer) {
 }
 
 static bool identifierEquals(Lexer* lexer, char* literal) {
-    size_t length = string_size(lexer->currentLiteral);
-    for (size_t i = 0; i < length; i++) {
+    uint32_t length = string_size(lexer->currentLiteral);
+    for (uint32_t i = 0; i < length; i++) {
         if (string_get(lexer->currentLiteral, i) != literal[i]) return false;
     }
     if (literal[length] != '\0') return false;
