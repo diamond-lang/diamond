@@ -7,8 +7,7 @@
 typedef struct {
     uint32_t line;
     uint32_t column;
-    String source;
-    char* sourcePointer;
+    char* source;
     Uint32List* literals;
     char current;
     char next;
@@ -17,7 +16,7 @@ typedef struct {
     String currentLiteral;
 } Lexer;
 
-void initLexer(Lexer* lexer, char* filePath, Uint32List* literals);
+void initLexer(Lexer* lexer, char* source, Uint32List* literals);
 Token scanToken(Lexer* lexer);
 
 #endif

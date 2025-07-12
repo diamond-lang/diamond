@@ -6,25 +6,36 @@
 #include "types.h"
 
 typedef enum {
-    FunctionBiding,
-    TypeBinding,
-    VariableBinding,
-    ArgumentBinding
+    FUNCTION_BINDING,
+    VARIABLE_BINDING,
+    ARGUMENT_BINDING
 } BindingKind;
 
 typedef struct {
     BindingKind kind;
-    uint32_t literalId;
-    uint32_t module;
     uint32_t id;
+    uint32_t module;
 } Binding;
 
 typedef HashmapType(Binding) BindingMap;
 typedef StackType(BindingMap) BindingMapStack;
 
-void scopes_addScope(BindingMapStack* scopes);
-void scopes_removeScope(BindingMapStack* scopes);
-Binding* scopes_getBinding(BindingMapStack* scopes, uint32_t literalId);
+typedef struct {
+    uint32_t id;
+    uint32_t module;
+} TypeBinding;
+
+typedef HashmapType(TypeBinding) TypeBindingMap;
+
+typedef struct {
+    TypeBindingMap types;
+    BindingMapStack bindings;
+} Scopes;
+
+void scopes_addScope(Scopes* scopes);
+void scopes_removeScope(Scopes* scopes);
+Binding* scopes_getBinding(Scopes* scopes, uint32_t literalId);
+TypeBinding* scopes_getTypeBinding(Scopes* scopes, uint32_t literalId);
 void scopes_addBinding(BindingMap* scope, uint32_t literalId, Binding binding);
 
 #endif

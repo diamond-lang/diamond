@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <errno.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -47,18 +48,18 @@ void normalizePath(String* path) {
 
     // Get parts in path
     PartList parts = (PartList)List();
-    for (uint32_t i = 0; i < string_size(copy);) {
+    for (size_t i = 0; i < string_size(copy);) {
         if (string_get(copy, i) == '/') i += 1;
-        uint32_t j = i;
+        size_t j = i;
         while (string_get(copy, j) != '/' && string_get(copy, j) != '\0') j++;
-        StringView part = (StringView){j - i, string_pointer(copy) + i};
+        StringView part = (StringView){j - i, string_asCString(copy) + i};
         if (!string_equal(part, cStringAsView("."))) list_append(parts, part);
         i = j;
     }
 
     // Get normalized parts
     PartStack normalizedParts = (PartStack)Stack();
-    for (uint32_t i = 0; i < list_size(parts); i++) {
+    for (size_t i = 0; i < list_size(parts); i++) {
         bool partIsTwoDots =
             string_equal(*list_get(parts, i), cStringAsView(".."));
         if (partIsTwoDots && stack_size(normalizedParts) != 0) {
@@ -78,7 +79,7 @@ void normalizePath(String* path) {
 
     // Construct normalized path
     if (isAbsolutePath(string_asView(copy))) string_append(path, '/');
-    for (uint32_t i = 0; i < stack_size(normalizedParts); i++) {
+    for (size_t i = 0; i < stack_size(normalizedParts); i++) {
         StringView part = *stack_get(normalizedParts, i);
         string_concat(path, part);
         if (i + 1 != stack_size(normalizedParts)) string_append(path, '/');

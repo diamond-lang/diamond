@@ -5,7 +5,9 @@
 #include "types.h"
 
 typedef struct {
+    Ast builtin;
     AstList asts;
+    StringList paths;
     Uint32ListList dependencyGraph;
 } Program;
 

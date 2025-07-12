@@ -36,9 +36,8 @@ void ast_initTypeDefinition(TypeDefinition* typeDefinition, uint32_t lifetime) {
     typeDefinition->fieldTypes = (Uint32List)ListWithLifetime(lifetime);
 }
 
-void ast_init(Ast* ast, String canonicalPath) {
+void ast_init(Ast* ast) {
     ast->importedAsts = (Uint32List)List();
-    ast->canonicalPath = canonicalPath;
     ast->imports = (ImportList)List();
     ast->functions = (FunctionList)List();
     ast->typeDefinitions = (TypeDefinitionList)List();
@@ -50,7 +49,6 @@ void ast_init(Ast* ast, String canonicalPath) {
 
 void ast_clear(Ast* ast) {
     list_clear(ast->importedAsts);
-    string_clear(&ast->canonicalPath);
     list_clear(ast->imports);
     list_clear(ast->functions);
     list_clear(ast->typeDefinitions);
@@ -139,6 +137,49 @@ uint32_t ast_createType(Ast* ast, TypeKind kind) {
             break;
     }
     return list_size(ast->types) - 1;
+}
+
+uint32_t ast_createTypeVariable(Ast* ast) { todo(); }
+
+uint32_t ast_createTypeApplication(Ast* ast) {
+    list_append(ast->types, (Type){TYPE_APPLICATION});
+    list_get(ast->types, list_size(ast->types) - 1)
+        ->application.parameterCount = 0;
+    return list_size(ast->types) - 1;
+}
+
+static inline uint32_t numberOfSlotsNeededForLiteral(uint32_t length) {
+    return 1 + length / sizeof(uint32_t) + (length % sizeof(uint32_t) != 0);
+}
+
+uint32_t ast_getLiteral(Uint32List* literals, StringView view) {
+    char* literal = view.pointer;
+    uint32_t length = view.length;
+
+    // Check if literal already exist
+    uint32_t literalId = None();
+    for (uint32_t i = 0; i < list_size(*literals);
+         i += numberOfSlotsNeededForLiteral(*list_get(*literals, i))) {
+        if (*list_get(*literals, i) == view.length &&
+            memcmp(list_get(*literals, i + 1), literal, length) == 0) {
+            literalId = i;
+            break;
+        }
+    }
+
+    // Add literal to literals
+    if (literalId == None()) {
+        literalId = list_size(*literals);
+
+        uint32_t extraCapacityNeeded = numberOfSlotsNeededForLiteral(length);
+        list_ensureExtraCapacity((*literals), extraCapacityNeeded);
+
+        list_size(*literals) += extraCapacityNeeded;
+        *list_get(*literals, literalId) = length;
+        strncpy((char*)list_get(*literals, literalId + 1), literal, length);
+    }
+
+    return literalId;
 }
 
 static char* getBinaryOp(AstInstructionKind kind) {
@@ -376,8 +417,8 @@ static void ast_printFunction(
     ast_printCode(ast, function.code, indentationLevel + 1);
 }
 
-void ast_print(Ast ast) {
-    printf("%s\n", ast.canonicalPath.buffer.buffer);
+void ast_print(Ast ast, String path) {
+    printf("%s\n", string_asCString(path));
     for (uint32_t i = 0; i < list_size(ast.imports); i++) {
         ast_printIndentation(1);
         printf(

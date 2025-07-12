@@ -166,7 +166,7 @@ static uint32_t structLiteral(
 );
 static uint32_t array(Parser *parser, Token leftBracket);
 
-void parse(Ast *ast) {
+void parse(Ast *ast, char *source) {
     arena_newLifetime();
 
     // Init parser
@@ -174,11 +174,7 @@ void parse(Ast *ast) {
     parser.ast = ast;
     parser.code = &ast->code;
 
-    initLexer(
-        &parser.lexer,
-        string_pointer(ast->canonicalPath),
-        &parser.ast->literals
-    );
+    initLexer(&parser.lexer, source, &parser.ast->literals);
     parser.next = scanToken(&parser.lexer);
     advance(&parser);
 
@@ -188,17 +184,13 @@ void parse(Ast *ast) {
     arena_destroyCurrentLifetime();
 }
 
-void parseImports(Ast *ast) {
+void parseImports(Ast *ast, char *source) {
     arena_newLifetime();
 
     // Init parser
     Parser parser = {.indentationLevel = Stack()};
     parser.ast = ast;
-    initLexer(
-        &parser.lexer,
-        string_pointer(ast->canonicalPath),
-        &parser.ast->literals
-    );
+    initLexer(&parser.lexer, source, &parser.ast->literals);
     parser.next = scanToken(&parser.lexer);
     advance(&parser);
 
@@ -284,7 +276,7 @@ static uint32_t import(Parser *parser, Token keyword) {
 
 // type → type ("[" type ("," type)* "]")*
 static uint32_t type(Parser *parser) {
-    uint32_t id = ast_createType(parser->ast, TYPE_APPLICATION);
+    uint32_t id = ast_createTypeApplication(parser->ast);
     consume(parser, IDENTIFIER, "a type");
     list_get(parser->ast->types, id)->application.identifier =
         parser->previous.literal;

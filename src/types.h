@@ -22,11 +22,8 @@
 #define List() {NULL, 0, 0, arena_currentLifetime()}
 #define ListWithLifetime(lifetime) {NULL, 0, 0, lifetime}
 
-void _list_get(void* buffer, uint32_t size, uint32_t index, int sizeOfItem);
-
-#define list_get(list, index)                    \
-    (index < (list).size ? &(list).buffer[index] \
-                         : (assert(index < (list).size), &(list).buffer[0]))
+#define list_get(list, index) \
+    (assert(index < (list).size), &(list).buffer[index])
 
 #define list_size(list) ((list).size)
 
@@ -149,7 +146,7 @@ StringView cStringAsView(char* string);
 
 uint32_t string_size(String string);
 void string_clear(String* string);
-char* string_pointer(String string);
+char* string_asCString(String string);
 char string_get(String string, uint32_t index);
 void string_append(String* string, char item);
 void string_concat(String* string, StringView toConcat);
@@ -172,9 +169,20 @@ typedef ListType(String) StringList;
     }
 
 #define Hashmap() {NULL, NULL, 0, 0, arena_currentLifetime()}
-
-uint32_t _findLocation(uint32_t* keys, uint32_t key, uint32_t capacity);
-#define hashmap_get(hashmap, key)
+#define hashmap_size(hashmap) (hashmap).size
+uint32_t _hashmap_findLocation(uint32_t* keys, uint32_t key, uint32_t capacity);
+#define hashmap_get(hashmap, key)                                  \
+    (((hashmap).size != 0 && (hashmap).keys[_hashmap_findLocation( \
+                                 (hashmap).keys,                   \
+                                 key,                              \
+                                 (hashmap).capacity                \
+                             )] != None())                         \
+         ? &(hashmap).values[_hashmap_findLocation(                \
+               (hashmap).keys,                                     \
+               key,                                                \
+               (hashmap).capacity                                  \
+           )]                                                      \
+         : NULL)
 #define hashmap_set(hashmap, key, value)                                    \
     do {                                                                    \
         if ((hashmap).size + 1 > (hashmap).capacity * 0.7) {                \
@@ -195,7 +203,7 @@ uint32_t _findLocation(uint32_t* keys, uint32_t key, uint32_t capacity);
             if (newCapacity__ != 256) {                                     \
                 for (uint32_t i__ = 0; i__ < (hashmap).capacity; i__++) {   \
                     if ((hashmap).keys[i__] != None()) {                    \
-                        uint32_t location__ = _findLocation(                \
+                        uint32_t location__ = _hashmap_findLocation(        \
                             newKeys__,                                      \
                             (hashmap).keys[i__],                            \
                             newCapacity__                                   \
@@ -222,12 +230,14 @@ uint32_t _findLocation(uint32_t* keys, uint32_t key, uint32_t capacity);
             (hashmap).capacity = newCapacity__;                             \
         }                                                                   \
         uint32_t location__ =                                               \
-            _findLocation((hashmap).keys, key, (hashmap).capacity);         \
+            _hashmap_findLocation((hashmap).keys, key, (hashmap).capacity); \
         if ((hashmap).keys[location__] == None()) {                         \
             (hashmap).size++;                                               \
         }                                                                   \
         (hashmap).keys[location__] = key;                                   \
         (hashmap).values[location__] = value;                               \
     } while (false)
+
+typedef HashmapType(uint32_t) Uint32Hashmap;
 
 #endif

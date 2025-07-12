@@ -153,18 +153,22 @@ typedef struct {
 
 typedef struct {
     uint32_t literal;
+    uint32_t type;
 } AstFloat;
 
 typedef struct {
     uint32_t literal;
+    uint32_t type;
 } AstInteger;
 
 typedef struct {
     uint32_t literal;
+    uint32_t type;
 } AstIdentifier;
 
 typedef struct {
     uint32_t value;
+    uint32_t type;
 } AstBoolean;
 
 typedef struct {
@@ -242,7 +246,6 @@ typedef ListType(Type) TypeList;
 // Ast
 typedef struct {
     Uint32List importedAsts;
-    String canonicalPath;
     ImportList imports;
     FunctionList functions;
     TypeDefinitionList typeDefinitions;
@@ -254,21 +257,27 @@ typedef struct {
 
 typedef ListType(Ast) AstList;
 
-void ast_init(Ast *ast, String canonicalPath);
+void ast_init(Ast *ast);
 void ast_clear(Ast *ast);
 uint32_t ast_addInstruction(Code *code, AstInstructionKind kind);
 uint32_t *_ast_getData(Code *code, uint32_t instruction);
 #define ast_getData(type, code, instruction) \
     ((type *)_ast_getData(code, instruction))
-uint32_t ast_createType(Ast *ast, TypeKind kind);
+uint32_t ast_createTypeVariable(Ast *ast);
+uint32_t ast_createTypeApplication(Ast *ast);
+#define ast_getTypeApplication(ast, id)                           \
+    (assert(list_get((ast).types, id)->kind == TYPE_APPLICATION), \
+     (TypeApplication *)&list_get((ast).types, id)->application)
+uint32_t ast_getLiteral(Uint32List *literals, StringView view);
 #define ast_literalExpand(ast, id) \
     *list_get(ast.literals, id), (char *)list_get(ast.literals, id + 1)
-#define ast_literalAsStringView(ast, id)                                      \
-    (StringView) {                                                            \
-        *list_get(ast->literals, id), (char *)list_get(ast->literals, id + 1) \
+#define ast_literalAsStringView(ast, id)             \
+    (StringView) {                                   \
+        *list_get((ast).literals, id),               \
+            (char *)list_get((ast).literals, id + 1) \
     }
 void ast_setBit(uint32_t *data, uint32_t position);
-void ast_print(Ast ast);
-void reportErrors(Ast ast);
+void ast_print(Ast ast, String path);
+void reportErrors(Ast ast, String path);
 
 #endif

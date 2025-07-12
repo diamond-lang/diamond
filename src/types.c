@@ -20,7 +20,7 @@ uint32_t string_size(String string) {
 
 void string_clear(String* string) { list_clear(string->buffer); }
 
-char* string_pointer(String string) { return string.buffer.buffer; }
+char* string_asCString(String string) { return string.buffer.buffer; }
 
 char string_get(String string, uint32_t index) {
     return *list_get(string.buffer, index);
@@ -54,7 +54,7 @@ StringView string_asView(String string) {
     return (StringView){string_size(string), list_get(string.buffer, 0)};
 }
 
-// HashMap
+// Hashmap
 static uint32_t hash(uint32_t x) {
     x = ((x >> 16) ^ x) * 0x45d9f3b;
     x = ((x >> 16) ^ x) * 0x45d9f3b;
@@ -62,8 +62,10 @@ static uint32_t hash(uint32_t x) {
     return x;
 }
 
-uint32_t _findLocation(uint32_t* keys, uint32_t key, uint32_t capacity) {
-    assert(keys);
+uint32_t _hashmap_findLocation(
+    uint32_t* keys, uint32_t key, uint32_t capacity
+) {
+    assert(keys != NULL);
     uint32_t index = hash(key) % capacity;
     while (true) {
         uint32_t keyFound = keys[index];
@@ -72,16 +74,4 @@ uint32_t _findLocation(uint32_t* keys, uint32_t key, uint32_t capacity) {
         }
         index = (index + 1) % capacity;
     }
-}
-
-void* _hashtable_get(
-    uint32_t* keys,
-    void* values,
-    uint32_t sizeOfValue,
-    uint32_t capacity,
-    uint32_t key
-) {
-    size_t location = _findLocation(keys, key, capacity);
-    if (location == None()) return NULL;
-    return ((uint8_t*)values) + location * sizeOfValue;
 }

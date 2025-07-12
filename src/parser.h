@@ -3,7 +3,7 @@
 
 #include "ast.h"
 
-void parse(Ast* ast);
-void parseImports(Ast* ast);
+void parse(Ast* ast, char* source);
+void parseImports(Ast* ast, char* source);
 
 #endif

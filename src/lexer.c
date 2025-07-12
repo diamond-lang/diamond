@@ -10,11 +10,10 @@
 #include "common.h"
 #include "token.h"
 #include "types.h"
-#include "utilities.h"
 
 static char nextChar(Lexer* lexer) {
-    char result = *lexer->sourcePointer;
-    if (result != '\0') lexer->sourcePointer += 1;
+    char result = *lexer->source;
+    if (result != '\0') lexer->source += 1;
     return result;
 }
 
@@ -68,58 +67,22 @@ static Token createToken(Lexer* lexer, TokenKind kind) {
     return token;
 }
 
-static inline uint32_t numberOfSlotsNeeded(uint32_t length) {
-    return 1 + length / sizeof(uint32_t) + (length % sizeof(uint32_t) != 0);
-}
-
 static Token createTokenWithLiteral(Lexer* lexer, TokenKind kind) {
-    const uint32_t literalsCount = list_size(*lexer->literals);
-    const uint32_t length = string_size(lexer->currentLiteral);
-    const char* currentLiteral = string_pointer(lexer->currentLiteral);
-
-    // Check if literal already exist
-    uint32_t literalId = None();
-    for (uint32_t i = 0; i < list_size(*lexer->literals);
-         i += numberOfSlotsNeeded(*list_get(*lexer->literals, i))) {
-        if (*list_get(*lexer->literals, i) == length &&
-            memcmp(list_get(*lexer->literals, i + 1), currentLiteral, length) ==
-                0) {
-            literalId = i;
-            break;
-        }
-    }
-
-    // Add literal to literals
-    if (literalId == None()) {
-        literalId = literalsCount;
-
-        uint32_t extraCapacityNeeded = numberOfSlotsNeeded(length);
-        list_ensureExtraCapacity((*lexer->literals), extraCapacityNeeded);
-
-        list_size(*lexer->literals) += extraCapacityNeeded;
-        *list_get(*lexer->literals, literalId) = length;
-        strncpy(
-            (char*)list_get(*lexer->literals, literalId + 1),
-            currentLiteral,
-            length
-        );
-    }
-
-    // Create token
+    StringView view = string_asView(lexer->currentLiteral);
+    uint32_t literalId = ast_getLiteral(lexer->literals, view);
     Token token = {
         .kind = kind,
         .line = lexer->line,
-        .column = lexer->column - length,
+        .column = lexer->column - string_size(lexer->currentLiteral),
         .literal = literalId
     };
     return token;
 }
 
-void initLexer(Lexer* lexer, char* filePath, Uint32List* literals) {
+void initLexer(Lexer* lexer, char* source, Uint32List* literals) {
     lexer->line = 1;
     lexer->column = 1;
-    lexer->source = readFile(filePath);
-    lexer->sourcePointer = string_pointer(lexer->source);
+    lexer->source = source;
     lexer->literals = literals;
     lexer->currentLiteral = String();
     lexer->current = '\0';

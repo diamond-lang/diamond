@@ -1,12 +1,18 @@
 #include "scopes.h"
 
 #include "common.h"
+#include "types.h"
 
-void scopes_addScope(BindingMapStack* scopes) { todo(); }
+void scopes_addScope(Scopes* scopes) {
+    BindingMap newMap = Hashmap();
+    stack_push(scopes->bindings, newMap);
+}
 
-void scopes_removeScope(BindingMapStack* scopes) { todo(); }
+void scopes_removeScope(Scopes* scopes) { todo(); }
 
-Binding* scopes_getBinding(BindingMapStack* scopes, uint32_t literalId) {
+Binding* scopes_getBinding(Scopes* scopes, uint32_t literalId) { todo(); }
+
+TypeBinding* scopes_getTypeBinding(Scopes* scopes, uint32_t literalId) {
     todo();
 }
 
