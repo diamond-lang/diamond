@@ -1,18 +1,27 @@
 #include "types.h"
 
 #include <assert.h>
+#include <ctype.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include "ast.h"
-
-// String
+// StringView
 StringView cStringAsView(char* string) {
     return (StringView){strlen(string), string};
 }
 
+bool isLowerCase(StringView view) {
+    for (uint32_t i = 0; i < view.length; i++) {
+        if (!isalpha(view.pointer[i]) || !islower(view.pointer[i])) {
+            return false;
+        }
+    }
+    return true;
+}
+
+// String
 uint32_t string_size(String string) {
     uint32_t bufferSize = list_size(string.buffer);
     return bufferSize == 0 ? 0 : bufferSize - 1;

@@ -69,7 +69,7 @@ static Token createToken(Lexer* lexer, TokenKind kind) {
 
 static Token createTokenWithLiteral(Lexer* lexer, TokenKind kind) {
     StringView view = string_asView(lexer->currentLiteral);
-    uint32_t literalId = ast_getLiteral(lexer->literals, view);
+    uint32_t literalId = ast_getLiteral(lexer->ast, view);
     Token token = {
         .kind = kind,
         .line = lexer->line,
@@ -79,11 +79,11 @@ static Token createTokenWithLiteral(Lexer* lexer, TokenKind kind) {
     return token;
 }
 
-void initLexer(Lexer* lexer, char* source, Uint32List* literals) {
+void initLexer(Lexer* lexer, char* source, Ast* ast) {
     lexer->line = 1;
     lexer->column = 1;
     lexer->source = source;
-    lexer->literals = literals;
+    lexer->ast = ast;
     lexer->currentLiteral = String();
     lexer->current = '\0';
     lexer->next = nextChar(lexer);
@@ -100,60 +100,60 @@ start:
     string_clear(&lexer->currentLiteral);
     advance(lexer);
     switch (lexer->current) {
-        case '(': return createToken(lexer, LEFT_PAREN);
-        case ')': return createToken(lexer, RIGHT_PAREN);
-        case '{': return createToken(lexer, LEFT_CURLY);
-        case '}': return createToken(lexer, RIGHT_CURLY);
-        case '[': return createToken(lexer, LEFT_BRACKET);
-        case ']': return createToken(lexer, RIGHT_BRACKET);
-        case '&': return createToken(lexer, AMPERSAND);
-        case '.':
-            if (isdigit(lexer->next)) return scanNumber(lexer);
-            if (lexer->previousWasImport) return scanImport(lexer);
-            return createToken(lexer, DOT);
-        case '+': return createToken(lexer, PLUS);
-        case '-':
-            if (match(lexer, '-')) {
-                advanceUntilNewLine(lexer);
-                goto start;
-            }
-            return createToken(lexer, MINUS);
-        case '*': return createToken(lexer, STAR);
-        case '/': return createToken(lexer, SLASH);
-        case '%': return createToken(lexer, MODULO);
-        case ':': {
-            if (match(lexer, '=')) return createToken(lexer, COLON_EQUAL);
-            return createToken(lexer, COLON);
+    case '(': return createToken(lexer, LEFT_PAREN);
+    case ')': return createToken(lexer, RIGHT_PAREN);
+    case '{': return createToken(lexer, LEFT_CURLY);
+    case '}': return createToken(lexer, RIGHT_CURLY);
+    case '[': return createToken(lexer, LEFT_BRACKET);
+    case ']': return createToken(lexer, RIGHT_BRACKET);
+    case '&': return createToken(lexer, AMPERSAND);
+    case '.':
+        if (isdigit(lexer->next)) return scanNumber(lexer);
+        if (lexer->previousWasImport) return scanImport(lexer);
+        return createToken(lexer, DOT);
+    case '+': return createToken(lexer, PLUS);
+    case '-':
+        if (match(lexer, '-')) {
+            advanceUntilNewLine(lexer);
+            goto start;
         }
-        case ',': return createToken(lexer, COMMA);
-        case '!': {
-            if (match(lexer, '=')) return createToken(lexer, NOT_EQUAL);
-            unreachable();
-        }
-        case '=': {
-            if (match(lexer, '=')) return createToken(lexer, EQUAL_EQUAL);
-            return createToken(lexer, EQUAL);
-        }
-        case '>': {
-            if (match(lexer, '=')) return createToken(lexer, GREATER_EQUAL);
-            return createToken(lexer, GREATER);
-        }
-        case '<': {
-            if (match(lexer, '=')) return createToken(lexer, LESS_EQUAL);
-            return createToken(lexer, LESS);
-        }
-        case ' ':
-        case '\t': goto start;
-        case '\n': {
-            Token token = createToken(lexer, NEW_LINES);
-            advanceUntilNextNoneLineToken(lexer);
-            return token;
-        }
-        case '\0': return createToken(lexer, END_OF_FILE);
-        default: {
-            if (isdigit(lexer->current)) return scanNumber(lexer);
-            if (isalpha(lexer->current)) return scanIdentifierOrKeyword(lexer);
-        }
+        return createToken(lexer, MINUS);
+    case '*': return createToken(lexer, STAR);
+    case '/': return createToken(lexer, SLASH);
+    case '%': return createToken(lexer, MODULO);
+    case ':': {
+        if (match(lexer, '=')) return createToken(lexer, COLON_EQUAL);
+        return createToken(lexer, COLON);
+    }
+    case ',': return createToken(lexer, COMMA);
+    case '!': {
+        if (match(lexer, '=')) return createToken(lexer, NOT_EQUAL);
+        unreachable();
+    }
+    case '=': {
+        if (match(lexer, '=')) return createToken(lexer, EQUAL_EQUAL);
+        return createToken(lexer, EQUAL);
+    }
+    case '>': {
+        if (match(lexer, '=')) return createToken(lexer, GREATER_EQUAL);
+        return createToken(lexer, GREATER);
+    }
+    case '<': {
+        if (match(lexer, '=')) return createToken(lexer, LESS_EQUAL);
+        return createToken(lexer, LESS);
+    }
+    case ' ':
+    case '\t': goto start;
+    case '\n': {
+        Token token = createToken(lexer, NEW_LINES);
+        advanceUntilNextNoneLineToken(lexer);
+        return token;
+    }
+    case '\0': return createToken(lexer, END_OF_FILE);
+    default: {
+        if (isdigit(lexer->current)) return scanNumber(lexer);
+        if (isalpha(lexer->current)) return scanIdentifierOrKeyword(lexer);
+    }
     }
 
     Token result = createTokenWithLiteral(lexer, UNKNOWN_TOKEN);

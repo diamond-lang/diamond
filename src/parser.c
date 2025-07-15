@@ -174,7 +174,7 @@ void parse(Ast *ast, char *source) {
     parser.ast = ast;
     parser.code = &ast->code;
 
-    initLexer(&parser.lexer, source, &parser.ast->literals);
+    initLexer(&parser.lexer, source, parser.ast);
     parser.next = scanToken(&parser.lexer);
     advance(&parser);
 
@@ -190,7 +190,7 @@ void parseImports(Ast *ast, char *source) {
     // Init parser
     Parser parser = {.indentationLevel = Stack()};
     parser.ast = ast;
-    initLexer(&parser.lexer, source, &parser.ast->literals);
+    initLexer(&parser.lexer, source, parser.ast);
     parser.next = scanToken(&parser.lexer);
     advance(&parser);
 
@@ -278,12 +278,12 @@ static uint32_t import(Parser *parser, Token keyword) {
 static uint32_t type(Parser *parser) {
     uint32_t id = ast_createTypeApplication(parser->ast);
     consume(parser, IDENTIFIER, "a type");
-    list_get(parser->ast->types, id)->application.identifier =
+    ast_getTypeApplication(*parser->ast, id)->literal =
         parser->previous.literal;
     if (match(parser, LEFT_BRACKET)) {
         while (!atEnd(*parser)) {
             expect(type(parser));
-            list_get(parser->ast->types, id)->application.parameterCount += 1;
+            ast_getTypeApplication(*parser->ast, id)->parameterCount += 1;
             if (!match(parser, COMMA)) break;
         }
         consume(parser, RIGHT_BRACKET, "a type");
@@ -467,9 +467,10 @@ static uint32_t declaration(Parser *parser, uint32_t identifier, Token op) {
         type = annotation;
     }
     uint32_t id = ast_addInstruction(parser->code, AST_DECLARATION);
-    ast_getData(AstDeclaration, parser->code, id)->mutable = op.kind == EQUAL;
-    ast_getData(AstDeclaration, parser->code, id)->identifier = identifier;
-    ast_getData(AstDeclaration, parser->code, id)->type = type;
+    AstDeclaration *data = (void *)ast_getData(parser->code, id);
+    data->mutable = op.kind == EQUAL;
+    data->identifier = identifier;
+    data->type = type;
     return id;
 }
 
@@ -489,8 +490,9 @@ static uint32_t assignment(Parser *parser, uint32_t assignable, Token op) {
         type = annotation;
     }
     uint32_t id = ast_addInstruction(parser->code, AST_ASSIGNMENT);
-    ast_getData(AstAssignment, parser->code, id)->nonlocal = nonlocal;
-    ast_getData(AstAssignment, parser->code, id)->type = type;
+    AstAssignment *data = (void *)ast_getData(parser->code, id);
+    data->nonlocal = nonlocal;
+    data->type = type;
     return id;
 }
 
@@ -523,10 +525,8 @@ static uint32_t ifElse(Parser *parser, Token keyword) {
     expect(expression(parser));
     uint32_t id = ast_addInstruction(parser->code, AST_IF_ELSE);
     expect(block(parser));
-    ast_getData(AstIfElse, parser->code, id)->ifBlockEnd =
-        list_size(parser->code->instructions) - 1;
-
-    // Parse else block
+    uint32_t ifBlockEnd = list_size(parser->code->instructions) - 1;
+    uint32_t elseBlockEnd = None();
     if (parser->next.kind == ELSE) {
         advance(parser);
         uint32_t indentationLevel = parser->current.column;
@@ -534,18 +534,16 @@ static uint32_t ifElse(Parser *parser, Token keyword) {
 
         if (*stack_top(parser->indentationLevel) == indentationLevel) {
             expect(block(parser));
-            ast_getData(AstIfElse, parser->code, id)->elseBlockEnd =
-                list_size(parser->code->instructions) - 1;
+            elseBlockEnd = list_size(parser->code->instructions) - 1;
         } else if (*stack_top(parser->indentationLevel) < indentationLevel) {
             todo();
         } else if (*stack_top(parser->indentationLevel) > indentationLevel) {
             todo();
         }
-    } else {
-        ast_getData(AstIfElse, parser->code, id)->elseBlockEnd = None();
     }
-
-    // Return
+    AstIfElse *data = (void *)ast_getData(parser->code, id);
+    data->ifBlockEnd = ifBlockEnd;
+    data->elseBlockEnd = elseBlockEnd;
     return id;
 }
 
@@ -555,8 +553,8 @@ static uint32_t whileStatement(Parser *parser, Token keyword) {
     expect(expression(parser));
     uint32_t id = ast_addInstruction(parser->code, AST_WHILE);
     expect(block(parser));
-    ast_getData(AstWhile, parser->code, id)->whileEnd =
-        list_size(parser->code->instructions) - 1;
+    AstWhile *data = (void *)ast_getData(parser->code, id);
+    data->whileEnd = list_size(parser->code->instructions) - 1;
     return id;
 }
 
@@ -597,19 +595,19 @@ static uint32_t notExpression(Parser *parser, Token keyword) {
 
 static AstInstructionKind getBinaryOperator(Token token) {
     switch ((uint8_t)token.kind) {
-        case OR: return AST_OR;
-        case AND: return AST_AND;
-        case EQUAL_EQUAL: return AST_EQUAL_EQUAL;
-        case NOT_EQUAL: return AST_NOT_EQUAL;
-        case LESS: return AST_LESS;
-        case LESS_EQUAL: return AST_LESS_EQUAL;
-        case GREATER: return AST_GREATER;
-        case GREATER_EQUAL: return AST_GREATER_EQUAL;
-        case PLUS: return AST_ADD;
-        case MINUS: return AST_SUBTRACT;
-        case STAR: return AST_MUL;
-        case SLASH: return AST_DIV;
-        case MODULO: return AST_MOD;
+    case OR: return AST_OR;
+    case AND: return AST_AND;
+    case EQUAL_EQUAL: return AST_EQUAL_EQUAL;
+    case NOT_EQUAL: return AST_NOT_EQUAL;
+    case LESS: return AST_LESS;
+    case LESS_EQUAL: return AST_LESS_EQUAL;
+    case GREATER: return AST_GREATER;
+    case GREATER_EQUAL: return AST_GREATER_EQUAL;
+    case PLUS: return AST_ADD;
+    case MINUS: return AST_SUBTRACT;
+    case STAR: return AST_MUL;
+    case SLASH: return AST_DIV;
+    case MODULO: return AST_MOD;
     }
     unreachable();
 }
@@ -757,7 +755,7 @@ static uint32_t call(Parser *parser, uint32_t accessed, Token leftParen) {
     consume(parser, RIGHT_PAREN, "a call");
 
     uint32_t id = ast_addInstruction(parser->code, AST_CALL);
-    *ast_getData(AstCall, parser->code, id) = callData;
+    *(AstCall *)ast_getData(parser->code, id) = callData;
     return id;
 }
 
@@ -818,7 +816,8 @@ uint32_t grouping(Parser *parser, Token leftParen) {
 uint32_t floatLiteral(Parser *parser, Token token) {
     assert(token.kind == FLOAT);
     uint32_t id = ast_addInstruction(parser->code, AST_FLOAT);
-    ast_getData(AstFloat, parser->code, id)->literal = token.literal;
+    AstFloat *data = (void *)ast_getData(parser->code, id);
+    data->literal = token.literal;
     return id;
 }
 
@@ -826,7 +825,8 @@ uint32_t floatLiteral(Parser *parser, Token token) {
 static uint32_t integer(Parser *parser, Token token) {
     assert(token.kind == INTEGER);
     uint32_t id = ast_addInstruction(parser->code, AST_INTEGER);
-    ast_getData(AstInteger, parser->code, id)->literal = token.literal;
+    AstInteger *data = (void *)ast_getData(parser->code, id);
+    data->literal = token.literal;
     return id;
 }
 
@@ -834,7 +834,8 @@ static uint32_t integer(Parser *parser, Token token) {
 static uint32_t boolean(Parser *parser, Token token) {
     assert(token.kind == TRUE || token.kind == FALSE);
     uint32_t id = ast_addInstruction(parser->code, AST_BOOLEAN);
-    ast_getData(AstBoolean, parser->code, id)->value = token.kind == TRUE;
+    AstBoolean *data = (void *)ast_getData(parser->code, id);
+    data->value = token.kind == TRUE;
     return id;
 }
 
@@ -842,8 +843,8 @@ static uint32_t boolean(Parser *parser, Token token) {
 static uint32_t identifier(Parser *parser) {
     consume(parser, IDENTIFIER, "an identifier");
     uint32_t id = ast_addInstruction(parser->code, AST_IDENTIFIER);
-    ast_getData(AstIdentifier, parser->code, id)->literal =
-        parser->previous.literal;
+    AstIdentifier *data = (void *)ast_getData(parser->code, id);
+    data->literal = parser->previous.literal;
     return id;
 }
 
@@ -851,8 +852,8 @@ static uint32_t identifier(Parser *parser) {
 static uint32_t string(Parser *parser) {
     consume(parser, STRING, "a string");
     uint32_t id = ast_addInstruction(parser->code, AST_STRING);
-    ast_getData(AstString, parser->code, id)->literal =
-        parser->previous.literal;
+    AstString *data = (void *)ast_getData(parser->code, id);
+    data->literal = parser->previous.literal;
     return id;
 }
 

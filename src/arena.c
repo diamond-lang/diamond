@@ -84,15 +84,19 @@ void arena_swapAllocations(
 ) {
     assert(lifetime < lifetimes.count);
     Lifetime* currentLifetime = &lifetimes.items[lifetime];
-    if (allocation == NULL) {
+    if (*allocation == NULL) {
         append(currentLifetime, newAllocation);
     } else {
+        bool founded = false;
         for (uint32_t i = 0; i < currentLifetime->count; i++) {
             if (currentLifetime->items[i] == allocation) {
                 free(currentLifetime->items[i]);
                 currentLifetime->items[i] = newAllocation;
+                founded = true;
+                break;
             }
         }
+        assert(founded);
     }
     *allocation = newAllocation;
 }

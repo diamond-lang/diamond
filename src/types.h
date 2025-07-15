@@ -10,6 +10,8 @@
 
 #include "arena.h"  // IWYU pragma: keep
 
+#define None() UINT32_MAX
+
 // List
 #define ListType(T)        \
     struct {               \
@@ -143,6 +145,7 @@ typedef struct {
 } StringView;
 
 StringView cStringAsView(char* string);
+bool isLowerCase(StringView view);
 
 uint32_t string_size(String string);
 void string_clear(String* string);

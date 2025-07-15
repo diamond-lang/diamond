@@ -5,7 +5,6 @@
 
 #include "arena.h"
 #include "ast.h"
-#include "builtin.h"
 #include "parser.h"
 #include "program.h"
 #include "semantic.h"
@@ -113,15 +112,10 @@ static Uint32ListList findDependencyGraph(AstList* asts) {
 
 Program compile(StringView file) {
     // Initialize program
-    Program program = {(Ast){}, (AstList)List(), (StringList)List()};
-    ast_init(&program.builtin);
+    Program program = {(AstList)List(), (StringList)List()};
     list_append(program.asts, (Ast){});
     ast_init(list_get(program.asts, 0));
     list_append(program.paths, getCanonicalPath(file));
-
-    // Parse core
-    parse(&program.builtin, builtin);
-    assert(list_size(program.builtin.errors) == 0);
 
     // Find what each file imports
     findImports(&program, 0);
@@ -165,6 +159,13 @@ Program compile(StringView file) {
         }
     }
 
+    // Find interface for each module following reverse dependecy graph order
+
+    for (uint32_t i = 0; i < list_size(program.asts); i++) {
+        ast_print(*list_get(program.asts, i), *list_get(program.paths, i));
+        if (i + 1 < list_size(program.asts)) printf("\n\n");
+    }
+
     // Do semantic analysis following dependecy graph
     for (uint32_t i = 0; i < list_size(program.dependencyGraph); i++) {
         Uint32List stage = *list_get(program.dependencyGraph, i);
@@ -188,8 +189,5 @@ Program compile(StringView file) {
         if (i + 1 < list_size(program.asts)) printf("\n\n");
     }
 
-    // Find interface for each module following reverse dependecy graph order
-
-    // Do semantic analysis reverse dependecy graph order
     return program;
 }
