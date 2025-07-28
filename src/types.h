@@ -154,6 +154,7 @@ char string_get(String string, uint32_t index);
 void string_append(String* string, char item);
 void string_concat(String* string, StringView toConcat);
 bool string_equal(StringView a, StringView b);
+char* string_pointer(String string);
 StringView string_asView(String string);
 
 #define String() \

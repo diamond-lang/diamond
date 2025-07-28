@@ -68,8 +68,8 @@ static Token createToken(Lexer* lexer, TokenKind kind) {
 }
 
 static Token createTokenWithLiteral(Lexer* lexer, TokenKind kind) {
-    StringView view = string_asView(lexer->currentLiteral);
-    uint32_t literalId = ast_getLiteral(lexer->ast, view);
+    char* literal = string_pointer(lexer->currentLiteral);
+    uint32_t literalId = ast_getLiteral(lexer->ast, literal);
     Token token = {
         .kind = kind,
         .line = lexer->line,
@@ -79,7 +79,7 @@ static Token createTokenWithLiteral(Lexer* lexer, TokenKind kind) {
     return token;
 }
 
-void initLexer(Lexer* lexer, char* source, Ast* ast) {
+void initLexer(Lexer* lexer, char* source, Ast* ast, bool parsingBuiltins) {
     lexer->line = 1;
     lexer->column = 1;
     lexer->source = source;
@@ -89,6 +89,7 @@ void initLexer(Lexer* lexer, char* source, Ast* ast) {
     lexer->next = nextChar(lexer);
     lexer->nextNext = nextChar(lexer);
     lexer->previousWasImport = false;
+    lexer->parsingBuiltins = parsingBuiltins;
 }
 
 static Token scanNumber(Lexer* lexer);
@@ -217,6 +218,8 @@ static Token scanIdentifierOrKeyword(Lexer* lexer) {
     if (identifierEquals(lexer, "not")) return createToken(lexer, NOT);
     if (identifierEquals(lexer, "extern")) return createToken(lexer, EXTERN);
     if (identifierEquals(lexer, "import")) return createToken(lexer, IMPORT);
+    if (lexer->parsingBuiltins && identifierEquals(lexer, "builtin"))
+        return createToken(lexer, BUILTIN);
 
     return createTokenWithLiteral(lexer, IDENTIFIER);
 }

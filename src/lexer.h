@@ -13,11 +13,12 @@ typedef struct {
     char next;
     char nextNext;
     bool previousWasImport;
+    bool parsingBuiltins;
     String currentLiteral;
     Ast* ast;
 } Lexer;
 
-void initLexer(Lexer* lexer, char* source, Ast* ast);
+void initLexer(Lexer* lexer, char* source, Ast* ast, bool parsingBuiltins);
 Token scanToken(Lexer* lexer);
 
 #endif

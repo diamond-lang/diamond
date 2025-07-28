@@ -5,6 +5,7 @@
 
 #include "arena.h"
 #include "ast.h"
+#include "builtin.h"
 #include "parser.h"
 #include "program.h"
 #include "semantic.h"
@@ -31,7 +32,7 @@ static void findImports(Program* program, uint32_t current) {
     // Parse imported files
     for (uint32_t i = 0; i < list_size(currentAst->imports); i++) {
         uint32_t literal = list_get(currentAst->imports, i)->path;
-        StringView view = ast_literalAsStringView(*currentAst, literal);
+        StringView view = ast_literalAsView(*currentAst, literal);
         String canonicalPath = getCanonicalPath(view);
         string_concat(&canonicalPath, (StringView){strlen(".dmd"), ".dmd"});
 
@@ -112,10 +113,15 @@ static Uint32ListList findDependencyGraph(AstList* asts) {
 
 Program compile(StringView file) {
     // Initialize program
-    Program program = {(AstList)List(), (StringList)List()};
+    Program program = {(Ast){}, (AstList)List(), (StringList)List()};
+    ast_init(&program.builtin);
     list_append(program.asts, (Ast){});
     ast_init(list_get(program.asts, 0));
     list_append(program.paths, getCanonicalPath(file));
+
+    // Parse builtin
+    parseBuiltin(&program.builtin, builtin);
+    assert(list_size(program.builtin.errors) == 0);
 
     // Find what each file imports
     findImports(&program, 0);

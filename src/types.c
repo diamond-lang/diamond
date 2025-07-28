@@ -59,6 +59,8 @@ bool string_equal(StringView a, StringView b) {
     return false;
 }
 
+char* string_pointer(String string) { return string.buffer.buffer; }
+
 StringView string_asView(String string) {
     return (StringView){string_size(string), list_get(string.buffer, 0)};
 }

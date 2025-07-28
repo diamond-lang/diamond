@@ -11,117 +11,119 @@
 
 static char* token_getLiteral(Ast ast, Token token) {
     switch (token.kind) {
-        case LEFT_PAREN: return "(";
-        case RIGHT_PAREN: return ")";
-        case LEFT_BRACKET: return "[";
-        case RIGHT_BRACKET: return "]";
-        case LEFT_CURLY: return "{";
-        case RIGHT_CURLY: return "}";
-        case COMMA: return ",";
-        case PLUS: return "+";
-        case SLASH: return "/";
-        case MODULO: return "%";
-        case STAR: return "*";
-        case MINUS: return "-";
-        case COLON: return ":";
-        case AMPERSAND: return "&";
-        case DOT: return ".";
-        case NOT: return "not";
-        case NOT_EQUAL: return "!=";
-        case GREATER: return ">";
-        case GREATER_EQUAL: return ">=";
-        case LESS: return "<";
-        case LESS_EQUAL: return "<=";
-        case COLON_EQUAL: return ":=";
-        case EQUAL: return "=";
-        case EQUAL_EQUAL: return "==";
-        case BE: return "be";
-        case INTEGER: todo();
-        case FLOAT: todo();
-        case IDENTIFIER: todo();
-        case STRING: todo();
-        case STRING_LEFT: todo();
-        case STRING_MIDDLE: todo();
-        case STRING_RIGHT: todo();
-        case IMPORT_PATH: todo();
-        case IF: return "if";
-        case ELSE: return "else";
-        case WHILE: return "while";
-        case FUNCTION: return "function";
-        case INTERFACE: return "interface";
-        case TYPE: return "type";
-        case CASE: return "case";
-        case TRUE: return "true";
-        case FALSE: return "false";
-        case OR: return "or";
-        case AND: return "and";
-        case IMPORT: return "import";
-        case BREAK: return "break";
-        case CONTINUE: return "continue";
-        case RETURN: return "return";
-        case MUT: return "and";
-        case EXTERN: return "extern";
-        case NEW_LINES: return "\\n";
-        case END_OF_FILE: return "\\0";
-        case UNKNOWN_TOKEN: todo();
+    case LEFT_PAREN: return "(";
+    case RIGHT_PAREN: return ")";
+    case LEFT_BRACKET: return "[";
+    case RIGHT_BRACKET: return "]";
+    case LEFT_CURLY: return "{";
+    case RIGHT_CURLY: return "}";
+    case COMMA: return ",";
+    case PLUS: return "+";
+    case SLASH: return "/";
+    case MODULO: return "%";
+    case STAR: return "*";
+    case MINUS: return "-";
+    case COLON: return ":";
+    case AMPERSAND: return "&";
+    case DOT: return ".";
+    case NOT: return "not";
+    case NOT_EQUAL: return "!=";
+    case GREATER: return ">";
+    case GREATER_EQUAL: return ">=";
+    case LESS: return "<";
+    case LESS_EQUAL: return "<=";
+    case COLON_EQUAL: return ":=";
+    case EQUAL: return "=";
+    case EQUAL_EQUAL: return "==";
+    case BE: return "be";
+    case INTEGER: todo();
+    case FLOAT: todo();
+    case IDENTIFIER: todo();
+    case STRING: todo();
+    case STRING_LEFT: todo();
+    case STRING_MIDDLE: todo();
+    case STRING_RIGHT: todo();
+    case IMPORT_PATH: todo();
+    case IF: return "if";
+    case ELSE: return "else";
+    case WHILE: return "while";
+    case FUNCTION: return "function";
+    case INTERFACE: return "interface";
+    case TYPE: return "type";
+    case CASE: return "case";
+    case TRUE: return "true";
+    case FALSE: return "false";
+    case OR: return "or";
+    case AND: return "and";
+    case IMPORT: return "import";
+    case BREAK: return "break";
+    case CONTINUE: return "continue";
+    case RETURN: return "return";
+    case MUT: return "and";
+    case EXTERN: return "extern";
+    case NEW_LINES: return "\\n";
+    case END_OF_FILE: return "\\0";
+    case BUILTIN: return "builtin";
+    case UNKNOWN_TOKEN: todo();
     }
 }
 
 static char* ast_tokenAsString(TokenKind kind) {
     switch (kind) {
-        case LEFT_PAREN: return "'('";
-        case RIGHT_PAREN: return "')'";
-        case LEFT_BRACKET: return "'['";
-        case RIGHT_BRACKET: return "']'";
-        case LEFT_CURLY: return "'{'";
-        case RIGHT_CURLY: return "'}'";
-        case COMMA: return "','";
-        case PLUS: return "'+'";
-        case SLASH: return "'/'";
-        case MODULO: return "'%%'";
-        case STAR: return "'*'";
-        case MINUS: return "'-'";
-        case COLON: return "':'";
-        case AMPERSAND: return "'&'";
-        case DOT: return "'.'";
-        case NOT: return "'not'";
-        case NOT_EQUAL: return "'!='";
-        case GREATER: return "'>'";
-        case GREATER_EQUAL: return "'>='";
-        case LESS: return "'<'";
-        case LESS_EQUAL: return "'<='";
-        case COLON_EQUAL: return "':='";
-        case EQUAL: return "'='";
-        case EQUAL_EQUAL: return "'=='";
-        case BE: return "be";
-        case INTEGER: return "an integer";
-        case FLOAT: return "a float";
-        case IDENTIFIER: return "an identifier";
-        case STRING: return "a string";
-        case STRING_LEFT: return "the start of an interpolated string";
-        case STRING_MIDDLE: return "the middle of an interpolated string";
-        case STRING_RIGHT: return "the end of an interpolated string";
-        case IMPORT_PATH: return "an import path";
-        case IF: return "if";
-        case ELSE: return "else";
-        case WHILE: return "while";
-        case FUNCTION: return "function";
-        case INTERFACE: return "interface";
-        case TYPE: return "type";
-        case CASE: return "case";
-        case TRUE: return "true";
-        case FALSE: return "false";
-        case OR: return "or";
-        case AND: return "and";
-        case IMPORT: return "import";
-        case BREAK: return "break";
-        case CONTINUE: return "continue";
-        case RETURN: return "return";
-        case MUT: return "and";
-        case EXTERN: return "extern";
-        case NEW_LINES: return "a new line";
-        case END_OF_FILE: return "end of file";
-        case UNKNOWN_TOKEN: return "an unknown character";
+    case LEFT_PAREN: return "'('";
+    case RIGHT_PAREN: return "')'";
+    case LEFT_BRACKET: return "'['";
+    case RIGHT_BRACKET: return "']'";
+    case LEFT_CURLY: return "'{'";
+    case RIGHT_CURLY: return "'}'";
+    case COMMA: return "','";
+    case PLUS: return "'+'";
+    case SLASH: return "'/'";
+    case MODULO: return "'%%'";
+    case STAR: return "'*'";
+    case MINUS: return "'-'";
+    case COLON: return "':'";
+    case AMPERSAND: return "'&'";
+    case DOT: return "'.'";
+    case NOT: return "'not'";
+    case NOT_EQUAL: return "'!='";
+    case GREATER: return "'>'";
+    case GREATER_EQUAL: return "'>='";
+    case LESS: return "'<'";
+    case LESS_EQUAL: return "'<='";
+    case COLON_EQUAL: return "':='";
+    case EQUAL: return "'='";
+    case EQUAL_EQUAL: return "'=='";
+    case BE: return "be";
+    case INTEGER: return "an integer";
+    case FLOAT: return "a float";
+    case IDENTIFIER: return "an identifier";
+    case STRING: return "a string";
+    case STRING_LEFT: return "the start of an interpolated string";
+    case STRING_MIDDLE: return "the middle of an interpolated string";
+    case STRING_RIGHT: return "the end of an interpolated string";
+    case IMPORT_PATH: return "an import path";
+    case IF: return "if";
+    case ELSE: return "else";
+    case WHILE: return "while";
+    case FUNCTION: return "function";
+    case INTERFACE: return "interface";
+    case TYPE: return "type";
+    case CASE: return "case";
+    case TRUE: return "true";
+    case FALSE: return "false";
+    case OR: return "or";
+    case AND: return "and";
+    case IMPORT: return "import";
+    case BREAK: return "break";
+    case CONTINUE: return "continue";
+    case RETURN: return "return";
+    case MUT: return "and";
+    case EXTERN: return "extern";
+    case NEW_LINES: return "a new line";
+    case END_OF_FILE: return "end of file";
+    case BUILTIN: return "builtin";
+    case UNKNOWN_TOKEN: return "an unknown character";
     }
 }
 
@@ -213,61 +215,60 @@ void underlineLine(String filePath, uint32_t line) {
 
 void reportError(Ast ast, String path, Error error) {
     switch (error.kind) {
-        case FILE_NOT_FOUND: todo(); break;
-        case UNKNOWN_CHARACTER:
-            printHeader("Unknown character", path);
-            printCurrentLine(path, error.line);
-            underlineLocation(path, error.line, error.column);
-            break;
-        case EXPECTING_LINE_ENDING:
-            printHeader("Expecting line ending", path);
-            printf("Finished parsing a statement. A new line was expected.\n\n"
-            );
-            printCurrentLine(path, error.line);
-            underlineToken(ast, error.expectingLineEnding.actualToken);
-            break;
-        case UNEXPECTED_IDENTATION:
-            printHeader("Unexpected indentation", path);
-            printCurrentLine(path, error.line);
-            underlineUntilLocation(path, error.line, error.column);
-            break;
-        case EXPECTING_STATEMENT:
-            printHeader("Expecting statement", path);
-            printCurrentLine(path, error.line);
-            underlineLine(path, error.line);
-            break;
-        case EXPECTING_NEW_IDENTATION_LEVEL:
-            printHeader("Expecting new indentation level", path);
-            if (error.line > 1) {
-                printCurrentLine(path, error.line - 1);
-            }
-            printCurrentLine(path, error.line);
-            underlineLocation(path, error.line, error.column);
-            break;
-        case UNEXPECTED_TOKEN:
-            printHeader("Unexpected token", path);
-            printf(
-                "Parsing %s. Was expecting %s, but found %s.\n\n",
-                error.unexpectedToken.beingParsed,
-                ast_tokenAsString(error.unexpectedToken.expectedToken),
-                ast_tokenAsString(error.unexpectedToken.actualToken)
-            );
-            printCurrentLine(path, error.line);
-            underlineLocation(path, error.line, error.column);
-            break;
-        case EXPECTING_EXPRESSION:
-            printHeader("Expected a expression", path);
-            printf(
-                "Was expecting a expression, but found %s.\n\n",
-                ast_tokenAsString(error.expectingExpression.actualToken)
-            );
-            printCurrentLine(path, error.line);
-            underlineLocation(path, error.line, error.column);
-            break;
-        case UDENFINED_VARIABLE: todo(); break;
-        case REASSIGNING_IMMUTABLE_VARIABLE: todo(); break;
-        case UDENFINED_FUNCTION: todo(); break;
-        case UNHANDLED_RETURN_VALUE: todo(); break;
+    case FILE_NOT_FOUND: todo(); break;
+    case UNKNOWN_CHARACTER:
+        printHeader("Unknown character", path);
+        printCurrentLine(path, error.line);
+        underlineLocation(path, error.line, error.column);
+        break;
+    case EXPECTING_LINE_ENDING:
+        printHeader("Expecting line ending", path);
+        printf("Finished parsing a statement. A new line was expected.\n\n");
+        printCurrentLine(path, error.line);
+        underlineToken(ast, error.expectingLineEnding.actualToken);
+        break;
+    case UNEXPECTED_IDENTATION:
+        printHeader("Unexpected indentation", path);
+        printCurrentLine(path, error.line);
+        underlineUntilLocation(path, error.line, error.column);
+        break;
+    case EXPECTING_STATEMENT:
+        printHeader("Expecting statement", path);
+        printCurrentLine(path, error.line);
+        underlineLine(path, error.line);
+        break;
+    case EXPECTING_NEW_IDENTATION_LEVEL:
+        printHeader("Expecting new indentation level", path);
+        if (error.line > 1) {
+            printCurrentLine(path, error.line - 1);
+        }
+        printCurrentLine(path, error.line);
+        underlineLocation(path, error.line, error.column);
+        break;
+    case UNEXPECTED_TOKEN:
+        printHeader("Unexpected token", path);
+        printf(
+            "Parsing %s. Was expecting %s, but found %s.\n\n",
+            error.unexpectedToken.beingParsed,
+            ast_tokenAsString(error.unexpectedToken.expectedToken),
+            ast_tokenAsString(error.unexpectedToken.actualToken)
+        );
+        printCurrentLine(path, error.line);
+        underlineLocation(path, error.line, error.column);
+        break;
+    case EXPECTING_EXPRESSION:
+        printHeader("Expected a expression", path);
+        printf(
+            "Was expecting a expression, but found %s.\n\n",
+            ast_tokenAsString(error.expectingExpression.actualToken)
+        );
+        printCurrentLine(path, error.line);
+        underlineLocation(path, error.line, error.column);
+        break;
+    case UDENFINED_VARIABLE: todo(); break;
+    case REASSIGNING_IMMUTABLE_VARIABLE: todo(); break;
+    case UDENFINED_FUNCTION: todo(); break;
+    case UNHANDLED_RETURN_VALUE: todo(); break;
     }
     printf("\n\n");
 }

@@ -6,7 +6,6 @@
 #include "types.h"
 
 typedef enum {
-    BUILTIN_BINDING,
     FUNCTION_BINDING,
     VARIABLE_BINDING,
     ARGUMENT_BINDING

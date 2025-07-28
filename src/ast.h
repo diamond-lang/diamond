@@ -2,6 +2,7 @@
 #define ast_h
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 #include "error.h"
@@ -91,33 +92,43 @@ typedef struct {
 } AstCall;
 
 typedef struct {
+    uint32_t type;
 } AstIfElseExpression;
 
 typedef struct {
+    uint32_t type;
 } AstNot;
 
 typedef struct {
+    uint32_t type;
 } AstOr;
 
 typedef struct {
+    uint32_t type;
 } AstAnd;
 
 typedef struct {
+    uint32_t type;
 } AstEqualEqual;
 
 typedef struct {
+    uint32_t type;
 } AstNotEqual;
 
 typedef struct {
+    uint32_t type;
 } AstLess;
 
 typedef struct {
+    uint32_t type;
 } AstLessEqual;
 
 typedef struct {
+    uint32_t type;
 } AstGreater;
 
 typedef struct {
+    uint32_t type;
 } AstGreaterEqual;
 
 typedef struct {
@@ -125,30 +136,39 @@ typedef struct {
 } AstAdd;
 
 typedef struct {
+    uint32_t type;
 } AstSubtract;
 
 typedef struct {
+    uint32_t type;
 } AstMul;
 
 typedef struct {
+    uint32_t type;
 } AstDiv;
 
 typedef struct {
+    uint32_t type;
 } AstMod;
 
 typedef struct {
+    uint32_t type;
 } AstNegation;
 
 typedef struct {
+    uint32_t type;
 } AstAddressOf;
 
 typedef struct {
+    uint32_t type;
 } AstDereference;
 
 typedef struct {
+    uint32_t type;
 } AstFieldAccess;
 
 typedef struct {
+    uint32_t type;
 } AstIndexAccess;
 
 typedef struct {
@@ -204,6 +224,7 @@ typedef struct {
     uint32_t identifier;
     FunctionArgumentList arguments;
     uint32_t returnType;
+    uint32_t type;
     Code code;
 } Function;
 
@@ -229,55 +250,89 @@ typedef struct {
 typedef struct {
     uint32_t literal;
     uint32_t parameterCount;
-} TypeApplication;
-
-typedef enum { TYPE_VARIABLE, TYPE_APPLICATION } TypeKind;
+    uint32_t firstParameter;
+} TypeWithParams;
 
 typedef struct {
-    TypeKind kind;
+    uint32_t returnType;
+    uint32_t parameterCount;
+    uint32_t firstParameter;
+} FunctionType;
+
+typedef enum { TYPE_VARIABLE, TYPE_WITH_PARAMS, FUNCTION_TYPE } TypeKind;
+
+typedef struct {
+    uint32_t kind;
     union {
         TypeVariable variable;
-        TypeApplication application;
+        TypeWithParams withParams;
+        FunctionType functionType;
     };
 } Type;
 
 typedef ListType(Type) TypeList;
 
-// Ast
 typedef struct {
+    TypeList types;
+    Uint32List parameters;
+} Types;
+
+// Ast
+typedef struct Ast {
     Uint32List importedAsts;
     ImportList imports;
     FunctionList functions;
     TypeDefinitionList typeDefinitions;
     Code code;
     Uint32List literals;
-    TypeList types;
+    Types types;
     ErrorList errors;
 } Ast;
 
 typedef ListType(Ast) AstList;
 
+// Initialization
 void ast_init(Ast *ast);
 void ast_clear(Ast *ast);
 
+// Instructions handling
 uint32_t ast_addInstruction(Code *code, AstInstructionKind kind);
 void *ast_getData(Code *code, uint32_t instruction);
-uint32_t ast_createTypeVariable(Ast *ast, uint32_t typeVariable);
-uint32_t ast_createTypeApplication(Ast *ast);
-#define ast_getTypeApplication(ast, id)                           \
-    (assert(list_get((ast).types, id)->kind == TYPE_APPLICATION), \
-     (TypeApplication *)&list_get((ast).types, id)->application)
-uint32_t ast_getNextParameter(Ast *ast, uint32_t typeId);
-void ast_printType(Ast ast, uint32_t typeId);
-uint32_t ast_getLiteral(Ast *ast, StringView view);
-#define ast_literalExpand(ast, id) \
-    *list_get((ast).literals, id), (char *)list_get((ast).literals, id + 1)
-#define ast_literalAsStringView(ast, id)             \
+
+// Types handling
+uint32_t ast_addTypeVariable(Types *types, uint32_t typeVariable);
+uint32_t ast_addTypeWithParams(
+    Types *types, uint32_t literal, uint32_t parameterCount
+);
+uint32_t ast_addFunctionType(
+    Types *types, uint32_t returnType, uint32_t parameterCount
+);
+uint32_t ast_getType(Ast ast, uint32_t instruction);
+#define ast_getTypeVariable(types__, id)                                     \
+    (assert(((Type *)list_get((types__).types, id))->kind == TYPE_VARIABLE), \
+     &((Type *)list_get((types__).types, id))->variable)
+#define ast_getTypeWithParams(types__, id)                                 \
+    (assert(                                                               \
+         ((Type *)list_get((types__).types, id))->kind == TYPE_WITH_PARAMS \
+     ),                                                                    \
+     &((Type *)list_get((types__).types, id))->withParams)
+#define ast_getFunctionType(types__, id)                                     \
+    (assert(((Type *)list_get((types__).types, id))->kind == FUNCTION_TYPE), \
+     &((Type *)list_get((types__).types, id))->functionType)
+
+uint32_t *ast_getParameters(Types types, uint32_t typeId);
+
+// Literals handling
+uint32_t ast_getLiteral(Ast *ast, char *literal);
+char *ast_literalAsString(Ast ast, uint32_t literal);
+#define ast_literalAsView(ast, id)                   \
     (StringView) {                                   \
         *list_get((ast).literals, id),               \
             (char *)list_get((ast).literals, id + 1) \
     }
-void ast_setBit(uint32_t *data, uint32_t position);
+
+// Printing
+void ast_printType(Ast ast, uint32_t typeId);
 void ast_print(Ast ast, String path);
 void reportErrors(Ast ast, String path);
 

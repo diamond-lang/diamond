@@ -59,6 +59,7 @@ typedef enum {
     EXTERN,
     NEW_LINES,
     END_OF_FILE,
+    BUILTIN,
     UNKNOWN_TOKEN
 } TokenKind;
 

@@ -8,13 +8,6 @@
 
 #include "arena.h"
 #include "ast.h"
-
-// #include <stddef.h>
-// #include <stdint.h>
-
-// #include "ast.h"
-// #include "common.h"
-// #include "scopes.h"
 #include "common.h"
 #include "program.h"
 #include "scopes.h"
@@ -23,102 +16,199 @@
 typedef struct {
     Ast* ast;
     Scopes scopes;
-    Uint32Stack expressions;
+    Uint32Stack stack;
     uint32_t lasTypeVariable;
+    Types temporaryTypes;
 } Context;
+
+static void initContext(Context* context, Program program, uint32_t astId) {
+    context->ast = list_get(program.asts, astId);
+    context->scopes =
+        (Scopes){(TypeBindingMap)Hashmap(), (BindingMapStack)Stack()};
+    context->lasTypeVariable = 0;
+    context->stack = (Uint32Stack)Stack();
+    context->temporaryTypes.types = (TypeList)List();
+    context->temporaryTypes.parameters = (Uint32List)List();
+    scopes_addScope(&context->scopes);
+}
+
+static uint32_t literalInContext(Context* context, Ast ast, uint32_t literal) {
+    return ast_getLiteral(context->ast, ast_literalAsString(ast, literal));
+}
+
+static uint32_t typeInContext(Context* context, Ast ast, uint32_t type) {
+    uint32_t newType = None();
+    TypeKind kind = ((Type*)list_get(ast.types.types, type))->kind;
+    switch (kind) {
+    case TYPE_VARIABLE: {
+        TypeVariable data = *ast_getTypeVariable(ast.types, type);
+        newType = ast_addTypeVariable(&context->ast->types, data.id);
+        break;
+    }
+    case TYPE_WITH_PARAMS: {
+        TypeWithParams data = *ast_getTypeWithParams(ast.types, type);
+        newType = ast_addTypeWithParams(
+            &context->ast->types,
+            literalInContext(context, ast, data.literal),
+            data.parameterCount
+        );
+        uint32_t* parameters = ast_getParameters(ast.types, type);
+        for (uint32_t i = 0; i < data.parameterCount; i++) {
+            ast_getParameters(context->ast->types, newType)[i] =
+                typeInContext(context, ast, parameters[i]);
+        }
+        break;
+    }
+    case FUNCTION_TYPE: {
+        FunctionType data = *ast_getFunctionType(ast.types, type);
+        newType = ast_addFunctionType(
+            &context->ast->types,
+            typeInContext(context, ast, data.returnType),
+            data.parameterCount
+        );
+        uint32_t* parameters = ast_getParameters(ast.types, type);
+        for (uint32_t i = 0; i < data.parameterCount; i++) {
+            ast_getParameters(context->ast->types, newType)[i] =
+                typeInContext(context, ast, parameters[i]);
+        }
+        break;
+    }
+    }
+    return newType;
+}
+
+static void importModuleUnqualified(Context* context, Ast ast, uint32_t astId) {
+    // Add types
+    for (uint32_t i = 0; i < list_size(ast.typeDefinitions); i++) {
+        TypeDefinition typeDef = *list_get(ast.typeDefinitions, i);
+        uint32_t identifier = ast_getLiteral(
+            context->ast,
+            ast_literalAsString(ast, typeDef.identifier)
+        );
+        TypeBinding* binding = hashmap_get(context->scopes.types, identifier);
+        if (binding != NULL) {
+            todo();
+        }
+        TypeBinding newTypeBinding = {i, astId};
+        hashmap_set(context->scopes.types, identifier, newTypeBinding);
+    }
+
+    // Add function definitions
+    BindingMap* currentScope = scopes_current(&context->scopes);
+    for (uint32_t i = 0; i < list_size(ast.functions); i++) {
+        Function function = *list_get(ast.functions, i);
+        if (function.type != None()) {
+            uint32_t identifier = ast_getLiteral(
+                context->ast,
+                ast_literalAsString(ast, function.identifier)
+            );
+            Binding* binding = hashmap_get(*currentScope, identifier);
+            if (binding != NULL) {
+                todo();
+            }
+            uint32_t functionType = typeInContext(context, ast, function.type);
+            Binding newBinding =
+                (Binding){FUNCTION_BINDING, identifier, astId, functionType};
+            hashmap_set(*currentScope, identifier, newBinding);
+        }
+    }
+}
 
 static uint32_t newTypeVariable(Context* context) {
     return context->lasTypeVariable++;
 }
 
-static void addBuiltins(Context* context) {
-    // Builtin types
-    uint32_t literal;
-    TypeBinding newType = (TypeBinding){None(), None()};
-
-    // Bool
-    literal = ast_getLiteral(context->ast, cStringAsView("Bool"));
-    hashmap_set(context->scopes.types, literal, newType);
-
-    // None
-    literal = ast_getLiteral(context->ast, cStringAsView("None"));
-    hashmap_set(context->scopes.types, literal, newType);
-
-    // Float64
-    literal = ast_getLiteral(context->ast, cStringAsView("Float64"));
-    hashmap_set(context->scopes.types, literal, newType);
-
-    // ->
-    literal = ast_getLiteral(context->ast, cStringAsView("->"));
-    hashmap_set(context->scopes.types, literal, newType);
-
-    // Builtin function print
-    uint32_t functionType = ast_createTypeApplication(context->ast);
-    ast_getTypeApplication(*context->ast, functionType)->parameterCount = 2;
-    ast_getTypeApplication(*context->ast, functionType)->literal =
-        ast_getLiteral(context->ast, cStringAsView("->"));
-
-    uint32_t parameter1 = ast_createTypeApplication(context->ast);
-    ast_getTypeApplication(*context->ast, parameter1)->literal =
-        ast_getLiteral(context->ast, cStringAsView("t"));
-
-    uint32_t parameter2 = ast_createTypeApplication(context->ast);
-    ast_getTypeApplication(*context->ast, parameter2)->literal =
-        ast_getLiteral(context->ast, cStringAsView("None"));
-
-    Binding binding = {BUILTIN_BINDING, None(), None(), functionType};
-    scopes_addBinding(
-        scopes_current(&context->scopes),
-        ast_getLiteral(context->ast, cStringAsView("print")),
-        binding
-    );
-}
-
 static uint32_t getBuiltInType(Context* context, char* type) {
-    StringView view = cStringAsView(type);
-    uint32_t literal = ast_getLiteral(context->ast, view);
+    uint32_t literal = ast_getLiteral(context->ast, type);
     TypeBinding* binding = scopes_getTypeBinding(&context->scopes, literal);
     assert(binding);
     assert(binding->module == None());
-    uint32_t newTypeId = ast_createTypeApplication(context->ast);
-    ast_getTypeApplication(*context->ast, newTypeId)->literal = literal;
+    uint32_t newTypeId = list_size(context->ast->types.types);
+    (void)ast_addTypeWithParams(&context->ast->types, literal, 0);
     return newTypeId;
 }
 
 static uint32_t _instantiateType(
     Context* context, uint32_t id, Uint32Hashmap* mappings
 ) {
-    Type* type = list_get(context->ast->types, id);
-    if (type->kind == TYPE_APPLICATION) {
-        TypeApplication* app = ast_getTypeApplication(*context->ast, id);
+    TypeKind kind = ((Type*)list_get(context->ast->types.types, id))->kind;
+    switch (kind) {
+    case TYPE_VARIABLE: {
+        unreachable();
+        break;
+    }
+    case TYPE_WITH_PARAMS: {
+        // Get type with params
+        TypeWithParams type = *ast_getTypeWithParams(context->ast->types, id);
         bool isTypeVariable =
-            isLowerCase(ast_literalAsStringView(*context->ast, app->literal));
+            isLowerCase(ast_literalAsView(*context->ast, type.literal));
+
+        // If is type variable, eg: t, a, b
         if (isTypeVariable) {
-            assert(app->parameterCount == 0);
-            if (hashmap_get(*mappings, app->literal) != NULL) {
-                return *hashmap_get(*mappings, app->literal);
+            // Instantiate type variable
+            assert(type.parameterCount == 0);
+            if (hashmap_get(*mappings, type.literal) == NULL) {
+                hashmap_set(
+                    *mappings,
+                    type.literal,
+                    ast_addTypeVariable(
+                        &context->ast->types,
+                        newTypeVariable(context)
+                    )
+                );
             }
-            hashmap_set(
-                *mappings,
-                app->literal,
-                ast_createTypeVariable(context->ast, newTypeVariable(context))
-            );
-            return *hashmap_get(*mappings, app->literal);
+            return *hashmap_get(*mappings, type.literal);
         } else {
-            uint32_t newId = ast_createTypeApplication(context->ast);
-            ast_getTypeApplication(*context->ast, newId)->literal =
-                app->literal;
-            uint32_t parameterCount =
-                ast_getTypeApplication(*context->ast, id)->parameterCount;
-            for (uint32_t i = id + 1; parameterCount > 0; parameterCount--) {
-                _instantiateType(context, i, mappings);
-                i = ast_getNextParameter(context->ast, i);
+            uint32_t firstParameter = list_size(context->ast->types.types);
+
+            // Instantiate parameters
+            for (uint32_t i = 0; i < type.parameterCount; i++) {
+                uint32_t parameter =
+                    ast_getParameters(context->ast->types, id)[i];
+                _instantiateType(context, parameter, mappings);
             }
-            ast_getTypeApplication(*context->ast, newId)->parameterCount =
-                ast_getTypeApplication(*context->ast, id)->parameterCount;
+            // Create new type
+            uint32_t newId = ast_addTypeWithParams(
+                &context->ast->types,
+                type.literal,
+                type.parameterCount
+            );
+
+            // Set type parameters
+            uint32_t* newParameters =
+                ast_getParameters(context->ast->types, newId);
+            for (uint32_t i = 0; i < type.parameterCount; i++) {
+                newParameters[i] = firstParameter + i;
+            }
             return newId;
         }
-    } else if (type->kind == TYPE_VARIABLE) {
+    }
+    case FUNCTION_TYPE: {
+        FunctionType type = *ast_getFunctionType(context->ast->types, id);
+        uint32_t firstParameter = list_size(context->ast->types.types);
+
+        // Instantiate arguments
+        for (uint32_t i = 0; i < type.parameterCount; i++) {
+            uint32_t parameter = ast_getParameters(context->ast->types, id)[i];
+            _instantiateType(context, parameter, mappings);
+        }
+
+        // Create new type
+        uint32_t newReturnType =
+            _instantiateType(context, type.returnType, mappings);
+        uint32_t newId = ast_addFunctionType(
+            &context->ast->types,
+            newReturnType,
+            type.parameterCount
+        );
+
+        // Set type arguments
+        uint32_t* newParameters = ast_getParameters(context->ast->types, newId);
+        for (uint32_t i = 0; i < type.parameterCount; i++) {
+            newParameters[i] = firstParameter + i;
+        }
+        return newId;
+    }
     }
     return None();
 }
@@ -131,22 +221,17 @@ static uint32_t instantiateType(Context* context, uint32_t id) {
     return result;
 }
 
-// static void importModuleUnqualified(Context* context, Ast ast, uint32_t astId) {
-//     // Add types
-//     for (uint32_t i = 0; i < list_size(ast.typeDefinitions); i++) {
-//         TypeDefinition typeDef = *list_get(ast.typeDefinitions, i);
-//         uint32_t key = ast_getLiteral(
-//             context->ast,
-//             ast_literalAsStringView(ast, typeDef.identifier)
-//         );
-//         TypeBinding* binding = hashmap_get(context->scopes.types, key);
-//         if (binding != NULL) {
-//             todo();
-//         }
-//         TypeBinding newTypeBinding = {i, astId};
-//         hashmap_set(context->scopes.types, key, newTypeBinding);
-//     }
-// }
+static void makeEqual(
+    Context* context, uint32_t typeId, uint32_t temporaryType
+) {
+    todo();
+    // TypeKind kind = ((Type*)list_get(context->ast->types.types, typeId))->kind;
+    // switch (kind) {
+    // case TYPE_VARIABLE: {
+    //     list_get(context->ast->types.types, typeId).break;
+    // }
+    // }
+}
 
 static bool analyzeTypeDefinition(
     Context* context, TypeDefinition* typeDefinition
@@ -156,17 +241,14 @@ static bool analyzeCode(Context* context, Code* code);
 static bool analyzeInstruction(Context* context, Code* code, uint32_t id);
 
 bool analyze(Program program, uint32_t astId) {
+    arena_newLifetime();
+
     // Initialize context
     Context context;
-    context.ast = list_get(program.asts, astId);
-    context.scopes =
-        (Scopes){(TypeBindingMap)Hashmap(), (BindingMapStack)Stack()};
-    context.lasTypeVariable = 0;
-    context.expressions = (Uint32Stack)Stack();
-    scopes_addScope(&context.scopes);
+    initContext(&context, program, astId);
 
     // Add builtin types
-    addBuiltins(&context);
+    importModuleUnqualified(&context, program.builtin, None());
 
     // Analyze types
     for (uint32_t i = 0; i < list_size(context.ast->typeDefinitions); i++) {
@@ -183,6 +265,8 @@ bool analyze(Program program, uint32_t astId) {
 
     // Analyze code
     analyzeCode(&context, &context.ast->code);
+
+    arena_destroyCurrentLifetime();
     return true;
 }
 
@@ -248,15 +332,35 @@ static bool whileStmt(
 
 static bool call(Context* context, Code* code, uint32_t id, AstCall* data) {
     assert(*list_get(code->instructions, id) == AST_CALL);
-    uint32_t argsCount = data->argumentsCount;
-    while (argsCount != 0) {
-        stack_pop(context->expressions);
-        argsCount--;
+
+    // Add new type variable
+    data->type =
+        ast_addTypeVariable(&context->ast->types, newTypeVariable(context));
+
+    // Get expression called
+    uint32_t called = *stack_get(
+        context->stack,
+        stack_size(context->stack) - 1 - data->argumentsCount
+    );
+
+    // Make call expression type equal to expected type
+    uint32_t expected = ast_addFunctionType(
+        &context->temporaryTypes,
+        data->type,
+        data->argumentsCount
+    );
+    uint32_t* parameters = ast_getParameters(context->temporaryTypes, expected);
+    for (uint32_t i = 0; i < data->argumentsCount; i++) {
+        uint32_t arg = *stack_get(
+            context->stack,
+            stack_size(context->stack) - data->argumentsCount
+        );
+        parameters[i] = ast_getType(*context->ast, arg);
     }
-    stack_pop(context->expressions);
-    stack_push(context->expressions, id);
+    makeEqual(context, ast_getType(*context->ast, called), expected);
     return true;
 }
+
 static bool ifElseExpression(
     Context* context, Code* code, uint32_t id, AstIfElseExpression* data
 ) {
@@ -310,9 +414,9 @@ static bool greaterEqual(
 }
 
 static bool add(Context* context, Code* code, uint32_t id, AstAdd* data) {
-    stack_pop(context->expressions);
-    stack_pop(context->expressions);
-    stack_push(context->expressions, id);
+    stack_pop(context->stack);
+    stack_pop(context->stack);
+    stack_push(context->stack, id);
     data->type = getBuiltInType(context, "Float64");
     return true;
 }
@@ -369,7 +473,7 @@ static bool floatLiteral(
     Context* context, Code* code, uint32_t id, AstFloat* data
 ) {
     data->type = getBuiltInType(context, "Float64");
-    stack_push(context->expressions, id);
+    stack_push(context->stack, id);
     return true;
 }
 
@@ -387,7 +491,7 @@ static bool identifier(
         todo();
     }
     data->type = instantiateType(context, binding->type);
-    stack_push(context->expressions, id);
+    stack_push(context->stack, id);
     return true;
 }
 

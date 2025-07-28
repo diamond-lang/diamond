@@ -166,7 +166,9 @@ static uint32_t structLiteral(
 );
 static uint32_t array(Parser *parser, Token leftBracket);
 
-void parse(Ast *ast, char *source) {
+typedef enum { PARSING_BUILTINS, PARSING_IMPORTS, NORMAL_PARSING } ParsingMode;
+
+static void _parse(Ast *ast, char *source, ParsingMode mode) {
     arena_newLifetime();
 
     // Init parser
@@ -174,30 +176,26 @@ void parse(Ast *ast, char *source) {
     parser.ast = ast;
     parser.code = &ast->code;
 
-    initLexer(&parser.lexer, source, parser.ast);
+    bool parsingBuiltins = mode == PARSING_BUILTINS;
+    initLexer(&parser.lexer, source, parser.ast, parsingBuiltins);
     parser.next = scanToken(&parser.lexer);
     advance(&parser);
 
     // Parse
-    program(&parser, false);
+    bool justImports = mode == PARSING_IMPORTS;
+    program(&parser, justImports);
 
     arena_destroyCurrentLifetime();
 }
 
+void parse(Ast *ast, char *source) { _parse(ast, source, NORMAL_PARSING); }
+
 void parseImports(Ast *ast, char *source) {
-    arena_newLifetime();
+    _parse(ast, source, PARSING_IMPORTS);
+}
 
-    // Init parser
-    Parser parser = {.indentationLevel = Stack()};
-    parser.ast = ast;
-    initLexer(&parser.lexer, source, parser.ast);
-    parser.next = scanToken(&parser.lexer);
-    advance(&parser);
-
-    // Parse
-    program(&parser, true);
-
-    arena_destroyCurrentLifetime();
+void parseBuiltin(Ast *ast, char *source) {
+    _parse(ast, source, PARSING_BUILTINS);
 }
 
 #define checkIndentation()                                                 \
@@ -276,17 +274,23 @@ static uint32_t import(Parser *parser, Token keyword) {
 
 // type → type ("[" type ("," type)* "]")*
 static uint32_t type(Parser *parser) {
-    uint32_t id = ast_createTypeApplication(parser->ast);
     consume(parser, IDENTIFIER, "a type");
-    ast_getTypeApplication(*parser->ast, id)->literal =
-        parser->previous.literal;
+    uint32_t literal = parser->previous.literal;
+    uint32_t paramsCount = 0;
+    uint32_t fistParameter = list_size(parser->ast->types.types);
     if (match(parser, LEFT_BRACKET)) {
         while (!atEnd(*parser)) {
             expect(type(parser));
-            ast_getTypeApplication(*parser->ast, id)->parameterCount += 1;
+            paramsCount += 1;
             if (!match(parser, COMMA)) break;
         }
         consume(parser, RIGHT_BRACKET, "a type");
+    }
+    uint32_t id =
+        ast_addTypeWithParams(&parser->ast->types, literal, paramsCount);
+    uint32_t *parameters = ast_getParameters(parser->ast->types, id);
+    for (uint32_t i = 0; i < paramsCount; i++) {
+        parameters[i] = fistParameter + i;
     }
     return id;
 }
@@ -345,11 +349,34 @@ static uint32_t function(Parser *parser, Token keyword) {
     if (match(parser, COLON)) {
         bind(annotation, typeAnnotation(parser, parser->previous));
         function.returnType = annotation;
+
+        bool allTypesSet = true;
+        for (uint32_t i = 0; i < list_size(function.arguments); i++) {
+            if (list_get(function.arguments, i)->type == None()) {
+                allTypesSet = false;
+                break;
+            }
+        }
+
+        if (allTypesSet) {
+            function.type = ast_addFunctionType(
+                &parser->ast->types,
+                function.returnType,
+                list_size(function.arguments)
+            );
+            uint32_t *parameters =
+                ast_getParameters(parser->ast->types, function.type);
+            for (uint32_t i = 0; i < list_size(function.arguments); i++) {
+                parameters[i] = list_get(function.arguments, i)->type;
+            }
+        }
     }
-    Code *backup = parser->code;
-    parser->code = &function.code;
-    bind(body, block(parser));
-    parser->code = backup;
+    if (!parser->lexer.parsingBuiltins || !match(parser, BUILTIN)) {
+        Code *backup = parser->code;
+        parser->code = &function.code;
+        bind(body, block(parser));
+        parser->code = backup;
+    }
     list_append(parser->ast->functions, function);
     return list_size(parser->ast->functions) - 1;
 }
@@ -730,8 +757,7 @@ static uint32_t unaryPostFix(Parser *parser) {
 
 static uint32_t callArgument(Parser *parser, AstCall *callData) {
     if (match(parser, MUT)) {
-        ast_setBit(&callData->argumentsMutability, callData->argumentsCount);
-        advance(parser);
+        todo();
     }
     callData->argumentsCount += 1;
     return expression(parser);
