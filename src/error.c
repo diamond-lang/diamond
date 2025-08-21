@@ -127,10 +127,9 @@ static char* ast_tokenAsString(TokenKind kind) {
     }
 }
 
-void printCurrentLine(String filePath, uint32_t line) {
+void printCurrentLine(String filePath, uint32_t line, Arena scratch) {
     printf("%u│ ", line);
-    arena_newLifetime();
-    String file = readFile(string_asCString(filePath));
+    String file = readFile(&scratch, string_asCString(filePath));
     for (uint32_t i = 0; i < string_size(file) && line >= 1; i++) {
         if (string_get(file, i) == '\n') {
             line -= 1;
@@ -138,7 +137,6 @@ void printCurrentLine(String filePath, uint32_t line) {
             printf("%c", string_get(file, i));
         }
     }
-    arena_destroyCurrentLifetime();
     printf("\n");
 }
 
@@ -196,13 +194,12 @@ void underlineToken(Ast ast, Token token) {
     }
 }
 
-void underlineLine(String filePath, uint32_t line) {
+void underlineLine(String filePath, uint32_t line, Arena scratch) {
     for (uint32_t i = 0; i < numberOfDigits(line); i++) {
         printf(" ");
     }
     printf("  ");
-    arena_newLifetime();
-    String file = readFile(string_asCString(filePath));
+    String file = readFile(&scratch, string_asCString(filePath));
     for (uint32_t i = 0; i < string_size(file) && line >= 1; i++) {
         if (string_get(file, i) == '\n') {
             line -= 1;
@@ -210,39 +207,38 @@ void underlineLine(String filePath, uint32_t line) {
             printRed("^");
         }
     }
-    arena_destroyCurrentLifetime();
 }
 
-void reportError(Ast ast, String path, Error error) {
+void reportError(Ast ast, String path, Error error, Arena scratch) {
     switch (error.kind) {
     case FILE_NOT_FOUND: todo(); break;
     case UNKNOWN_CHARACTER:
         printHeader("Unknown character", path);
-        printCurrentLine(path, error.line);
+        printCurrentLine(path, error.line, scratch);
         underlineLocation(path, error.line, error.column);
         break;
     case EXPECTING_LINE_ENDING:
         printHeader("Expecting line ending", path);
         printf("Finished parsing a statement. A new line was expected.\n\n");
-        printCurrentLine(path, error.line);
+        printCurrentLine(path, error.line, scratch);
         underlineToken(ast, error.expectingLineEnding.actualToken);
         break;
     case UNEXPECTED_IDENTATION:
         printHeader("Unexpected indentation", path);
-        printCurrentLine(path, error.line);
+        printCurrentLine(path, error.line, scratch);
         underlineUntilLocation(path, error.line, error.column);
         break;
     case EXPECTING_STATEMENT:
         printHeader("Expecting statement", path);
-        printCurrentLine(path, error.line);
-        underlineLine(path, error.line);
+        printCurrentLine(path, error.line, scratch);
+        underlineLine(path, error.line, scratch);
         break;
     case EXPECTING_NEW_IDENTATION_LEVEL:
         printHeader("Expecting new indentation level", path);
         if (error.line > 1) {
-            printCurrentLine(path, error.line - 1);
+            printCurrentLine(path, error.line - 1, scratch);
         }
-        printCurrentLine(path, error.line);
+        printCurrentLine(path, error.line, scratch);
         underlineLocation(path, error.line, error.column);
         break;
     case UNEXPECTED_TOKEN:
@@ -253,7 +249,7 @@ void reportError(Ast ast, String path, Error error) {
             ast_tokenAsString(error.unexpectedToken.expectedToken),
             ast_tokenAsString(error.unexpectedToken.actualToken)
         );
-        printCurrentLine(path, error.line);
+        printCurrentLine(path, error.line, scratch);
         underlineLocation(path, error.line, error.column);
         break;
     case EXPECTING_EXPRESSION:
@@ -262,7 +258,7 @@ void reportError(Ast ast, String path, Error error) {
             "Was expecting a expression, but found %s.\n\n",
             ast_tokenAsString(error.expectingExpression.actualToken)
         );
-        printCurrentLine(path, error.line);
+        printCurrentLine(path, error.line, scratch);
         underlineLocation(path, error.line, error.column);
         break;
     case UDENFINED_VARIABLE: todo(); break;
@@ -273,8 +269,8 @@ void reportError(Ast ast, String path, Error error) {
     printf("\n\n");
 }
 
-void reportErrors(Ast ast, String path) {
+void reportErrors(Ast ast, String path, Arena scratch) {
     for (uint32_t i = 0; i < list_size(ast.errors); i++) {
-        reportError(ast, path, *list_get(ast.errors, i));
+        reportError(ast, path, *list_get(ast.errors, i), scratch);
     }
 }

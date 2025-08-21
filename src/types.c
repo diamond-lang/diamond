@@ -7,6 +7,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "arena.h"
+
 // StringView
 StringView cStringAsView(char* string) {
     return (StringView){strlen(string), string};
@@ -22,34 +24,51 @@ bool isLowerCase(StringView view) {
 }
 
 // String
-uint32_t string_size(String string) {
-    uint32_t bufferSize = list_size(string.buffer);
-    return bufferSize == 0 ? 0 : bufferSize - 1;
-}
+uint32_t string_size(String string) { return string.count; }
 
-void string_clear(String* string) { list_clear(string->buffer); }
+void string_clear(String* string) { string->count = 0; }
 
-char* string_asCString(String string) { return string.buffer.buffer; }
+char* string_asCString(String string) { return string.buffer; }
 
 char string_get(String string, uint32_t index) {
-    return *list_get(string.buffer, index);
+    assert(index < string.count);
+    return string.buffer[index];
 }
 
-void string_append(String* string, char item) {
-    if (list_size(string->buffer) == 0) {
-        list_append(string->buffer, item);
-        list_append(string->buffer, '\0');
+void string_append(Arena* arena, String* string, char item) {
+    if (string->count == 0) {
+        string->buffer = alloc(arena, char, 256);
+        string->capacity = 256;
     } else {
-        *list_get(string->buffer, string_size(*string)) = item;
-        list_append(string->buffer, '\0');
+        if (string->count + 1 >= string->capacity) {
+            string->capacity *= 2;
+            void* newBuffer = alloc(arena, char, string->capacity);
+            memcpy(newBuffer, string->buffer, string->count);
+            string->buffer = newBuffer;
+        }
     }
+    string->buffer[string->count] = item;
+    string->buffer[string->count + 1] = '\0';
+    string->count += 1;
 }
 
-void string_concat(String* string, StringView toConcat) {
-    list_ensureExtraCapacity(string->buffer, toConcat.length);
-    list_setSize(string->buffer, string_size(*string));
-    list_concat(string->buffer, toConcat.pointer, toConcat.length);
-    list_append(string->buffer, '\0');
+void string_concat(Arena* arena, String* string, StringView toConcat) {
+    if (string->count == 0) {
+        string->buffer = alloc(arena, char, 256);
+        string->capacity = 256;
+        string->buffer[0] = '\0';
+    }
+    if (string->count + toConcat.length >= string->capacity) {
+        while (string->count + toConcat.length >= string->capacity) {
+            string->capacity *= 2;
+        }
+        void* newBuffer = alloc(arena, char, string->capacity);
+        memcpy(newBuffer, string->buffer, string->count);
+        string->buffer = newBuffer;
+    }
+    memcpy(string->buffer + string->count, toConcat.pointer, toConcat.length);
+    string->count += toConcat.length;
+    string->buffer[string->count] = '\0';
 }
 
 bool string_equal(StringView a, StringView b) {
@@ -59,12 +78,31 @@ bool string_equal(StringView a, StringView b) {
     return false;
 }
 
-char* string_pointer(String string) { return string.buffer.buffer; }
+char* string_pointer(String string) { return string.buffer; }
 
-StringView string_asView(String string) {
-    return (StringView){string_size(string), list_get(string.buffer, 0)};
+void string_ensureExtraCapacity(
+    Arena* arena, String* string, uint32_t extraCapacity
+) {
+    if (string->count == 0) {
+        string->buffer = alloc(arena, char, 256);
+        string->capacity = 256;
+        string->buffer[0] = '\0';
+    }
+    if (string->count + extraCapacity >= string->capacity) {
+        while (string->count + extraCapacity >= string->capacity) {
+            string->capacity *= 2;
+        }
+        void* newBuffer = alloc(arena, char, string->capacity);
+        memcpy(newBuffer, string->buffer, string->count);
+        string->buffer = newBuffer;
+    }
 }
 
+StringView string_asView(String string) {
+    return (StringView){string_size(string), string.buffer};
+}
+
+// Hashmap
 // Hashmap
 static uint32_t hash(uint32_t x) {
     x = ((x >> 16) ^ x) * 0x45d9f3b;
@@ -73,13 +111,12 @@ static uint32_t hash(uint32_t x) {
     return x;
 }
 
-uint32_t _hashmap_findLocation(
-    uint32_t* keys, uint32_t key, uint32_t capacity
-) {
-    assert(keys != NULL);
+uint32_t _hashmap_findLocation(Uint32List keys, uint32_t key) {
+    assert(list_capacity(keys) != 0);
+    uint32_t capacity = list_capacity(keys);
     uint32_t index = hash(key) % capacity;
     while (true) {
-        uint32_t keyFound = keys[index];
+        uint32_t keyFound = *_list_get(keys, index);
         if (keyFound == key || keyFound == None()) {
             return index;
         }

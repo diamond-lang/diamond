@@ -33,11 +33,13 @@ typedef struct {
     BindingMapStack bindings;
 } Scopes;
 
-void scopes_addScope(Scopes* scopes);
+void scopes_addScope(Arena* arena, Scopes* scopes);
 void scopes_removeScope(Scopes* scopes);
 Binding* scopes_getBinding(Scopes* scopes, uint32_t literalId);
 TypeBinding* scopes_getTypeBinding(Scopes* scopes, uint32_t literalId);
 BindingMap* scopes_current(Scopes* scopes);
-void scopes_addBinding(BindingMap* scope, uint32_t literalId, Binding binding);
+void scopes_addBinding(
+    Arena* arena, BindingMap* scope, uint32_t literalId, Binding binding
+);
 
 #endif

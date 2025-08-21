@@ -3,3 +3,6 @@ debug: src/*.c src/*.h
 
 release: src/*.c src/*.h
 	clang -std=c99 -Wall -Werror -Wswitch-enum -o3 src/*.c -o diamond
+
+releaseDebug: src/*.c src/*.h
+	clang -std=c99 -Wall -Werror -Wswitch-enum -g3 src/*.c -o diamond

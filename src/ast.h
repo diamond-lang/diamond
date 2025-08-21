@@ -5,6 +5,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "arena.h"
 #include "error.h"
 #include "types.h"
 
@@ -228,15 +229,11 @@ typedef struct {
     Code code;
 } Function;
 
-void ast_initFunction(Function *function, uint32_t lifetime);
-
 typedef struct {
     uint32_t identifier;
     Uint32List fields;
     Uint32List fieldTypes;
 } TypeDefinition;
-
-void ast_initTypeDefinition(TypeDefinition *typeDefinition, uint32_t lifetime);
 
 typedef ListType(Import) ImportList;
 typedef ListType(Function) FunctionList;
@@ -277,6 +274,15 @@ typedef struct {
     Uint32List parameters;
 } Types;
 
+// Literals
+typedef struct {
+    uint32_t hash;
+    uint32_t length;
+    uint32_t arenaOffset;
+} Literal;
+
+typedef ListType(Literal) LiteralList;
+
 // Ast
 typedef struct Ast {
     Uint32List importedAsts;
@@ -284,56 +290,68 @@ typedef struct Ast {
     FunctionList functions;
     TypeDefinitionList typeDefinitions;
     Code code;
-    Uint32List literals;
+    LiteralList literals;
     Types types;
     ErrorList errors;
+    Arena arena;
 } Ast;
+
+void ast_clear(Ast *ast);
 
 typedef ListType(Ast) AstList;
 
-// Initialization
-void ast_init(Ast *ast);
-void ast_clear(Ast *ast);
-
 // Instructions handling
-uint32_t ast_addInstruction(Code *code, AstInstructionKind kind);
+uint32_t ast_addInstruction(Arena *arena, Code *code, AstInstructionKind kind);
+AstInstructionKind ast_getInstruction(Code code, uint32_t id);
+uint32_t *ast_getDataOrIndex(Code code, uint32_t id);
+void ast_addData(Arena *arena, Code *code, uint32_t instruction);
 void *ast_getData(Code *code, uint32_t instruction);
 
 // Types handling
-uint32_t ast_addTypeVariable(Types *types, uint32_t typeVariable);
+uint32_t ast_addTypeVariable(Arena *arena, Types *types, uint32_t typeVariable);
 uint32_t ast_addTypeWithParams(
-    Types *types, uint32_t literal, uint32_t parameterCount
+    Arena *arena, Types *types, uint32_t literal, uint32_t parameterCount
 );
 uint32_t ast_addFunctionType(
-    Types *types, uint32_t returnType, uint32_t parameterCount
+    Arena *arena, Types *types, uint32_t returnType, uint32_t parameterCount
 );
-uint32_t ast_getType(Ast ast, uint32_t instruction);
-#define ast_getTypeVariable(types__, id)                                     \
-    (assert(((Type *)list_get((types__).types, id))->kind == TYPE_VARIABLE), \
-     &((Type *)list_get((types__).types, id))->variable)
-#define ast_getTypeWithParams(types__, id)                                 \
-    (assert(                                                               \
-         ((Type *)list_get((types__).types, id))->kind == TYPE_WITH_PARAMS \
-     ),                                                                    \
-     &((Type *)list_get((types__).types, id))->withParams)
-#define ast_getFunctionType(types__, id)                                     \
-    (assert(((Type *)list_get((types__).types, id))->kind == FUNCTION_TYPE), \
-     &((Type *)list_get((types__).types, id))->functionType)
-
+TypeKind ast_getTypeKind(Types types, uint32_t type);
+Type *ast_getType(Types types, uint32_t type);
+uint32_t ast_getTypeOfInstruction(Ast ast, uint32_t instruction);
+#define ast_getTypeVariable(types__, id)                                    \
+    (assert(                                                                \
+         ((Type *)list_get((types__).types, id - 1))->kind == TYPE_VARIABLE \
+     ),                                                                     \
+     &((Type *)list_get((types__).types, id - 1))->variable)
+#define ast_getTypeWithParams(types__, id)                                     \
+    (assert(                                                                   \
+         ((Type *)list_get((types__).types, id - 1))->kind == TYPE_WITH_PARAMS \
+     ),                                                                        \
+     &((Type *)list_get((types__).types, id - 1))->withParams)
+#define ast_getFunctionType(types__, id)                                    \
+    (assert(                                                                \
+         ((Type *)list_get((types__).types, id - 1))->kind == FUNCTION_TYPE \
+     ),                                                                     \
+     &((Type *)list_get((types__).types, id - 1))->functionType)
+uint32_t ast_getParametersCount(Types types, uint32_t typeId);
 uint32_t *ast_getParameters(Types types, uint32_t typeId);
+bool ast_typeHasParams(TypeKind kind);
+String ast_typeAsString(Arena *arena, Ast ast, Types types, uint32_t typeId);
 
 // Literals handling
 uint32_t ast_getLiteral(Ast *ast, char *literal);
+uint32_t ast_getLiteralWithLength(Ast *ast, char *pointer, uint32_t length);
 char *ast_literalAsString(Ast ast, uint32_t literal);
-#define ast_literalAsView(ast, id)                   \
-    (StringView) {                                   \
-        *list_get((ast).literals, id),               \
-            (char *)list_get((ast).literals, id + 1) \
+#define ast_literalAsView(ast, id)                                  \
+    (StringView) {                                                  \
+        list_get((ast).literals, id - 1)->length,                   \
+            (char *)((ast).arena.buffer +                           \
+                     list_get((ast).literals, id - 1)->arenaOffset) \
     }
 
 // Printing
 void ast_printType(Ast ast, uint32_t typeId);
-void ast_print(Ast ast, String path);
-void reportErrors(Ast ast, String path);
+void ast_print(Ast ast, String path, Arena scratch);
+void reportErrors(Ast ast, String path, Arena scratch);
 
 #endif

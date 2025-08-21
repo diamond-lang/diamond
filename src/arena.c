@@ -3,118 +3,58 @@
 #include <assert.h>
 #include <stdbool.h>
 #include <stddef.h>
-#include <stdlib.h>
+#include <stdint.h>
 #include <string.h>
 
-typedef struct {
-    void** items;
-    uint32_t count;
-    uint32_t capacity;
-} Lifetime;
+#include "common.h"
 
-#define Lifetime() (Lifetime){NULL, 0, 0}
+#define arena_size() UINT32_MAX
 
-static void append(Lifetime* lifetime, void* allocation) {
-    if (lifetime->count >= lifetime->capacity) {
-        if (lifetime->capacity == 0) {
-            lifetime->capacity = 256;
-        } else {
-            lifetime->capacity *= 2;
-        }
-        lifetime->items =
-            realloc(lifetime->items, lifetime->capacity * sizeof(void*));
-    }
-    lifetime->items[lifetime->count] = allocation;
-    lifetime->count += 1;
+Arena arena_new() {
+    Arena arena = {0};
+    arena.buffer = malloc(arena_size());
+    assert(arena.buffer);
+    return arena;
+}
+void arena_init(Arena* arena) {
+    arena->buffer = NULL;
+    arena->offset = 0;
 }
 
-typedef struct {
-    Lifetime* items;
-    uint32_t count;
-    uint32_t capacity;
-} LifetimeStack;
+static bool isPowerOfTwo(uintptr_t x) { return (x & (x - 1)) == 0; }
 
-static void push(LifetimeStack* lifetimes, Lifetime lifetime) {
-    if (lifetimes->count >= lifetimes->capacity) {
-        if (lifetimes->capacity == 0) {
-            lifetimes->capacity = 256;
-        } else {
-            lifetimes->capacity *= 2;
-        }
-        lifetimes->items =
-            realloc(lifetimes->items, lifetimes->capacity * sizeof(Lifetime));
-    }
-    lifetimes->items[lifetimes->count] = lifetime;
-    lifetimes->count += 1;
+static uint32_t paddingNeeded(Arena* arena, uint32_t alignment) {
+    assert(isPowerOfTwo(alignment));
+    uintptr_t pointer = (uintptr_t)arena->buffer + (uintptr_t)arena->offset;
+    uintptr_t modulo = pointer & (alignment - 1);
+    return modulo == 0 ? 0 : alignment - modulo;
 }
 
-static void pop(LifetimeStack* lifetimes) { lifetimes->count -= 1; }
-
-#define stack_top(stack) stack.items[stack.count - 1]
-
-static LifetimeStack lifetimes = {NULL, 0, 0};
-
-void arena_newLifetime() { push(&lifetimes, Lifetime()); }
-
-uint32_t arena_currentLifetime() {
-    return lifetimes.count > 0 ? lifetimes.count - 1 : 0;
-}
-
-void* arena_realloc(uint32_t lifetime, void* pointer, uint32_t numberOfBytes) {
-    assert(lifetime < lifetimes.count);
-    Lifetime* currentLifetime = &lifetimes.items[lifetime];
-    if (pointer == NULL) {
-        void* newAllocation = malloc(numberOfBytes);
-        assert(newAllocation != NULL);
-        append(currentLifetime, newAllocation);
-        return newAllocation;
-    } else {
-        for (uint32_t i = 0; i < currentLifetime->count; i++) {
-            if (currentLifetime->items[i] == pointer) {
-                currentLifetime->items[i] = realloc(pointer, numberOfBytes);
-                return currentLifetime->items[i];
-            }
-        }
-        assert(false);
-    }
-}
-
-void arena_swapAllocations(
-    uint32_t lifetime, void** allocation, void* newAllocation
+void* arena_alloc(
+    Arena* arena, uint32_t size, uint32_t alignment, uint32_t count
 ) {
-    assert(lifetime < lifetimes.count);
-    Lifetime* currentLifetime = &lifetimes.items[lifetime];
-    if (*allocation == NULL) {
-        append(currentLifetime, newAllocation);
+    assert(arena && arena->buffer);
+    uint32_t padding = paddingNeeded(arena, alignment);
+    if ((uint64_t)arena->offset + padding + size * count < UINT32_MAX) {
+        void* result = &arena->buffer[arena->offset + padding];
+        assert(((uintptr_t)result % alignment) == 0);
+        arena->offset += padding + size * count;
+        memset(result, 0, padding + size * count);
+        return result;
     } else {
-        bool founded = false;
-        for (uint32_t i = 0; i < currentLifetime->count; i++) {
-            if (currentLifetime->items[i] == allocation) {
-                free(currentLifetime->items[i]);
-                currentLifetime->items[i] = newAllocation;
-                founded = true;
-                break;
-            }
-        }
-        assert(founded);
+        unreachable();
     }
-    *allocation = newAllocation;
+    return NULL;
 }
 
-void arena_destroyCurrentLifetime() {
-    Lifetime currentLifetime = stack_top(lifetimes);
-    for (uint32_t i = 0; i < currentLifetime.count; i++) {
-        free(currentLifetime.items[i]);
-    }
-    free(currentLifetime.items);
-    pop(&lifetimes);
+void arena_free(Arena* arena) {
+    free(arena->buffer);
+    *arena = (Arena){0};
 }
 
-void arena_destroyAllLifetimes() {
-    while (lifetimes.count > 0) {
-        arena_destroyCurrentLifetime();
-    }
-    free(lifetimes.items);
+uint32_t arena_getOffset(Arena arena, void* pointer) {
+    uintptr_t buffer = (uintptr_t)arena.buffer;
+    uintptr_t ptr = (uintptr_t)pointer;
+    assert(buffer <= ptr && ptr < (buffer + UINT32_MAX));
+    return ptr - buffer;
 }
-
-void arena_assertNoLifetimesRemaining() { assert(lifetimes.count == 0); }

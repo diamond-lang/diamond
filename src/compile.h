@@ -3,8 +3,9 @@
 
 #include <stddef.h>
 
+#include "arena.h"
 #include "program.h"
 
-Program compile(StringView file);
+Program compile(Arena* arena, StringView file, Arena scratch);
 
 #endif

@@ -4,13 +4,18 @@
 #include <stddef.h>
 #include <stdlib.h>
 
-void arena_newLifetime();
-uint32_t arena_currentLifetime();
-void* arena_realloc(uint32_t lifetime, void* pointer, uint32_t numberOfBytes);
-void arena_swapAllocations(
-    uint32_t lifetime, void** allocation, void* newAllocation
+typedef struct {
+    uint8_t* buffer;
+    uint32_t offset;
+} Arena;
+
+Arena arena_new();
+void* arena_alloc(
+    Arena* arena, uint32_t size, uint32_t alignment, uint32_t count
 );
-void arena_destroyCurrentLifetime();
-void arena_assertNoLifetimesRemaining();
+#define alloc(arena, T, count) \
+    (T*)arena_alloc(arena, sizeof(T), alignof(T), count)
+void arena_free(Arena* arena);
+uint32_t arena_getOffset(Arena arena, void* pointer);
 
 #endif

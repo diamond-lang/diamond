@@ -3,13 +3,13 @@
 #include <ctype.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 
 #include "ast.h"
 #include "common.h"
 #include "token.h"
-#include "types.h"
 
 static char nextChar(Lexer* lexer) {
     char result = *lexer->source;
@@ -22,11 +22,11 @@ static void advance(Lexer* lexer) {
         lexer->column = 1;
         lexer->line += 1;
     }
+    lexer->offset += 1;
     lexer->column += 1;
     lexer->current = lexer->next;
     lexer->next = lexer->nextNext;
     lexer->nextNext = nextChar(lexer);
-    string_append(&lexer->currentLiteral, lexer->current);
 }
 
 static void advanceUntilNewLine(Lexer* lexer) {
@@ -61,19 +61,20 @@ static Token createToken(Lexer* lexer, TokenKind kind) {
     Token token = {
         .kind = kind,
         .line = lexer->line,
-        .column = lexer->column - string_size(lexer->currentLiteral)
+        .column = lexer->column - (lexer->offset - lexer->start)
     };
     lexer->previousWasImport = kind == IMPORT;
     return token;
 }
 
 static Token createTokenWithLiteral(Lexer* lexer, TokenKind kind) {
-    char* literal = string_pointer(lexer->currentLiteral);
-    uint32_t literalId = ast_getLiteral(lexer->ast, literal);
+    char* literal = lexer->initialSource + lexer->start;
+    uint32_t length = lexer->offset - lexer->start;
+    uint32_t literalId = ast_getLiteralWithLength(lexer->ast, literal, length);
     Token token = {
         .kind = kind,
         .line = lexer->line,
-        .column = lexer->column - string_size(lexer->currentLiteral),
+        .column = lexer->column - length,
         .literal = literalId
     };
     return token;
@@ -84,7 +85,9 @@ void initLexer(Lexer* lexer, char* source, Ast* ast, bool parsingBuiltins) {
     lexer->column = 1;
     lexer->source = source;
     lexer->ast = ast;
-    lexer->currentLiteral = String();
+    lexer->initialSource = source;
+    lexer->start = 0;
+    lexer->offset = 0;
     lexer->current = '\0';
     lexer->next = nextChar(lexer);
     lexer->nextNext = nextChar(lexer);
@@ -98,7 +101,7 @@ static Token scanImport(Lexer* lexer);
 
 Token scanToken(Lexer* lexer) {
 start:
-    string_clear(&lexer->currentLiteral);
+    lexer->start = lexer->offset;
     advance(lexer);
     switch (lexer->current) {
     case '(': return createToken(lexer, LEFT_PAREN);
@@ -183,9 +186,10 @@ static Token scanNumber(Lexer* lexer) {
 }
 
 static bool identifierEquals(Lexer* lexer, char* literal) {
-    uint32_t length = string_size(lexer->currentLiteral);
+    uint32_t length = lexer->offset - lexer->start;
     for (uint32_t i = 0; i < length; i++) {
-        if (string_get(lexer->currentLiteral, i) != literal[i]) return false;
+        if ((lexer->initialSource + lexer->start)[i] != literal[i])
+            return false;
     }
     if (literal[length] != '\0') return false;
     return true;

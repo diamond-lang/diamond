@@ -1,9 +1,10 @@
 #ifndef lexer_h
 #define lexer_h
 
+#include <stdint.h>
+
 #include "ast.h"
 #include "token.h"
-#include "types.h"
 
 typedef struct {
     uint32_t line;
@@ -14,7 +15,9 @@ typedef struct {
     char nextNext;
     bool previousWasImport;
     bool parsingBuiltins;
-    String currentLiteral;
+    char* initialSource;
+    uint32_t start;
+    uint32_t offset;
     Ast* ast;
 } Lexer;
 

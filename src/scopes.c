@@ -7,9 +7,9 @@
 #include "common.h"
 #include "types.h"
 
-void scopes_addScope(Scopes* scopes) {
-    BindingMap newMap = Hashmap();
-    stack_push(scopes->bindings, newMap);
+void scopes_addScope(Arena* arena, Scopes* scopes) {
+    BindingMap newMap = {0};
+    stack_push(arena, scopes->bindings, newMap);
 }
 
 void scopes_removeScope(Scopes* scopes) { todo(); }
@@ -19,7 +19,8 @@ Binding* scopes_getBinding(Scopes* scopes, uint32_t literalId) {
     uint32_t scopesCount = stack_size(scopes->bindings);
     for (uint32_t scope = scopesCount - 1; 0 <= scope && scope < scopesCount;
          scope--) {
-        binding = hashmap_get(*stack_get(scopes->bindings, scope), literalId);
+        BindingMap bindings = *stack_get(scopes->bindings, scope);
+        binding = hashmap_get(bindings, literalId);
         if (binding != NULL) break;
     }
     return binding;
@@ -34,6 +35,8 @@ TypeBinding* scopes_getTypeBinding(Scopes* scopes, uint32_t literalId) {
     return hashmap_get(scopes->types, literalId);
 }
 
-void scopes_addBinding(BindingMap* scope, uint32_t literalId, Binding binding) {
-    hashmap_set(*scope, literalId, binding);
+void scopes_addBinding(
+    Arena* arena, BindingMap* scope, uint32_t literalId, Binding binding
+) {
+    hashmap_set(arena, *scope, literalId, binding);
 }

@@ -14,8 +14,6 @@
 int main(int argc, char* argv[]) {
     assert(argc == 2);
 
-    arena_newLifetime();
-
     // Program program = (Program){List()};
     // list_append(program.asts, (Ast){});
     // initAst(
@@ -25,10 +23,9 @@ int main(int argc, char* argv[]) {
     // parse(list_get(program.asts, 0));
 
     // Compile program
-    (void)compile(cStringAsView(argv[1]));
-
-    arena_destroyCurrentLifetime();
-    arena_assertNoLifetimesRemaining();
+    Arena arena = arena_new();
+    Arena scratch = arena_new();
+    (void)compile(&arena, cStringAsView(argv[1]), scratch);
 
     return 0;
 }
