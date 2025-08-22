@@ -37,12 +37,12 @@ char string_get(String string, uint32_t index) {
 
 void string_append(Arena* arena, String* string, char item) {
     if (string->count == 0) {
-        string->buffer = alloc(arena, char, 256);
+        string->buffer = arena_alloc(arena, char, 256);
         string->capacity = 256;
     } else {
         if (string->count + 1 >= string->capacity) {
             string->capacity *= 2;
-            void* newBuffer = alloc(arena, char, string->capacity);
+            void* newBuffer = arena_alloc(arena, char, string->capacity);
             memcpy(newBuffer, string->buffer, string->count);
             string->buffer = newBuffer;
         }
@@ -54,7 +54,7 @@ void string_append(Arena* arena, String* string, char item) {
 
 void string_concat(Arena* arena, String* string, StringView toConcat) {
     if (string->count == 0) {
-        string->buffer = alloc(arena, char, 256);
+        string->buffer = arena_alloc(arena, char, 256);
         string->capacity = 256;
         string->buffer[0] = '\0';
     }
@@ -62,7 +62,7 @@ void string_concat(Arena* arena, String* string, StringView toConcat) {
         while (string->count + toConcat.length >= string->capacity) {
             string->capacity *= 2;
         }
-        void* newBuffer = alloc(arena, char, string->capacity);
+        void* newBuffer = arena_alloc(arena, char, string->capacity);
         memcpy(newBuffer, string->buffer, string->count);
         string->buffer = newBuffer;
     }
@@ -84,7 +84,7 @@ void string_ensureExtraCapacity(
     Arena* arena, String* string, uint32_t extraCapacity
 ) {
     if (string->count == 0) {
-        string->buffer = alloc(arena, char, 256);
+        string->buffer = arena_alloc(arena, char, 256);
         string->capacity = 256;
         string->buffer[0] = '\0';
     }
@@ -92,7 +92,7 @@ void string_ensureExtraCapacity(
         while (string->count + extraCapacity >= string->capacity) {
             string->capacity *= 2;
         }
-        void* newBuffer = alloc(arena, char, string->capacity);
+        void* newBuffer = arena_alloc(arena, char, string->capacity);
         memcpy(newBuffer, string->buffer, string->count);
         string->buffer = newBuffer;
     }

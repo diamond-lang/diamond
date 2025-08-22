@@ -2,6 +2,7 @@
 #define arena_h
 
 #include <stddef.h>
+#include <stdint.h>
 #include <stdlib.h>
 
 typedef struct {
@@ -10,12 +11,15 @@ typedef struct {
 } Arena;
 
 Arena arena_new();
-void* arena_alloc(
+void* arena_allocWithAlignment(
     Arena* arena, uint32_t size, uint32_t alignment, uint32_t count
 );
-#define alloc(arena, T, count) \
-    (T*)arena_alloc(arena, sizeof(T), alignof(T), count)
+#define arena_alloc(arena, T, count) \
+    ((T*)arena_allocWithAlignment(arena, sizeof(T), alignof(T), count))
 void arena_free(Arena* arena);
-uint32_t arena_getOffset(Arena arena, void* pointer);
+uint32_t arena_getId(Arena arena, void* pointer);
+void* _arena_getPointer(Arena arena, uint32_t alignment, uint32_t id);
+#define arena_getPointer(arena, T, id) \
+    ((T*)_arena_getPointer(arena, alignof(T), id))
 
 #endif

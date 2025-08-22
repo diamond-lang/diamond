@@ -123,7 +123,7 @@ String readFile(Arena* arena, char* path) {
     long fileSize = ftell(file);
     assert(fileSize != -1);
 
-    char* content = alloc(arena, char, fileSize + 1);
+    char* content = arena_alloc(arena, char, fileSize + 1);
     assert(fseek(file, 0, SEEK_SET) == 0);
 
     fread(content, sizeof(char), fileSize, file);

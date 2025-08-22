@@ -281,7 +281,7 @@ static uint32_t type(Parser *parser) {
     consume(parser, IDENTIFIER, "a type");
     uint32_t literal = parser->previous.literal;
     uint32_t paramsCount = 0;
-    uint32_t fistParameter = list_size(parser->ast->types.types);
+    uint32_t fistParameter = list_size(parser->ast->types);
     if (match(parser, LEFT_BRACKET)) {
         while (!atEnd(*parser)) {
             expect(type(parser));
@@ -296,9 +296,12 @@ static uint32_t type(Parser *parser) {
         literal,
         paramsCount
     );
-    uint32_t *parameters = ast_getParameters(parser->ast->types, id);
+    TypeWithParams *type = &ast_getType(parser->ast->types, id)->withParams;
+    uint32_t *params =
+        arena_getPointer(parser->ast->arena, uint32_t, type->parameters);
     for (uint32_t i = 0; i < paramsCount; i++) {
-        parameters[i] = fistParameter + i;
+        Type *paramType = ast_getType(parser->ast->types, fistParameter + i);
+        params[i] = arena_getId(parser->ast->arena, paramType);
     }
     return id;
 }
@@ -372,10 +375,15 @@ static uint32_t function(Parser *parser, Token keyword) {
                 function.returnType,
                 list_size(function.arguments)
             );
-            uint32_t *parameters =
-                ast_getParameters(parser->ast->types, function.type);
+            TypeWithParams *type =
+                &ast_getType(parser->ast->types, function.type)->withParams;
+            uint32_t *params = arena_getPointer(
+                parser->ast->arena,
+                uint32_t,
+                type->parameters
+            );
             for (uint32_t i = 0; i < list_size(function.arguments); i++) {
-                parameters[i] = list_get(function.arguments, i)->type;
+                params[i] = list_get(function.arguments, i)->type;
             }
         }
     }

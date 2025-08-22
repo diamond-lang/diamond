@@ -134,6 +134,7 @@ typedef struct {
 
 typedef struct {
     uint32_t type;
+    uint32_t operatorType;
 } AstAdd;
 
 typedef struct {
@@ -247,13 +248,13 @@ typedef struct {
 typedef struct {
     uint32_t literal;
     uint32_t parameterCount;
-    uint32_t firstParameter;
+    uint32_t parameters;
 } TypeWithParams;
 
 typedef struct {
     uint32_t returnType;
-    uint32_t parameterCount;
-    uint32_t firstParameter;
+    uint32_t argumentsCount;
+    uint32_t arguments;
 } FunctionType;
 
 typedef enum { TYPE_VARIABLE, TYPE_WITH_PARAMS, FUNCTION_TYPE } TypeKind;
@@ -269,16 +270,11 @@ typedef struct {
 
 typedef ListType(Type) TypeList;
 
-typedef struct {
-    TypeList types;
-    Uint32List parameters;
-} Types;
-
 // Literals
 typedef struct {
     uint32_t hash;
     uint32_t length;
-    uint32_t arenaOffset;
+    uint32_t arenaId;
 } Literal;
 
 typedef ListType(Literal) LiteralList;
@@ -291,7 +287,7 @@ typedef struct Ast {
     TypeDefinitionList typeDefinitions;
     Code code;
     LiteralList literals;
-    Types types;
+    TypeList types;
     ErrorList errors;
     Arena arena;
 } Ast;
@@ -308,49 +304,35 @@ void ast_addData(Arena *arena, Code *code, uint32_t instruction);
 void *ast_getData(Code *code, uint32_t instruction);
 
 // Types handling
-uint32_t ast_addTypeVariable(Arena *arena, Types *types, uint32_t typeVariable);
+uint32_t ast_addTypeVariable(
+    Arena *arena, TypeList *types, uint32_t typeVariable
+);
 uint32_t ast_addTypeWithParams(
-    Arena *arena, Types *types, uint32_t literal, uint32_t parameterCount
+    Arena *arena, TypeList *types, uint32_t literal, uint32_t parameterCount
 );
 uint32_t ast_addFunctionType(
-    Arena *arena, Types *types, uint32_t returnType, uint32_t parameterCount
+    Arena *arena, TypeList *types, uint32_t returnType, uint32_t argumentsCount
 );
-TypeKind ast_getTypeKind(Types types, uint32_t type);
-Type *ast_getType(Types types, uint32_t type);
+Type *ast_getType(TypeList types, uint32_t type);
 uint32_t ast_getTypeOfInstruction(Ast ast, uint32_t instruction);
-#define ast_getTypeVariable(types__, id)                                    \
-    (assert(                                                                \
-         ((Type *)list_get((types__).types, id - 1))->kind == TYPE_VARIABLE \
-     ),                                                                     \
-     &((Type *)list_get((types__).types, id - 1))->variable)
-#define ast_getTypeWithParams(types__, id)                                     \
-    (assert(                                                                   \
-         ((Type *)list_get((types__).types, id - 1))->kind == TYPE_WITH_PARAMS \
-     ),                                                                        \
-     &((Type *)list_get((types__).types, id - 1))->withParams)
-#define ast_getFunctionType(types__, id)                                    \
-    (assert(                                                                \
-         ((Type *)list_get((types__).types, id - 1))->kind == FUNCTION_TYPE \
-     ),                                                                     \
-     &((Type *)list_get((types__).types, id - 1))->functionType)
-uint32_t ast_getParametersCount(Types types, uint32_t typeId);
-uint32_t *ast_getParameters(Types types, uint32_t typeId);
-bool ast_typeHasParams(TypeKind kind);
-String ast_typeAsString(Arena *arena, Ast ast, Types types, uint32_t typeId);
+String ast_typeAsString(Arena *arena, Ast ast, Type *type, Arena typeArena);
 
 // Literals handling
 uint32_t ast_getLiteral(Ast *ast, char *literal);
 uint32_t ast_getLiteralWithLength(Ast *ast, char *pointer, uint32_t length);
 char *ast_literalAsString(Ast ast, uint32_t literal);
-#define ast_literalAsView(ast, id)                                  \
-    (StringView) {                                                  \
-        list_get((ast).literals, id - 1)->length,                   \
-            (char *)((ast).arena.buffer +                           \
-                     list_get((ast).literals, id - 1)->arenaOffset) \
+#define ast_literalAsView(ast, id)                        \
+    (StringView) {                                        \
+        list_get((ast).literals, id - 1)->length,         \
+            (char *)(arena_getPointer(                    \
+                (ast).arena,                              \
+                char,                                     \
+                list_get((ast).literals, id - 1)->arenaId \
+            ))                                            \
     }
 
 // Printing
-void ast_printType(Ast ast, uint32_t typeId);
+void ast_printType(Ast ast, uint32_t typeId, Arena scratch);
 void ast_print(Ast ast, String path, Arena scratch);
 void reportErrors(Ast ast, String path, Arena scratch);
 

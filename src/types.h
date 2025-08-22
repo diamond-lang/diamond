@@ -58,23 +58,23 @@ typedef ListType(Uint32List) Uint32ListList;
 #define list_totalCapacityPreviousChunks(list, chunk) \
     (list_initialChunkSize * ((1 << (chunk)) - 1))
 
-#define list_grow(arena, list)                                \
-    do {                                                      \
-        if (list_capacity(list) == 0) {                       \
-            (list).chunks = arena_alloc(                      \
-                arena,                                        \
-                sizeof(*(list).chunks),                       \
-                alignof(*(list).chunks),                      \
-                24                                            \
-            );                                                \
-        }                                                     \
-        (list).chunks[(list).chunksCount] = arena_alloc(      \
-            arena,                                            \
-            sizeof(**(list).chunks),                          \
-            alignof(**(list).chunks),                         \
-            list_initialChunkSize * (1 << (list).chunksCount) \
-        );                                                    \
-        (list).chunksCount += 1;                              \
+#define list_grow(arena, list)                                        \
+    do {                                                              \
+        if (list_capacity(list) == 0) {                               \
+            (list).chunks = arena_allocWithAlignment(                 \
+                arena,                                                \
+                sizeof(*(list).chunks),                               \
+                alignof(*(list).chunks),                              \
+                24                                                    \
+            );                                                        \
+        }                                                             \
+        (list).chunks[(list).chunksCount] = arena_allocWithAlignment( \
+            arena,                                                    \
+            sizeof(**(list).chunks),                                  \
+            alignof(**(list).chunks),                                 \
+            list_initialChunkSize * (1 << (list).chunksCount)         \
+        );                                                            \
+        (list).chunksCount += 1;                                      \
     } while (false)
 
 #define list_append(arena, list, item)                  \
@@ -204,13 +204,13 @@ uint32_t _hashmap_findLocation(Uint32List keys, uint32_t key);
             list_grow(arena, (hashmap).values);                                \
             if (initialCapacity__ != 0) {                                      \
                 Arena scratch__ = *arena;                                      \
-                uint32_t* temporayKeys__ = arena_alloc(                        \
+                uint32_t* temporayKeys__ = arena_allocWithAlignment(           \
                     &scratch__,                                                \
                     sizeof(**(hashmap).keys.chunks),                           \
                     alignof(**(hashmap).keys.chunks),                          \
                     initialCapacity__                                          \
                 );                                                             \
-                void* temporayValues__ = arena_alloc(                          \
+                void* temporayValues__ = arena_allocWithAlignment(             \
                     &scratch__,                                                \
                     sizeof(**(hashmap).values.chunks),                         \
                     alignof(**(hashmap).values.chunks),                        \

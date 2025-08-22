@@ -30,7 +30,7 @@ static uint32_t paddingNeeded(Arena* arena, uint32_t alignment) {
     return modulo == 0 ? 0 : alignment - modulo;
 }
 
-void* arena_alloc(
+void* arena_allocWithAlignment(
     Arena* arena, uint32_t size, uint32_t alignment, uint32_t count
 ) {
     assert(arena && arena->buffer);
@@ -52,9 +52,18 @@ void arena_free(Arena* arena) {
     *arena = (Arena){0};
 }
 
-uint32_t arena_getOffset(Arena arena, void* pointer) {
+uint32_t arena_getId(Arena arena, void* pointer) {
     uintptr_t buffer = (uintptr_t)arena.buffer;
     uintptr_t ptr = (uintptr_t)pointer;
     assert(buffer <= ptr && ptr < (buffer + UINT32_MAX));
-    return ptr - buffer;
+    return ptr - buffer + 1;
+}
+
+void* _arena_getPointer(Arena arena, uint32_t alignment, uint32_t id) {
+    uint64_t id64 = id;
+    assert(0 < id64 && id64 <= UINT32_MAX);
+    uintptr_t pointer = (uintptr_t)arena.buffer + (id - 1);
+    uintptr_t modulo = pointer & (alignment - 1);
+    assert(modulo == 0);
+    return (void*)pointer;
 }
