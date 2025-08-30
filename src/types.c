@@ -53,13 +53,13 @@ void string_append(Arena* arena, String* string, char item) {
 }
 
 void string_concat(Arena* arena, String* string, StringView toConcat) {
-    if (string->count == 0) {
+    if (string->capacity == 0) {
         string->buffer = arena_alloc(arena, char, 256);
         string->capacity = 256;
         string->buffer[0] = '\0';
     }
-    if (string->count + toConcat.length >= string->capacity) {
-        while (string->count + toConcat.length >= string->capacity) {
+    if (string->count + toConcat.length + 1 >= string->capacity) {
+        while (string->count + toConcat.length + 1 >= string->capacity) {
             string->capacity *= 2;
         }
         void* newBuffer = arena_alloc(arena, char, string->capacity);
@@ -102,7 +102,14 @@ StringView string_asView(String string) {
     return (StringView){string_size(string), string.buffer};
 }
 
-// Hashmap
+String string_substring(
+    Arena* arena, String string, uint32_t start, uint32_t length
+) {
+    String result = {0};
+    string_concat(arena, &result, (StringView){length, string.buffer + start});
+    return result;
+}
+
 // Hashmap
 static uint32_t hash(uint32_t x) {
     x = ((x >> 16) ^ x) * 0x45d9f3b;

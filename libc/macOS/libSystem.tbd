@@ -1,0 +1,8 @@
+--- !tapi-tbd
+tbd-version: 4
+targets: [arm64-macos]
+install-name: '/usr/lib/libSystem.dylib'
+exports:
+  - targets: [arm64-macos]
+    symbols: [dyld_stub_binder, _printf, _malloc, _free]
+...

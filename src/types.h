@@ -12,19 +12,6 @@
 
 #define None() 0
 
-#if defined(__GNUC__) || defined(__clang__)
-#define alignof(expression)              \
-    offsetof(                            \
-        struct {                         \
-            char x;                      \
-            __typeof__(expression) test; \
-        },                               \
-        test                             \
-    )
-#else
-#define alignof(expression) (2 * sizeof(void*))
-#endif
-
 // List
 #define ListType(T)           \
     struct {                  \
@@ -36,6 +23,7 @@
 typedef ListType(uint8_t) Uint8List;
 typedef ListType(uint32_t) Uint32List;
 typedef ListType(Uint32List) Uint32ListList;
+typedef ListType(char*) CStringList;
 
 #define list_initialChunkSize 256
 
@@ -64,14 +52,14 @@ typedef ListType(Uint32List) Uint32ListList;
             (list).chunks = arena_allocWithAlignment(                 \
                 arena,                                                \
                 sizeof(*(list).chunks),                               \
-                alignof(*(list).chunks),                              \
+                getAlignOfExpression(*(list).chunks),                 \
                 24                                                    \
             );                                                        \
         }                                                             \
         (list).chunks[(list).chunksCount] = arena_allocWithAlignment( \
             arena,                                                    \
             sizeof(**(list).chunks),                                  \
-            alignof(**(list).chunks),                                 \
+            getAlignOfExpression(**(list).chunks),                    \
             list_initialChunkSize * (1 << (list).chunksCount)         \
         );                                                            \
         (list).chunksCount += 1;                                      \
@@ -166,6 +154,9 @@ void string_ensureExtraCapacity(
     Arena* arena, String* string, uint32_t extraCapacity
 );
 StringView string_asView(String string);
+String string_substring(
+    Arena* arena, String string, uint32_t start, uint32_t length
+);
 
 typedef ListType(String) StringList;
 
@@ -207,13 +198,13 @@ uint32_t _hashmap_findLocation(Uint32List keys, uint32_t key);
                 uint32_t* temporayKeys__ = arena_allocWithAlignment(           \
                     &scratch__,                                                \
                     sizeof(**(hashmap).keys.chunks),                           \
-                    alignof(**(hashmap).keys.chunks),                          \
+                    getAlignOfExpression(**(hashmap).keys.chunks),             \
                     initialCapacity__                                          \
                 );                                                             \
                 void* temporayValues__ = arena_allocWithAlignment(             \
                     &scratch__,                                                \
                     sizeof(**(hashmap).values.chunks),                         \
-                    alignof(**(hashmap).values.chunks),                        \
+                    getAlignOfExpression(**(hashmap).values.chunks),           \
                     initialCapacity__                                          \
                 );                                                             \
                 assert(                                                        \

@@ -99,18 +99,40 @@ String getWorkingDirectory(Arena* arena) {
     return string;
 }
 
-String getCanonicalPath(Arena* arena, StringView path, Arena scratch) {
-    if (isAbsolutePath(path)) {
+String getCanonicalPath(Arena* arena, StringView importPath, Arena scratch) {
+    if (isAbsolutePath(importPath)) {
         String canonicalPath = {0};
-        canonicalPath = appendToPath(arena, canonicalPath, path);
+        canonicalPath = appendToPath(arena, canonicalPath, importPath);
         canonicalPath = normalizePath(arena, canonicalPath, scratch);
         return canonicalPath;
     } else {
         String canonicalPath = getWorkingDirectory(arena);
-        canonicalPath = appendToPath(arena, canonicalPath, path);
+        canonicalPath = appendToPath(arena, canonicalPath, importPath);
         canonicalPath = normalizePath(arena, canonicalPath, scratch);
         return canonicalPath;
     }
+}
+
+String getBasePath(Arena* arena, String path) {
+    uint32_t i = string_size(path) - 1;
+    while (0 <= i && i <= string_size(path)) {
+        if (path.buffer[i] == '/') {
+            break;
+        }
+        i--;
+    }
+    return string_substring(arena, path, i + 1, string_size(path) - (i + 1));
+}
+
+String getPathWithoutExtension(Arena* arena, String path) {
+    uint32_t i = string_size(path);
+    while (0 <= i && i <= string_size(path)) {
+        if (path.buffer[i] == '.') {
+            break;
+        }
+        i--;
+    }
+    return string_substring(arena, path, 0, i);
 }
 
 String readFile(Arena* arena, char* path) {
@@ -133,6 +155,15 @@ String readFile(Arena* arena, char* path) {
 
     String result2 = {content, fileSize, fileSize};
     return result2;
+}
+
+String numberAsString(Arena* arena, uint32_t number) {
+    uint32_t digitsCount = numberOfDigits(number);
+    String result = {0};
+    string_ensureExtraCapacity(arena, &result, digitsCount + 1);
+    snprintf(result.buffer, digitsCount + 1, "%d", number);
+    result.count = digitsCount;
+    return result;
 }
 
 int numberOfDigits(uint32_t number) {

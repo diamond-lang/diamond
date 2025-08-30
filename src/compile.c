@@ -10,6 +10,7 @@
 #include "arena.h"
 #include "ast.h"
 #include "builtin.h"
+#include "codegen.h"
 #include "parser.h"
 #include "program.h"
 #include "semantic.h"
@@ -229,6 +230,12 @@ Program compile(Arena* arena, StringView file, Arena scratch) {
         );
         if (i + 1 < list_size(program.asts)) printf("\n\n");
     }
+
+    // Generate object codes
+    for (uint32_t i = 0; i < list_size(program.asts); i++) {
+        generateObjectCode(program, i, *arena, scratch);
+    }
+    generateExecutable(program, scratch);
 
     return program;
 }

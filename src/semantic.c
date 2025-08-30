@@ -477,72 +477,6 @@ static void makeEqual(
     }
 }
 
-static bool analyzeTypeDefinition(
-    Context* context, TypeDefinition* typeDefinition, Arena scratch
-);
-static bool analyzeFunction(
-    Context* context, Function* function, Arena scratch
-);
-static bool analyzeCode(Context* context, Code* code, Arena scratch);
-static bool analyzeInstruction(
-    Context* context, Code* code, uint32_t id, Arena scratch
-);
-
-bool analyze(
-    Program program, uint32_t astId, Arena scratch, Arena otherScratch
-) {
-    // Initialize context
-    Context context = {0};
-    context.arena = scratch;
-    context.ast = list_get(program.asts, astId);
-    scopes_addScope(&context.arena, &context.scopes);
-
-    // Add builtin types
-    importModuleUnqualified(&context, program.builtin, None());
-
-    // Analyze types
-    for (uint32_t i = 0; i < list_size(context.ast->typeDefinitions); i++) {
-        analyzeTypeDefinition(
-            &context,
-            list_get(context.ast->typeDefinitions, i),
-            otherScratch
-        );
-    }
-
-    // Analyze functions
-    for (uint32_t i = 0; i < list_size(context.ast->functions); i++) {
-        analyzeFunction(
-            &context,
-            list_get(context.ast->functions, i),
-            otherScratch
-        );
-    }
-
-    // Analyze code
-    analyzeCode(&context, &context.ast->code, otherScratch);
-    return true;
-}
-
-static bool analyzeTypeDefinition(
-    Context* context, TypeDefinition* typeDefinition, Arena scratch
-) {
-    todo();
-}
-
-static bool analyzeFunction(
-    Context* context, Function* function, Arena scratch
-) {
-    todo();
-}
-
-static bool analyzeCode(Context* context, Code* code, Arena scratch) {
-    for (uint32_t id = 1; id <= list_size(code->instructions); id++) {
-        bool result = analyzeInstruction(context, code, id, scratch);
-        if (!result) return false;
-    }
-    return true;
-}
-
 static bool declaration(
     Context* ctx, Code* code, uint32_t id, AstDeclaration* data, Arena scratch
 ) {
@@ -992,4 +926,59 @@ static bool analyzeInstruction(
         return structLiteral(context, code, id, data, scratch);
     default: unreachable();
     }
+}
+
+static bool analyzeTypeDefinition(
+    Context* context, TypeDefinition* typeDefinition, Arena scratch
+) {
+    todo();
+}
+
+static bool analyzeFunction(
+    Context* context, Function* function, Arena scratch
+) {
+    todo();
+}
+
+static bool analyzeCode(Context* context, Code* code, Arena scratch) {
+    for (uint32_t id = 1; id <= list_size(code->instructions); id++) {
+        bool result = analyzeInstruction(context, code, id, scratch);
+        if (!result) return false;
+    }
+    return true;
+}
+
+bool analyze(
+    Program program, uint32_t astId, Arena scratch, Arena otherScratch
+) {
+    // Initialize context
+    Context context = {0};
+    context.arena = scratch;
+    context.ast = list_get(program.asts, astId);
+    scopes_addScope(&context.arena, &context.scopes);
+
+    // Add builtin types
+    importModuleUnqualified(&context, program.builtin, None());
+
+    // Analyze types
+    for (uint32_t i = 0; i < list_size(context.ast->typeDefinitions); i++) {
+        analyzeTypeDefinition(
+            &context,
+            list_get(context.ast->typeDefinitions, i),
+            otherScratch
+        );
+    }
+
+    // Analyze functions
+    for (uint32_t i = 0; i < list_size(context.ast->functions); i++) {
+        analyzeFunction(
+            &context,
+            list_get(context.ast->functions, i),
+            otherScratch
+        );
+    }
+
+    // Analyze code
+    analyzeCode(&context, &context.ast->code, otherScratch);
+    return true;
 }

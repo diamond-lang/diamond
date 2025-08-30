@@ -202,10 +202,7 @@ String ast_typeAsString(Arena* arena, Ast ast, Type* type, Arena typeArena) {
     switch (type->kind) {
     case TYPE_VARIABLE: {
         TypeVariable* data = &type->variable;
-        int digitsCount = numberOfDigits(data->id);
-        string_ensureExtraCapacity(arena, &result, digitsCount + 1);
-        snprintf(result.buffer, digitsCount + 1, "%d", data->id);
-        result.count = digitsCount;
+        result = numberAsString(arena, data->id);
         break;
     }
     case TYPE_WITH_PARAMS: {

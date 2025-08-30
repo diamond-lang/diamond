@@ -2,6 +2,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "arena.h"
 #include "ast.h"
@@ -13,6 +14,13 @@
 
 int main(int argc, char* argv[]) {
     assert(argc == 2);
+
+    // uint32_t* p = NULL;
+    // {
+    //     uint32_t a = 10;
+    //     p = &a;
+    // }
+    // printf("%d", *p);
 
     // Program program = (Program){List()};
     // list_append(program.asts, (Ast){});

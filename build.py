@@ -5,14 +5,16 @@ import sys
 import multiprocessing
 import functools
 import subprocess
+import shutil
 
 # Configuration
 # -------------
 name = 'diamond'
-source_files = [
-    'main.c',
-    'token.c'
-]
+c_compiler = 'clang -std=c99'
+cpp_compiler = 'clang++ -std=c++17'
+debug_compiler_args = '-g -fsanitize=address,undefined,null -fomit-frame-pointer -Wall -Werror -Wswitch-enum'
+release_compiler_args = '-Wall -Werror -Wswitch-enum -o3'
+release_debug_compiler_args = '-Wall -Werror -Wswitch-enum -g3'
 
 # Platform specific constants
 # ---------------------------
@@ -59,6 +61,22 @@ def need_to_recompile():
         if os.path.getmtime(os.path.join('src', file)) > os.path.getmtime(get_name()):
             return True
 
+
+def get_source_files():
+    source_files = [os.path.join('src', f) for f in os.listdir('src') if f.endswith('.c') or f.endswith('.cpp')]
+    return source_files
+
+def get_compiler_args():
+    compiler_args = debug_compiler_args
+    if len(sys.argv) > 1:
+        assert len(sys.argv) <= 2
+        assert sys.argv[1] in ['debug', 'release', 'releaseDebug']
+        if sys.argv[1] == 'release':
+            compiler_args = release_compiler_args
+        elif sys.argv[1] == 'releaseDebug':
+            compiler_args = release_debug_compiler_args 
+    return compiler_args
+
 # Build
 # -----
 def build_object_file(source_file, llvm_include_path):
@@ -68,11 +86,16 @@ def build_object_file(source_file, llvm_include_path):
 
     # If object file should be builded or rebuilded
     if not os.path.exists(object_file) or os.path.getmtime(source_file) > os.path.getmtime(object_file):
+        compiler = c_compiler
+        if source_file.endswith('.cpp'):
+            compiler = cpp_compiler
+        compiler_args = get_compiler_args()
+
         # Build
-        command = f'clang -g {source_file} -c -o {object_file} -I {llvm_include_path}'
+        command = f'{compiler} {compiler_args} {source_file} -c -o {object_file} -I {llvm_include_path}'
         print(command)
 
-        result = subprocess.run(command.split(" "), capture_output=True, text=True)
+        result = subprocess.run(command.split(' '), capture_output=True, text=True)
         if result.returncode == 0:
             return True
         else:
@@ -80,13 +103,16 @@ def build_object_file(source_file, llvm_include_path):
             return False
 
 def build_object_files(llvm_config):
+    # Source files
+    source_files = get_source_files()
+
     # Make cache dir if not exists
     if not os.path.exists('cache'):
         os.mkdir('cache')
 
     # Get llvm include path
     command = f'{llvm_config} --includedir'
-    llvm_include_path = subprocess.run(command.split(" "), capture_output=True, text=True).stdout.strip()
+    llvm_include_path = subprocess.run(command.split(' '), capture_output=True, text=True).stdout.strip()
 
     # Build object files in parallalel
     num_cores = multiprocessing.cpu_count()
@@ -101,9 +127,6 @@ def build():
     if platform.system() == 'Windows':
         llvm_config += '.exe'
 
-    if len(sys.argv) > 1:
-        llvm_config = sys.argv[1]
-
     # Check llvm-config exists
     if not os.path.exists(llvm_config):
         print(f'Couldn\'t found llvm-config in {os.path.dirname(llvm_config)} :(')
@@ -116,41 +139,42 @@ def build():
 
      # Get llvm libs
     command = f'{llvm_config} --libs --link-static'
-    llvm_libs = subprocess.run(command.split(" "), capture_output=True, text=True).stdout.strip()
+    llvm_libs = subprocess.run(command.split(' '), capture_output=True, text=True).stdout.strip()
     llvm_libs = llvm_libs.strip()
 
     if platform.system() == 'Windows':
-        llvm_libs = llvm_libs.split(" ")
-        llvm_libs = [lib.split("\\")[-1] for lib in llvm_libs]
-        llvm_libs = ["-l" + lib.split(".")[0] for lib in llvm_libs]
-        llvm_libs = " ".join(llvm_libs)
+        llvm_libs = llvm_libs.split(' ')
+        llvm_libs = [lib.split('\\')[-1] for lib in llvm_libs]
+        llvm_libs = ['-l' + lib.split('.')[0] for lib in llvm_libs]
+        llvm_libs = ' '.join(llvm_libs)
 
     # Get libs path
     command = f'{llvm_config} --link-static --ldflags'
-    libpath = subprocess.run(command.split(" "), capture_output=True, text=True).stdout.strip()
+    libpath = subprocess.run(command.split(' '), capture_output=True, text=True).stdout.strip()
 
-    if platform.system() == "Linux" or platform.system() == "Darwin":
-        libpath = libpath.split("-L")[1]
+    if platform.system() == 'Linux' or platform.system() == 'Darwin':
+        libpath = libpath.split('-L')[1]
 
     elif platform.system() == 'Windows':
-        libpath = libpath.split("-LIBPATH:")[1]
+        libpath = libpath.split('-LIBPATH:')[1]
 
     # Get system libs
     command = f'{llvm_config} --link-static --system-libs'
-    system_libs = subprocess.run(command.split(" "), capture_output=True, text=True).stdout.strip()
+    system_libs = subprocess.run(command.split(' '), capture_output=True, text=True).stdout.strip()
 
-    if platform.system() == "Darwin":
+    if platform.system() == 'Darwin':
         system_libs = '-L/opt/homebrew/lib ' + system_libs
 
     elif platform.system() == 'Windows':
-        system_libs = system_libs.split(" ")
-        system_libs = ["-l" + lib.split(".")[0] for lib in system_libs]
-        system_libs = " ".join(system_libs)
+        system_libs = system_libs.split(' ')
+        system_libs = ['-l' + lib.split('.')[0] for lib in system_libs]
+        system_libs = ' '.join(system_libs)
 
     # Build diamond
-    command = f'clang {objects_files} -o {get_name()} -L {libpath} {get_lld_libraries()} {llvm_libs} {system_libs}'
-    print("Linking...")
-    result = subprocess.run(command.split(" "), capture_output=True, text=True)
+    compiler_args = get_compiler_args()
+    command = f'{cpp_compiler} {compiler_args} {objects_files} -o {get_name()} -L {libpath} {get_lld_libraries()} {llvm_libs} {system_libs}'
+    print('Linking...')
+    result = subprocess.run(command.split(' '), capture_output=True, text=True)
     if result.returncode == 0:
         return True
     else:
@@ -160,11 +184,17 @@ def build():
 # Main
 # ----
 def main():
-    if need_to_recompile():
+    if len(sys.argv) > 1:
+        if os.path.exists('cache'): 
+            shutil.rmtree('cache')
+            os.mkdir('cache')
         build()
-
     else:
-        print("Nothing to do...")
+        if need_to_recompile():
+            build()
 
-if __name__ == "__main__":
+        else:
+            print('Nothing to do...')
+
+if __name__ == '__main__':
     main()

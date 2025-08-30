@@ -16,4 +16,5 @@ AllowShortIfStatementsOnASingleLine: AllIfsAndElse
 AlignOperands: AlignAfterOperator
 AllowShortCaseLabelsOnASingleLine: true
 AllowShortEnumsOnASingleLine: true
+IndentCaseLabels: false
 ---
