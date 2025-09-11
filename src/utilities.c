@@ -9,6 +9,7 @@
 #include <string.h>
 
 #include "arena.h"
+#include "common.h"
 #include "types.h"
 
 #ifdef WIN32
@@ -132,6 +133,7 @@ String getPathWithoutExtension(Arena* arena, String path) {
         }
         i--;
     }
+    assert(i <= string_size(path));
     return string_substring(arena, path, 0, i);
 }
 
@@ -164,6 +166,43 @@ String numberAsString(Arena* arena, uint32_t number) {
     snprintf(result.buffer, digitsCount + 1, "%d", number);
     result.count = digitsCount;
     return result;
+}
+
+#ifdef _WIN32
+#include <io.h>
+#elif __APPLE__ || __LINUX__
+#include <unistd.h>
+#endif
+
+bool fileExists(char* path) { return (access(path, F_OK) == 0); }
+
+String getObjectFileName(Arena* arena, String path) {
+    String objectFileName = getPathWithoutExtension(arena, path);
+    switch (currentPlatform()) {
+    case Windows:
+        string_concat(arena, &objectFileName, cStringAsView(".obj"));
+        break;
+    case Linux:
+        string_concat(arena, &objectFileName, cStringAsView(".o"));
+        break;
+    case MacOS:
+        string_concat(arena, &objectFileName, cStringAsView(".o"));
+        break;
+    }
+    return objectFileName;
+}
+
+String getExecutableName(Arena* arena, String path) {
+    String executableName = getPathWithoutExtension(arena, path);
+    switch (currentPlatform()) {
+    case Windows: {
+        string_concat(arena, &executableName, cStringAsView(".exe"));
+        break;
+    }
+    case Linux: break;
+    case MacOS: break;
+    }
+    return executableName;
 }
 
 int numberOfDigits(uint32_t number) {

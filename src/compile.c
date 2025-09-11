@@ -116,7 +116,7 @@ static Uint32ListList findDependencyGraph(
     return graph;
 }
 
-Program compile(Arena* arena, StringView file, Arena scratch) {
+Program getProgramGraph(Arena* arena, StringView file, Arena scratch) {
     // Initialize program
     Program program = {0};
     list_append(arena, program.asts, (Ast){.arena = arena_new()});
@@ -133,109 +133,65 @@ Program compile(Arena* arena, StringView file, Arena scratch) {
     // Find dependecy graph
     program.dependencyGraph =
         findDependencyGraph(arena, &program.asts, scratch);
-    for (uint32_t i = 0; i < list_size(program.dependencyGraph); i++) {
-        for (uint32_t j = 0;
-             j < list_size(*list_get(program.dependencyGraph, i));
-             j++) {
-            uint32_t ast = *list_get(*list_get(program.dependencyGraph, i), j);
-            printf("%s\n", string_asCString(*list_get(program.paths, ast)));
-        }
-        printf("\n");
-    }
 
+    // Return
+    return program;
+}
+
+void parseProgram(Program* program, Arena scratch) {
     // Parse following dependecy graph
-    for (uint32_t i = 0; i < list_size(program.dependencyGraph); i++) {
-        Uint32List stage = *list_get(program.dependencyGraph, i);
+    for (uint32_t i = 0; i < list_size(program->dependencyGraph); i++) {
+        Uint32List stage = *list_get(program->dependencyGraph, i);
 
         for (uint32_t j = 0; j < list_size(stage); j++) {
             uint32_t astId = *list_get(stage, j);
 
             // reset AST
-            Ast* ast = list_get(program.asts, astId);
-            String path = *list_get(program.paths, astId);
+            Ast* ast = list_get(program->asts, astId);
+            String path = *list_get(program->paths, astId);
             ast_clear(ast);
 
             // Parse AST
-            clock_t start, end;
-            double timeSpent;
-            start = clock();
             Arena newScratch = scratch;
             String source = readFile(&newScratch, string_asCString(path));
             parse(ast, string_asCString(source), newScratch);
-            end = clock();
-            timeSpent = (double)(end - start) / CLOCKS_PER_SEC;
-            printf("Total 1: %g[s]\n\n", timeSpent);
 
             // Report errors if they are
             if (list_size(ast->errors) != 0) {
-                String path = *list_get(program.paths, astId);
+                String path = *list_get(program->paths, astId);
                 reportErrors(*ast, path, newScratch);
                 exit(EXIT_FAILURE);
             }
-
-            uint32_t sum = 0;
-            for (uint32_t i = 0; i < list_size(ast->code.instructions); i++) {
-                printf("%d ", ast_getInstruction(ast->code, i + 1));
-                sum += ast_getInstruction(ast->code, i + 1);
-            }
-            printf(
-                "\n#instructions: %u, sum: %u, data: %u\n",
-                list_size(ast->code.instructions),
-                sum,
-                list_size(ast->code.data)
-            );
-            printf(
-                "arena usage: %g\n",
-                ((double)ast->arena.offset / UINT32_MAX) * 100
-            );
         }
     }
+}
 
-    // Find interface for each module following reverse dependecy graph order
-
-    // Print
-    for (uint32_t i = 0; i < list_size(program.asts); i++) {
-        ast_print(
-            *list_get(program.asts, i),
-            *list_get(program.paths, i),
-            scratch
-        );
-        if (i + 1 < list_size(program.asts)) printf("\n\n");
-    }
-
+void analyzeProgram(Program* program, Arena scratch, Arena otherScratch) {
     // Do semantic analysis following dependecy graph
-    for (uint32_t i = 0; i < list_size(program.dependencyGraph); i++) {
-        Uint32List stage = *list_get(program.dependencyGraph, i);
+    for (uint32_t i = 0; i < list_size(program->dependencyGraph); i++) {
+        Uint32List stage = *list_get(program->dependencyGraph, i);
 
         for (uint32_t j = 0; j < list_size(stage); j++) {
             uint32_t astId = *list_get(stage, j);
-            analyze(program, astId, *arena, scratch);
+            analyze(*program, astId, scratch, otherScratch);
 
             // Report errors if they are
-            Ast ast = *list_get(program.asts, astId);
+            Ast ast = *list_get(program->asts, astId);
             if (list_size(ast.errors) != 0) {
-                String path = *list_get(program.paths, astId);
+                String path = *list_get(program->paths, astId);
                 reportErrors(ast, path, scratch);
                 exit(EXIT_FAILURE);
             }
         }
     }
+}
 
-    // Print
+void codegenObjectFiles(Program program, Arena scratch, Arena otherScratch) {
     for (uint32_t i = 0; i < list_size(program.asts); i++) {
-        ast_print(
-            *list_get(program.asts, i),
-            *list_get(program.paths, i),
-            scratch
-        );
-        if (i + 1 < list_size(program.asts)) printf("\n\n");
+        generateObjectCode(program, i, scratch, otherScratch);
     }
+}
 
-    // Generate object codes
-    for (uint32_t i = 0; i < list_size(program.asts); i++) {
-        generateObjectCode(program, i, *arena, scratch);
-    }
+void linkProgram(Program program, Arena scratch) {
     generateExecutable(program, scratch);
-
-    return program;
 }

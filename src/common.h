@@ -6,7 +6,7 @@
 #define todo() assert(false);
 #define unreachable() assert(false);
 
-typedef enum { Windows, Linux, MacOs } Platform;
+typedef enum { Windows, Linux, MacOS } Platform;
 
 Platform currentPlatform();
 

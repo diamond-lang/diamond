@@ -266,10 +266,6 @@ static void makeEqual(
 ) {
     TypeKind kind = type->kind;
     TypeKind kindExpected = otherType->kind;
-    String s1 = ast_typeAsString(&scratch, *context->ast, type, typeArena);
-    String s2 =
-        ast_typeAsString(&scratch, *context->ast, otherType, otherTypeArena);
-    printf("HERE!: %s | %s \n\n", s1.buffer, s2.buffer);
     switch (kind) {
     case TYPE_VARIABLE: {
         switch (kindExpected) {
@@ -689,14 +685,6 @@ static bool add(
     for (uint32_t i = 0; i < 2; i++) {
         args[i] = arena_getId(context->ast->arena, resultType);
     }
-    String s1 = ast_typeAsString(
-        &scratch,
-        *context->ast,
-        operatorType,
-        context->ast->arena
-    );
-    //String s2 = ast_typeAsString(&scratch, *context->ast, otherType);
-    printf("%s !!\n", s1.buffer);
 
     // Construct expected type
     TypeList temporary = {0};
@@ -722,9 +710,6 @@ static bool add(
         Type* argType = ast_getType(context->ast->types, argTypeId);
         arguments[i] = arena_getId(context->ast->arena, argType);
     }
-
-    String s2 = ast_typeAsString(&scratch, *context->ast, expected, scratch);
-    printf("%s !!!\n", s2.buffer);
 
     // Make type of called expression equal to expected type
     makeEqual(
@@ -837,13 +822,6 @@ static bool identifier(
         todo();
     }
     data->type = instantiateType(context, binding->type, scratch);
-    String string = ast_typeAsString(
-        &scratch,
-        *context->ast,
-        ast_getType(context->ast->types, data->type),
-        context->ast->arena
-    );
-    printf("%s\n", string.buffer);
     stack_push(&context->arena, context->stack, id);
     return true;
 }

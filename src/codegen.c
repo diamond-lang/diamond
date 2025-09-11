@@ -33,6 +33,20 @@ typedef struct {
     LLVMBasicBlockRef lastWhileBlock;       // Needed for continue
 } Context;
 
+static void init_context(
+    Context* context, Program program, uint32_t astId, Arena arena
+) {
+    context->arena = arena;
+    context->ast = list_get(program.asts, astId);
+    scopes_addScope(&context->arena, &context->scopes);
+    context->llvmContext = LLVMContextCreate();
+    context->llvmModule = LLVMModuleCreateWithNameInContext(
+        list_get(program.paths, astId)->buffer,
+        context->llvmContext
+    );
+    context->llvmBuilder = LLVMCreateBuilderInContext(context->llvmContext);
+}
+
 // static bool declaration(
 //     Context* ctx, Code* code, uint32_t id, AstDeclaration* data, Arena scratch
 // ) {
@@ -405,17 +419,6 @@ static void codegen(Context* context, Arena scratch) {
     LLVMBuildRet(context->llvmBuilder, returnValue);
 }
 
-static String getObjectFileName(Arena* arena, String executableName) {
-    String result = {0};
-    string_concat(arena, &result, string_asView(executableName));
-    switch (currentPlatform()) {
-    case Windows: string_concat(arena, &result, cStringAsView(".obj")); break;
-    case Linux: string_concat(arena, &result, cStringAsView(".o")); break;
-    case MacOs: string_concat(arena, &result, cStringAsView(".o")); break;
-    }
-    return result;
-}
-
 void generateObjectCode(
     Program program, uint32_t astId, Arena scratch, Arena otherScratch
 ) {
@@ -424,15 +427,7 @@ void generateObjectCode(
 
     // Initialize context
     Context context = {0};
-    context.arena = scratch;
-    context.ast = list_get(program.asts, astId);
-    scopes_addScope(&context.arena, &context.scopes);
-    context.llvmContext = LLVMContextCreate();
-    context.llvmModule = LLVMModuleCreateWithNameInContext(
-        list_get(program.paths, astId)->buffer,
-        context.llvmContext
-    );
-    context.llvmBuilder = LLVMCreateBuilderInContext(context.llvmContext);
+    init_context(&context, program, astId, otherScratch);
 
     // Codegen
     codegen(&context, scratch);
@@ -476,10 +471,8 @@ void generateObjectCode(
     LLVMSetTarget(context.llvmModule, triple);
 
     // Generate object code
-    String executableName =
-        getPathWithoutExtension(&scratch, *list_get(program.paths, 0));
-    executableName = getBasePath(&scratch, executableName);
-    String objectFileName = getObjectFileName(&scratch, executableName);
+    String objectFileName =
+        getObjectFileName(&scratch, *list_get(program.paths, 0));
     error = NULL;
     LLVMBool errorOcurred = LLVMTargetMachineEmitToFile(
         targetMachine,
@@ -505,7 +498,7 @@ static void link(String executableName, StringList objectFiles, Arena scratch) {
     switch (currentPlatform()) {
     case Windows: todo();
     case Linux: todo();
-    case MacOs: {
+    case MacOS: {
         String macosVersion = {0};
         string_concat(&scratch, &macosVersion, cStringAsView("11.0.0"));
 
@@ -543,10 +536,22 @@ void generateExecutable(Program program, Arena scratch) {
 
     // Link
     String executableName =
-        getPathWithoutExtension(&scratch, *list_get(program.paths, 0));
-    executableName = getBasePath(&scratch, executableName);
+        getExecutableName(&scratch, *list_get(program.paths, 0));
     StringList objectFiles = {0};
-    String objectFile = getObjectFileName(&scratch, executableName);
+    String objectFile =
+        getObjectFileName(&scratch, *list_get(program.paths, 0));
     list_append(&scratch, objectFiles, objectFile);
     link(executableName, objectFiles, scratch);
+
+    // Remove generated object file
+    remove(objectFile.buffer);
+}
+
+void printLLVMIR(
+    Program program, uint32_t astId, Arena scratch, Arena otherScratch
+) {
+    Context context = {0};
+    init_context(&context, program, astId, otherScratch);
+    codegen(&context, scratch);
+    LLVMDumpModule(context.llvmModule);
 }

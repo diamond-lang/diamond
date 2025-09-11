@@ -7,8 +7,9 @@
 #include <iostream>
 #include <string>
 
-#include "common.h"
 #include "types.h"
+
+#if __APPLE__
 
 LLD_HAS_DRIVER(macho)
 
@@ -19,27 +20,20 @@ extern "C" bool lld_link(CStringList args) {
     llvm::raw_string_ostream errorsStream(errors);
     std::vector<const char*> argsAsCStrings;
     for (uint32_t i = 0; i < list_size(args); i++) {
-        printf("%s ", *list_get(args, i));
         argsAsCStrings.push_back(*list_get(args, i));
     }
-    bool result;
-    switch (currentPlatform()) {
-    case Windows: todo();
-    case Linux: todo();
-    case MacOs: {
-        result = lld::macho::link(
-            argsAsCStrings,
-            outputStream,
-            errorsStream,
-            false,
-            false
-        );
-        break;
-    }
-    }
+    bool result = lld::macho::link(
+        argsAsCStrings,
+        outputStream,
+        errorsStream,
+        false,
+        false
+    );
     if (result == false) {
         std::cout << errors;
         return false;
     }
     return true;
 }
+
+#endif

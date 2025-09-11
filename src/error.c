@@ -9,6 +9,23 @@
 #include "types.h"
 #include "utilities.h"
 
+void error_printUsage() {
+    printf(
+        "\x1b[96mdiamond build [program file]\x1b[0m\n"
+        "    Creates a native executable.\n\n"
+        "\x1b[96mdiamond run [program file]\x1b[0m\n"
+        "    Runs the program.\n\n"
+        "\x1b[96mdiamond emit [options] [program file]\n\x1b[0m\n"
+        "    This command emits intermediary representations of\n"
+        "    the program. Is useful for debugging the compiler.\n\n"
+        "    The options are:\n"
+        "        --dependency-graph"
+        "        --ast\n"
+        "        --ast-with-types\n"
+        "        --llvm-ir"
+    );
+}
+
 static char* token_getLiteral(Ast ast, Token token) {
     switch (token.kind) {
     case LEFT_PAREN: return "(";

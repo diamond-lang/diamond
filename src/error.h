@@ -4,6 +4,8 @@
 #include "token.h"
 #include "types.h"
 
+void error_printUsage();
+
 typedef enum {
     FILE_NOT_FOUND,
 

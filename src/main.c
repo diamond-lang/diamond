@@ -6,34 +6,181 @@
 
 #include "arena.h"
 #include "ast.h"
+#include "codegen.h"
 #include "compile.h"
-#include "parser.h"
+#include "error.h"
 #include "program.h"
 #include "types.h"
 #include "utilities.h"
 
+#ifdef _WIN32
+#include <Windows.h>
+
+void enableColoredTextAndUnicode() {
+    // Colored text
+    HANDLE handle = GetStdHandle(STD_OUTPUT_HANDLE);
+    SetConsoleMode(
+        handle,
+        ENABLE_PROCESSED_OUTPUT | ENABLE_VIRTUAL_TERMINAL_PROCESSING
+    );
+
+    // Unicode
+    SetConsoleOutputCP(65001);
+}
+#endif
+
+typedef enum { BuildCommand, RunCommand, EmitCommand } CommandKind;
+
+typedef struct {
+    CommandKind kind;
+    String path;
+    StringList options;
+} Command;
+
+static void printUsageAndExit() {
+    error_printUsage();
+    exit(EXIT_FAILURE);
+}
+
+static void checkUsage(int argc, char* argv[]) {
+    if (argc < 3) {
+        printUsageAndExit();
+    }
+    if (strcmp(argv[1], "run") == 0 && argc < 3) {
+        printUsageAndExit();
+    }
+    if (strcmp(argv[1], "emit") == 0 &&
+        (argc < 4 || !((strcmp(argv[2], "--dependency-graph") == 0) ||
+                       (strcmp(argv[2], "--ast") == 0) ||
+                       (strcmp(argv[2], "--ast-with-types") == 0) ||
+                       (strcmp(argv[2], "--llvm-ir") == 0)))) {
+        printUsageAndExit();
+    }
+}
+
+static Command get_command(Arena* arena, int argc, char* argv[]) {
+    String path = {0};
+    StringList options = {0};
+    if (strcmp(argv[1], "build") == 0) {
+        string_concat(arena, &path, cStringAsView(argv[2]));
+        return (Command){BuildCommand, path, options};
+    }
+    if (strcmp(argv[1], "run") == 0) {
+        string_concat(arena, &path, cStringAsView(argv[2]));
+        return (Command){RunCommand, path, options};
+    }
+    if (strcmp(argv[1], "emit") == 0) {
+        String option = {0};
+        string_concat(arena, &option, cStringAsView(argv[2]));
+        string_concat(arena, &path, cStringAsView(argv[3]));
+        list_append(arena, options, option);
+        return (Command){EmitCommand, path, options};
+    }
+    assert(false);
+}
+
+static void build(Command command, Arena scratch, Arena otherScratch) {
+    Program program =
+        getProgramGraph(&otherScratch, string_asView(command.path), scratch);
+    parseProgram(&program, scratch);
+    analyzeProgram(&program, scratch, otherScratch);
+    codegenObjectFiles(program, scratch, otherScratch);
+    linkProgram(program, scratch);
+}
+
+static void run(Command command, Arena scratch, Arena otherScratch) {
+    Program program =
+        getProgramGraph(&otherScratch, string_asView(command.path), scratch);
+    String executableName =
+        getExecutableName(&scratch, *list_get(program.paths, 0));
+    bool alreadyExisted = fileExists(executableName.buffer);
+    parseProgram(&program, scratch);
+    analyzeProgram(&program, scratch, otherScratch);
+    codegenObjectFiles(program, scratch, otherScratch);
+    linkProgram(program, scratch);
+    system(executableName.buffer);
+    if (!alreadyExisted) {
+        remove(executableName.buffer);
+    }
+}
+
+static void emit(Command command, Arena scratch, Arena otherScratch) {
+    Program program =
+        getProgramGraph(&otherScratch, string_asView(command.path), scratch);
+    if (strcmp(list_get(command.options, 0)->buffer, "--dependency-graph") ==
+        0) {
+        for (uint32_t i = 0; i < list_size(program.dependencyGraph); i++) {
+            for (uint32_t j = 0;
+                 j < list_size(*list_get(program.dependencyGraph, i));
+                 j++) {
+                uint32_t ast =
+                    *list_get(*list_get(program.dependencyGraph, i), j);
+                printf("%s\n", string_asCString(*list_get(program.paths, ast)));
+            }
+            printf("\n");
+        }
+        return;
+    }
+    parseProgram(&program, scratch);
+    if (strcmp(list_get(command.options, 0)->buffer, "--ast") == 0) {
+        for (uint32_t i = 0; i < list_size(program.asts); i++) {
+            ast_print(
+                *list_get(program.asts, i),
+                *list_get(program.paths, i),
+                scratch
+            );
+            if (i + 1 < list_size(program.asts)) printf("\n\n");
+        }
+        return;
+    }
+    analyzeProgram(&program, scratch, otherScratch);
+    if (strcmp(list_get(command.options, 0)->buffer, "--ast-with-types") == 0) {
+        for (uint32_t i = 0; i < list_size(program.asts); i++) {
+            ast_print(
+                *list_get(program.asts, i),
+                *list_get(program.paths, i),
+                scratch
+            );
+            if (i + 1 < list_size(program.asts)) printf("\n\n");
+        }
+        return;
+    }
+    if (strcmp(list_get(command.options, 0)->buffer, "--llvm-ir") == 0) {
+        printLLVMIR(program, 0, scratch, otherScratch);
+        return;
+    }
+}
+
 int main(int argc, char* argv[]) {
-    assert(argc == 2);
+    Arena arena1 = arena_new();
+    Arena arena2 = arena_new();
 
-    // uint32_t* p = NULL;
-    // {
-    //     uint32_t a = 10;
-    //     p = &a;
-    // }
-    // printf("%d", *p);
+    // Enable colored text and unicode on windows
+#ifdef _WIN32
+    enableColoredTextAndUnicode();
+#endif
 
-    // Program program = (Program){List()};
-    // list_append(program.asts, (Ast){});
-    // initAst(
-    //     list_get(program.asts, 0),
-    //     getCanonicalPath((StringView){strlen(argv[1]), argv[1]})
-    // );
-    // parse(list_get(program.asts, 0));
+    // Check usage
+    checkUsage(argc, argv);
 
-    // Compile program
-    Arena arena = arena_new();
-    Arena scratch = arena_new();
-    (void)compile(&arena, cStringAsView(argv[1]), scratch);
+    // Get command line arguments
+    Command command = get_command(&arena1, argc, argv);
+
+    // Execute command
+    switch (command.kind) {
+    case BuildCommand: {
+        build(command, arena1, arena2);
+        break;
+    }
+    case RunCommand: {
+        run(command, arena1, arena2);
+        break;
+    }
+    case EmitCommand: {
+        emit(command, arena1, arena2);
+        break;
+    }
+    }
 
     return 0;
 }
