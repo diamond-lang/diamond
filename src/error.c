@@ -19,7 +19,7 @@ void error_printUsage() {
         "    This command emits intermediary representations of\n"
         "    the program. Is useful for debugging the compiler.\n\n"
         "    The options are:\n"
-        "        --dependency-graph"
+        "        --dependency-graph\n"
         "        --ast\n"
         "        --ast-with-types\n"
         "        --llvm-ir"

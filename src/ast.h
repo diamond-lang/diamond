@@ -333,7 +333,7 @@ char *ast_literalAsString(Ast ast, uint32_t literal);
 
 // Printing
 void ast_printType(Ast ast, uint32_t typeId, Arena scratch);
-void ast_print(Ast ast, String path, Arena scratch);
+void ast_print(Ast ast, String path, Arena scratch, Arena otherScratch);
 void reportErrors(Ast ast, String path, Arena scratch);
 
 #endif

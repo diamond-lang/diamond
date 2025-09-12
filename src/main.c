@@ -105,19 +105,25 @@ static void run(Command command, Arena scratch, Arena otherScratch) {
 }
 
 static void emit(Command command, Arena scratch, Arena otherScratch) {
+    String workingDirectory = getWorkingDirectory(&scratch);
     Program program =
         getProgramGraph(&otherScratch, string_asView(command.path), scratch);
     if (strcmp(list_get(command.options, 0)->buffer, "--dependency-graph") ==
         0) {
         for (uint32_t i = 0; i < list_size(program.dependencyGraph); i++) {
-            for (uint32_t j = 0;
-                 j < list_size(*list_get(program.dependencyGraph, i));
-                 j++) {
-                uint32_t ast =
-                    *list_get(*list_get(program.dependencyGraph, i), j);
-                printf("%s\n", string_asCString(*list_get(program.paths, ast)));
+            Uint32List stage = *list_get(program.dependencyGraph, i);
+            printf("stage%d\n", i + 1);
+            for (uint32_t j = 0; j < list_size(stage); j++) {
+                uint32_t ast = *list_get(stage, j);
+                Arena newScratch = scratch;
+                String relativePath = getRelativePath(
+                    &newScratch,
+                    workingDirectory,
+                    *list_get(program.paths, ast),
+                    otherScratch
+                );
+                printf("    %s\n", relativePath.buffer);
             }
-            printf("\n");
         }
         return;
     }
@@ -127,7 +133,8 @@ static void emit(Command command, Arena scratch, Arena otherScratch) {
             ast_print(
                 *list_get(program.asts, i),
                 *list_get(program.paths, i),
-                scratch
+                scratch,
+                otherScratch
             );
             if (i + 1 < list_size(program.asts)) printf("\n\n");
         }
@@ -139,7 +146,8 @@ static void emit(Command command, Arena scratch, Arena otherScratch) {
             ast_print(
                 *list_get(program.asts, i),
                 *list_get(program.paths, i),
-                scratch
+                scratch,
+                otherScratch
             );
             if (i + 1 < list_size(program.asts)) printf("\n\n");
         }

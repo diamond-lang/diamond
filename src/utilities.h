@@ -8,6 +8,7 @@
 
 String getWorkingDirectory(Arena* arena);
 String getCanonicalPath(Arena* arena, StringView importPath, Arena scratch);
+String getRelativePath(Arena* arena, String from, String to, Arena scratch);
 String getBasePath(Arena* arena, String path);
 String getPathWithoutExtension(Arena* arena, String path);
 String readFile(Arena* arena, char* path);

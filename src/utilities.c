@@ -43,9 +43,9 @@ typedef StackType(StringView) PartStack;
 static String normalizePath(Arena* arena, String path, Arena scratch) {
     // Get parts in path
     PartList parts = {0};
-    for (size_t i = 0; i < string_size(path);) {
+    for (uint32_t i = 0; i < string_size(path);) {
         if (string_get(path, i) == '/') i += 1;
-        size_t j = i;
+        uint32_t j = i;
         while (j < string_size(path) && string_get(path, j) != '/') j++;
         StringView part = (StringView){j - i, string_asCString(path) + i};
         if (!string_equal(part, cStringAsView(".")))
@@ -55,7 +55,7 @@ static String normalizePath(Arena* arena, String path, Arena scratch) {
 
     // Get normalized parts
     PartStack normalizedParts = {0};
-    for (size_t i = 0; i < list_size(parts); i++) {
+    for (uint32_t i = 0; i < list_size(parts); i++) {
         bool partIsTwoDots =
             string_equal(*list_get(parts, i), cStringAsView(".."));
         if (partIsTwoDots && stack_size(normalizedParts) != 0) {
@@ -76,7 +76,7 @@ static String normalizePath(Arena* arena, String path, Arena scratch) {
     // Construct normalized path and return
     String result = {0};
     if (isAbsolutePath(string_asView(path))) string_append(arena, &result, '/');
-    for (size_t i = 0; i < stack_size(normalizedParts); i++) {
+    for (uint32_t i = 0; i < stack_size(normalizedParts); i++) {
         StringView part = *stack_get(normalizedParts, i);
         string_concat(arena, &result, part);
         if (i + 1 != stack_size(normalizedParts))
@@ -112,6 +112,67 @@ String getCanonicalPath(Arena* arena, StringView importPath, Arena scratch) {
         canonicalPath = normalizePath(arena, canonicalPath, scratch);
         return canonicalPath;
     }
+}
+
+String getRelativePath(Arena* arena, String from, String to, Arena scratch) {
+    String relativePath = {0};
+
+    // Get parts in from
+    PartList partsFrom = {0};
+    for (uint32_t i = 0; i < string_size(from);) {
+        if (string_get(from, i) == '/') i += 1;
+        uint32_t j = i;
+        while (j < string_size(from) && string_get(from, j) != '/') j++;
+        StringView part = (StringView){j - i, string_asCString(from) + i};
+        if (!string_equal(part, cStringAsView(".")))
+            list_append(&scratch, partsFrom, part);
+        i = j;
+    }
+
+    // Get parts in to
+    PartList partsTo = {0};
+    for (uint32_t i = 0; i < string_size(to);) {
+        if (string_get(to, i) == '/') i += 1;
+        uint32_t j = i;
+        while (j < string_size(to) && string_get(to, j) != '/') j++;
+        StringView part = (StringView){j - i, string_asCString(to) + i};
+        if (!string_equal(part, cStringAsView(".")))
+            list_append(&scratch, partsTo, part);
+        i = j;
+    }
+
+    // Find part where absolute paths diverge
+    uint32_t different = 0;
+    for (; different < list_size(partsFrom) && different < list_size(partsTo);
+         different++) {
+        StringView partFrom = *list_get(partsFrom, different);
+        StringView partTo = *list_get(partsTo, different);
+        if (!string_equal(partFrom, partTo)) {
+            break;
+        }
+    }
+
+    // Add ".." to go "from" path to "to" path
+    uint32_t partsTotal =
+        (list_size(partsFrom) - different) + (list_size(partsTo) - different);
+    for (uint32_t i = different; i < list_size(partsFrom); i++) {
+        string_concat(arena, &relativePath, cStringAsView(".."));
+        if ((i - different) + 1 != partsTotal) {
+            string_concat(arena, &relativePath, cStringAsView("/"));
+        }
+    }
+
+    // Add parts from "to" path
+    for (uint32_t i = different; i < list_size(partsTo); i++) {
+        StringView part = *list_get(partsTo, i);
+        string_concat(arena, &relativePath, part);
+        if ((i - different) + 1 != partsTotal) {
+            string_concat(arena, &relativePath, cStringAsView("/"));
+        }
+    }
+
+    // Return
+    return relativePath;
 }
 
 String getBasePath(Arena* arena, String path) {

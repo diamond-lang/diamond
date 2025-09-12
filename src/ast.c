@@ -529,8 +529,11 @@ static void ast_printFunction(
     ast_printCode(ast, function.code, indentationLevel + 1, scratch);
 }
 
-void ast_print(Ast ast, String path, Arena scratch) {
-    printf("%s\n", string_asCString(path));
+void ast_print(Ast ast, String path, Arena scratch, Arena otherScratch) {
+    String workinDirectory = getWorkingDirectory(&scratch);
+    String relativePath =
+        getRelativePath(&otherScratch, workinDirectory, path, otherScratch);
+    printf("%s\n", string_asCString(relativePath));
     for (uint32_t i = 0; i < list_size(ast.imports); i++) {
         ast_printIndentation(1);
         printf(
