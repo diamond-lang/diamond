@@ -1,0 +1,25 @@
+{
+  "configurations": [
+    {
+      "name": "Debug diamond",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/diamond",
+      "args": ["build", "${input:filePath}"],
+      "stopAtEntry": true,
+      "cwd": "${workspaceFolder}",
+      "environment": [],
+      "externalConsole": false,
+      "MIMode": "lldb"
+    }
+  ],
+  "inputs": [
+    {
+      "id": "filePath",
+      "type": "promptString",
+      "description": "Program to build",
+      "default": ""
+    }
+  ],
+  "version": "2.0.0"
+}
