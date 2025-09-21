@@ -63,6 +63,7 @@ typedef ListType(char*) CStringList;
             list_initialChunkSize * (1 << (list).chunksCount)         \
         );                                                            \
         (list).chunksCount += 1;                                      \
+        assert((list).chunksCount <= 24);                             \
     } while (false)
 
 #define list_append(arena, list, item)                  \

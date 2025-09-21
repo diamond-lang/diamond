@@ -18,6 +18,7 @@ void ast_clear(Ast* ast) {
     ast->importedAsts.count = 0;
     ast->imports.count = 0;
     ast->functions.count = 0;
+    ast->interfaces.count = 0;
     ast->typeDefinitions.count = 0;
     ast->code.instructions.count = 0;
     ast->code.dataOrIndex.count = 0;
@@ -344,7 +345,7 @@ static void ast_printCode(
 
     for (uint32_t i = 1; i <= list_size(code.instructions); i += 1) {
         ast_printIndentation(indentationLevel + stack_size(indentation));
-        AstInstructionKind kind = ast_getInstruction(ast.code, i);
+        AstInstructionKind kind = ast_getInstruction(code, i);
         switch (kind) {
         case AST_DECLARATION: {
             AstDeclaration* data = ast_getData(&code, i);
@@ -500,6 +501,38 @@ static void ast_printTypeDefinition(
     }
 }
 
+static void ast_printInterface(
+    Ast ast, Interface interface, uint32_t indentationLevel, Arena scratch
+) {
+    ast_printIndentation(indentationLevel);
+    printf(
+        "interface %s[%s]",
+        ast_literalAsString(ast, interface.identifier),
+        ast_literalAsString(ast, interface.parameter)
+    );
+    printf("(");
+    for (uint32_t i = 0; i < list_size(interface.arguments); i++) {
+        FunctionArgument argument = *list_get(interface.arguments, i);
+        if (argument.mutable) {
+            printf("mut ");
+        }
+        printf("%s", ast_literalAsString(ast, argument.identifier));
+        if (argument.type != None()) {
+            printf(": ");
+            ast_printType(ast, argument.type, scratch);
+        }
+        if (i + 1 != list_size(interface.arguments)) {
+            printf(", ");
+        }
+    }
+    printf(")");
+    if (interface.returnType != None()) {
+        printf(": ");
+        ast_printType(ast, interface.returnType, scratch);
+    }
+    printf("\n");
+}
+
 static void ast_printFunction(
     Ast ast, Function function, uint32_t indentationLevel, Arena scratch
 ) {
@@ -549,6 +582,9 @@ void ast_print(Ast ast, String path, Arena scratch, Arena otherScratch) {
             1,
             scratch
         );
+    }
+    for (uint32_t i = 0; i < list_size(ast.interfaces); i++) {
+        ast_printInterface(ast, *list_get(ast.interfaces, i), 1, scratch);
     }
     for (uint32_t i = 0; i < list_size(ast.functions); i++) {
         ast_printFunction(ast, *list_get(ast.functions, i), 1, scratch);

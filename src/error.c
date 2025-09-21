@@ -41,6 +41,7 @@ static char* token_getLiteral(Ast ast, Token token) {
     case STAR: return "*";
     case MINUS: return "-";
     case COLON: return ":";
+    case COLON_COLON: return "::";
     case AMPERSAND: return "&";
     case DOT: return ".";
     case NOT: return "not";
@@ -100,6 +101,7 @@ static char* ast_tokenAsString(TokenKind kind) {
     case STAR: return "'*'";
     case MINUS: return "'-'";
     case COLON: return "':'";
+    case COLON_COLON: return "'::'";
     case AMPERSAND: return "'&'";
     case DOT: return "'.'";
     case NOT: return "'not'";

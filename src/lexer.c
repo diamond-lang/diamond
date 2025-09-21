@@ -127,6 +127,7 @@ start:
     case '%': return createToken(lexer, MODULO);
     case ':': {
         if (match(lexer, '=')) return createToken(lexer, COLON_EQUAL);
+        if (match(lexer, ':')) return createToken(lexer, COLON_COLON);
         return createToken(lexer, COLON);
     }
     case ',': return createToken(lexer, COMMA);
@@ -222,6 +223,8 @@ static Token scanIdentifierOrKeyword(Lexer* lexer) {
     if (identifierEquals(lexer, "not")) return createToken(lexer, NOT);
     if (identifierEquals(lexer, "extern")) return createToken(lexer, EXTERN);
     if (identifierEquals(lexer, "import")) return createToken(lexer, IMPORT);
+    if (identifierEquals(lexer, "interface"))
+        return createToken(lexer, INTERFACE);
     if (lexer->parsingBuiltins && identifierEquals(lexer, "builtin"))
         return createToken(lexer, BUILTIN);
 

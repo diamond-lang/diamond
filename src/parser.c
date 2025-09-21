@@ -320,10 +320,11 @@ static uint32_t statementOrDefinition(Parser *parser) {
     if (match(parser, INTERFACE)) return interface(parser, prev);
     if (match(parser, EXTERN)) return externDefinition(parser, prev);
     if (match(parser, TYPE)) return typeDefinition(parser, prev);
+    if (match(parser, INTERFACE)) return interface(parser, prev);
     return statement(parser);
 }
 
-static uint32_t functionArgument(Parser *parser, Function *function) {
+static uint32_t functionArgument(Parser *parser, FunctionArgumentList *args) {
     FunctionArgument argument = {false, None(), None()};
     if (match(parser, MUT)) {
         argument.mutable = true;
@@ -337,22 +338,19 @@ static uint32_t functionArgument(Parser *parser, Function *function) {
         bind(annotation, typeAnnotation(parser, parser->previous));
         argument.type = annotation;
     }
-    list_append(&parser->ast->arena, function->arguments, argument);
-    return list_size(function->arguments);
+    list_append(&parser->ast->arena, *args, argument);
+    return list_size(*args);
 }
 
-// function → "function" IDENTIFIER type_parameters? "(" (functionArgument (":" type)? ",")* ")" (":" type)? block
+// function → "function" IDENTIFIER "(" (functionArgument (":" type)? ("," functionArgument (":" type)?)*)? ")" (":" type)? block
 static uint32_t function(Parser *parser, Token keyword) {
     Function function = {0};
     assert(keyword.kind == FUNCTION);
     consume(parser, IDENTIFIER, "a function");
     function.identifier = parser->previous.literal;
-    if (match(parser, LEFT_BRACKET)) {
-        todo();
-    }
     consume(parser, LEFT_PAREN, "a function");
     while (!atEnd(*parser) && !check(*parser, RIGHT_PAREN)) {
-        expect(functionArgument(parser, &function));
+        expect(functionArgument(parser, &function.arguments));
         if (!match(parser, COMMA)) break;
     }
     consume(parser, RIGHT_PAREN, "a function");
@@ -390,15 +388,59 @@ static uint32_t function(Parser *parser, Token keyword) {
     if (!parser->lexer.parsingBuiltins || !match(parser, BUILTIN)) {
         Code *backup = parser->code;
         parser->code = &function.code;
-        bind(body, block(parser));
+        uint32_t result = block(parser);
         parser->code = backup;
+        if (result == None()) return result;
     }
     list_append(&parser->ast->arena, parser->ast->functions, function);
-    return list_size(parser->ast->functions) - 1;
+    return list_size(parser->ast->functions);
 }
 
-// interface → "interface" IDENTIFIER type_parameters "(" (function_argument ":" type) ",")* ")" ":" type
-static uint32_t interface(Parser *parser, Token keyword) { todo(); }
+// interface → "interface" IDENTIFIER "[" IDENTIFIER "]" "(" (functionArgument ":" type ("," functionArgument ":" type)*)? ")" ":" type
+static uint32_t interface(Parser *parser, Token keyword) {
+    assert(keyword.kind == INTERFACE);
+    Interface interface = {0};
+    consume(parser, IDENTIFIER, "an interface");
+    interface.identifier = parser->previous.literal;
+    consume(parser, LEFT_BRACKET, "an interface");
+    consume(parser, IDENTIFIER, "an interface");
+    interface.parameter = parser->previous.literal;
+    consume(parser, RIGHT_BRACKET, "an interface");
+    consume(parser, LEFT_PAREN, "an interface");
+    while (!atEnd(*parser) && !check(*parser, RIGHT_PAREN)) {
+        expect(functionArgument(parser, &interface.arguments));
+        if (!match(parser, COMMA)) break;
+    }
+    consume(parser, RIGHT_PAREN, "an interface");
+    consume(parser, COLON, "an interface");
+    bind(annotation, typeAnnotation(parser, parser->previous));
+    interface.returnType = annotation;
+    bool allTypesSet = true;
+    for (uint32_t i = 0; i < list_size(interface.arguments); i++) {
+        if (list_get(interface.arguments, i)->type == None()) {
+            allTypesSet = false;
+            break;
+        }
+    }
+    if (!allTypesSet) {
+        todo();
+    }
+    interface.type = ast_addFunctionType(
+        &parser->ast->arena,
+        &parser->ast->types,
+        interface.returnType,
+        list_size(interface.arguments)
+    );
+    TypeWithParams *type =
+        &ast_getType(parser->ast->types, interface.type)->withParams;
+    uint32_t *params =
+        arena_getPointer(parser->ast->arena, uint32_t, type->parameters);
+    for (uint32_t i = 0; i < list_size(interface.arguments); i++) {
+        params[i] = list_get(interface.arguments, i)->type;
+    }
+    list_append(&parser->ast->arena, parser->ast->interfaces, interface);
+    return list_size(parser->ast->interfaces) - 1;
+}
 
 // extern → "extern" IDENTIFIER "(" (IDENTIFIER ":" type "..."? ("," IDENTIFIER ":" type "..."?)*)? ")" ":" type
 static uint32_t externDefinition(Parser *parser, Token keyword) { todo(); }
@@ -483,7 +525,7 @@ static uint32_t block(Parser *parser) {
 
     // Return
     if (initialErrorCount < list_size(parser->ast->errors)) return None();
-    else return 0;
+    else return 1;
 }
 
 // statement → return | ifElse | while | break | continue | declaration |

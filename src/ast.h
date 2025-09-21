@@ -214,6 +214,8 @@ typedef struct {
     uint32_t path;
 } Import;
 
+typedef ListType(Import) ImportList;
+
 typedef struct {
     bool mutable;
     uint32_t identifier;
@@ -230,14 +232,32 @@ typedef struct {
     Code code;
 } Function;
 
+typedef ListType(Function) FunctionList;
+
+typedef struct {
+    uint32_t astId;
+    uint32_t functionId;
+} Implementation;
+
+typedef ListType(Implementation) ImplementationList;
+
+typedef struct {
+    uint32_t identifier;
+    uint32_t parameter;
+    FunctionArgumentList arguments;
+    uint32_t returnType;
+    uint32_t type;
+    ImplementationList implementations;
+} Interface;
+
+typedef ListType(Interface) InterfaceList;
+
 typedef struct {
     uint32_t identifier;
     Uint32List fields;
     Uint32List fieldTypes;
 } TypeDefinition;
 
-typedef ListType(Import) ImportList;
-typedef ListType(Function) FunctionList;
 typedef ListType(TypeDefinition) TypeDefinitionList;
 
 // Types
@@ -284,6 +304,7 @@ typedef struct Ast {
     Uint32List importedAsts;
     ImportList imports;
     FunctionList functions;
+    InterfaceList interfaces;
     TypeDefinitionList typeDefinitions;
     Code code;
     LiteralList literals;

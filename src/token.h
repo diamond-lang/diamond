@@ -20,6 +20,7 @@ typedef enum {
     STAR,
     MINUS,
     COLON,
+    COLON_COLON,
     AMPERSAND,
     DOT,
     NOT,
