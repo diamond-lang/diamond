@@ -203,6 +203,7 @@ void parseBuiltin(Ast *ast, char *source, Arena scratch) {
     if (check(*parser, NEW_LINES)) indentationLevel = parser->next.column; \
     if (indentationLevel < *stack_top(parser->indentationLevel)) break;    \
     else if (indentationLevel > *stack_top(parser->indentationLevel)) {    \
+        if (check(*parser, NEW_LINES)) advance(parser);                    \
         addError(parser, UNEXPECTED_IDENTATION);                           \
         consumeIfExists(parser, NEW_LINES);                                \
         advanceUntilNewLine(parser);                                       \
