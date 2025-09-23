@@ -13,33 +13,50 @@ typedef enum {
 
 typedef struct {
     BindingKind kind;
-    uint32_t id;
-    uint32_t module;
+    uint32_t identifier;
     uint32_t type;
+    uint32_t module;
 } Binding;
 
-typedef HashmapType(Binding) BindingMap;
-typedef StackType(BindingMap) BindingMapStack;
+typedef StackType(Binding) BindingStack;
 
 typedef struct {
-    uint32_t id;
+    BindingStack bindings;
+    Uint32Stack scopeStart;
+} Scopes;
+
+typedef struct {
+    uint32_t identifier;
     uint32_t module;
 } TypeBinding;
 
-typedef HashmapType(TypeBinding) TypeBindingMap;
+typedef ListType(TypeBinding) TypeBindingList;
 
 typedef struct {
-    TypeBindingMap types;
-    BindingMapStack bindings;
-} Scopes;
+    TypeBindingList types;
+    Scopes scopes;
+} Bindings;
 
-void scopes_addScope(Arena* arena, Scopes* scopes);
-void scopes_removeScope(Scopes* scopes);
-Binding* scopes_getBinding(Scopes* scopes, uint32_t literalId);
-TypeBinding* scopes_getTypeBinding(Scopes* scopes, uint32_t literalId);
-BindingMap* scopes_current(Scopes* scopes);
-void scopes_addBinding(
-    Arena* arena, BindingMap* scope, uint32_t literalId, Binding binding
+void scopes_addScope(Arena* arena, Bindings* bindings);
+void scopes_removeScope(Bindings* bindings);
+Binding* scopes_getBinding(Bindings bindings, uint32_t literalId);
+Binding* scopes_getBindingInCurrentScope(Bindings bindings, uint32_t literalId);
+void scopes_addArgumentBinding(
+    Arena* arena, Bindings* bindings, uint32_t literalId, uint32_t type
+);
+void scopes_addVariableBinding(
+    Arena* arena, Bindings* bindings, uint32_t literalId, uint32_t type
+);
+void scopes_addFunctionBinding(
+    Arena* arena,
+    Bindings* bindings,
+    uint32_t literalId,
+    uint32_t type,
+    uint32_t module
+);
+TypeBinding* scopes_getTypeBinding(Bindings bindings, uint32_t literalId);
+void scopes_addTypeBinding(
+    Arena* arena, Bindings* bindings, uint32_t identifier, uint32_t module
 );
 
 #endif

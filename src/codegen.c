@@ -21,7 +21,7 @@
 
 typedef struct {
     Ast* ast;
-    Scopes scopes;
+    Bindings bindings;
     Uint32Stack stack;
     uint32_t lastTypeVariable;
     Arena arena;
@@ -38,7 +38,7 @@ static void init_context(
 ) {
     context->arena = arena;
     context->ast = list_get(program.asts, astId);
-    scopes_addScope(&context->arena, &context->scopes);
+    scopes_addScope(&context->arena, &context->bindings);
     context->llvmContext = LLVMContextCreate();
     context->llvmModule = LLVMModuleCreateWithNameInContext(
         list_get(program.paths, astId)->buffer,
@@ -420,17 +420,17 @@ static void codegen(Context* context, Arena scratch) {
 }
 
 void generateObjectCode(
-    Program program, uint32_t astId, Arena scratch, Arena otherScratch
+    Program program, uint32_t astId, Arena scratch1, Arena scratch2
 ) {
     assert(astId == 0);
     char* error = NULL;
 
     // Initialize context
     Context context = {0};
-    init_context(&context, program, astId, otherScratch);
+    init_context(&context, program, astId, scratch1);
 
     // Codegen
-    codegen(&context, scratch);
+    codegen(&context, scratch2);
 
     // Initialize code generation
     LLVMInitializeAllTargetInfos();
@@ -472,7 +472,7 @@ void generateObjectCode(
 
     // Generate object code
     String objectFileName =
-        getObjectFileName(&scratch, *list_get(program.paths, 0));
+        getObjectFileName(&scratch1, *list_get(program.paths, 0));
     error = NULL;
     LLVMBool errorOcurred = LLVMTargetMachineEmitToFile(
         targetMachine,
@@ -548,10 +548,10 @@ void generateExecutable(Program program, Arena scratch) {
 }
 
 void printLLVMIR(
-    Program program, uint32_t astId, Arena scratch, Arena otherScratch
+    Program program, uint32_t astId, Arena scratch1, Arena scratch2
 ) {
     Context context = {0};
-    init_context(&context, program, astId, otherScratch);
-    codegen(&context, scratch);
+    init_context(&context, program, astId, scratch1);
+    codegen(&context, scratch2);
     LLVMDumpModule(context.llvmModule);
 }

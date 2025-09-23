@@ -166,29 +166,29 @@ void parseProgram(Program* program, Arena scratch) {
     }
 }
 
-void analyzeProgram(Program* program, Arena scratch, Arena otherScratch) {
+void analyzeProgram(Program* program, Arena scratch1, Arena scratch2) {
     // Do semantic analysis following dependecy graph
     for (uint32_t i = 0; i < list_size(program->dependencyGraph); i++) {
         Uint32List stage = *list_get(program->dependencyGraph, i);
 
         for (uint32_t j = 0; j < list_size(stage); j++) {
             uint32_t astId = *list_get(stage, j);
-            analyze(*program, astId, scratch, otherScratch);
+            analyze(*program, astId, scratch1, scratch2);
 
             // Report errors if they are
             Ast ast = *list_get(program->asts, astId);
             if (list_size(ast.errors) != 0) {
                 String path = *list_get(program->paths, astId);
-                reportErrors(ast, path, scratch);
+                reportErrors(ast, path, scratch1);
                 exit(EXIT_FAILURE);
             }
         }
     }
 }
 
-void codegenObjectFiles(Program program, Arena scratch, Arena otherScratch) {
+void codegenObjectFiles(Program program, Arena scratch1, Arena scratch2) {
     for (uint32_t i = 0; i < list_size(program.asts); i++) {
-        generateObjectCode(program, i, scratch, otherScratch);
+        generateObjectCode(program, i, scratch1, scratch2);
     }
 }
 

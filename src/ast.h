@@ -15,7 +15,7 @@ typedef enum {
     AST_DECLARATION,
     AST_ASSIGNMENT,
     AST_RETURN,
-    AST_RETURN_EXPRESSION,
+    AST_RETURN_LAST_EXPRESSION,
     AST_BREAK,
     AST_CONTINUE,
     AST_IF_ELSE,
@@ -69,7 +69,7 @@ typedef struct {
 } AstReturn;
 
 typedef struct {
-} AstReturnExpression;
+} AstReturnLastExpression;
 
 typedef struct {
 } AstBreak;
@@ -230,6 +230,7 @@ typedef struct {
     uint32_t returnType;
     uint32_t type;
     Code code;
+    uint32_t beingAnalyzed;
 } Function;
 
 typedef ListType(Function) FunctionList;
@@ -271,20 +272,13 @@ typedef struct {
     uint32_t parameters;
 } TypeWithParams;
 
-typedef struct {
-    uint32_t returnType;
-    uint32_t argumentsCount;
-    uint32_t arguments;
-} FunctionType;
-
-typedef enum { TYPE_VARIABLE, TYPE_WITH_PARAMS, FUNCTION_TYPE } TypeKind;
+typedef enum { TYPE_VARIABLE, TYPE_WITH_PARAMS } TypeKind;
 
 typedef struct {
     uint32_t kind;
     union {
         TypeVariable variable;
         TypeWithParams withParams;
-        FunctionType functionType;
     };
 } Type;
 
@@ -325,17 +319,16 @@ void ast_addData(Arena *arena, Code *code, uint32_t instruction);
 void *ast_getData(Code *code, uint32_t instruction);
 
 // Types handling
-uint32_t ast_addTypeVariable(
-    Arena *arena, TypeList *types, uint32_t typeVariable
-);
+uint32_t ast_addTypeVariable(Ast *ast, uint32_t typeVariable);
 uint32_t ast_addTypeWithParams(
-    Arena *arena, TypeList *types, uint32_t literal, uint32_t parameterCount
+    Ast *ast, uint32_t literal, uint32_t parameterCount
 );
-uint32_t ast_addFunctionType(
-    Arena *arena, TypeList *types, uint32_t returnType, uint32_t argumentsCount
+uint32_t ast_addFunctionType(Ast *ast, uint32_t parameterCount);
+Type *ast_createTemporaryTypeWithParams(
+    Arena *arena, uint32_t literal, uint32_t parameterCount
 );
 Type *ast_getType(TypeList types, uint32_t type);
-uint32_t ast_getTypeOfInstruction(Ast ast, uint32_t instruction);
+uint32_t ast_getTypeOfInstruction(Code code, uint32_t instruction);
 String ast_typeAsString(Arena *arena, Ast ast, Type *type, Arena typeArena);
 
 // Literals handling
@@ -354,7 +347,7 @@ char *ast_literalAsString(Ast ast, uint32_t literal);
 
 // Printing
 void ast_printType(Ast ast, uint32_t typeId, Arena scratch);
-void ast_print(Ast ast, String path, Arena scratch, Arena otherScratch);
+void ast_print(Ast ast, String path, Arena scratch1, Arena scratch2);
 void reportErrors(Ast ast, String path, Arena scratch);
 
 #endif

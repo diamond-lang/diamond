@@ -51,7 +51,9 @@ static uint32_t ast_numberOfSlotsUsedInData(AstInstructionKind kind) {
     case AST_DECLARATION: result = sizeof(AstDeclaration); break;
     case AST_ASSIGNMENT: result = sizeof(AstAssignment); break;
     case AST_RETURN: result = sizeof(AstReturn); break;
-    case AST_RETURN_EXPRESSION: result = sizeof(AstReturnExpression); break;
+    case AST_RETURN_LAST_EXPRESSION:
+        result = sizeof(AstReturnLastExpression);
+        break;
     case AST_BREAK: result = sizeof(AstBreak); break;
     case AST_CONTINUE: result = sizeof(AstContinue); break;
     case AST_IF_ELSE: result = sizeof(AstIfElse); break;
@@ -112,58 +114,70 @@ void* ast_getData(Code* code, uint32_t instruction) {
     }
 }
 
-uint32_t ast_addTypeVariable(
-    Arena* arena, TypeList* types, uint32_t typeVariable
-) {
+uint32_t ast_addTypeVariable(Ast* ast, uint32_t typeVariable) {
     Type newType = {TYPE_VARIABLE, .variable = (TypeVariable){typeVariable}};
-    list_append(arena, *types, newType);
-    return list_size(*types);
+    list_append(&ast->arena, ast->types, newType);
+    return list_size(ast->types);
 }
 
 uint32_t ast_addTypeWithParams(
-    Arena* arena, TypeList* types, uint32_t literal, uint32_t parameterCount
+    Ast* ast, uint32_t literal, uint32_t parameterCount
+) {
+    uint32_t* params = arena_alloc(&ast->arena, uint32_t, parameterCount);
+    for (uint32_t i = 0; i < parameterCount; i++) params[i] = None();
+    Type type = {0};
+    type.kind = TYPE_WITH_PARAMS;
+    type.withParams.literal = literal;
+    type.withParams.parameterCount = parameterCount;
+    type.withParams.parameters = arena_getId(ast->arena, params);
+    list_append(&ast->arena, ast->types, type);
+    return list_size(ast->types);
+}
+
+uint32_t ast_addFunctionType(Ast* ast, uint32_t argumentsCount) {
+    return ast_addTypeWithParams(
+        ast,
+        ast_getLiteral(ast, "->"),
+        argumentsCount + 1
+    );
+}
+
+Type* ast_createTemporaryTypeWithParams(
+    Arena* arena, uint32_t literal, uint32_t parameterCount
 ) {
     uint32_t* params = arena_alloc(arena, uint32_t, parameterCount);
     for (uint32_t i = 0; i < parameterCount; i++) params[i] = None();
-    Type newType = {
-        TYPE_WITH_PARAMS,
-        .withParams = (TypeWithParams
-        ){literal, parameterCount, arena_getId(*arena, params)}
-    };
-    list_append(arena, *types, newType);
-    return list_size(*types);
+    Type* type = arena_alloc(arena, Type, parameterCount);
+    type->kind = TYPE_WITH_PARAMS;
+    type->withParams.literal = literal;
+    type->withParams.parameterCount = parameterCount;
+    type->withParams.parameters = arena_getId(*arena, params);
+    return type;
 }
 
-uint32_t ast_addFunctionType(
-    Arena* arena, TypeList* types, uint32_t returnType, uint32_t argumentsCount
-) {
-    uint32_t* args = arena_alloc(arena, uint32_t, argumentsCount);
-    for (uint32_t i = 0; i < argumentsCount; i++) args[i] = None();
-    Type newType = {
-        FUNCTION_TYPE,
-        .functionType = (FunctionType
-        ){returnType, argumentsCount, arena_getId(*arena, args)}
-    };
-    list_append(arena, *types, newType);
-    return list_size(*types);
+uint32_t* ast_getParams(Arena arena, Type* type) {
+    assert(type->kind == TYPE_WITH_PARAMS);
+    uint32_t* params =
+        arena_getPointer(arena, uint32_t, type->withParams.parameters);
+    return params;
 }
 
 Type* ast_getType(TypeList types, uint32_t type) {
     return list_get(types, type - 1);
 }
 
-uint32_t ast_getTypeOfInstruction(Ast ast, uint32_t instruction) {
-    AstInstructionKind kind = ast_getInstruction(ast.code, instruction);
+uint32_t ast_getTypeOfInstruction(Code code, uint32_t instruction) {
+    AstInstructionKind kind = ast_getInstruction(code, instruction);
     switch (kind) {
     case AST_DECLARATION: unreachable();
     case AST_ASSIGNMENT: unreachable();
     case AST_RETURN: unreachable();
-    case AST_RETURN_EXPRESSION: unreachable();
+    case AST_RETURN_LAST_EXPRESSION: unreachable();
     case AST_BREAK: unreachable();
     case AST_CONTINUE: unreachable();
     case AST_IF_ELSE: unreachable();
     case AST_WHILE: unreachable();
-    case AST_CALL: return ((AstCall*)ast_getData(&ast.code, instruction))->type;
+    case AST_CALL: return ((AstCall*)ast_getData(&code, instruction))->type;
     case AST_IF_ELSE_EXPRESSION: todo();
     case AST_NOT: todo();
     case AST_OR: todo();
@@ -174,7 +188,7 @@ uint32_t ast_getTypeOfInstruction(Ast ast, uint32_t instruction) {
     case AST_LESS_EQUAL: todo();
     case AST_GREATER: todo();
     case AST_GREATER_EQUAL: todo();
-    case AST_ADD: return ((AstAdd*)ast_getData(&ast.code, instruction))->type;
+    case AST_ADD: return ((AstAdd*)ast_getData(&code, instruction))->type;
     case AST_SUBTRACT: todo();
     case AST_MUL: todo();
     case AST_DIV: todo();
@@ -184,14 +198,13 @@ uint32_t ast_getTypeOfInstruction(Ast ast, uint32_t instruction) {
     case AST_ADDRESS_OF: todo();
     case AST_FIELD_ACCESS: todo();
     case AST_INDEX_ACCESS: todo();
-    case AST_FLOAT:
-        return ((AstFloat*)ast_getData(&ast.code, instruction))->type;
+    case AST_FLOAT: return ((AstFloat*)ast_getData(&code, instruction))->type;
     case AST_INTEGER:
-        return ((AstInteger*)ast_getData(&ast.code, instruction))->type;
+        return ((AstInteger*)ast_getData(&code, instruction))->type;
     case AST_IDENTIFIER:
-        return ((AstIdentifier*)ast_getData(&ast.code, instruction))->type;
+        return ((AstIdentifier*)ast_getData(&code, instruction))->type;
     case AST_BOOLEAN:
-        return ((AstBoolean*)ast_getData(&ast.code, instruction))->type;
+        return ((AstBoolean*)ast_getData(&code, instruction))->type;
     case AST_STRING: todo();
     case AST_ARRAY: todo();
     case AST_STRUCT_LITERAL: todo();
@@ -208,47 +221,50 @@ String ast_typeAsString(Arena* arena, Ast ast, Type* type, Arena typeArena) {
     }
     case TYPE_WITH_PARAMS: {
         TypeWithParams* data = &type->withParams;
-        string_concat(arena, &result, ast_literalAsView(ast, data->literal));
-        if (data->parameterCount > 0) {
-            string_append(arena, &result, '[');
-            uint32_t* params =
+        if (data->literal == ast_getLiteral(&ast, "->")) {
+            assert(data->parameterCount >= 2);
+            string_append(arena, &result, '(');
+            uint32_t* args =
                 arena_getPointer(typeArena, uint32_t, data->parameters);
-            for (uint32_t i = 0; i < data->parameterCount; i++) {
-                Type* paramPointer =
-                    arena_getPointer(ast.arena, Type, params[i]);
-                String param =
-                    ast_typeAsString(arena, ast, paramPointer, ast.arena);
+            for (uint32_t i = 0; i < data->parameterCount - 1; i++) {
+                Type* arg = ast_getType(ast.types, args[i]);
+                String param = ast_typeAsString(arena, ast, arg, ast.arena);
                 string_concat(arena, &result, string_asView(param));
-                if (i + 1 != data->parameterCount) {
+                if (i + 1 != data->parameterCount - 1) {
                     string_append(arena, &result, ',');
                     string_append(arena, &result, ' ');
                 }
             }
-            string_append(arena, &result, ']');
-        }
-        break;
-    }
-    case FUNCTION_TYPE: {
-        FunctionType* data = &type->functionType;
-        assert(data->argumentsCount > 0);
-        string_append(arena, &result, '(');
-        uint32_t* args = arena_getPointer(typeArena, uint32_t, data->arguments);
-        for (uint32_t i = 0; i < data->argumentsCount; i++) {
-            Type* argPointer = arena_getPointer(ast.arena, Type, args[i]);
-            String param = ast_typeAsString(arena, ast, argPointer, ast.arena);
-            string_concat(arena, &result, string_asView(param));
-            if (i + 1 != data->argumentsCount) {
-                string_append(arena, &result, ',');
-                string_append(arena, &result, ' ');
+            string_append(arena, &result, ')');
+            string_concat(arena, &result, cStringAsView("->"));
+            Type* returnType =
+                ast_getType(ast.types, args[data->parameterCount - 1]);
+            String returnTypeStr =
+                ast_typeAsString(arena, ast, returnType, ast.arena);
+            string_concat(arena, &result, string_asView(returnTypeStr));
+        } else {
+            string_concat(
+                arena,
+                &result,
+                ast_literalAsView(ast, data->literal)
+            );
+            if (data->parameterCount > 0) {
+                string_append(arena, &result, '[');
+                uint32_t* params =
+                    arena_getPointer(typeArena, uint32_t, data->parameters);
+                for (uint32_t i = 0; i < data->parameterCount; i++) {
+                    Type* param = ast_getType(ast.types, params[i]);
+                    String paramAsString =
+                        ast_typeAsString(arena, ast, param, ast.arena);
+                    string_concat(arena, &result, string_asView(paramAsString));
+                    if (i + 1 != data->parameterCount) {
+                        string_append(arena, &result, ',');
+                        string_append(arena, &result, ' ');
+                    }
+                }
+                string_append(arena, &result, ']');
             }
         }
-        string_append(arena, &result, ')');
-        string_concat(arena, &result, cStringAsView("->"));
-        Type* returnTypePointer =
-            arena_getPointer(ast.arena, Type, data->returnType);
-        String returnType =
-            ast_typeAsString(arena, ast, returnTypePointer, ast.arena);
-        string_concat(arena, &result, string_asView(returnType));
         break;
     }
     }
@@ -367,7 +383,9 @@ static void ast_printCode(
         }
         case AST_ASSIGNMENT: printf("assignment\n"); break;
         case AST_RETURN: printf("return\n"); break;
-        case AST_RETURN_EXPRESSION: printf("returnExpression\n"); break;
+        case AST_RETURN_LAST_EXPRESSION:
+            printf("returnLastExpression\n");
+            break;
         case AST_BREAK: printf("break\n"); break;
         case AST_CONTINUE: printf("continue\n"); break;
         case AST_IF_ELSE: {
@@ -396,7 +414,12 @@ static void ast_printCode(
                     printf(", ");
                 }
             }
-            printf(")\n");
+            printf(")");
+            if (data->type != None()) {
+                printf(": ");
+                ast_printType(ast, data->type, scratch);
+            }
+            printf("\n");
             break;
         }
         case AST_IF_ELSE_EXPRESSION: printf("ifElseExpression\n"); break;
@@ -562,10 +585,10 @@ static void ast_printFunction(
     ast_printCode(ast, function.code, indentationLevel + 1, scratch);
 }
 
-void ast_print(Ast ast, String path, Arena scratch, Arena otherScratch) {
-    String workinDirectory = getWorkingDirectory(&scratch);
+void ast_print(Ast ast, String path, Arena scratch1, Arena scratch2) {
+    String workinDirectory = getWorkingDirectory(&scratch1);
     String relativePath =
-        getRelativePath(&otherScratch, workinDirectory, path, otherScratch);
+        getRelativePath(&scratch1, workinDirectory, path, scratch2);
     printf("%s\n", string_asCString(relativePath));
     for (uint32_t i = 0; i < list_size(ast.imports); i++) {
         ast_printIndentation(1);
@@ -574,20 +597,20 @@ void ast_print(Ast ast, String path, Arena scratch, Arena otherScratch) {
             ast_literalAsString(ast, list_get(ast.imports, i)->path)
         );
     }
-    ast_printCode(ast, ast.code, 1, scratch);
+    ast_printCode(ast, ast.code, 1, scratch1);
     for (uint32_t i = 0; i < list_size(ast.typeDefinitions); i++) {
         ast_printTypeDefinition(
             ast,
             *list_get(ast.typeDefinitions, i),
             1,
-            scratch
+            scratch1
         );
     }
     for (uint32_t i = 0; i < list_size(ast.interfaces); i++) {
-        ast_printInterface(ast, *list_get(ast.interfaces, i), 1, scratch);
+        ast_printInterface(ast, *list_get(ast.interfaces, i), 1, scratch1);
     }
     for (uint32_t i = 0; i < list_size(ast.functions); i++) {
-        ast_printFunction(ast, *list_get(ast.functions, i), 1, scratch);
+        ast_printFunction(ast, *list_get(ast.functions, i), 1, scratch1);
     }
 }
 

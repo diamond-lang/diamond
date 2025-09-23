@@ -79,35 +79,35 @@ static Command get_command(Arena* arena, int argc, char* argv[]) {
     assert(false);
 }
 
-static void build(Command command, Arena scratch, Arena otherScratch) {
+static void build(Command command, Arena scratch1, Arena scratch2) {
     Program program =
-        getProgramGraph(&otherScratch, string_asView(command.path), scratch);
-    parseProgram(&program, scratch);
-    analyzeProgram(&program, scratch, otherScratch);
-    codegenObjectFiles(program, scratch, otherScratch);
-    linkProgram(program, scratch);
+        getProgramGraph(&scratch1, string_asView(command.path), scratch2);
+    parseProgram(&program, scratch1);
+    analyzeProgram(&program, scratch1, scratch2);
+    codegenObjectFiles(program, scratch1, scratch2);
+    linkProgram(program, scratch1);
 }
 
-static void run(Command command, Arena scratch, Arena otherScratch) {
+static void run(Command command, Arena scratch1, Arena scratch2) {
     Program program =
-        getProgramGraph(&otherScratch, string_asView(command.path), scratch);
+        getProgramGraph(&scratch1, string_asView(command.path), scratch2);
     String executableName =
-        getExecutableName(&scratch, *list_get(program.paths, 0));
+        getExecutableName(&scratch1, *list_get(program.paths, 0));
     bool alreadyExisted = fileExists(executableName.buffer);
-    parseProgram(&program, scratch);
-    analyzeProgram(&program, scratch, otherScratch);
-    codegenObjectFiles(program, scratch, otherScratch);
-    linkProgram(program, scratch);
+    parseProgram(&program, scratch1);
+    analyzeProgram(&program, scratch1, scratch2);
+    codegenObjectFiles(program, scratch1, scratch2);
+    linkProgram(program, scratch1);
     system(executableName.buffer);
     if (!alreadyExisted) {
         remove(executableName.buffer);
     }
 }
 
-static void emit(Command command, Arena scratch, Arena otherScratch) {
-    String workingDirectory = getWorkingDirectory(&scratch);
+static void emit(Command command, Arena scratch1, Arena scratch2) {
+    String workingDirectory = getWorkingDirectory(&scratch1);
     Program program =
-        getProgramGraph(&otherScratch, string_asView(command.path), scratch);
+        getProgramGraph(&scratch1, string_asView(command.path), scratch2);
     if (strcmp(list_get(command.options, 0)->buffer, "--dependency-graph") ==
         0) {
         for (uint32_t i = 0; i < list_size(program.dependencyGraph); i++) {
@@ -115,46 +115,46 @@ static void emit(Command command, Arena scratch, Arena otherScratch) {
             printf("stage%d\n", i + 1);
             for (uint32_t j = 0; j < list_size(stage); j++) {
                 uint32_t ast = *list_get(stage, j);
-                Arena newScratch = scratch;
+                Arena copyScratch1 = scratch1;
                 String relativePath = getRelativePath(
-                    &newScratch,
+                    &copyScratch1,
                     workingDirectory,
                     *list_get(program.paths, ast),
-                    otherScratch
+                    scratch2
                 );
                 printf("    %s\n", relativePath.buffer);
             }
         }
         return;
     }
-    parseProgram(&program, scratch);
+    parseProgram(&program, scratch1);
     if (strcmp(list_get(command.options, 0)->buffer, "--ast") == 0) {
         for (uint32_t i = 0; i < list_size(program.asts); i++) {
             ast_print(
                 *list_get(program.asts, i),
                 *list_get(program.paths, i),
-                scratch,
-                otherScratch
+                scratch1,
+                scratch2
             );
             if (i + 1 < list_size(program.asts)) printf("\n\n");
         }
         return;
     }
-    analyzeProgram(&program, scratch, otherScratch);
+    analyzeProgram(&program, scratch1, scratch2);
     if (strcmp(list_get(command.options, 0)->buffer, "--ast-with-types") == 0) {
         for (uint32_t i = 0; i < list_size(program.asts); i++) {
             ast_print(
                 *list_get(program.asts, i),
                 *list_get(program.paths, i),
-                scratch,
-                otherScratch
+                scratch1,
+                scratch2
             );
             if (i + 1 < list_size(program.asts)) printf("\n\n");
         }
         return;
     }
     if (strcmp(list_get(command.options, 0)->buffer, "--llvm-ir") == 0) {
-        printLLVMIR(program, 0, scratch, otherScratch);
+        printLLVMIR(program, 0, scratch1, scratch2);
         return;
     }
 }

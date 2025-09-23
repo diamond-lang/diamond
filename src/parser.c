@@ -291,12 +291,7 @@ static uint32_t type(Parser *parser) {
         }
         consume(parser, RIGHT_BRACKET, "a type");
     }
-    uint32_t id = ast_addTypeWithParams(
-        &parser->ast->arena,
-        &parser->ast->types,
-        literal,
-        paramsCount
-    );
+    uint32_t id = ast_addTypeWithParams(parser->ast, literal, paramsCount);
     TypeWithParams *type = &ast_getType(parser->ast->types, id)->withParams;
     uint32_t *params =
         arena_getPointer(parser->ast->arena, uint32_t, type->parameters);
@@ -360,7 +355,8 @@ static uint32_t function(Parser *parser, Token keyword) {
         function.returnType = annotation;
 
         bool allTypesSet = true;
-        for (uint32_t i = 0; i < list_size(function.arguments); i++) {
+        uint32_t argsCount = list_size(function.arguments);
+        for (uint32_t i = 0; i < argsCount; i++) {
             if (list_get(function.arguments, i)->type == None()) {
                 allTypesSet = false;
                 break;
@@ -368,12 +364,7 @@ static uint32_t function(Parser *parser, Token keyword) {
         }
 
         if (allTypesSet) {
-            function.type = ast_addFunctionType(
-                &parser->ast->arena,
-                &parser->ast->types,
-                function.returnType,
-                list_size(function.arguments)
-            );
+            function.type = ast_addFunctionType(parser->ast, argsCount);
             TypeWithParams *type =
                 &ast_getType(parser->ast->types, function.type)->withParams;
             uint32_t *params = arena_getPointer(
@@ -381,9 +372,11 @@ static uint32_t function(Parser *parser, Token keyword) {
                 uint32_t,
                 type->parameters
             );
-            for (uint32_t i = 0; i < list_size(function.arguments); i++) {
-                params[i] = list_get(function.arguments, i)->type;
+            for (uint32_t i = 0; i < argsCount; i++) {
+                uint32_t argType = list_get(function.arguments, i)->type;
+                params[i] = argType;
             }
+            params[argsCount] = function.returnType;
         }
     }
     if (!parser->lexer.parsingBuiltins || !match(parser, BUILTIN)) {
@@ -417,7 +410,8 @@ static uint32_t interface(Parser *parser, Token keyword) {
     bind(annotation, typeAnnotation(parser, parser->previous));
     interface.returnType = annotation;
     bool allTypesSet = true;
-    for (uint32_t i = 0; i < list_size(interface.arguments); i++) {
+    uint32_t argsCount = list_size(interface.arguments);
+    for (uint32_t i = 0; i < argsCount; i++) {
         if (list_get(interface.arguments, i)->type == None()) {
             allTypesSet = false;
             break;
@@ -426,19 +420,15 @@ static uint32_t interface(Parser *parser, Token keyword) {
     if (!allTypesSet) {
         todo();
     }
-    interface.type = ast_addFunctionType(
-        &parser->ast->arena,
-        &parser->ast->types,
-        interface.returnType,
-        list_size(interface.arguments)
-    );
+    interface.type = ast_addFunctionType(parser->ast, argsCount);
     TypeWithParams *type =
         &ast_getType(parser->ast->types, interface.type)->withParams;
     uint32_t *params =
         arena_getPointer(parser->ast->arena, uint32_t, type->parameters);
-    for (uint32_t i = 0; i < list_size(interface.arguments); i++) {
+    for (uint32_t i = 0; i < argsCount; i++) {
         params[i] = list_get(interface.arguments, i)->type;
     }
+    params[argsCount] = interface.returnType;
     list_append(&parser->ast->arena, parser->ast->interfaces, interface);
     return list_size(parser->ast->interfaces) - 1;
 }
@@ -611,7 +601,7 @@ static uint32_t returnStatement(Parser *parser, Token keyword) {
         return ast_addInstruction(
             &parser->ast->arena,
             parser->code,
-            AST_RETURN_EXPRESSION
+            AST_RETURN_LAST_EXPRESSION
         );
     } else {
         return ast_addInstruction(
