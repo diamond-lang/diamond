@@ -16,7 +16,7 @@
 typedef struct {
     Ast* builtin;
     Ast* ast;
-    Bindings bindings;
+    Scopes scopes;
     Uint32Stack stack;
     uint32_t lastTypeVariable;
     Arena arena;
@@ -37,23 +37,17 @@ static uint32_t typeInContext(Context* context, Ast ast, uint32_t typeId) {
         break;
     }
     case TYPE_WITH_PARAMS: {
-        TypeWithParams data = type->withParams;
+        TypeWithParams* data = &type->withParams;
         newType = ast_addTypeWithParams(
             context->ast,
-            literalInContext(context, ast, data.literal),
-            data.parameterCount
+            literalInContext(context, ast, data->literal),
+            data->parameterCount
         );
         TypeWithParams* newData =
             &ast_getType(context->ast->types, newType)->withParams;
-        uint32_t* params =
-            arena_getPointer(ast.arena, uint32_t, data.parameters);
-        uint32_t* newParams = arena_getPointer(
-            context->ast->arena,
-            uint32_t,
-            newData->parameters
-        );
-        for (uint32_t i = 0; i < data.parameterCount; i++) {
-            newParams[i] = typeInContext(context, ast, params[i]);
+        for (uint32_t i = 0; i < data->parameterCount; i++) {
+            newData->parameters[i] =
+                typeInContext(context, ast, data->parameters[i]);
         }
         break;
     }
@@ -70,13 +64,13 @@ static void importModuleUnqualified(Context* context, Ast ast, uint32_t astId) {
             ast_literalAsString(ast, typeDef.identifier)
         );
         TypeBinding* binding =
-            scopes_getTypeBinding(context->bindings, identifier);
+            scopes_getTypeBinding(context->scopes, identifier);
         if (binding != NULL) {
             todo();
         }
         scopes_addTypeBinding(
             &context->arena,
-            &context->bindings,
+            &context->scopes,
             identifier,
             astId
         );
@@ -91,14 +85,14 @@ static void importModuleUnqualified(Context* context, Ast ast, uint32_t astId) {
                 ast_literalAsString(ast, function.identifier)
             );
             Binding* binding =
-                scopes_getBindingInCurrentScope(context->bindings, identifier);
+                scopes_getBindingInCurrentScope(context->scopes, identifier);
             if (binding != NULL) {
                 todo();
             }
             uint32_t functionType = typeInContext(context, ast, function.type);
             scopes_addFunctionBinding(
                 &context->arena,
-                &context->bindings,
+                &context->scopes,
                 identifier,
                 functionType,
                 astId
@@ -113,7 +107,7 @@ static void init_context(
     context->arena = contextArena;
     context->ast = ast;
     context->builtin = builtin;
-    scopes_addScope(&context->arena, &context->bindings);
+    scopes_addScope(&context->arena, &context->scopes);
     importModuleUnqualified(context, *builtin, None());
 }
 
@@ -123,7 +117,7 @@ static uint32_t newTypeVariable(Context* context) {
 
 static uint32_t getBuiltInType(Context* context, char* type) {
     uint32_t literal = ast_getLiteral(context->ast, type);
-    TypeBinding* binding = scopes_getTypeBinding(context->bindings, literal);
+    TypeBinding* binding = scopes_getTypeBinding(context->scopes, literal);
     assert(binding);
     assert(binding->module == None());
     uint32_t newType = ast_addTypeWithParams(context->ast, literal, 0);
@@ -140,48 +134,38 @@ static uint32_t _instantiateType(
     }
     case TYPE_WITH_PARAMS: {
         // Get type with params
-        TypeWithParams data = type->withParams;
+        TypeWithParams* data = &type->withParams;
         bool isTypeVariable =
-            isLowerCase(ast_literalAsView(*context->ast, data.literal));
+            isLowerCase(ast_literalAsView(*context->ast, data->literal));
 
         // If is type variable, eg: t, a, b
         if (isTypeVariable) {
             // Instantiate type variable
-            assert(data.parameterCount == 0);
-            if (hashmap_get(*mappings, data.literal) == NULL) {
+            assert(data->parameterCount == 0);
+            if (hashmap_get(*mappings, data->literal) == NULL) {
                 hashmap_set(
                     arena,
                     *mappings,
-                    data.literal,
+                    data->literal,
                     ast_addTypeVariable(context->ast, newTypeVariable(context))
                 );
             }
-            uint32_t mappedType = *hashmap_get(*mappings, data.literal);
+            uint32_t mappedType = *hashmap_get(*mappings, data->literal);
             return mappedType;
         } else {
             // Create new type
             uint32_t newId = ast_addTypeWithParams(
                 context->ast,
-                data.literal,
-                data.parameterCount
+                data->literal,
+                data->parameterCount
             );
-            TypeWithParams newData =
-                ast_getType(context->ast->types, newId)->withParams;
+            TypeWithParams* newData =
+                &ast_getType(context->ast->types, newId)->withParams;
 
             // Instantiate parameters
-            uint32_t* params = arena_getPointer(
-                context->ast->arena,
-                uint32_t,
-                data.parameters
-            );
-            uint32_t* newParams = arena_getPointer(
-                context->ast->arena,
-                uint32_t,
-                newData.parameters
-            );
-            for (uint32_t i = 0; i < data.parameterCount; i++) {
-                uint32_t parameter = params[i];
-                newParams[i] =
+            for (uint32_t i = 0; i < data->parameterCount; i++) {
+                uint32_t parameter = data->parameters[i];
+                newData->parameters[i] =
                     _instantiateType(context, parameter, mappings, arena);
             }
             return newId;
@@ -197,124 +181,51 @@ static uint32_t instantiateType(Context* context, uint32_t id, Arena scratch) {
     return result;
 }
 
-static void makeEqual(
-    Context* context,
-    Type* type,
-    Arena typeArena,
-    Type* otherType,
-    Arena otherTypeArena,
-    Arena scratch
-) {
-    TypeKind kind = type->kind;
-    TypeKind kindExpected = otherType->kind;
-    String str1 = ast_typeAsString(&scratch, *context->ast, type, typeArena);
-    String str2 =
-        ast_typeAsString(&scratch, *context->ast, otherType, otherTypeArena);
-    printf("%s = %s\n", str1.buffer, str2.buffer);
-    printf("[");
-    for (uint32_t i = 1; i <= list_size(context->ast->types); i++) {
-        ast_printType(*context->ast, i, scratch);
-        if (i != list_size(context->ast->types)) {
-            printf(", ");
-        }
-    }
-    printf("]\n");
-    switch (kind) {
-    case TYPE_VARIABLE: {
-        switch (kindExpected) {
-        case TYPE_VARIABLE: {
-            *type = *otherType;
-            break;
-        }
-        case TYPE_WITH_PARAMS: {
-            *type = *otherType;
-            if (typeArena.buffer != otherTypeArena.buffer) {
-                TypeWithParams* data = &type->withParams;
-                uint32_t* params = arena_getPointer(
-                    context->ast->arena,
-                    uint32_t,
-                    data->parameters
-                );
-                uint32_t* newParams = arena_alloc(
-                    &context->ast->arena,
-                    uint32_t,
-                    data->parameterCount
-                );
-                for (uint32_t i = 0; i < data->parameterCount; i++) {
-                    newParams[i] = params[i];
-                }
-                data->parameters = arena_getId(context->ast->arena, newParams);
+static bool contains(Context* context, Type* a, TypeVariable* b) {
+    if (a->kind == TYPE_VARIABLE) {
+        return a->variable.id == b->id;
+    } else if (a->kind == TYPE_WITH_PARAMS) {
+        for (uint32_t i = 0; i < a->withParams.parameterCount; i++) {
+            Type* param =
+                ast_getType(context->ast->types, a->withParams.parameters[i]);
+            if (contains(context, param, b)) {
+                return true;
             }
-            break;
-        }
-        }
-        break;
-    }
-    case TYPE_WITH_PARAMS: {
-        switch (kindExpected) {
-        case TYPE_VARIABLE: unreachable();
-        case TYPE_WITH_PARAMS: {
-            TypeWithParams* data = &type->withParams;
-            TypeWithParams* otherData = &otherType->withParams;
-            if (data->literal != otherData->literal) {
-                todo();
-            }
-            if (data->parameterCount != otherData->parameterCount) {
-                todo();
-            }
-            uint32_t* params =
-                arena_getPointer(typeArena, uint32_t, data->parameters);
-            uint32_t* otherParams = arena_getPointer(
-                otherTypeArena,
-                uint32_t,
-                otherData->parameters
-            );
-            for (uint32_t i = 0; i < data->parameterCount; i++) {
-                Type* param = ast_getType(context->ast->types, params[i]);
-                Type* otherParam =
-                    ast_getType(context->ast->types, otherParams[i]);
-                if (param->kind == TYPE_VARIABLE) {
-                    makeEqual(
-                        context,
-                        param,
-                        context->ast->arena,
-                        otherParam,
-                        context->ast->arena,
-                        scratch
-                    );
-                } else if (otherParam->kind == TYPE_VARIABLE) {
-                    makeEqual(
-                        context,
-                        otherParam,
-                        context->ast->arena,
-                        param,
-                        context->ast->arena,
-                        scratch
-                    );
-                } else {
-                    makeEqual(
-                        context,
-                        param,
-                        context->ast->arena,
-                        otherParam,
-                        context->ast->arena,
-                        scratch
-                    );
-                }
-            }
-            break;
-        } break;
         }
     }
-    }
-    printf("[");
-    for (uint32_t i = 1; i <= list_size(context->ast->types); i++) {
-        ast_printType(*context->ast, i, scratch);
-        if (i != list_size(context->ast->types)) {
-            printf(", ");
+    return false;
+}
+
+static void makeEqual(Context* context, uint32_t aId, uint32_t bId) {
+    Type* a = ast_findType(context->ast, aId);
+    Type* b = ast_findType(context->ast, bId);
+    if (a == b) return;
+
+    if (a->kind == TYPE_VARIABLE) {
+        if (contains(context, b, &a->variable)) {
+            todo();  // Infinite type detected
         }
+        ast_makeEqual(&a->variable, bId);
+        return;
     }
-    printf("]\n");
+
+    if (b->kind == TYPE_VARIABLE) {
+        return makeEqual(context, bId, aId);
+    }
+
+    if (a->withParams.literal != b->withParams.literal) {
+        todo();  // Couldn't unify types
+    }
+
+    if (a->withParams.parameterCount != b->withParams.parameterCount) {
+        todo();  // Couldn't unify types
+    }
+
+    for (uint32_t i = 0; i < a->withParams.parameterCount; i++) {
+        uint32_t paramA = a->withParams.parameters[i];
+        uint32_t paramB = b->withParams.parameters[i];
+        makeEqual(context, paramA, paramB);
+    }
 }
 
 static bool declaration(
@@ -350,25 +261,14 @@ static bool returnLastExpression(
     if (!context->functionBeingAnalyzed) {
         todo();  // Not inside function
     }
-    Type* returnType = ast_getType(
-        context->ast->types,
-        context->functionBeingAnalyzed->returnType
-    );
+    uint32_t returnType = context->functionBeingAnalyzed->returnType;
 
     // Get type of expression
     uint32_t expr = *stack_top(context->stack);
-    uint32_t exprTypeId = ast_getTypeOfInstruction(*code, expr);
-    Type* exprType = ast_getType(context->ast->types, exprTypeId);
+    uint32_t exprType = ast_getTypeOfInstruction(*code, expr);
 
     // Make return type equal to type of expression
-    makeEqual(
-        context,
-        returnType,
-        context->ast->arena,
-        exprType,
-        context->ast->arena,
-        scratch
-    );
+    makeEqual(context, returnType, exprType);
 
     return true;
 }
@@ -410,36 +310,24 @@ static bool call(
         context->stack,
         stack_size(context->stack) - 1 - data->argumentsCount
     );
-    uint32_t expectedId = ast_getTypeOfInstruction(*code, called);
-    Type* expected = ast_getType(context->ast->types, expectedId);
+    uint32_t expected = ast_getTypeOfInstruction(*code, called);
 
     // Get actual type so far
-    Type* actualType = ast_createTemporaryTypeWithParams(
-        &scratch,
-        ast_getLiteral(context->ast, "->"),
-        data->argumentsCount + 1
-    );
-    uint32_t* params =
-        arena_getPointer(scratch, uint32_t, actualType->withParams.parameters);
+    uint32_t actualTypeId =
+        ast_addFunctionType(context->ast, data->argumentsCount);
+    Type* actualType = ast_getType(context->ast->types, actualTypeId);
     for (uint32_t i = 0; i < data->argumentsCount; i++) {
         uint32_t arg = *stack_get(
             context->stack,
             stack_size(context->stack) - data->argumentsCount + i
         );
         uint32_t argTypeId = ast_getTypeOfInstruction(*code, arg);
-        params[i] = argTypeId;
+        actualType->withParams.parameters[i] = argTypeId;
     }
-    params[data->argumentsCount] = data->type;
+    actualType->withParams.parameters[data->argumentsCount] = data->type;
 
     // Make type of called expression equal to expected type
-    makeEqual(
-        context,
-        actualType,
-        scratch,
-        expected,
-        context->ast->arena,
-        scratch
-    );
+    makeEqual(context, actualTypeId, expected);
     return true;
 }
 
@@ -518,59 +406,7 @@ static bool greaterEqual(
 static bool add(
     Context* context, Code* code, uint32_t id, AstAdd* data, Arena scratch
 ) {
-    // stack_pop(context->stack);
-    // stack_pop(context->stack);
-    // stack_push(&context->arena, context->stack, id);
-    // data->type = getBuiltInType(context, "Float64");
-
-    // Construct add type
-    uint32_t resultTypeId =
-        ast_addTypeVariable(context->ast, newTypeVariable(context));
-    uint32_t operatorTypeId = ast_addFunctionType(context->ast, 2);
-    Type* operatorType = ast_getType(context->ast->types, operatorTypeId);
-    uint32_t* params = arena_getPointer(
-        context->ast->arena,
-        uint32_t,
-        operatorType->withParams.parameters
-    );
-    for (uint32_t i = 0; i < 3; i++) {
-        params[i] = resultTypeId;
-    }
-
-    // Construct expected type
-    data->type = ast_addTypeVariable(context->ast, newTypeVariable(context));
-    Type* expected = ast_createTemporaryTypeWithParams(
-        &scratch,
-        ast_getLiteral(context->ast, "->"),
-        3
-    );
-    uint32_t* paramsExpected =
-        arena_getPointer(scratch, uint32_t, expected->withParams.parameters);
-    for (uint32_t i = 0; i < 2; i++) {
-        uint32_t arg =
-            *stack_get(context->stack, stack_size(context->stack) - 2);
-        uint32_t argTypeId = ast_getTypeOfInstruction(*code, arg);
-        paramsExpected[i] = argTypeId;
-    }
-    paramsExpected[2] = data->type;
-
-    // Make type of called expression equal to expected type
-    makeEqual(
-        context,
-        operatorType,
-        context->ast->arena,
-        expected,
-        scratch,
-        scratch
-    );
-
-    // Modify stack
-    stack_pop(context->stack);
-    stack_pop(context->stack);
-    stack_push(&context->arena, context->stack, id);
-
-    // Return
-    return true;
+    todo();
 }
 
 static bool subtract(
@@ -660,7 +496,7 @@ static bool identifier(
     AstIdentifier* data,
     Arena scratch
 ) {
-    Binding* binding = scopes_getBinding(context->bindings, data->literal);
+    Binding* binding = scopes_getBinding(context->scopes, data->literal);
     if (binding == NULL) {
         todo();
     }
@@ -770,9 +606,21 @@ static bool analyzeFunctionNotCompletelyTyped(
     function->beingAnalyzed = true;
 
     // Create new context
-    Context newContext = {0};
-    init_context(&newContext, context->arena, context->ast, context->builtin);
+    Context newContext = *context;
     newContext.functionBeingAnalyzed = function;
+
+    // Reset scopes
+    newContext.scopes.bindings = (BindingStack){0};
+    newContext.scopes.scopeStart = (Uint32Stack){0};
+    scopes_addScope(&newContext.arena, &newContext.scopes);
+    for (uint32_t i = 0; i < stack_size(context->scopes.bindings); i++) {
+        Binding binding = *stack_get(context->scopes.bindings, i);
+        stack_push(&newContext.arena, newContext.scopes.bindings, binding);
+        if (stack_size(context->scopes.scopeStart) >= 2 &&
+            i == *stack_get(context->scopes.scopeStart, 1)) {
+            break;
+        }
+    }
 
     // For every argument
     for (uint32_t i = 0; i < list_size(function->arguments); i++) {
@@ -787,7 +635,7 @@ static bool analyzeFunctionNotCompletelyTyped(
         }
         scopes_addArgumentBinding(
             &newContext.arena,
-            &newContext.bindings,
+            &newContext.scopes,
             argument->identifier,
             argument->type
         );
@@ -813,12 +661,10 @@ static bool analyzeFunctionNotCompletelyTyped(
     function->type = ast_addFunctionType(newContext.ast, argsCount);
     TypeWithParams* type =
         &ast_getType(newContext.ast->types, function->type)->withParams;
-    uint32_t* params =
-        arena_getPointer(newContext.ast->arena, uint32_t, type->parameters);
     for (uint32_t i = 0; i < argsCount; i++) {
-        params[i] = list_get(function->arguments, i)->type;
+        type->parameters[i] = list_get(function->arguments, i)->type;
     }
-    params[argsCount] = function->returnType;
+    type->parameters[argsCount] = function->returnType;
 
     // Return
     function->beingAnalyzed = false;

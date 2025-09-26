@@ -293,11 +293,9 @@ static uint32_t type(Parser *parser) {
     }
     uint32_t id = ast_addTypeWithParams(parser->ast, literal, paramsCount);
     TypeWithParams *type = &ast_getType(parser->ast->types, id)->withParams;
-    uint32_t *params =
-        arena_getPointer(parser->ast->arena, uint32_t, type->parameters);
     for (uint32_t i = 0; i < paramsCount; i++) {
         Type *paramType = ast_getType(parser->ast->types, fistParameter + i);
-        params[i] = arena_getId(parser->ast->arena, paramType);
+        type->parameters[i] = arena_getId(parser->ast->arena, paramType);
     }
     return id;
 }
@@ -367,16 +365,11 @@ static uint32_t function(Parser *parser, Token keyword) {
             function.type = ast_addFunctionType(parser->ast, argsCount);
             TypeWithParams *type =
                 &ast_getType(parser->ast->types, function.type)->withParams;
-            uint32_t *params = arena_getPointer(
-                parser->ast->arena,
-                uint32_t,
-                type->parameters
-            );
             for (uint32_t i = 0; i < argsCount; i++) {
                 uint32_t argType = list_get(function.arguments, i)->type;
-                params[i] = argType;
+                type->parameters[i] = argType;
             }
-            params[argsCount] = function.returnType;
+            type->parameters[argsCount] = function.returnType;
         }
     }
     if (!parser->lexer.parsingBuiltins || !match(parser, BUILTIN)) {
@@ -423,12 +416,10 @@ static uint32_t interface(Parser *parser, Token keyword) {
     interface.type = ast_addFunctionType(parser->ast, argsCount);
     TypeWithParams *type =
         &ast_getType(parser->ast->types, interface.type)->withParams;
-    uint32_t *params =
-        arena_getPointer(parser->ast->arena, uint32_t, type->parameters);
     for (uint32_t i = 0; i < argsCount; i++) {
-        params[i] = list_get(interface.arguments, i)->type;
+        type->parameters[i] = list_get(interface.arguments, i)->type;
     }
-    params[argsCount] = interface.returnType;
+    type->parameters[argsCount] = interface.returnType;
     list_append(&parser->ast->arena, parser->ast->interfaces, interface);
     return list_size(parser->ast->interfaces) - 1;
 }

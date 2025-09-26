@@ -21,11 +21,6 @@ typedef struct {
 typedef StackType(Binding) BindingStack;
 
 typedef struct {
-    BindingStack bindings;
-    Uint32Stack scopeStart;
-} Scopes;
-
-typedef struct {
     uint32_t identifier;
     uint32_t module;
 } TypeBinding;
@@ -33,30 +28,31 @@ typedef struct {
 typedef ListType(TypeBinding) TypeBindingList;
 
 typedef struct {
+    BindingStack bindings;
+    Uint32Stack scopeStart;
     TypeBindingList types;
-    Scopes scopes;
-} Bindings;
+} Scopes;
 
-void scopes_addScope(Arena* arena, Bindings* bindings);
-void scopes_removeScope(Bindings* bindings);
-Binding* scopes_getBinding(Bindings bindings, uint32_t literalId);
-Binding* scopes_getBindingInCurrentScope(Bindings bindings, uint32_t literalId);
+void scopes_addScope(Arena* arena, Scopes* scopes);
+void scopes_removeScope(Scopes* scopes);
+Binding* scopes_getBinding(Scopes scopes, uint32_t literalId);
+Binding* scopes_getBindingInCurrentScope(Scopes scopes, uint32_t literalId);
 void scopes_addArgumentBinding(
-    Arena* arena, Bindings* bindings, uint32_t literalId, uint32_t type
+    Arena* arena, Scopes* scopes, uint32_t literalId, uint32_t type
 );
 void scopes_addVariableBinding(
-    Arena* arena, Bindings* bindings, uint32_t literalId, uint32_t type
+    Arena* arena, Scopes* scopes, uint32_t literalId, uint32_t type
 );
 void scopes_addFunctionBinding(
     Arena* arena,
-    Bindings* bindings,
+    Scopes* scopes,
     uint32_t literalId,
     uint32_t type,
     uint32_t module
 );
-TypeBinding* scopes_getTypeBinding(Bindings bindings, uint32_t literalId);
+TypeBinding* scopes_getTypeBinding(Scopes scopes, uint32_t literalId);
 void scopes_addTypeBinding(
-    Arena* arena, Bindings* bindings, uint32_t identifier, uint32_t module
+    Arena* arena, Scopes* scopes, uint32_t identifier, uint32_t module
 );
 
 #endif

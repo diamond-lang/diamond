@@ -21,7 +21,7 @@
 
 typedef struct {
     Ast* ast;
-    Bindings bindings;
+    Scopes bindings;
     Uint32Stack stack;
     uint32_t lastTypeVariable;
     Arena arena;

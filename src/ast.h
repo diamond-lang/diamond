@@ -264,12 +264,13 @@ typedef ListType(TypeDefinition) TypeDefinitionList;
 // Types
 typedef struct {
     uint32_t id;
+    uint32_t forwarded;
 } TypeVariable;
 
 typedef struct {
     uint32_t literal;
     uint32_t parameterCount;
-    uint32_t parameters;
+    uint32_t parameters[];
 } TypeWithParams;
 
 typedef enum { TYPE_VARIABLE, TYPE_WITH_PARAMS } TypeKind;
@@ -281,8 +282,6 @@ typedef struct {
         TypeWithParams withParams;
     };
 } Type;
-
-typedef ListType(Type) TypeList;
 
 // Literals
 typedef struct {
@@ -302,7 +301,7 @@ typedef struct Ast {
     TypeDefinitionList typeDefinitions;
     Code code;
     LiteralList literals;
-    TypeList types;
+    Uint32List types;
     ErrorList errors;
     Arena arena;
 } Ast;
@@ -324,12 +323,11 @@ uint32_t ast_addTypeWithParams(
     Ast *ast, uint32_t literal, uint32_t parameterCount
 );
 uint32_t ast_addFunctionType(Ast *ast, uint32_t parameterCount);
-Type *ast_createTemporaryTypeWithParams(
-    Arena *arena, uint32_t literal, uint32_t parameterCount
-);
-Type *ast_getType(TypeList types, uint32_t type);
+Type *ast_findType(Ast *ast, uint32_t type);
+void ast_makeEqual(TypeVariable *typeVariable, uint32_t other);
+Type *ast_getType(Uint32List types, uint32_t type);
 uint32_t ast_getTypeOfInstruction(Code code, uint32_t instruction);
-String ast_typeAsString(Arena *arena, Ast ast, Type *type, Arena typeArena);
+String ast_typeAsString(Arena *arena, Ast ast, uint32_t typeId);
 
 // Literals handling
 uint32_t ast_getLiteral(Ast *ast, char *literal);
