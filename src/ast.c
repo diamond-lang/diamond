@@ -119,7 +119,7 @@ uint32_t ast_addTypeVariable(Ast* ast, uint32_t typeVariable) {
     list_ensureExtraCapacity(&ast->arena, ast->types, numberOfSlotsUsed);
     uint32_t id = list_size(ast->types) + 1;
     list_setSize(ast->types, list_size(ast->types) + numberOfSlotsUsed);
-    Type* type = ast_getType(ast->types, id);
+    Type* type = ast_getType(*ast, id);
     *type = (Type){TYPE_VARIABLE, .variable = (TypeVariable){typeVariable}};
     return id;
 }
@@ -132,7 +132,7 @@ uint32_t ast_addTypeWithParams(
     list_ensureExtraCapacity(&ast->arena, ast->types, numberOfSlotsUsed);
     uint32_t id = list_size(ast->types) + 1;
     list_setSize(ast->types, list_size(ast->types) + numberOfSlotsUsed);
-    Type* type = ast_getType(ast->types, id);
+    Type* type = ast_getType(*ast, id);
     *type = (Type){TYPE_WITH_PARAMS,
                    .withParams = (TypeWithParams){literal, parameterCount}};
     return id;
@@ -147,10 +147,10 @@ uint32_t ast_addFunctionType(Ast* ast, uint32_t argumentsCount) {
 }
 
 Type* ast_findType(Ast* ast, uint32_t type) {
-    Type* result = ast_getType(ast->types, type);
+    Type* result = ast_getType(*ast, type);
     while (result->kind == TYPE_VARIABLE) {
         if (result->variable.forwarded == None()) break;
-        result = ast_getType(ast->types, result->variable.forwarded);
+        result = ast_getType(*ast, result->variable.forwarded);
     }
     return result;
 }
@@ -159,8 +159,8 @@ void ast_makeEqual(TypeVariable* typeVariable, uint32_t other) {
     typeVariable->forwarded = other;
 }
 
-Type* ast_getType(Uint32List types, uint32_t type) {
-    return (Type*)list_get(types, type - 1);
+Type* ast_getType(Ast ast, uint32_t type) {
+    return (Type*)list_get(ast.types, type - 1);
 }
 
 uint32_t ast_getTypeOfInstruction(Code code, uint32_t instruction) {
@@ -262,6 +262,13 @@ String ast_typeAsString(Arena* arena, Ast ast, uint32_t typeId) {
         break;
     }
     }
+    return result;
+}
+
+bool ast_isTypeVariable(Ast ast, TypeWithParams* type) {
+    StringView view = ast_literalAsView(ast, type->literal);
+    bool result = string_isLowerCase(view);
+    assert(!result || type->parameterCount == 0);
     return result;
 }
 

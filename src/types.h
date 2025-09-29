@@ -141,7 +141,7 @@ typedef struct {
 } StringView;
 
 StringView cStringAsView(char* string);
-bool isLowerCase(StringView view);
+bool string_isLowerCase(StringView view);
 
 uint32_t string_size(String string);
 void string_clear(String* string);

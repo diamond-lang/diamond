@@ -14,6 +14,7 @@ typedef enum {
 typedef struct {
     BindingKind kind;
     uint32_t identifier;
+    uint32_t id;
     uint32_t type;
     uint32_t module;
 } Binding;
@@ -47,6 +48,7 @@ void scopes_addFunctionBinding(
     Arena* arena,
     Scopes* scopes,
     uint32_t literalId,
+    uint32_t id,
     uint32_t type,
     uint32_t module
 );

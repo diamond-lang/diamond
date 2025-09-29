@@ -292,9 +292,9 @@ static uint32_t type(Parser *parser) {
         consume(parser, RIGHT_BRACKET, "a type");
     }
     uint32_t id = ast_addTypeWithParams(parser->ast, literal, paramsCount);
-    TypeWithParams *type = &ast_getType(parser->ast->types, id)->withParams;
+    TypeWithParams *type = &ast_getType(*parser->ast, id)->withParams;
     for (uint32_t i = 0; i < paramsCount; i++) {
-        Type *paramType = ast_getType(parser->ast->types, fistParameter + i);
+        Type *paramType = ast_getType(*parser->ast, fistParameter + i);
         type->parameters[i] = arena_getId(parser->ast->arena, paramType);
     }
     return id;
@@ -336,6 +336,34 @@ static uint32_t functionArgument(Parser *parser, FunctionArgumentList *args) {
     return list_size(*args);
 }
 
+static void addTypeParameters(
+    Parser *parser, Uint32List *parameters, uint32_t typeId
+) {
+    Type *type = ast_getType(*parser->ast, typeId);
+    switch (type->kind) {
+    case TYPE_VARIABLE: return;
+    case TYPE_WITH_PARAMS: {
+        if (ast_isTypeVariable(*parser->ast, &type->withParams)) {
+            bool alreadyIn = false;
+            for (uint32_t i = 0; i < list_size(*parameters); i++) {
+                uint32_t param = *list_get(*parameters, i);
+                if (param == type->withParams.literal) {
+                    alreadyIn = true;
+                    break;
+                }
+            }
+            if (!alreadyIn) {
+                list_append(
+                    &parser->ast->arena,
+                    *parameters,
+                    type->withParams.literal
+                );
+            }
+        }
+    }
+    }
+}
+
 // function → "function" IDENTIFIER "(" (functionArgument (":" type)? ("," functionArgument (":" type)?)*)? ")" (":" type)? block
 static uint32_t function(Parser *parser, Token keyword) {
     Function function = {0};
@@ -351,26 +379,31 @@ static uint32_t function(Parser *parser, Token keyword) {
     if (match(parser, COLON)) {
         bind(annotation, typeAnnotation(parser, parser->previous));
         function.returnType = annotation;
-
-        bool allTypesSet = true;
-        uint32_t argsCount = list_size(function.arguments);
+    }
+    bool allTypesSet = true;
+    uint32_t argsCount = list_size(function.arguments);
+    for (uint32_t i = 0; i < argsCount; i++) {
+        FunctionArgument *arg = list_get(function.arguments, i);
+        if (arg->type == None()) {
+            allTypesSet = false;
+        } else {
+            addTypeParameters(parser, &function.parameters, arg->type);
+        }
+    }
+    if (function.returnType == None()) {
+        allTypesSet = false;
+    } else {
+        addTypeParameters(parser, &function.parameters, function.returnType);
+    }
+    if (allTypesSet) {
+        function.type = ast_addFunctionType(parser->ast, argsCount);
+        TypeWithParams *type =
+            &ast_getType(*parser->ast, function.type)->withParams;
         for (uint32_t i = 0; i < argsCount; i++) {
-            if (list_get(function.arguments, i)->type == None()) {
-                allTypesSet = false;
-                break;
-            }
+            uint32_t argType = list_get(function.arguments, i)->type;
+            type->parameters[i] = argType;
         }
-
-        if (allTypesSet) {
-            function.type = ast_addFunctionType(parser->ast, argsCount);
-            TypeWithParams *type =
-                &ast_getType(parser->ast->types, function.type)->withParams;
-            for (uint32_t i = 0; i < argsCount; i++) {
-                uint32_t argType = list_get(function.arguments, i)->type;
-                type->parameters[i] = argType;
-            }
-            type->parameters[argsCount] = function.returnType;
-        }
+        type->parameters[argsCount] = function.returnType;
     }
     if (!parser->lexer.parsingBuiltins || !match(parser, BUILTIN)) {
         Code *backup = parser->code;
@@ -415,7 +448,7 @@ static uint32_t interface(Parser *parser, Token keyword) {
     }
     interface.type = ast_addFunctionType(parser->ast, argsCount);
     TypeWithParams *type =
-        &ast_getType(parser->ast->types, interface.type)->withParams;
+        &ast_getType(*parser->ast, interface.type)->withParams;
     for (uint32_t i = 0; i < argsCount; i++) {
         type->parameters[i] = list_get(interface.arguments, i)->type;
     }

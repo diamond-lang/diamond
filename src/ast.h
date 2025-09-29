@@ -226,6 +226,7 @@ typedef ListType(FunctionArgument) FunctionArgumentList;
 
 typedef struct {
     uint32_t identifier;
+    Uint32List parameters;
     FunctionArgumentList arguments;
     uint32_t returnType;
     uint32_t type;
@@ -325,9 +326,10 @@ uint32_t ast_addTypeWithParams(
 uint32_t ast_addFunctionType(Ast *ast, uint32_t parameterCount);
 Type *ast_findType(Ast *ast, uint32_t type);
 void ast_makeEqual(TypeVariable *typeVariable, uint32_t other);
-Type *ast_getType(Uint32List types, uint32_t type);
+Type *ast_getType(Ast ast, uint32_t type);
 uint32_t ast_getTypeOfInstruction(Code code, uint32_t instruction);
 String ast_typeAsString(Arena *arena, Ast ast, uint32_t typeId);
+bool ast_isTypeVariable(Ast ast, TypeWithParams *type);
 
 // Literals handling
 uint32_t ast_getLiteral(Ast *ast, char *literal);

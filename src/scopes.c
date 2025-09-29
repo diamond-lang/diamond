@@ -38,14 +38,22 @@ Binding* scopes_getBindingInCurrentScope(Scopes scopes, uint32_t literalId) {
 void scopes_addArgumentBinding(
     Arena* arena, Scopes* scopes, uint32_t literalId, uint32_t type
 ) {
-    Binding binding = {ARGUMENT_BINDING, literalId, type};
+    Binding binding = {
+        .kind = ARGUMENT_BINDING,
+        .identifier = literalId,
+        .type = type
+    };
     stack_push(arena, scopes->bindings, binding);
 }
 
 void scopes_addVariableBinding(
     Arena* arena, Scopes* scopes, uint32_t literalId, uint32_t type
 ) {
-    Binding binding = {VARIABLE_BINDING, literalId, type};
+    Binding binding = {
+        .kind = VARIABLE_BINDING,
+        .identifier = literalId,
+        .type = type
+    };
     stack_push(arena, scopes->bindings, binding);
 }
 
@@ -53,10 +61,17 @@ void scopes_addFunctionBinding(
     Arena* arena,
     Scopes* scopes,
     uint32_t literalId,
+    uint32_t id,
     uint32_t type,
     uint32_t module
 ) {
-    Binding binding = {FUNCTION_BINDING, literalId, type, module};
+    Binding binding = {
+        .kind = FUNCTION_BINDING,
+        .identifier = literalId,
+        .id = id,
+        .type = type,
+        .module = module
+    };
     stack_push(arena, scopes->bindings, binding);
 }
 

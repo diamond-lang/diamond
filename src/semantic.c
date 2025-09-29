@@ -12,10 +12,12 @@
 #include "program.h"
 #include "scopes.h"
 #include "types.h"
+#include "utilities.h"
 
 typedef struct {
     Ast* builtin;
     Ast* ast;
+    uint32_t astId;
     Scopes scopes;
     Uint32Stack stack;
     uint32_t lastTypeVariable;
@@ -29,7 +31,7 @@ static uint32_t literalInContext(Context* context, Ast ast, uint32_t literal) {
 
 static uint32_t typeInContext(Context* context, Ast ast, uint32_t typeId) {
     uint32_t newType = None();
-    Type* type = ast_getType(ast.types, typeId);
+    Type* type = ast_getType(ast, typeId);
     switch (type->kind) {
     case TYPE_VARIABLE: {
         TypeVariable data = type->variable;
@@ -44,7 +46,7 @@ static uint32_t typeInContext(Context* context, Ast ast, uint32_t typeId) {
             data->parameterCount
         );
         TypeWithParams* newData =
-            &ast_getType(context->ast->types, newType)->withParams;
+            &ast_getType(*context->ast, newType)->withParams;
         for (uint32_t i = 0; i < data->parameterCount; i++) {
             newData->parameters[i] =
                 typeInContext(context, ast, data->parameters[i]);
@@ -94,6 +96,7 @@ static void importModuleUnqualified(Context* context, Ast ast, uint32_t astId) {
                 &context->arena,
                 &context->scopes,
                 identifier,
+                i,
                 functionType,
                 astId
             );
@@ -102,10 +105,11 @@ static void importModuleUnqualified(Context* context, Ast ast, uint32_t astId) {
 }
 
 static void init_context(
-    Context* context, Arena contextArena, Ast* ast, Ast* builtin
+    Context* context, Arena contextArena, Ast* ast, uint32_t astId, Ast* builtin
 ) {
     context->arena = contextArena;
     context->ast = ast;
+    context->astId = astId;
     context->builtin = builtin;
     scopes_addScope(&context->arena, &context->scopes);
     importModuleUnqualified(context, *builtin, None());
@@ -127,7 +131,7 @@ static uint32_t getBuiltInType(Context* context, char* type) {
 static uint32_t _instantiateType(
     Context* context, uint32_t typeId, Uint32Hashmap* mappings, Arena* arena
 ) {
-    Type* type = ast_getType(context->ast->types, typeId);
+    Type* type = ast_findType(context->ast, typeId);
     switch (type->kind) {
     case TYPE_VARIABLE: {
         return typeId;
@@ -135,10 +139,9 @@ static uint32_t _instantiateType(
     case TYPE_WITH_PARAMS: {
         // Get type with params
         TypeWithParams* data = &type->withParams;
-        bool isTypeVariable =
-            isLowerCase(ast_literalAsView(*context->ast, data->literal));
 
         // If is type variable, eg: t, a, b
+        bool isTypeVariable = ast_isTypeVariable(*context->ast, data);
         if (isTypeVariable) {
             // Instantiate type variable
             assert(data->parameterCount == 0);
@@ -160,7 +163,7 @@ static uint32_t _instantiateType(
                 data->parameterCount
             );
             TypeWithParams* newData =
-                &ast_getType(context->ast->types, newId)->withParams;
+                &ast_getType(*context->ast, newId)->withParams;
 
             // Instantiate parameters
             for (uint32_t i = 0; i < data->parameterCount; i++) {
@@ -176,6 +179,7 @@ static uint32_t _instantiateType(
 }
 
 static uint32_t instantiateType(Context* context, uint32_t id, Arena scratch) {
+    if (id == 0) return 0;
     Uint32Hashmap mappings = {0};
     uint32_t result = _instantiateType(context, id, &mappings, &scratch);
     return result;
@@ -187,7 +191,7 @@ static bool contains(Context* context, Type* a, TypeVariable* b) {
     } else if (a->kind == TYPE_WITH_PARAMS) {
         for (uint32_t i = 0; i < a->withParams.parameterCount; i++) {
             Type* param =
-                ast_getType(context->ast->types, a->withParams.parameters[i]);
+                ast_getType(*context->ast, a->withParams.parameters[i]);
             if (contains(context, param, b)) {
                 return true;
             }
@@ -228,8 +232,22 @@ static void makeEqual(Context* context, uint32_t aId, uint32_t bId) {
     }
 }
 
+static bool analyzeType(Context* context, uint32_t typeId, Arena scratch) {
+    Type* type = ast_getType(*context->ast, typeId);
+    assert(type->kind == TYPE_WITH_PARAMS);
+    TypeBinding* binding =
+        scopes_getTypeBinding(context->scopes, type->withParams.literal);
+    assert(binding);
+    assert(binding->module == None());
+    return true;
+}
+
 static bool declaration(
-    Context* ctx, Code* code, uint32_t id, AstDeclaration* data, Arena scratch
+    Context* context,
+    Code* code,
+    uint32_t id,
+    AstDeclaration* data,
+    Arena scratch
 ) {
     todo();
 }
@@ -315,7 +333,7 @@ static bool call(
     // Get actual type so far
     uint32_t actualTypeId =
         ast_addFunctionType(context->ast, data->argumentsCount);
-    Type* actualType = ast_getType(context->ast->types, actualTypeId);
+    Type* actualType = ast_getType(*context->ast, actualTypeId);
     for (uint32_t i = 0; i < data->argumentsCount; i++) {
         uint32_t arg = *stack_get(
             context->stack,
@@ -327,7 +345,9 @@ static bool call(
     actualType->withParams.parameters[data->argumentsCount] = data->type;
 
     // Make type of called expression equal to expected type
-    makeEqual(context, actualTypeId, expected);
+    if (expected != None()) {
+        makeEqual(context, actualTypeId, expected);
+    }
     return true;
 }
 
@@ -489,6 +509,10 @@ static bool integerLiteral(
     todo();
 }
 
+static bool analyzeFunctionNotCompletelyTyped(
+    Context* context, Function* function, Arena scratch
+);
+
 static bool identifier(
     Context* context,
     Code* code,
@@ -499,6 +523,13 @@ static bool identifier(
     Binding* binding = scopes_getBinding(context->scopes, data->literal);
     if (binding == NULL) {
         todo();
+    } else if (binding->kind == FUNCTION_BINDING && binding->type == None()) {
+        assert(binding->module == context->astId);
+        Function* function = list_get(context->ast->functions, binding->id);
+        if (!function->beingAnalyzed) {
+            analyzeFunctionNotCompletelyTyped(context, function, scratch);
+            binding->type = function->type;
+        }
     }
     data->type = instantiateType(context, binding->type, scratch);
     stack_push(&context->arena, context->stack, id);
@@ -591,18 +622,127 @@ static bool analyzeTypeDefinition(
     todo();
 }
 
+static bool analyzeCode(Context* context, Code* code, Arena scratch);
+
 static bool analyzeFunction(
     Context* context, Function* function, Arena scratch
 ) {
-    todo();
+    assert(!function->beingAnalyzed);
+    function->beingAnalyzed = true;
+
+    // Create new context
+    Context newContext = *context;
+    newContext.functionBeingAnalyzed = function;
+
+    // Reset scopes
+    newContext.scopes.bindings = (BindingStack){0};
+    newContext.scopes.scopeStart = (Uint32Stack){0};
+    scopes_addScope(&newContext.arena, &newContext.scopes);
+    for (uint32_t i = 0; i < stack_size(context->scopes.bindings); i++) {
+        Binding binding = *stack_get(context->scopes.bindings, i);
+        stack_push(&newContext.arena, newContext.scopes.bindings, binding);
+        if (stack_size(context->scopes.scopeStart) >= 2 &&
+            i == *stack_get(context->scopes.scopeStart, 1)) {
+            break;
+        }
+    }
+
+    // For every argument
+    for (uint32_t i = 0; i < list_size(function->arguments); i++) {
+        FunctionArgument* argument = list_get(function->arguments, i);
+        analyzeType(context, argument->type, scratch);
+        scopes_addArgumentBinding(
+            &newContext.arena,
+            &newContext.scopes,
+            argument->identifier,
+            argument->type
+        );
+    }
+
+    // For return type
+    analyzeType(context, function->returnType, scratch);
+
+    // Analyze function
+    bool result = analyzeCode(&newContext, &function->code, scratch);
+    if (!result) {
+        todo();  // print errors
+        return false;
+    }
+
+    // Return
+    function->beingAnalyzed = false;
+    return true;
 }
 
-static bool analyzeCode(Context* context, Code* code, Arena scratch);
+static uint32_t addNewParameter(
+    Ast* ast, uint32_t* id, Uint32List* parameters, Arena scratch
+) {
+    String result;
+    uint32_t newParam;
+    char letters[] = "abcdefghijklmnopqrstuvwxyz";
+    while (true) {
+        result = (String){0};
+        string_append(&scratch, &result, letters[(*id + 19) % 26]);
+        if (*id > 25) {
+            String num = numberAsString(&scratch, 1 + *id / 26);
+            string_concat(&scratch, &result, string_asView(num));
+        }
+        newParam = ast_getLiteral(ast, result.buffer);
+
+        bool alreadyUsed = false;
+        for (uint32_t i = 0; i < list_size(*parameters); i++) {
+            uint32_t param = *list_get(*parameters, i);
+            if (param == newParam) {
+                alreadyUsed = true;
+                break;
+            }
+        }
+        if (!alreadyUsed) break;
+        *id = *id + 1;
+    }
+    list_append(&ast->arena, *parameters, newParam);
+    uint32_t newType = ast_addTypeWithParams(ast, newParam, 0);
+    return newType;
+}
+
+static void generalizeType(
+    Context* context,
+    uint32_t typeId,
+    uint32_t* newParametersCount,
+    Uint32List* parameters,
+    Arena scratch
+) {
+    Type* type = ast_findType(context->ast, typeId);
+    switch (type->kind) {
+    case TYPE_VARIABLE: {
+        uint32_t newParam = addNewParameter(
+            context->ast,
+            newParametersCount,
+            parameters,
+            scratch
+        );
+        ast_makeEqual(&type->variable, newParam);
+        break;
+    }
+    case TYPE_WITH_PARAMS: {
+        for (uint32_t i = 0; i < type->withParams.parameterCount; i++) {
+            uint32_t param = type->withParams.parameters[i];
+            generalizeType(
+                context,
+                param,
+                newParametersCount,
+                parameters,
+                scratch
+            );
+        }
+    }
+    }
+}
 
 static bool analyzeFunctionNotCompletelyTyped(
     Context* context, Function* function, Arena scratch
 ) {
-    if (function->beingAnalyzed) return true;
+    assert(!function->beingAnalyzed);
     function->beingAnalyzed = true;
 
     // Create new context
@@ -652,17 +792,27 @@ static bool analyzeFunctionNotCompletelyTyped(
     // Analyze function
     bool result = analyzeCode(&newContext, &function->code, scratch);
     if (!result) {
-        todo();
+        todo();  // print errors
         return false;
     }
 
-    // Add function type
+    // Generalize types
+    Uint32List* params = &function->parameters;
+    uint32_t count = 0;
     uint32_t argsCount = list_size(function->arguments);
+    for (uint32_t i = 0; i < argsCount; i++) {
+        uint32_t argType = list_get(function->arguments, i)->type;
+        generalizeType(context, argType, &count, params, scratch);
+    }
+    generalizeType(context, function->returnType, &count, params, scratch);
+
+    // Create function type
     function->type = ast_addFunctionType(newContext.ast, argsCount);
     TypeWithParams* type =
-        &ast_getType(newContext.ast->types, function->type)->withParams;
+        &ast_getType(*newContext.ast, function->type)->withParams;
     for (uint32_t i = 0; i < argsCount; i++) {
-        type->parameters[i] = list_get(function->arguments, i)->type;
+        uint32_t argType = list_get(function->arguments, i)->type;
+        type->parameters[i] = argType;
     }
     type->parameters[argsCount] = function->returnType;
 
@@ -686,6 +836,7 @@ bool analyze(Program program, uint32_t astId, Arena scratch1, Arena scratch2) {
         &context,
         scratch1,
         list_get(program.asts, astId),
+        astId,
         &program.builtin
     );
 
@@ -698,6 +849,28 @@ bool analyze(Program program, uint32_t astId, Arena scratch1, Arena scratch2) {
         );
     }
 
+    // Add function binding
+    for (uint32_t i = 0; i < list_size(context.ast->functions); i++) {
+        Function* function = list_get(context.ast->functions, i);
+
+        // Add function binding
+        Binding* binding = scopes_getBindingInCurrentScope(
+            context.scopes,
+            function->identifier
+        );
+        if (binding != NULL) {
+            todo();
+        }
+        scopes_addFunctionBinding(
+            &context.arena,
+            &context.scopes,
+            function->identifier,
+            function->type,
+            i,
+            astId
+        );
+    }
+
     // Analyze functions
     for (uint32_t i = 0; i < list_size(context.ast->functions); i++) {
         Function* function = list_get(context.ast->functions, i);
@@ -705,6 +878,11 @@ bool analyze(Program program, uint32_t astId, Arena scratch1, Arena scratch2) {
             analyzeFunction(&context, function, scratch2);
         } else {
             analyzeFunctionNotCompletelyTyped(&context, function, scratch2);
+            Binding* binding =
+                scopes_getBinding(context.scopes, function->identifier);
+            assert(binding);
+            assert(binding->kind == FUNCTION_BINDING);
+            binding->type = function->type;
         }
     }
 

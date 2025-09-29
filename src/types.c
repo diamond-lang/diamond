@@ -14,7 +14,7 @@ StringView cStringAsView(char* string) {
     return (StringView){strlen(string), string};
 }
 
-bool isLowerCase(StringView view) {
+bool string_isLowerCase(StringView view) {
     for (uint32_t i = 0; i < view.length; i++) {
         if (!isalpha(view.pointer[i]) || !islower(view.pointer[i])) {
             return false;
