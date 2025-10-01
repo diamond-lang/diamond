@@ -7,6 +7,7 @@
 
 typedef enum {
     FUNCTION_BINDING,
+    INTERFACE_BINDING,
     VARIABLE_BINDING,
     ARGUMENT_BINDING
 } BindingKind;
@@ -45,6 +46,14 @@ void scopes_addVariableBinding(
     Arena* arena, Scopes* scopes, uint32_t literalId, uint32_t type
 );
 void scopes_addFunctionBinding(
+    Arena* arena,
+    Scopes* scopes,
+    uint32_t literalId,
+    uint32_t id,
+    uint32_t type,
+    uint32_t module
+);
+void scopes_addInterfaceBinding(
     Arena* arena,
     Scopes* scopes,
     uint32_t literalId,

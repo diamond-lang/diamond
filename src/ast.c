@@ -529,12 +529,9 @@ static void ast_printInterface(
     Ast ast, Interface interface, uint32_t indentationLevel, Arena scratch
 ) {
     ast_printIndentation(indentationLevel);
-    printf(
-        "interface %s[%s]",
-        ast_literalAsString(ast, interface.identifier),
-        ast_literalAsString(ast, interface.parameter)
-    );
-    printf("(");
+    printf("interface %s[", ast_literalAsString(ast, interface.identifier));
+    ast_printType(ast, interface.parameter, scratch);
+    printf("](");
     for (uint32_t i = 0; i < list_size(interface.arguments); i++) {
         FunctionArgument argument = *list_get(interface.arguments, i);
         if (argument.mutable) {
@@ -581,6 +578,19 @@ static void ast_printFunction(
     if (function.returnType != None()) {
         printf(": ");
         ast_printType(ast, function.returnType, scratch);
+    }
+    if (list_size(function.constraints) != 0) {
+        printf(" with ");
+    }
+    for (uint32_t i = 0; i < list_size(function.constraints); i++) {
+        Constraint constraint = *list_get(function.constraints, i);
+        Interface interface = *list_get(ast.interfaces, constraint.interface);
+        printf("%s[", ast_literalAsString(ast, interface.identifier));
+        ast_printType(ast, interface.parameter, scratch);
+        printf("]");
+        if (i + 1 != list_size(function.constraints)) {
+            printf(", ");
+        }
     }
     printf("\n");
     ast_printCode(ast, function.code, indentationLevel + 1, scratch);

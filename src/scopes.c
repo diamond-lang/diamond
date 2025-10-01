@@ -75,6 +75,24 @@ void scopes_addFunctionBinding(
     stack_push(arena, scopes->bindings, binding);
 }
 
+void scopes_addInterfaceBinding(
+    Arena* arena,
+    Scopes* scopes,
+    uint32_t literalId,
+    uint32_t id,
+    uint32_t type,
+    uint32_t module
+) {
+    Binding binding = {
+        .kind = INTERFACE_BINDING,
+        .identifier = literalId,
+        .id = id,
+        .type = type,
+        .module = module
+    };
+    stack_push(arena, scopes->bindings, binding);
+}
+
 TypeBinding* scopes_getTypeBinding(Scopes bindings, uint32_t literalId) {
     uint32_t bindingsCount = stack_size(bindings.types);
     for (uint32_t i = bindingsCount - 1; 0 <= i && i < bindingsCount; i--) {

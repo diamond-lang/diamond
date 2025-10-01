@@ -217,6 +217,13 @@ typedef struct {
 typedef ListType(Import) ImportList;
 
 typedef struct {
+    uint32_t parameter;
+    uint32_t interface;
+} Constraint;
+
+typedef ListType(Constraint) ConstraintList;
+
+typedef struct {
     bool mutable;
     uint32_t identifier;
     uint32_t type;
@@ -230,6 +237,7 @@ typedef struct {
     FunctionArgumentList arguments;
     uint32_t returnType;
     uint32_t type;
+    ConstraintList constraints;
     Code code;
     uint32_t beingAnalyzed;
 } Function;

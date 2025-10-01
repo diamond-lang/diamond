@@ -185,6 +185,24 @@ static uint32_t instantiateType(Context* context, uint32_t id, Arena scratch) {
     return result;
 }
 
+static uint32_t instantiateInterface(
+    Context* context, uint32_t interfaceId, Arena scratch
+) {
+    Interface* interface = list_get(context->ast->interfaces, interfaceId);
+    Uint32Hashmap mappings = {0};
+    uint32_t parameter =
+        _instantiateType(context, interface->parameter, &mappings, &scratch);
+    if (context->functionBeingAnalyzed != NULL) {
+        Constraint constraint = {parameter, interfaceId};
+        list_append(
+            &context->ast->arena,
+            context->functionBeingAnalyzed->constraints,
+            constraint
+        );
+    }
+    return _instantiateType(context, interface->type, &mappings, &scratch);
+}
+
 static bool contains(Context* context, Type* a, TypeVariable* b) {
     if (a->kind == TYPE_VARIABLE) {
         return a->variable.id == b->id;
@@ -329,6 +347,12 @@ static bool call(
         stack_size(context->stack) - 1 - data->argumentsCount
     );
     uint32_t expected = ast_getTypeOfInstruction(*code, called);
+    if (ast_getType(*context->ast, expected)->kind == TYPE_WITH_PARAMS) {
+        if (ast_getType(*context->ast, expected)->withParams.literal !=
+            ast_getLiteral(context->ast, "->")) {
+            todo();
+        }
+    }
 
     // Get actual type so far
     uint32_t actualTypeId =
@@ -531,7 +555,11 @@ static bool identifier(
             binding->type = function->type;
         }
     }
-    data->type = instantiateType(context, binding->type, scratch);
+    if (binding->kind == INTERFACE_BINDING) {
+        data->type = instantiateInterface(context, binding->id, scratch);
+    } else {
+        data->type = instantiateType(context, binding->type, scratch);
+    }
     stack_push(&context->arena, context->stack, id);
     return true;
 }
@@ -816,6 +844,26 @@ static bool analyzeFunctionNotCompletelyTyped(
     }
     type->parameters[argsCount] = function->returnType;
 
+    // Remove repeated constraints
+    for (uint32_t i = 0; i < list_size(function->constraints); i++) {
+        Constraint a = *list_get(function->constraints, i);
+        for (uint32_t j = i + 1; j < list_size(function->constraints);) {
+            bool constraintRemoved = false;
+            Constraint b = *list_get(function->constraints, i);
+            if (a.interface == b.interface) {
+                Type* typeA = ast_findType(context->ast, a.parameter);
+                Type* typeB = ast_findType(context->ast, a.parameter);
+                if (typeA == typeB) {
+                    list_removeIndex(function->constraints, j);
+                    constraintRemoved = true;
+                }
+            }
+            if (!constraintRemoved) {
+                j++;
+            }
+        }
+    }
+
     // Return
     function->beingAnalyzed = false;
     return true;
@@ -849,7 +897,29 @@ bool analyze(Program program, uint32_t astId, Arena scratch1, Arena scratch2) {
         );
     }
 
-    // Add function binding
+    // Add interface bindings
+    for (uint32_t i = 0; i < list_size(context.ast->interfaces); i++) {
+        Interface* interface = list_get(context.ast->interfaces, i);
+
+        // Add function binding
+        Binding* binding = scopes_getBindingInCurrentScope(
+            context.scopes,
+            interface->identifier
+        );
+        if (binding != NULL) {
+            todo();
+        }
+        scopes_addInterfaceBinding(
+            &context.arena,
+            &context.scopes,
+            interface->identifier,
+            i,
+            interface->type,
+            astId
+        );
+    }
+
+    // Add function bindings
     for (uint32_t i = 0; i < list_size(context.ast->functions); i++) {
         Function* function = list_get(context.ast->functions, i);
 
@@ -859,16 +929,28 @@ bool analyze(Program program, uint32_t astId, Arena scratch1, Arena scratch2) {
             function->identifier
         );
         if (binding != NULL) {
-            todo();
+            if (binding->kind == INTERFACE_BINDING) {
+                Interface* interface =
+                    list_get(context.ast->interfaces, binding->id);
+                Implementation implementation = {astId, i};
+                list_append(
+                    &context.ast->arena,
+                    interface->implementations,
+                    implementation
+                );
+            } else {
+                todo();
+            }
+        } else {
+            scopes_addFunctionBinding(
+                &context.arena,
+                &context.scopes,
+                function->identifier,
+                i,
+                function->type,
+                astId
+            );
         }
-        scopes_addFunctionBinding(
-            &context.arena,
-            &context.scopes,
-            function->identifier,
-            function->type,
-            i,
-            astId
-        );
     }
 
     // Analyze functions

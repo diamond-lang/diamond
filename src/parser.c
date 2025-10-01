@@ -121,6 +121,7 @@ static void addUnexpectedTokenError(
 static void program(Parser *parser, bool justImports);
 static uint32_t import(Parser *parser, Token keyword);
 static uint32_t type(Parser *parse);
+static uint32_t typeParameter(Parser *parser);
 static uint32_t typeAnnotation(Parser *parser, Token colon);
 static uint32_t statementOrDefinition(Parser *parser);
 static uint32_t function(Parser *parser, Token keyword);
@@ -300,6 +301,16 @@ static uint32_t type(Parser *parser) {
     return id;
 }
 
+// typeParameter → IDENTIFIER
+static uint32_t typeParameter(Parser *parser) {
+    consume(parser, IDENTIFIER, "a type parameter");
+    uint32_t literal = parser->previous.literal;
+    if (!string_isLowerCase(ast_literalAsView(*parser->ast, literal))) {
+        todo();  // is not a type variable
+    }
+    return ast_addTypeWithParams(parser->ast, literal, 0);
+}
+
 // typeAnnotation → ":" type
 static uint32_t typeAnnotation(Parser *parser, Token colon) {
     assert(colon.kind == COLON);
@@ -423,8 +434,8 @@ static uint32_t interface(Parser *parser, Token keyword) {
     consume(parser, IDENTIFIER, "an interface");
     interface.identifier = parser->previous.literal;
     consume(parser, LEFT_BRACKET, "an interface");
-    consume(parser, IDENTIFIER, "an interface");
-    interface.parameter = parser->previous.literal;
+    bind(parameter, typeParameter(parser));
+    interface.parameter = parameter;
     consume(parser, RIGHT_BRACKET, "an interface");
     consume(parser, LEFT_PAREN, "an interface");
     while (!atEnd(*parser) && !check(*parser, RIGHT_PAREN)) {

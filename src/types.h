@@ -85,6 +85,19 @@ typedef ListType(char*) CStringList;
         }                                                    \
     } while (false)
 
+#define list_removeIndex(list, index)                                          \
+    do {                                                                       \
+        if ((list).count > 0) {                                                \
+            uint32_t sizeMinusOne__ = (list).count > 0 ? (list).count - 1 : 0; \
+            for (uint32_t j__ = index; j__ < sizeMinusOne__; j__++) {          \
+                *list_get(list, j__) = *list_get(list, j__ + 1);               \
+            }                                                                  \
+            if (index < (list).count) {                                        \
+                (list).count--;                                                \
+            }                                                                  \
+        }                                                                      \
+    } while (false)
+
 #define list_removeFirstMatch(list, item)                                      \
     do {                                                                       \
         if ((list).count > 0) {                                                \
