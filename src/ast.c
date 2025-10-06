@@ -35,6 +35,67 @@ uint32_t ast_addInstruction(Arena* arena, Code* code, AstInstructionKind kind) {
     return id;
 }
 
+uint32_t ast_insertInst(
+    Arena* arena,
+    Code* code,
+    AstInstructionKind kind,
+    AstInsertLocation location
+) {
+    size_t numberOfSlotsUsed = ast_numberOfSlotsUsedInData(kind);
+
+    // Make space for insertation
+    list_ensureExtraCapacity(arena, code->instructions, 1);
+    list_ensureExtraCapacity(arena, code->dataOrIndex, 1);
+    code->instructions.count += 1;
+    code->dataOrIndex.count += 1;
+    for (size_t i = list_size(code->instructions) - 2;
+         location.location <= i && i <= list_size(code->instructions) - 2;
+         i--) {
+        *list_get(code->instructions, i + 1) = *list_get(code->instructions, i);
+        *list_get(code->dataOrIndex, i + 1) = *list_get(code->dataOrIndex, i);
+        size_t slotsUsed =
+            ast_numberOfSlotsUsedInData(*list_get(code->instructions, i));
+        if (slotsUsed > 1) {
+            *list_get(code->dataOrIndex, i + 1) += numberOfSlotsUsed;
+        }
+    }
+    list_ensureExtraCapacity(arena, code->data, numberOfSlotsUsed);
+    code->data.count += numberOfSlotsUsed;
+    for (size_t i = list_size(code->data) - 1 - numberOfSlotsUsed;
+         location.dataLocation <= i &&
+         i <= list_size(code->data) - 1 - numberOfSlotsUsed;
+         i--) {
+        *list_get(code->data, i + numberOfSlotsUsed) = *list_get(code->data, i);
+    }
+
+    // Remember sizes
+    size_t actualSize = code->instructions.count;
+    size_t actualSizeData = code->data.count;
+
+    // Set size
+    code->instructions.count = location.location;
+    code->dataOrIndex.count = location.location;
+    code->data.count = location.dataLocation;
+
+    // Add instruction
+    uint32_t inst = ast_addInstruction(arena, code, kind);
+
+    // Reset data
+    for (uint32_t i = location.dataLocation;
+         (i - location.dataLocation) < numberOfSlotsUsed;
+         i++) {
+        *list_get(code->data, i) = 0;
+    }
+
+    // Restore size;
+    code->instructions.count = actualSize;
+    code->dataOrIndex.count = actualSize;
+    code->data.count = actualSizeData;
+
+    // Returm
+    return inst;
+}
+
 AstInstructionKind ast_getInstruction(Code code, uint32_t id) {
     assert(1 <= id && id <= list_size(code.instructions));
     return *list_get(code.instructions, id - 1);
@@ -60,21 +121,6 @@ static uint32_t ast_numberOfSlotsUsedInData(AstInstructionKind kind) {
     case AST_WHILE: result = sizeof(AstWhile); break;
     case AST_CALL: result = sizeof(AstCall); break;
     case AST_IF_ELSE_EXPRESSION: result = sizeof(AstIfElseExpression); break;
-    case AST_NOT: result = sizeof(AstNot); break;
-    case AST_OR: result = sizeof(AstOr); break;
-    case AST_AND: result = sizeof(AstAnd); break;
-    case AST_EQUAL_EQUAL: result = sizeof(AstEqualEqual); break;
-    case AST_NOT_EQUAL: result = sizeof(AstNotEqual); break;
-    case AST_LESS: result = sizeof(AstLess); break;
-    case AST_LESS_EQUAL: result = sizeof(AstLessEqual); break;
-    case AST_GREATER: result = sizeof(AstGreater); break;
-    case AST_GREATER_EQUAL: result = sizeof(AstGreaterEqual); break;
-    case AST_ADD: result = sizeof(AstAdd); break;
-    case AST_SUBTRACT: result = sizeof(AstSubtract); break;
-    case AST_MUL: result = sizeof(AstMul); break;
-    case AST_DIV: result = sizeof(AstDiv); break;
-    case AST_MOD: result = sizeof(AstMod); break;
-    case AST_NEGATION: result = sizeof(AstNegation); break;
     case AST_DEREFERENCE: result = sizeof(AstDereference); break;
     case AST_ADDRESS_OF: result = sizeof(AstAddressOf); break;
     case AST_FIELD_ACCESS: result = sizeof(AstFieldAccess); break;
@@ -176,21 +222,6 @@ uint32_t ast_getTypeOfInstruction(Code code, uint32_t instruction) {
     case AST_WHILE: unreachable();
     case AST_CALL: return ((AstCall*)ast_getData(&code, instruction))->type;
     case AST_IF_ELSE_EXPRESSION: todo();
-    case AST_NOT: todo();
-    case AST_OR: todo();
-    case AST_AND: todo();
-    case AST_EQUAL_EQUAL: todo();
-    case AST_NOT_EQUAL: todo();
-    case AST_LESS: todo();
-    case AST_LESS_EQUAL: todo();
-    case AST_GREATER: todo();
-    case AST_GREATER_EQUAL: todo();
-    case AST_ADD: return ((AstAdd*)ast_getData(&code, instruction))->type;
-    case AST_SUBTRACT: todo();
-    case AST_MUL: todo();
-    case AST_DIV: todo();
-    case AST_MOD: todo();
-    case AST_NEGATION: todo();
     case AST_DEREFERENCE: todo();
     case AST_ADDRESS_OF: todo();
     case AST_FIELD_ACCESS: todo();
@@ -327,25 +358,6 @@ char* ast_literalAsString(Ast ast, uint32_t literal) {
     ));
 }
 
-static char* getBinaryOp(AstInstructionKind kind) {
-    switch ((uint8_t)kind) {
-    case AST_OR: return "or";
-    case AST_AND: return "and";
-    case AST_EQUAL_EQUAL: return "==";
-    case AST_NOT_EQUAL: return "!=";
-    case AST_LESS: return "<";
-    case AST_LESS_EQUAL: return "<=";
-    case AST_GREATER: return ">";
-    case AST_GREATER_EQUAL: return ">=";
-    case AST_ADD: return "+";
-    case AST_SUBTRACT: return "-";
-    case AST_MUL: return "*";
-    case AST_DIV: return "/";
-    case AST_MOD: return "%";
-    }
-    unreachable();
-}
-
 void ast_setBit(uint32_t* data, uint32_t position) {
     *data = *data | 1 << position;
 }
@@ -424,30 +436,6 @@ static void ast_printCode(
             break;
         }
         case AST_IF_ELSE_EXPRESSION: printf("ifElseExpression\n"); break;
-        case AST_NOT: printf("not\n"); break;
-        case AST_OR: printf("%s\n", getBinaryOp(kind)); break;
-        case AST_AND: printf("%s\n", getBinaryOp(kind)); break;
-        case AST_EQUAL_EQUAL: printf("%s\n", getBinaryOp(kind)); break;
-        case AST_NOT_EQUAL: printf("%s\n", getBinaryOp(kind)); break;
-        case AST_LESS: printf("%s\n", getBinaryOp(kind)); break;
-        case AST_LESS_EQUAL: printf("%s\n", getBinaryOp(kind)); break;
-        case AST_GREATER: printf("%s\n", getBinaryOp(kind)); break;
-        case AST_GREATER_EQUAL: printf("%s\n", getBinaryOp(kind)); break;
-        case AST_ADD: {
-            AstAdd* data = ast_getData(&code, i);
-            printf("%s", getBinaryOp(kind));
-            if (data->type != None()) {
-                printf(": ");
-                ast_printType(ast, data->type, scratch);
-            }
-            printf("\n");
-            break;
-        }
-        case AST_SUBTRACT: printf("%s\n", getBinaryOp(kind)); break;
-        case AST_MUL: printf("%s\n", getBinaryOp(kind)); break;
-        case AST_DIV: printf("%s\n", getBinaryOp(kind)); break;
-        case AST_MOD: printf("%s\n", getBinaryOp(kind)); break;
-        case AST_NEGATION: printf("-\n"); break;
         case AST_DEREFERENCE: printf("dereference\n"); break;
         case AST_ADDRESS_OF: printf("addressOf\n"); break;
         case AST_FIELD_ACCESS: printf("fieldAccess\n"); break;
@@ -561,14 +549,14 @@ static void ast_printFunction(
     printf("function %s", ast_literalAsString(ast, function.identifier));
     printf("(");
     for (uint32_t i = 0; i < list_size(function.arguments); i++) {
-        FunctionArgument argument = *list_get(function.arguments, i);
-        if (argument.mutable) {
+        FunctionArgument* arg = list_get(function.arguments, i);
+        if (arg->mutable) {
             printf("mut ");
         }
-        printf("%s", ast_literalAsString(ast, argument.identifier));
-        if (argument.type != None()) {
+        printf("%s", ast_literalAsString(ast, arg->identifier));
+        if (arg->type != None()) {
             printf(": ");
-            ast_printType(ast, argument.type, scratch);
+            ast_printType(ast, arg->type, scratch);
         }
         if (i + 1 != list_size(function.arguments)) {
             printf(", ");

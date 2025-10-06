@@ -38,7 +38,6 @@ static void advanceUntilNewLine(Lexer* lexer) {
 static bool match(Lexer* lexer, char c) {
     if (lexer->next == c) {
         advance(lexer);
-        advance(lexer);
         return true;
     }
     return false;
@@ -115,16 +114,16 @@ start:
         if (isdigit(lexer->next)) return scanNumber(lexer);
         if (lexer->previousWasImport) return scanImport(lexer);
         return createToken(lexer, DOT);
-    case '+': return createToken(lexer, PLUS);
+    case '+': return createTokenWithLiteral(lexer, IDENTIFIER);
     case '-':
         if (match(lexer, '-')) {
             advanceUntilNewLine(lexer);
             goto start;
         }
-        return createToken(lexer, MINUS);
-    case '*': return createToken(lexer, STAR);
-    case '/': return createToken(lexer, SLASH);
-    case '%': return createToken(lexer, MODULO);
+        return createTokenWithLiteral(lexer, IDENTIFIER);
+    case '*': return createTokenWithLiteral(lexer, IDENTIFIER);
+    case '/': return createTokenWithLiteral(lexer, IDENTIFIER);
+    case '%': return createTokenWithLiteral(lexer, IDENTIFIER);
     case ':': {
         if (match(lexer, '=')) return createToken(lexer, COLON_EQUAL);
         if (match(lexer, ':')) return createToken(lexer, COLON_COLON);
@@ -132,20 +131,20 @@ start:
     }
     case ',': return createToken(lexer, COMMA);
     case '!': {
-        if (match(lexer, '=')) return createToken(lexer, NOT_EQUAL);
+        if (match(lexer, '=')) return createTokenWithLiteral(lexer, IDENTIFIER);
         unreachable();
     }
     case '=': {
-        if (match(lexer, '=')) return createToken(lexer, EQUAL_EQUAL);
+        if (match(lexer, '=')) return createTokenWithLiteral(lexer, IDENTIFIER);
         return createToken(lexer, EQUAL);
     }
     case '>': {
-        if (match(lexer, '=')) return createToken(lexer, GREATER_EQUAL);
-        return createToken(lexer, GREATER);
+        if (match(lexer, '=')) return createTokenWithLiteral(lexer, IDENTIFIER);
+        createTokenWithLiteral(lexer, IDENTIFIER);
     }
     case '<': {
-        if (match(lexer, '=')) return createToken(lexer, LESS_EQUAL);
-        return createToken(lexer, LESS);
+        if (match(lexer, '=')) return createTokenWithLiteral(lexer, IDENTIFIER);
+        return createTokenWithLiteral(lexer, IDENTIFIER);
     }
     case ' ':
     case '\t': goto start;
@@ -220,7 +219,6 @@ static Token scanIdentifierOrKeyword(Lexer* lexer) {
         return createToken(lexer, CONTINUE);
     if (identifierEquals(lexer, "return")) return createToken(lexer, RETURN);
     if (identifierEquals(lexer, "mut")) return createToken(lexer, MUT);
-    if (identifierEquals(lexer, "not")) return createToken(lexer, NOT);
     if (identifierEquals(lexer, "extern")) return createToken(lexer, EXTERN);
     if (identifierEquals(lexer, "import")) return createToken(lexer, IMPORT);
     if (identifierEquals(lexer, "interface"))

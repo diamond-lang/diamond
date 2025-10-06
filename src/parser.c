@@ -56,6 +56,16 @@ static bool match(Parser *parser, TokenKind token) {
     return false;
 }
 
+static bool matchId(Parser *parser, char *identifier) {
+    uint32_t literal = ast_getLiteral(parser->ast, identifier);
+    if (parser->current.kind == IDENTIFIER &&
+        parser->current.literal == literal) {
+        advance(parser);
+        return true;
+    }
+    return false;
+}
+
 static void consumeIfExists(Parser *parser, TokenKind kind) {
     if (check(*parser, kind)) advance(parser);
 }
@@ -116,6 +126,35 @@ static void addUnexpectedTokenError(
     error.unexpectedToken.actualToken = parser->current.kind;
     error.unexpectedToken.beingParsed = beingParsed;
     list_append(&parser->ast->arena, parser->ast->errors, error);
+}
+
+static AstInsertLocation getInsertLocation(Parser parser) {
+    return (AstInsertLocation){list_size(parser.ast->code.instructions),
+                               list_size(parser.ast->code.data)};
+}
+
+static void addIdentifierInstruction(Parser *parser, uint32_t literal) {
+    uint32_t id =
+        ast_addInstruction(&parser->ast->arena, parser->code, AST_IDENTIFIER);
+    AstIdentifier *data = ast_getData(parser->code, id);
+    data->literal = literal;
+}
+
+static void insertIdentifierInstruction(
+    Parser *parser, uint32_t literal, AstInsertLocation loc
+) {
+    uint32_t id =
+        ast_insertInst(&parser->ast->arena, parser->code, AST_IDENTIFIER, loc);
+    AstIdentifier *data = ast_getData(parser->code, id);
+    data->literal = literal;
+}
+
+static uint32_t addCallInstruction(Parser *parser, uint32_t argsCount) {
+    uint32_t id =
+        ast_addInstruction(&parser->ast->arena, parser->code, AST_CALL);
+    AstCall *data = ast_getData(parser->code, id);
+    data->argumentsCount = argsCount;
+    return id;
 }
 
 static void program(Parser *parser, bool justImports);
@@ -713,7 +752,7 @@ static uint32_t expression(Parser *parser) {
     }
     Token current = parser->current;
     if (match(parser, IF)) return ifElseExpression(parser, current);
-    else if (match(parser, NOT)) return notExpression(parser, current);
+    else if (matchId(parser, "not")) return notExpression(parser, current);
     else return or (parser);
 }
 
@@ -734,94 +773,85 @@ static uint32_t ifElseExpression(Parser *parser, Token keyword) {
 
 // not → "not" expression
 static uint32_t notExpression(Parser *parser, Token keyword) {
-    assert(keyword.kind == NOT);
+    assert(
+        keyword.kind == IDENTIFIER &&
+        keyword.literal == ast_getLiteral(parser->ast, "not")
+    );
+    addIdentifierInstruction(parser, keyword.literal);
     expect(expression(parser));
-    return ast_addInstruction(&parser->ast->arena, parser->code, AST_NOT);
-}
-
-static AstInstructionKind getBinaryOperator(Token token) {
-    switch ((uint8_t)token.kind) {
-    case OR: return AST_OR;
-    case AND: return AST_AND;
-    case EQUAL_EQUAL: return AST_EQUAL_EQUAL;
-    case NOT_EQUAL: return AST_NOT_EQUAL;
-    case LESS: return AST_LESS;
-    case LESS_EQUAL: return AST_LESS_EQUAL;
-    case GREATER: return AST_GREATER;
-    case GREATER_EQUAL: return AST_GREATER_EQUAL;
-    case PLUS: return AST_ADD;
-    case MINUS: return AST_SUBTRACT;
-    case STAR: return AST_MUL;
-    case SLASH: return AST_DIV;
-    case MODULO: return AST_MOD;
-    }
-    unreachable();
+    return addCallInstruction(parser, 1);
 }
 
 // or → and ("or" and)*
 uint32_t or (Parser * parser) {
+    AstInsertLocation loc = getInsertLocation(*parser);
     bind(left, and(parser));
     while (match(parser, OR)) {
-        AstInstructionKind op = getBinaryOperator(parser->previous);
+        insertIdentifierInstruction(parser, parser->previous.literal, loc);
         expect(and(parser));
-        left = ast_addInstruction(&parser->ast->arena, parser->code, op);
+        left = addCallInstruction(parser, 2);
     }
     return left;
 }
 
 // and → equality ("and" equality)*
 uint32_t and (Parser * parser) {
+    AstInsertLocation loc = getInsertLocation(*parser);
     bind(left, equality(parser));
     while (match(parser, AND)) {
-        AstInstructionKind op = getBinaryOperator(parser->previous);
+        insertIdentifierInstruction(parser, parser->previous.literal, loc);
         expect(equality(parser));
-        left = ast_addInstruction(&parser->ast->arena, parser->code, op);
+        left = addCallInstruction(parser, 2);
     }
     return left;
 }
 
 // equality → comparison (("=="|"!=") comparison)*
 uint32_t equality(Parser *parser) {
+    AstInsertLocation loc = getInsertLocation(*parser);
     bind(left, comparison(parser));
-    while (match(parser, EQUAL_EQUAL) || match(parser, NOT_EQUAL)) {
-        AstInstructionKind op = getBinaryOperator(parser->previous);
+    while (matchId(parser, "==") || matchId(parser, "!=")) {
+        insertIdentifierInstruction(parser, parser->previous.literal, loc);
         expect(comparison(parser));
-        left = ast_addInstruction(&parser->ast->arena, parser->code, op);
+        left = addCallInstruction(parser, 2);
     }
     return left;
 }
 
 // comparison → term ((">"|">="|"<"|"<=") term)*
 uint32_t comparison(Parser *parser) {
+    AstInsertLocation loc = getInsertLocation(*parser);
     bind(left, term(parser));
-    while (match(parser, LESS) || match(parser, LESS_EQUAL) ||
-           match(parser, GREATER) || match(parser, GREATER_EQUAL)) {
-        AstInstructionKind op = getBinaryOperator(parser->previous);
+    while (matchId(parser, "<") || matchId(parser, "<=") ||
+           matchId(parser, ">") || matchId(parser, ">=")) {
+        insertIdentifierInstruction(parser, parser->previous.literal, loc);
         expect(term(parser));
-        left = ast_addInstruction(&parser->ast->arena, parser->code, op);
+        left = addCallInstruction(parser, 2);
     }
     return left;
 }
 
 // term → factor (("+"|"-") factor)*
 uint32_t term(Parser *parser) {
+    AstInsertLocation loc = getInsertLocation(*parser);
     bind(left, factor(parser));
-    while (match(parser, PLUS) || match(parser, MINUS)) {
-        AstInstructionKind op = getBinaryOperator(parser->previous);
+    while (matchId(parser, "+") || matchId(parser, "-")) {
+        insertIdentifierInstruction(parser, parser->previous.literal, loc);
         expect(factor(parser));
-        left = ast_addInstruction(&parser->ast->arena, parser->code, op);
+        left = addCallInstruction(parser, 2);
     }
     return left;
 }
 
 // factor → unary (("*"|"/"|"%") unary)*
 uint32_t factor(Parser *parser) {
+    AstInsertLocation loc = getInsertLocation(*parser);
     bind(left, unary(parser));
-    while (match(parser, STAR) || match(parser, SLASH) || match(parser, MODULO)
+    while (matchId(parser, "*") || matchId(parser, "/") || matchId(parser, "%%")
     ) {
-        AstInstructionKind op = getBinaryOperator(parser->previous);
+        insertIdentifierInstruction(parser, parser->previous.literal, loc);
         expect(unary(parser));
-        left = ast_addInstruction(&parser->ast->arena, parser->code, op);
+        left = addCallInstruction(parser, 2);
     }
     return left;
 }
@@ -829,17 +859,19 @@ uint32_t factor(Parser *parser) {
 // unary → negation | addressOf | dererefence | unaryPostFix
 uint32_t unary(Parser *parser) {
     Token previous = parser->current;
-    if (match(parser, MINUS)) return negation(parser, previous);
-    if (match(parser, STAR)) return dereference(parser, previous);
+    if (matchId(parser, "-")) return negation(parser, previous);
+    if (matchId(parser, "*")) return dereference(parser, previous);
     if (match(parser, AMPERSAND)) return addressOf(parser, previous);
     return unaryPostFix(parser);
 }
 
 // negation → "-" unary
 uint32_t negation(Parser *parser, Token operator) {
-    assert(operator.kind == MINUS);
+    assert(operator.kind == IDENTIFIER && operator.literal ==
+           ast_getLiteral(parser->ast, "-'"));
+    addIdentifierInstruction(parser, operator.literal);
     expect(unary(parser));
-    return ast_addInstruction(&parser->ast->arena, parser->code, AST_NEGATION);
+    return addCallInstruction(parser, 1);
 }
 
 // address_of → "&" unary
@@ -855,7 +887,8 @@ static uint32_t addressOf(Parser *parser, Token operator) {
 
 // dereference → "*" unary
 static uint32_t dereference(Parser *parser, Token operator) {
-    assert(operator.kind == STAR);
+    assert(operator.kind == IDENTIFIER && operator.literal ==
+           ast_getLiteral(parser->ast, "*"));
     expect(unary(parser));
     return ast_addInstruction(
         &parser->ast->arena,

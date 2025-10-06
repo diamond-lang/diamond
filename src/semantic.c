@@ -385,104 +385,6 @@ static bool ifElseExpression(
     todo();
 }
 
-static bool not(
-    Context * context, Code* code, uint32_t id, AstNot* data, Arena scratch
-) {
-    todo();
-}
-
-static bool orExpr(
-    Context* context, Code* code, uint32_t id, AstOr* data, Arena scratch
-) {
-    todo();
-}
-
-static bool andExpr(
-    Context* context, Code* code, uint32_t id, AstAnd* data, Arena scratch
-) {
-    todo();
-}
-
-static bool equalEqual(
-    Context* context,
-    Code* code,
-    uint32_t id,
-    AstEqualEqual* data,
-    Arena scratch
-) {
-    todo();
-}
-
-static bool notEqual(
-    Context* context, Code* code, uint32_t id, AstNotEqual* data, Arena scratch
-) {
-    todo();
-}
-
-static bool less(
-    Context* context, Code* code, uint32_t id, AstLess* data, Arena scratch
-) {
-    todo();
-}
-
-static bool lessEqual(
-    Context* context, Code* code, uint32_t id, AstLessEqual* data, Arena scratch
-) {
-    todo();
-}
-
-static bool greater(
-    Context* context, Code* code, uint32_t id, AstGreater* data, Arena scratch
-) {
-    todo();
-}
-
-static bool greaterEqual(
-    Context* context,
-    Code* code,
-    uint32_t id,
-    AstGreaterEqual* data,
-    Arena scratch
-) {
-    todo();
-}
-
-static bool add(
-    Context* context, Code* code, uint32_t id, AstAdd* data, Arena scratch
-) {
-    todo();
-}
-
-static bool subtract(
-    Context* context, Code* code, uint32_t id, AstSubtract* data, Arena scratch
-) {
-    todo();
-}
-
-static bool mul(
-    Context* context, Code* code, uint32_t id, AstMul* data, Arena scratch
-) {
-    todo();
-}
-
-static bool divExpr(
-    Context* context, Code* code, uint32_t id, AstDiv* data, Arena scratch
-) {
-    todo();
-}
-
-static bool mod(
-    Context* context, Code* code, uint32_t id, AstMod* data, Arena scratch
-) {
-    todo();
-}
-
-static bool negation(
-    Context* context, Code* code, uint32_t id, AstNegation* data, Arena scratch
-) {
-    todo();
-}
-
 static bool addressOf(
     Context* context, Code* code, uint32_t id, AstAddressOf* data, Arena scratch
 ) {
@@ -612,22 +514,6 @@ static bool analyzeInstruction(
     case AST_CALL: return call(context, code, id, data, scratch);
     case AST_IF_ELSE_EXPRESSION:
         ifElseExpression(context, code, id, data, scratch);
-    case AST_NOT: return not(context, code, id, data, scratch);
-    case AST_OR: return orExpr(context, code, id, data, scratch);
-    case AST_AND: return andExpr(context, code, id, data, scratch);
-    case AST_EQUAL_EQUAL: return equalEqual(context, code, id, data, scratch);
-    case AST_NOT_EQUAL: return notEqual(context, code, id, data, scratch);
-    case AST_LESS: return less(context, code, id, data, scratch);
-    case AST_LESS_EQUAL: return lessEqual(context, code, id, data, scratch);
-    case AST_GREATER: return greater(context, code, id, data, scratch);
-    case AST_GREATER_EQUAL:
-        return greaterEqual(context, code, id, data, scratch);
-    case AST_ADD: return add(context, code, id, data, scratch);
-    case AST_SUBTRACT: return subtract(context, code, id, data, scratch);
-    case AST_MUL: return mul(context, code, id, data, scratch);
-    case AST_DIV: return divExpr(context, code, id, data, scratch);
-    case AST_MOD: return mod(context, code, id, data, scratch);
-    case AST_NEGATION: return negation(context, code, id, data, scratch);
     case AST_ADDRESS_OF: return addressOf(context, code, id, data, scratch);
     case AST_DEREFERENCE: return dereference(context, code, id, data, scratch);
     case AST_FIELD_ACCESS: return fieldAccess(context, code, id, data, scratch);

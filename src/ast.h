@@ -24,21 +24,6 @@ typedef enum {
     // Expressions
     AST_CALL,
     AST_IF_ELSE_EXPRESSION,
-    AST_NOT,
-    AST_OR,
-    AST_AND,
-    AST_EQUAL_EQUAL,
-    AST_NOT_EQUAL,
-    AST_LESS,
-    AST_LESS_EQUAL,
-    AST_GREATER,
-    AST_GREATER_EQUAL,
-    AST_ADD,
-    AST_SUBTRACT,
-    AST_MUL,
-    AST_DIV,
-    AST_MOD,
-    AST_NEGATION,
     AST_ADDRESS_OF,
     AST_DEREFERENCE,
     AST_FIELD_ACCESS,
@@ -320,7 +305,18 @@ void ast_clear(Ast *ast);
 typedef ListType(Ast) AstList;
 
 // Instructions handling
+typedef struct {
+    uint32_t location;
+    uint32_t dataLocation;
+} AstInsertLocation;
+
 uint32_t ast_addInstruction(Arena *arena, Code *code, AstInstructionKind kind);
+uint32_t ast_insertInst(
+    Arena *arena,
+    Code *code,
+    AstInstructionKind kind,
+    AstInsertLocation location
+);
 AstInstructionKind ast_getInstruction(Code code, uint32_t id);
 uint32_t *ast_getDataOrIndex(Code code, uint32_t id);
 void ast_addData(Arena *arena, Code *code, uint32_t instruction);
