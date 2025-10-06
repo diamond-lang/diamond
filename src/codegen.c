@@ -419,18 +419,16 @@ static void codegen(Context* context, Arena scratch) {
     LLVMBuildRet(context->llvmBuilder, returnValue);
 }
 
-void generateObjectCode(
-    Program program, uint32_t astId, Arena scratch1, Arena scratch2
-) {
+void generateObjectCode(Program program, uint32_t astId, Arena scratch) {
     assert(astId == 0);
     char* error = NULL;
 
     // Initialize context
     Context context = {0};
-    init_context(&context, program, astId, scratch1);
+    init_context(&context, program, astId, arena_new());
 
     // Codegen
-    codegen(&context, scratch2);
+    codegen(&context, scratch);
 
     // Initialize code generation
     LLVMInitializeAllTargetInfos();
@@ -472,7 +470,7 @@ void generateObjectCode(
 
     // Generate object code
     String objectFileName =
-        getObjectFileName(&scratch1, *list_get(program.paths, 0));
+        getObjectFileName(&scratch, *list_get(program.paths, 0));
     error = NULL;
     LLVMBool errorOcurred = LLVMTargetMachineEmitToFile(
         targetMachine,
@@ -492,6 +490,9 @@ void generateObjectCode(
     LLVMDisposeBuilder(context.llvmBuilder);
     LLVMDisposeModule(context.llvmModule);
     LLVMContextDispose(context.llvmContext);
+
+    // Free arena
+    arena_free(&context.arena);
 }
 
 static void link(String executableName, StringList objectFiles, Arena scratch) {
@@ -547,11 +548,10 @@ void generateExecutable(Program program, Arena scratch) {
     remove(objectFile.buffer);
 }
 
-void printLLVMIR(
-    Program program, uint32_t astId, Arena scratch1, Arena scratch2
-) {
+void printLLVMIR(Program program, uint32_t astId, Arena scratch) {
     Context context = {0};
-    init_context(&context, program, astId, scratch1);
-    codegen(&context, scratch2);
+    init_context(&context, program, astId, arena_new());
+    codegen(&context, scratch);
     LLVMDumpModule(context.llvmModule);
+    arena_free(&context.arena);
 }

@@ -36,8 +36,12 @@ void* arena_allocWithAlignment(
     ))
 void arena_free(Arena* arena);
 uint32_t arena_getId(Arena arena, void* pointer);
-void* _arena_getPointer(Arena arena, uint32_t alignment, uint32_t id);
-#define arena_getPointer(arena, T, id) \
-    ((T*)_arena_getPointer(arena, getAlignOfExpression(T), id))
+void* arena_getPointer(Arena arena, uint32_t id);
+#define arena_getPointerWithType(arena, T, id)        \
+    ((assert(                                         \
+          (((uintptr_t)arena_getPointer(arena, id)) & \
+           (getAlignOfExpression(T) - 1)) == 0        \
+      ),                                              \
+      ((T*)arena_getPointer(arena, id))))
 
 #endif

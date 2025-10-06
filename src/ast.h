@@ -191,7 +191,6 @@ typedef struct {
 typedef struct {
     Uint8List instructions;
     Uint32List dataOrIndex;
-    Uint32List data;
 } Code;
 
 // Definitions
@@ -295,7 +294,6 @@ typedef struct Ast {
     TypeDefinitionList typeDefinitions;
     Code code;
     LiteralList literals;
-    Uint32List types;
     ErrorList errors;
     Arena arena;
 } Ast;
@@ -305,33 +303,27 @@ void ast_clear(Ast *ast);
 typedef ListType(Ast) AstList;
 
 // Instructions handling
-typedef struct {
-    uint32_t location;
-    uint32_t dataLocation;
-} AstInsertLocation;
-
-uint32_t ast_addInstruction(Arena *arena, Code *code, AstInstructionKind kind);
+uint32_t ast_addInstruction(Ast *ast, Code *code, AstInstructionKind kind);
 uint32_t ast_insertInst(
-    Arena *arena,
-    Code *code,
-    AstInstructionKind kind,
-    AstInsertLocation location
+    Ast *ast, Code *code, AstInstructionKind kind, uint32_t offset
 );
 AstInstructionKind ast_getInstruction(Code code, uint32_t id);
 uint32_t *ast_getDataOrIndex(Code code, uint32_t id);
-void ast_addData(Arena *arena, Code *code, uint32_t instruction);
-void *ast_getData(Code *code, uint32_t instruction);
+void ast_addData(Ast *ast, Code *code, uint32_t instruction);
+void *ast_getData(Ast *ast, Code *code, uint32_t instruction);
 
 // Types handling
 uint32_t ast_addTypeVariable(Ast *ast, uint32_t typeVariable);
 uint32_t ast_addTypeWithParams(
-    Ast *ast, uint32_t literal, uint32_t parameterCount
+    Ast *ast, uint32_t literal, Uint32List parameters
 );
-uint32_t ast_addFunctionType(Ast *ast, uint32_t parameterCount);
+uint32_t ast_addFunctionType(
+    Ast *ast, Uint32List arguments, uint32_t returnType
+);
 Type *ast_findType(Ast *ast, uint32_t type);
 void ast_makeEqual(TypeVariable *typeVariable, uint32_t other);
 Type *ast_getType(Ast ast, uint32_t type);
-uint32_t ast_getTypeOfInstruction(Code code, uint32_t instruction);
+uint32_t ast_getTypeOfInstruction(Ast *ast, Code *code, uint32_t instruction);
 String ast_typeAsString(Arena *arena, Ast ast, uint32_t typeId);
 bool ast_isTypeVariable(Ast ast, TypeWithParams *type);
 
@@ -344,7 +336,6 @@ char *ast_literalAsString(Ast ast, uint32_t literal);
         list_get((ast).literals, id - 1)->length,         \
             (char *)(arena_getPointer(                    \
                 (ast).arena,                              \
-                char,                                     \
                 list_get((ast).literals, id - 1)->arenaId \
             ))                                            \
     }

@@ -59,11 +59,9 @@ uint32_t arena_getId(Arena arena, void* pointer) {
     return ptr - buffer + 1;
 }
 
-void* _arena_getPointer(Arena arena, uint32_t alignment, uint32_t id) {
+void* arena_getPointer(Arena arena, uint32_t id) {
     uint64_t id64 = id;
     assert(0 < id64 && id64 <= UINT32_MAX);
     uintptr_t pointer = (uintptr_t)arena.buffer + (id - 1);
-    uintptr_t modulo = pointer & (alignment - 1);
-    assert(modulo == 0);
     return (void*)pointer;
 }

@@ -12,8 +12,6 @@
 #include "types.h"
 #include "utilities.h"
 
-static uint32_t ast_numberOfSlotsUsedInData(AstInstructionKind kind);
-
 void ast_clear(Ast* ast) {
     ast->importedAsts.count = 0;
     ast->imports.count = 0;
@@ -22,75 +20,45 @@ void ast_clear(Ast* ast) {
     ast->typeDefinitions.count = 0;
     ast->code.instructions.count = 0;
     ast->code.dataOrIndex.count = 0;
-    ast->code.data.count = 0;
-    ast->types.count = 0;
     ast->errors.count = 0;
 }
 
-uint32_t ast_addInstruction(Arena* arena, Code* code, AstInstructionKind kind) {
-    list_append(arena, code->instructions, kind);
-    list_append(arena, code->dataOrIndex, None());
+uint32_t ast_addInstruction(Ast* ast, Code* code, AstInstructionKind kind) {
+    list_append(&ast->arena, code->instructions, kind);
+    list_append(&ast->arena, code->dataOrIndex, None());
     uint32_t id = list_size(code->instructions);
-    ast_addData(arena, code, id);
+    ast_addData(ast, code, id);
     return id;
 }
 
 uint32_t ast_insertInst(
-    Arena* arena,
-    Code* code,
-    AstInstructionKind kind,
-    AstInsertLocation location
+    Ast* ast, Code* code, AstInstructionKind kind, uint32_t offset
 ) {
-    size_t numberOfSlotsUsed = ast_numberOfSlotsUsedInData(kind);
-
     // Make space for insertation
-    list_ensureExtraCapacity(arena, code->instructions, 1);
-    list_ensureExtraCapacity(arena, code->dataOrIndex, 1);
+    list_ensureExtraCapacity(&ast->arena, code->instructions, 1);
+    list_ensureExtraCapacity(&ast->arena, code->dataOrIndex, 1);
     code->instructions.count += 1;
     code->dataOrIndex.count += 1;
     for (size_t i = list_size(code->instructions) - 2;
-         location.location <= i && i <= list_size(code->instructions) - 2;
+         offset <= i && i <= list_size(code->instructions) - 2;
          i--) {
         *list_get(code->instructions, i + 1) = *list_get(code->instructions, i);
         *list_get(code->dataOrIndex, i + 1) = *list_get(code->dataOrIndex, i);
-        size_t slotsUsed =
-            ast_numberOfSlotsUsedInData(*list_get(code->instructions, i));
-        if (slotsUsed > 1) {
-            *list_get(code->dataOrIndex, i + 1) += numberOfSlotsUsed;
-        }
-    }
-    list_ensureExtraCapacity(arena, code->data, numberOfSlotsUsed);
-    code->data.count += numberOfSlotsUsed;
-    for (size_t i = list_size(code->data) - 1 - numberOfSlotsUsed;
-         location.dataLocation <= i &&
-         i <= list_size(code->data) - 1 - numberOfSlotsUsed;
-         i--) {
-        *list_get(code->data, i + numberOfSlotsUsed) = *list_get(code->data, i);
     }
 
     // Remember sizes
     size_t actualSize = code->instructions.count;
-    size_t actualSizeData = code->data.count;
 
     // Set size
-    code->instructions.count = location.location;
-    code->dataOrIndex.count = location.location;
-    code->data.count = location.dataLocation;
+    code->instructions.count = offset;
+    code->dataOrIndex.count = offset;
 
     // Add instruction
-    uint32_t inst = ast_addInstruction(arena, code, kind);
-
-    // Reset data
-    for (uint32_t i = location.dataLocation;
-         (i - location.dataLocation) < numberOfSlotsUsed;
-         i++) {
-        *list_get(code->data, i) = 0;
-    }
+    uint32_t inst = ast_addInstruction(ast, code, kind);
 
     // Restore size;
     code->instructions.count = actualSize;
     code->dataOrIndex.count = actualSize;
-    code->data.count = actualSizeData;
 
     // Returm
     return inst;
@@ -106,7 +74,7 @@ uint32_t* ast_getDataOrIndex(Code code, uint32_t id) {
     return list_get(code.dataOrIndex, id - 1);
 }
 
-static uint32_t ast_numberOfSlotsUsedInData(AstInstructionKind kind) {
+static uint32_t sizeOfData(AstInstructionKind kind) {
     uint32_t result;
     switch (kind) {
     case AST_DECLARATION: result = sizeof(AstDeclaration); break;
@@ -133,63 +101,83 @@ static uint32_t ast_numberOfSlotsUsedInData(AstInstructionKind kind) {
     case AST_ARRAY: result = sizeof(AstArray); break;
     case AST_STRUCT_LITERAL: result = sizeof(AstStructLiteral); break;
     }
-    return result / sizeof(uint32_t);
+    return result;
 }
 
-void ast_addData(Arena* arena, Code* code, uint32_t instruction) {
-    uint32_t numberOfSlotsUsed =
-        ast_numberOfSlotsUsedInData(ast_getInstruction(*code, instruction));
+void ast_addData(Ast* ast, Code* code, uint32_t instruction) {
+    AstInstructionKind inst = ast_getInstruction(*code, instruction);
+    uint32_t size = sizeOfData(inst);
+    uint32_t alignment = sizeof(uint32_t);
+    uint32_t numberOfSlotsUsed = size / sizeof(uint32_t);
     if (numberOfSlotsUsed == 0) return;
-    if (numberOfSlotsUsed == 1) return;
+    else if (numberOfSlotsUsed == 1) return;
     else {
         assert(*ast_getDataOrIndex(*code, instruction) == None());
-        *ast_getDataOrIndex(*code, instruction) = list_size(code->data);
-        list_ensureExtraCapacity(arena, code->data, numberOfSlotsUsed);
-        list_setSize(code->data, list_size(code->data) + numberOfSlotsUsed);
+        uint8_t* data =
+            arena_allocWithAlignment(&ast->arena, size, alignment, 1);
+        *ast_getDataOrIndex(*code, instruction) = arena_getId(ast->arena, data);
     }
 }
 
-void* ast_getData(Code* code, uint32_t instruction) {
+void* ast_getData(Ast* ast, Code* code, uint32_t instruction) {
     uint32_t numberOfSlotsUsed =
-        ast_numberOfSlotsUsedInData(ast_getInstruction(*code, instruction));
+        sizeOfData(ast_getInstruction(*code, instruction));
     if (numberOfSlotsUsed == 0) return NULL;
     if (numberOfSlotsUsed == 1) {
         return ast_getDataOrIndex(*code, instruction);
     } else {
-        return list_get(code->data, *ast_getDataOrIndex(*code, instruction));
+        uint32_t arenaId = *ast_getDataOrIndex(*code, instruction);
+        return arena_getPointer(ast->arena, arenaId);
     }
 }
 
 uint32_t ast_addTypeVariable(Ast* ast, uint32_t typeVariable) {
-    uint32_t numberOfSlotsUsed = sizeof(Type) / sizeof(uint32_t);
-    list_ensureExtraCapacity(&ast->arena, ast->types, numberOfSlotsUsed);
-    uint32_t id = list_size(ast->types) + 1;
-    list_setSize(ast->types, list_size(ast->types) + numberOfSlotsUsed);
-    Type* type = ast_getType(*ast, id);
+    Type* type = arena_allocWithAlignment(&ast->arena, sizeof(Type), 4, 1);
     *type = (Type){TYPE_VARIABLE, .variable = (TypeVariable){typeVariable}};
+    uint32_t id = arena_getId(ast->arena, type);
     return id;
 }
 
 uint32_t ast_addTypeWithParams(
-    Ast* ast, uint32_t literal, uint32_t parameterCount
+    Ast* ast, uint32_t literal, Uint32List parameters
 ) {
-    uint32_t numberOfSlotsUsed =
-        sizeof(Type) / sizeof(uint32_t) + parameterCount;
-    list_ensureExtraCapacity(&ast->arena, ast->types, numberOfSlotsUsed);
-    uint32_t id = list_size(ast->types) + 1;
-    list_setSize(ast->types, list_size(ast->types) + numberOfSlotsUsed);
-    Type* type = ast_getType(*ast, id);
-    *type = (Type){TYPE_WITH_PARAMS,
-                   .withParams = (TypeWithParams){literal, parameterCount}};
+    Type* type = arena_allocWithAlignment(
+        &ast->arena,
+        sizeof(Type) + sizeof(uint32_t) * list_size(parameters),
+        4,
+        1
+    );
+    *type =
+        (Type){TYPE_WITH_PARAMS,
+               .withParams = (TypeWithParams
+               ){.literal = literal, .parameterCount = list_size(parameters)}};
+    for (uint32_t i = 0; i < list_size(parameters); i++) {
+        type->withParams.parameters[i] = *list_get(parameters, i);
+    }
+    uint32_t id = arena_getId(ast->arena, type);
     return id;
 }
 
-uint32_t ast_addFunctionType(Ast* ast, uint32_t argumentsCount) {
-    return ast_addTypeWithParams(
-        ast,
-        ast_getLiteral(ast, "->"),
-        argumentsCount + 1
+uint32_t ast_addFunctionType(
+    Ast* ast, Uint32List arguments, uint32_t returnType
+) {
+    Type* type = arena_allocWithAlignment(
+        &ast->arena,
+        sizeof(Type) + sizeof(uint32_t) * (list_size(arguments) + 1),
+        4,
+        1
     );
+    uint32_t literal = ast_getLiteral(ast, "->");
+    *type = (Type
+    ){TYPE_WITH_PARAMS,
+      .withParams = (TypeWithParams
+      ){.literal = literal, .parameterCount = list_size(arguments) + 1}};
+    for (uint32_t i = 0; i < list_size(arguments); i++) {
+        type->withParams.parameters[i] = *list_get(arguments, i);
+    }
+    type->withParams.parameters[list_size(arguments)] = returnType;
+    uint32_t id = arena_getId(ast->arena, type);
+    return id;
 }
 
 Type* ast_findType(Ast* ast, uint32_t type) {
@@ -206,11 +194,11 @@ void ast_makeEqual(TypeVariable* typeVariable, uint32_t other) {
 }
 
 Type* ast_getType(Ast ast, uint32_t type) {
-    return (Type*)list_get(ast.types, type - 1);
+    return arena_getPointerWithType(ast.arena, Type, type);
 }
 
-uint32_t ast_getTypeOfInstruction(Code code, uint32_t instruction) {
-    AstInstructionKind kind = ast_getInstruction(code, instruction);
+uint32_t ast_getTypeOfInstruction(Ast* ast, Code* code, uint32_t instruction) {
+    AstInstructionKind kind = ast_getInstruction(*code, instruction);
     switch (kind) {
     case AST_DECLARATION: unreachable();
     case AST_ASSIGNMENT: unreachable();
@@ -220,19 +208,20 @@ uint32_t ast_getTypeOfInstruction(Code code, uint32_t instruction) {
     case AST_CONTINUE: unreachable();
     case AST_IF_ELSE: unreachable();
     case AST_WHILE: unreachable();
-    case AST_CALL: return ((AstCall*)ast_getData(&code, instruction))->type;
+    case AST_CALL: return ((AstCall*)ast_getData(ast, code, instruction))->type;
     case AST_IF_ELSE_EXPRESSION: todo();
     case AST_DEREFERENCE: todo();
     case AST_ADDRESS_OF: todo();
     case AST_FIELD_ACCESS: todo();
     case AST_INDEX_ACCESS: todo();
-    case AST_FLOAT: return ((AstFloat*)ast_getData(&code, instruction))->type;
+    case AST_FLOAT:
+        return ((AstFloat*)ast_getData(ast, code, instruction))->type;
     case AST_INTEGER:
-        return ((AstInteger*)ast_getData(&code, instruction))->type;
+        return ((AstInteger*)ast_getData(ast, code, instruction))->type;
     case AST_IDENTIFIER:
-        return ((AstIdentifier*)ast_getData(&code, instruction))->type;
+        return ((AstIdentifier*)ast_getData(ast, code, instruction))->type;
     case AST_BOOLEAN:
-        return ((AstBoolean*)ast_getData(&code, instruction))->type;
+        return ((AstBoolean*)ast_getData(ast, code, instruction))->type;
     case AST_STRING: todo();
     case AST_ARRAY: todo();
     case AST_STRUCT_LITERAL: todo();
@@ -328,7 +317,7 @@ uint32_t ast_getLiteralWithLength(Ast* ast, char* literal, uint32_t length) {
         bool equalLength = otherLiteral->length == length;
         if (equalHash && equalLength &&
             memcmp(
-                arena_getPointer(ast->arena, char, otherLiteral->arenaId),
+                arena_getPointer(ast->arena, otherLiteral->arenaId),
                 literal,
                 length
             ) == 0) {
@@ -353,7 +342,6 @@ uint32_t ast_getLiteralWithLength(Ast* ast, char* literal, uint32_t length) {
 char* ast_literalAsString(Ast ast, uint32_t literal) {
     return (char*)(arena_getPointer(
         ast.arena,
-        char,
         list_get((ast).literals, literal - 1)->arenaId
     ));
 }
@@ -377,7 +365,7 @@ static void ast_printCode(
         AstInstructionKind kind = ast_getInstruction(code, i);
         switch (kind) {
         case AST_DECLARATION: {
-            AstDeclaration* data = ast_getData(&code, i);
+            AstDeclaration* data = ast_getData(&ast, &code, i);
             if (data->type != None()) {
                 printf(
                     "declaration(%s, expectedType: ",
@@ -402,7 +390,7 @@ static void ast_printCode(
         case AST_BREAK: printf("break\n"); break;
         case AST_CONTINUE: printf("continue\n"); break;
         case AST_IF_ELSE: {
-            AstIfElse* data = ast_getData(&code, i);
+            AstIfElse* data = ast_getData(&ast, &code, i);
             printf("ifElse\n");
             if (data->elseBlockEnd != None()) {
                 stack_push(&scratch, separations, data->ifBlockEnd);
@@ -413,13 +401,13 @@ static void ast_printCode(
             break;
         }
         case AST_WHILE: {
-            AstWhile* data = ast_getData(&code, i);
+            AstWhile* data = ast_getData(&ast, &code, i);
             printf("while\n");
             stack_push(&scratch, indentation, data->whileEnd);
             break;
         }
         case AST_CALL: {
-            AstCall* data = ast_getData(&code, i);
+            AstCall* data = ast_getData(&ast, &code, i);
             printf("call(");
             for (uint32_t arg = 0; arg < data->argumentsCount; arg++) {
                 printf("_");
@@ -441,7 +429,7 @@ static void ast_printCode(
         case AST_FIELD_ACCESS: printf("fieldAccess\n"); break;
         case AST_INDEX_ACCESS: printf("indexAccess\n"); break;
         case AST_FLOAT: {
-            AstFloat* data = ast_getData(&code, i);
+            AstFloat* data = ast_getData(&ast, &code, i);
             printf("%s", ast_literalAsString(ast, data->literal));
             if (data->type != None()) {
                 printf(": ");
@@ -451,12 +439,12 @@ static void ast_printCode(
             break;
         }
         case AST_INTEGER: {
-            AstInteger* data = ast_getData(&code, i);
+            AstInteger* data = ast_getData(&ast, &code, i);
             printf("integer(%s)\n", ast_literalAsString(ast, data->literal));
             break;
         }
         case AST_IDENTIFIER: {
-            AstIdentifier* data = ast_getData(&code, i);
+            AstIdentifier* data = ast_getData(&ast, &code, i);
             printf("%s", ast_literalAsString(ast, data->literal));
             if (data->type != None()) {
                 printf(": ");
@@ -466,12 +454,12 @@ static void ast_printCode(
             break;
         }
         case AST_BOOLEAN: {
-            AstBoolean* data = ast_getData(&code, i);
+            AstBoolean* data = ast_getData(&ast, &code, i);
             printf("boolean(%s)\n", data->value ? "true" : "false");
             break;
         }
         case AST_STRING: {
-            AstString* data = ast_getData(&code, i);
+            AstString* data = ast_getData(&ast, &code, i);
             printf("string(\"%s\")\n", ast_literalAsString(ast, data->literal));
             break;
         }
