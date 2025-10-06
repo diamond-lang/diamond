@@ -82,6 +82,33 @@ static void importModuleUnqualified(
         );
     }
 
+    // Add interfaces
+    for (uint32_t i = 0; i < list_size(ast.interfaces); i++) {
+        Interface* interface = list_get(ast.interfaces, i);
+        uint32_t identifier = ast_getLiteral(
+            context->ast,
+            ast_literalAsString(ast, interface->identifier)
+        );
+        Binding* binding =
+            scopes_getBindingInCurrentScope(context->scopes, identifier);
+        if (binding != NULL) {
+            todo();
+        }
+        uint32_t parameter =
+            typeInContext(context, ast, interface->parameter, scratch);
+        uint32_t interfaceType =
+            typeInContext(context, ast, interface->type, scratch);
+        scopes_addInterfaceBinding(
+            &context->arena,
+            &context->scopes,
+            identifier,
+            i,
+            interfaceType,
+            astId,
+            parameter
+        );
+    }
+
     // Add function definitions
     for (uint32_t i = 0; i < list_size(ast.functions); i++) {
         Function function = *list_get(ast.functions, i);
@@ -194,21 +221,29 @@ static uint32_t instantiateType(Context* context, uint32_t id, Arena scratch) {
 }
 
 static uint32_t instantiateInterface(
-    Context* context, uint32_t interfaceId, Arena scratch
+    Context* context,
+    uint32_t module,
+    uint32_t parameter,
+    uint32_t type,
+    uint32_t identifier,
+    Arena scratch
 ) {
-    Interface* interface = list_get(context->ast->interfaces, interfaceId);
     Uint32Hashmap mappings = {0};
-    uint32_t parameter =
-        _instantiateType(&scratch, context, interface->parameter, &mappings);
+    uint32_t instParameter =
+        _instantiateType(&scratch, context, parameter, &mappings);
     if (context->functionBeingAnalyzed != NULL) {
-        Constraint constraint = {parameter, interfaceId};
+        Constraint constraint = {
+            .identifier = identifier,
+            .parameter = instParameter,
+            .module = module,
+        };
         list_append(
             &context->ast->arena,
             context->functionBeingAnalyzed->constraints,
             constraint
         );
     }
-    return _instantiateType(&scratch, context, interface->type, &mappings);
+    return _instantiateType(&scratch, context, type, &mappings);
 }
 
 static bool contains(Context* context, Type* a, TypeVariable* b) {
@@ -379,6 +414,15 @@ static bool call(
     if (expected != None()) {
         makeEqual(context, actualTypeId, expected);
     }
+
+    // Pop arguments and expression called
+    for (uint32_t i = 0; i < data->argumentsCount + 1; i++) {
+        stack_pop(context->stack);
+    }
+    // then add call
+    stack_push(&context->arena, context->stack, id);
+
+    // Return
     return true;
 }
 
@@ -465,7 +509,14 @@ static bool identifier(
         }
     }
     if (binding->kind == INTERFACE_BINDING) {
-        data->type = instantiateInterface(context, binding->id, scratch);
+        data->type = instantiateInterface(
+            context,
+            binding->module,
+            binding->parameter,
+            binding->type,
+            binding->identifier,
+            scratch
+        );
     } else {
         data->type = instantiateType(context, binding->type, scratch);
     }
@@ -742,7 +793,7 @@ static bool analyzeFunctionNotCompletelyTyped(
         for (uint32_t j = i + 1; j < list_size(function->constraints);) {
             bool constraintRemoved = false;
             Constraint b = *list_get(function->constraints, i);
-            if (a.interface == b.interface) {
+            if (a.identifier == b.identifier) {
                 Type* typeA = ast_findType(context->ast, a.parameter);
                 Type* typeB = ast_findType(context->ast, a.parameter);
                 if (typeA == typeB) {
@@ -794,7 +845,7 @@ bool analyze(Program program, uint32_t astId, Arena scratch) {
     for (uint32_t i = 0; i < list_size(context.ast->interfaces); i++) {
         Interface* interface = list_get(context.ast->interfaces, i);
 
-        // Add function binding
+        // Add interface binding
         Binding* binding = scopes_getBindingInCurrentScope(
             context.scopes,
             interface->identifier
@@ -808,7 +859,8 @@ bool analyze(Program program, uint32_t astId, Arena scratch) {
             interface->identifier,
             i,
             interface->type,
-            astId
+            astId,
+            interface->parameter
         );
     }
 

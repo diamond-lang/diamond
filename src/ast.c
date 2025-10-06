@@ -560,9 +560,8 @@ static void ast_printFunction(
     }
     for (uint32_t i = 0; i < list_size(function.constraints); i++) {
         Constraint constraint = *list_get(function.constraints, i);
-        Interface interface = *list_get(ast.interfaces, constraint.interface);
-        printf("%s[", ast_literalAsString(ast, interface.identifier));
-        ast_printType(ast, interface.parameter, scratch);
+        printf("%s[", ast_literalAsString(ast, constraint.identifier));
+        ast_printType(ast, constraint.parameter, scratch);
         printf("]");
         if (i + 1 != list_size(function.constraints)) {
             printf(", ");

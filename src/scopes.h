@@ -18,6 +18,7 @@ typedef struct {
     uint32_t id;
     uint32_t type;
     uint32_t module;
+    uint32_t parameter;  // for interfaces
 } Binding;
 
 typedef StackType(Binding) BindingStack;
@@ -59,7 +60,8 @@ void scopes_addInterfaceBinding(
     uint32_t literalId,
     uint32_t id,
     uint32_t type,
-    uint32_t module
+    uint32_t module,
+    uint32_t parameter
 );
 TypeBinding* scopes_getTypeBinding(Scopes scopes, uint32_t literalId);
 void scopes_addTypeBinding(

@@ -201,8 +201,9 @@ typedef struct {
 typedef ListType(Import) ImportList;
 
 typedef struct {
+    uint32_t identifier;
     uint32_t parameter;
-    uint32_t interface;
+    uint32_t module;
 } Constraint;
 
 typedef ListType(Constraint) ConstraintList;

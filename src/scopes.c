@@ -81,14 +81,16 @@ void scopes_addInterfaceBinding(
     uint32_t literalId,
     uint32_t id,
     uint32_t type,
-    uint32_t module
+    uint32_t module,
+    uint32_t parameter
 ) {
     Binding binding = {
         .kind = INTERFACE_BINDING,
         .identifier = literalId,
         .id = id,
         .type = type,
-        .module = module
+        .module = module,
+        .parameter = parameter
     };
     stack_push(arena, scopes->bindings, binding);
 }
