@@ -4,8 +4,16 @@
 #include "arena.h"
 #include "program.h"
 
-void generateObjectCode(Program program, uint32_t astId, Arena scratch);
-void generateExecutable(Program program, Arena scratch);
+void generateObjectCode(
+    Program program,
+    Ast* ast,
+    String objectFileName,
+    bool isEntry,
+    Arena scratch
+);
+void linkObjectFiles(
+    String executableName, StringList objectFiles, Arena scratch
+);
 void printLLVMIR(Program program, uint32_t astId, Arena scratch);
 
 #endif

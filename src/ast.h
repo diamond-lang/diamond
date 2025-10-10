@@ -225,6 +225,7 @@ typedef struct {
     ConstraintList constraints;
     Code code;
     uint32_t beingAnalyzed;
+    uint32_t builtin;
 } Function;
 
 typedef ListType(Function) FunctionList;

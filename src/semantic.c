@@ -529,6 +529,7 @@ static bool booleanLiteral(
 ) {
     uint32_t type = getBuiltInType(context, "Bool");
     data->type = type;
+    stack_push(&context->arena, context->stack, id);
     return true;
 }
 

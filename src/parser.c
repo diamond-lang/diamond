@@ -453,7 +453,8 @@ static uint32_t function(Parser *parser, Token keyword, Arena scratch) {
         function.type =
             ast_addFunctionType(parser->ast, argTypes, function.returnType);
     }
-    if (!parser->lexer.parsingBuiltins || !match(parser, BUILTIN)) {
+    function.builtin = parser->lexer.parsingBuiltins && match(parser, BUILTIN);
+    if (!function.builtin) {
         Code *backup = parser->code;
         parser->code = &function.code;
         uint32_t result = block(parser, scratch);

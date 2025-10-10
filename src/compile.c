@@ -11,6 +11,7 @@
 #include "ast.h"
 #include "builtin.h"
 #include "codegen.h"
+#include "common.h"
 #include "parser.h"
 #include "program.h"
 #include "semantic.h"
@@ -186,12 +187,49 @@ void analyzeProgram(Program* program, Arena scratch) {
     }
 }
 
-void codegenObjectFiles(Program program, Arena scratch) {
+void codegenObjectFiles(Program program, Arena scratch1, Arena scratch2) {
+    switch (currentPlatform()) {
+    case Windows: todo();
+    case Linux: todo();
+    case MacOS: {
+        system("mkdir -p .diamond-cache && rm -f .diamond-cache/*.o");
+        break;
+    }
+    }
+    generateObjectCode(
+        program,
+        &program.builtin,
+        getBuiltinObjectFileName(&scratch1),
+        false,
+        scratch2
+    );
     for (uint32_t i = 0; i < list_size(program.asts); i++) {
-        generateObjectCode(program, i, scratch);
+        Ast* ast = list_get(program.asts, i);
+        String path = *list_get(program.paths, i);
+        String objectFileName = getObjectFileName(&scratch1, i, path, scratch2);
+        bool isEntry = i == 0;
+        generateObjectCode(program, ast, objectFileName, isEntry, scratch2);
     }
 }
 
-void linkProgram(Program program, Arena scratch) {
-    generateExecutable(program, scratch);
+void linkProgram(Program program, Arena scratch1, Arena scratch2) {
+    // Get executable name
+    String executableName =
+        getExecutableName(&scratch1, *list_get(program.paths, 0));
+
+    // Get object files
+    StringList objectFiles = {0};
+    list_append(&scratch1, objectFiles, getBuiltinObjectFileName(&scratch1));
+    for (uint32_t i = 0; i < list_size(program.asts); i++) {
+        String objectFile = getObjectFileName(
+            &scratch1,
+            i,
+            *list_get(program.paths, i),
+            scratch2
+        );
+        list_append(&scratch1, objectFiles, objectFile);
+    }
+
+    // Link
+    linkObjectFiles(executableName, objectFiles, scratch1);
 }

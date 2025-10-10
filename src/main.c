@@ -84,8 +84,8 @@ static void build(Command command, Arena scratch1, Arena scratch2) {
         getProgramGraph(&scratch1, string_asView(command.path), scratch2);
     parseProgram(&program, scratch1);
     analyzeProgram(&program, scratch1);
-    codegenObjectFiles(program, scratch1);
-    linkProgram(program, scratch1);
+    codegenObjectFiles(program, scratch1, scratch2);
+    linkProgram(program, scratch1, scratch2);
 }
 
 static void run(Command command, Arena scratch1, Arena scratch2) {
@@ -96,8 +96,8 @@ static void run(Command command, Arena scratch1, Arena scratch2) {
     bool alreadyExisted = fileExists(executableName.buffer);
     parseProgram(&program, scratch1);
     analyzeProgram(&program, scratch1);
-    codegenObjectFiles(program, scratch1);
-    linkProgram(program, scratch1);
+    codegenObjectFiles(program, scratch1, scratch2);
+    linkProgram(program, scratch1, scratch2);
     system(executableName.buffer);
     if (!alreadyExisted) {
         remove(executableName.buffer);

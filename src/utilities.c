@@ -237,24 +237,34 @@ String numberAsString(Arena* arena, uint32_t number) {
 
 bool fileExists(char* path) { return (access(path, F_OK) == 0); }
 
-String getObjectFileName(Arena* arena, String path) {
-    String objectFileName = getPathWithoutExtension(arena, path);
+String getObjectFileName(
+    Arena* arena, uint32_t astId, String canonicalPath, Arena scratch
+) {
+    String result = getWorkingDirectory(&scratch);
+    String baseName = getPathWithoutExtension(arena, canonicalPath);
+    baseName = getBasePath(&scratch, baseName);
+    String number = numberAsString(&scratch, astId);
+    string_concat(arena, &result, cStringAsView("/.diamond-cache/"));
+    string_concat(arena, &result, string_asView(number));
+    string_concat(arena, &result, cStringAsView("_"));
+    string_concat(arena, &result, string_asView(baseName));
     switch (currentPlatform()) {
-    case Windows:
-        string_concat(arena, &objectFileName, cStringAsView(".obj"));
-        break;
-    case Linux:
-        string_concat(arena, &objectFileName, cStringAsView(".o"));
-        break;
-    case MacOS:
-        string_concat(arena, &objectFileName, cStringAsView(".o"));
-        break;
+    case Windows: string_concat(arena, &result, cStringAsView(".obj")); break;
+    case Linux: string_concat(arena, &result, cStringAsView(".o")); break;
+    case MacOS: string_concat(arena, &result, cStringAsView(".o")); break;
     }
-    return objectFileName;
+    return result;
+}
+
+String getBuiltinObjectFileName(Arena* arena) {
+    String result = getWorkingDirectory(arena);
+    string_concat(arena, &result, cStringAsView("/.diamond-cache/builtin.o"));
+    return result;
 }
 
 String getExecutableName(Arena* arena, String path) {
-    String executableName = getPathWithoutExtension(arena, path);
+    String executableName =
+        getBasePath(arena, getPathWithoutExtension(arena, path));
     switch (currentPlatform()) {
     case Windows: {
         string_concat(arena, &executableName, cStringAsView(".exe"));
@@ -263,6 +273,9 @@ String getExecutableName(Arena* arena, String path) {
     case Linux: break;
     case MacOS: break;
     }
+    String result = getWorkingDirectory(arena);
+    string_concat(arena, &result, cStringAsView("/"));
+    string_concat(arena, &result, string_asView(executableName));
     return executableName;
 }
 

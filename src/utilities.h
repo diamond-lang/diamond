@@ -13,7 +13,10 @@ String getBasePath(Arena* arena, String path);
 String getPathWithoutExtension(Arena* arena, String path);
 String readFile(Arena* arena, char* path);
 bool fileExists(char* path);
-String getObjectFileName(Arena* arena, String path);
+String getObjectFileName(
+    Arena* arena, uint32_t astId, String canonicalPath, Arena scratch
+);
+String getBuiltinObjectFileName(Arena* arena);
 String getExecutableName(Arena* arena, String path);
 String numberAsString(Arena* arena, uint32_t number);
 int numberOfDigits(uint32_t number);
