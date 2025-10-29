@@ -19,7 +19,6 @@
         uint32_t chunksCount; \
         uint32_t count;       \
     }
-
 typedef ListType(uint8_t) Uint8List;
 typedef ListType(uint32_t) Uint32List;
 typedef ListType(Uint32List) Uint32ListList;
@@ -39,7 +38,7 @@ typedef ListType(char*) CStringList;
     )
 
 #define list_get(list, index) \
-    (assert(index < (list).count), _list_get(list, index))
+    (assert(((uint64_t)index) < (list).count), _list_get(list, index))
 
 #define list_size(list) ((list).count)
 
@@ -125,23 +124,16 @@ typedef ListType(char*) CStringList;
 
 // Stack
 #define StackType(T) ListType(T)
-
 typedef StackType(uint32_t) Uint32Stack;
 typedef StackType(Uint32List) Uint32ListStack;
 
 #define stack_size(stack) list_size(stack)
-
 #define stack_get(stack, index) list_get(stack, index)
-
 #define stack_push(arena, stack, item) list_append(arena, stack, item)
-
 #define stack_pop(stack) list_setSize(stack, list_size(stack) - 1)
-
 #define stack_top(stack) list_get(stack, list_size(stack) - 1)
 
 // String
-typedef ListType(char) CharList;
-
 typedef struct {
     char* buffer;
     uint32_t count;
@@ -174,116 +166,44 @@ String string_substring(
 
 typedef ListType(String) StringList;
 
-// HashMap
-#define HashmapType(T)      \
+// ArrayHashmap
+#define ArrayHashmapType(T) \
     struct {                \
         Uint32List keys;    \
         ListType(T) values; \
     }
 
-typedef HashmapType(uint32_t) Uint32Hashmap;
+typedef ArrayHashmapType(uint32_t) Uint32Hashmap;
 
-#define hashmap_size(hashmap) list_size((hashmap).keys)
+#define array_hashmap_size(hashmap) list_size((hashmap).keys)
 
-#define hashmap_capacity(hashmap) list_capacity((hashmap).keys)
+#define array_hashmap_capacity(hashmap) list_capacity((hashmap).keys)
 
-uint32_t _hashmap_findLocation(Uint32List keys, uint32_t key);
+uint64_t _array_hashmap_findLocation(Uint32List keys, uint32_t key);
 
-#define hashmap_get(hashmap, key)                         \
-    ((hashmap_size(hashmap) != 0 &&                       \
-      *_list_get(                                         \
-          (hashmap).keys,                                 \
-          _hashmap_findLocation((hashmap).keys, key)      \
-      ) != None())                                        \
-         ? _list_get(                                     \
-               (hashmap).values,                          \
-               _hashmap_findLocation((hashmap).keys, key) \
-           )                                              \
+#define array_hashmap_get(hashmap, key)                         \
+    (_array_hashmap_findLocation((hashmap).keys, key) <         \
+             list_size((hashmap).keys)                          \
+         ? list_get(                                            \
+               (hashmap).values,                                \
+               _array_hashmap_findLocation((hashmap).keys, key) \
+           )                                                    \
          : NULL)
 
-#define hashmap_set(arena, hashmap, key, value)                                \
-    do {                                                                       \
-        uint32_t initialCapacity__ = hashmap_capacity(hashmap);                \
-        if (hashmap_size(hashmap) + 1 > initialCapacity__ * 0.7) {             \
-            list_grow(arena, (hashmap).keys);                                  \
-            list_grow(arena, (hashmap).values);                                \
-            if (initialCapacity__ != 0) {                                      \
-                Arena scratch__ = *arena;                                      \
-                uint32_t* temporayKeys__ = arena_allocWithAlignment(           \
-                    &scratch__,                                                \
-                    sizeof(**(hashmap).keys.chunks),                           \
-                    getAlignOfExpression(**(hashmap).keys.chunks),             \
-                    initialCapacity__                                          \
-                );                                                             \
-                void* temporayValues__ = arena_allocWithAlignment(             \
-                    &scratch__,                                                \
-                    sizeof(**(hashmap).values.chunks),                         \
-                    getAlignOfExpression(**(hashmap).values.chunks),           \
-                    initialCapacity__                                          \
-                );                                                             \
-                assert(                                                        \
-                    list_size((hashmap).keys) == list_size((hashmap).values)   \
-                );                                                             \
-                uint32_t sizeOfValue__ = sizeof(**(hashmap).values.chunks);    \
-                for (uint32_t i__ = 0; i__ < (hashmap).keys.chunksCount - 1;   \
-                     i__++) {                                                  \
-                    uint32_t chunkSize__ = list_initialChunkSize * (1 << i__); \
-                    uint32_t chunkSizeSoFar__ =                                \
-                        list_totalCapacityPreviousChunks((hashmap).keys, i__); \
-                    memcpy(                                                    \
-                        temporayKeys__ + chunkSizeSoFar__,                     \
-                        (hashmap).keys.chunks[i__],                            \
-                        chunkSize__ * sizeof(uint32_t)                         \
-                    );                                                         \
-                    memcpy(                                                    \
-                        temporayValues__ + chunkSizeSoFar__ * sizeOfValue__,   \
-                        (hashmap).values.chunks[i__],                          \
-                        chunkSize__ * sizeOfValue__                            \
-                    );                                                         \
-                    for (uint32_t j__ = 0; j__ < chunkSize__; j__++) {         \
-                        (hashmap).keys.chunks[i__][j__] = None();              \
-                        memset(                                                \
-                            &(hashmap).values.chunks[i__][j__],                \
-                            0,                                                 \
-                            sizeOfValue__                                      \
-                        );                                                     \
-                    }                                                          \
-                }                                                              \
-                for (uint32_t i__ = 0; i__ < initialCapacity__; i__++) {       \
-                    if (temporayKeys__[i__] == None()) continue;               \
-                    uint32_t location2__ = _hashmap_findLocation(              \
-                        (hashmap).keys,                                        \
-                        temporayKeys__[i__]                                    \
-                    );                                                         \
-                    *_list_get((hashmap).keys, location2__) =                  \
-                        temporayKeys__[i__];                                   \
-                    memcpy(                                                    \
-                        _list_get((hashmap).values, location2__),              \
-                        temporayValues__ + i__ * sizeOfValue__,                \
-                        sizeOfValue__                                          \
-                    );                                                         \
-                }                                                              \
-            }                                                                  \
-        }                                                                      \
-        uint32_t location__ = _hashmap_findLocation((hashmap).keys, key);      \
-        if (*_list_get((hashmap).keys, location__) == None()) {                \
-            (hashmap).keys.count++;                                            \
-            (hashmap).values.count++;                                          \
-        }                                                                      \
-        *_list_get((hashmap).keys, location__) = key;                          \
-        *_list_get((hashmap).values, location__) = value;                      \
-    } while (false)
-
-#define hashmap_clear(hashmap)                                                \
-    do {                                                                      \
-        uint32_t sizeOfValue__ = sizeof(**(hashmap).values.chunks);           \
-        for (uint32_t i__ = 0; i__ < (hashmap).keys.chunksCount; i__++) {     \
-            uint32_t chunkSize__ = list_initialChunkSize * (1 << i__);        \
-            for (uint32_t j__ = 0; j__ < chunkSize__; j__++) {                \
-                (hashmap).keys.chunks[i__][j__] = None();                     \
-                memset(&(hashmap).values.chunks[i__][j__], 0, sizeOfValue__); \
-            }                                                                 \
-        }                                                                     \
+#define array_hashmap_set(arena, hashmap, key, value)      \
+    do {                                                   \
+        uint32_t i__;                                      \
+        for (i__ = 0; i__ < (hashmap).keys.count; i__++) { \
+            if (*list_get((hashmap).keys, i__) == key) {   \
+                break;                                     \
+            }                                              \
+        }                                                  \
+        if (i__ < list_size((hashmap).keys)) {             \
+            *list_get((hashmap).keys, i__) = value;        \
+        } else {                                           \
+            list_append(arena, (hashmap).keys, key);       \
+            list_append(arena, (hashmap).values, value);   \
+        }                                                  \
     } while (false)
 
 #endif

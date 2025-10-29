@@ -16,8 +16,11 @@ void ast_clear(Ast* ast) {
     ast->importedAsts.count = 0;
     ast->imports.count = 0;
     ast->functions.count = 0;
+    ast->importedFunctions.count = 0;
     ast->interfaces.count = 0;
+    ast->importedInterfaces.count = 0;
     ast->typeDefinitions.count = 0;
+    ast->importedTypeDefinitions.count = 0;
     ast->code.instructions.count = 0;
     ast->code.dataOrIndex.count = 0;
     ast->errors.count = 0;

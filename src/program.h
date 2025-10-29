@@ -1,6 +1,8 @@
 #ifndef program_h
 #define program_h
 
+#include <stdint.h>
+
 #include "ast.h"
 #include "types.h"
 
@@ -10,5 +12,8 @@ typedef struct {
     StringList paths;
     Uint32ListList dependencyGraph;
 } Program;
+
+Ast* program_getAst(Program* program, uint32_t astId);
+String program_getPath(Program* program, uint32_t astId);
 
 #endif

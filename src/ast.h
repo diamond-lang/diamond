@@ -224,11 +224,26 @@ typedef struct {
     uint32_t type;
     ConstraintList constraints;
     Code code;
-    uint32_t beingAnalyzed;
-    uint32_t builtin;
+    bool beingAnalyzed;
+    bool builtin;
+    bool private;
+    bool isImplementation;
 } Function;
 
 typedef ListType(Function) FunctionList;
+
+typedef struct {
+    uint32_t identifier;
+    FunctionArgumentList arguments;
+    uint32_t returnType;
+    uint32_t type;
+    ConstraintList constraints;
+    uint32_t id;
+    uint32_t module;
+    bool isImplementation;
+} ImportedFunction;
+
+typedef ListType(ImportedFunction) ImportedFunctionList;
 
 typedef struct {
     uint32_t astId;
@@ -250,11 +265,33 @@ typedef ListType(Interface) InterfaceList;
 
 typedef struct {
     uint32_t identifier;
+    uint32_t parameter;
+    FunctionArgumentList arguments;
+    uint32_t returnType;
+    uint32_t type;
+    uint32_t id;
+    uint32_t module;
+} ImportedInterface;
+
+typedef ListType(ImportedInterface) ImportedInterfaceList;
+
+typedef struct {
+    uint32_t identifier;
     Uint32List fields;
     Uint32List fieldTypes;
 } TypeDefinition;
 
 typedef ListType(TypeDefinition) TypeDefinitionList;
+
+typedef struct {
+    uint32_t identifier;
+    Uint32List fields;
+    Uint32List fieldTypes;
+    uint32_t id;
+    uint32_t module;
+} ImportedTypeDefinition;
+
+typedef ListType(ImportedTypeDefinition) ImportedTypeDefinitionList;
 
 // Types
 typedef struct {
@@ -292,8 +329,11 @@ typedef struct Ast {
     Uint32List importedAsts;
     ImportList imports;
     FunctionList functions;
+    ImportedFunctionList importedFunctions;
     InterfaceList interfaces;
+    ImportedInterfaceList importedInterfaces;
     TypeDefinitionList typeDefinitions;
+    ImportedTypeDefinitionList importedTypeDefinitions;
     Code code;
     LiteralList literals;
     ErrorList errors;

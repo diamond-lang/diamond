@@ -154,7 +154,7 @@ static void emit(Command command, Arena scratch1, Arena scratch2) {
         return;
     }
     if (strcmp(list_get(command.options, 0)->buffer, "--llvm-ir") == 0) {
-        printLLVMIR(program, 0, scratch1);
+        printLLVMIR(&program, 1, scratch1);
         return;
     }
 }

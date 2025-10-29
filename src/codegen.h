@@ -5,8 +5,8 @@
 #include "program.h"
 
 void generateObjectCode(
-    Program program,
-    Ast* ast,
+    Program* program,
+    uint32_t astId,
     String objectFileName,
     bool isEntry,
     Arena scratch
@@ -14,6 +14,6 @@ void generateObjectCode(
 void linkObjectFiles(
     String executableName, StringList objectFiles, Arena scratch
 );
-void printLLVMIR(Program program, uint32_t astId, Arena scratch);
+void printLLVMIR(Program* program, uint32_t astId, Arena scratch);
 
 #endif

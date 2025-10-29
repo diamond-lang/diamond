@@ -16,9 +16,59 @@
 #include "common.h"
 #include "lld-c.h"
 #include "program.h"
-#include "scopes.h"
 #include "types.h"
 #include "utilities.h"
+
+typedef enum {
+    FUNCTION_BINDING,
+    INTERFACE_BINDING,
+    VARIABLE_BINDING,
+    ARGUMENT_BINDING
+} BindingKind;
+
+typedef struct {
+    uint32_t id;
+    uint32_t module;
+} FunctionBinding;
+
+typedef struct {
+    uint32_t id;
+    uint32_t module;
+} InterfaceBinding;
+
+typedef struct {
+    LLVMValueRef value;
+} VariableBinding;
+
+typedef struct {
+    LLVMValueRef value;
+} ArgumentBinding;
+
+typedef struct {
+    BindingKind kind;
+    uint32_t literal;
+    union {
+        FunctionBinding asFunction;
+        InterfaceBinding asInterface;
+        VariableBinding asVariable;
+        ArgumentBinding asArgument;
+    };
+} Binding;
+
+typedef StackType(Binding) BindingStack;
+
+typedef struct {
+    uint32_t literal;
+    uint32_t module;
+} TypeBinding;
+
+typedef ListType(TypeBinding) TypeBindingList;
+
+typedef struct {
+    BindingStack bindings;
+    Uint32Stack scopeStart;
+    TypeBindingList types;
+} Scopes;
 
 typedef struct {
     uint32_t literal;
@@ -27,42 +77,326 @@ typedef struct {
 
 typedef ListType(GlobalString) GlobalStringList;
 
+typedef StackType(LLVMValueRef) LLVMValueStack;
+
 typedef struct {
     Ast* ast;
-    Scopes bindings;
-    Uint32Stack stack;
+    uint32_t astId;
+    Program* program;
+    Scopes scopes;
+    LLVMValueStack stack;
     uint32_t lastTypeVariable;
     Arena arena;
     LLVMContextRef llvmContext;
     LLVMModuleRef llvmModule;
     LLVMBuilderRef llvmBuilder;
-    LLVMBasicBlockRef currentEntryBlock;
+    LLVMBasicBlockRef currentBlockEntry;
     LLVMBasicBlockRef lastAfterWhileBlock;  // Needed for break
     LLVMBasicBlockRef lastWhileBlock;       // Needed for continue
     GlobalStringList globalStrings;
 } Context;
 
+static void addScope(Context* context) {
+    stack_push(
+        &context->arena,
+        context->scopes.scopeStart,
+        stack_size(context->scopes.bindings)
+    );
+}
+
+static void removeScope(Context* context) {
+    context->scopes.bindings.count = *stack_top(context->scopes.scopeStart);
+    stack_pop(context->scopes.scopeStart);
+}
+
+static Binding* getBinding(Context* context, uint32_t literalId) {
+    uint32_t bindingsCount = stack_size(context->scopes.bindings);
+    for (uint32_t i = bindingsCount - 1; 0 <= i && i < bindingsCount; i--) {
+        Binding* binding = stack_get(context->scopes.bindings, i);
+        if (binding->literal == literalId) return binding;
+    }
+    return NULL;
+}
+
+static Binding* getBindingInCurrentScope(Context* context, uint32_t literalId) {
+    uint32_t start = *stack_top(context->scopes.scopeStart);
+    uint32_t bindingsCount = stack_size(context->scopes.bindings);
+    assert(bindingsCount >= start);
+    for (uint32_t i = bindingsCount - 1; start <= i && i < bindingsCount; i--) {
+        Binding* binding = stack_get(context->scopes.bindings, i);
+        if (binding->literal == literalId) return binding;
+    }
+    return NULL;
+}
+
+// static void addArgumentBinding(
+//     Context* context, uint32_t literal, LLVMValueRef value
+// ) {
+//     Binding binding = {
+//         .kind = ARGUMENT_BINDING,
+//         .literal = literal,
+//         .asArgument = (ArgumentBinding){.value = value}
+//     };
+//     stack_push(&context->arena, context->scopes.bindings, binding);
+// }
+
+// static void scopes_addVariableBinding(
+//     Arena* arena, Scopes* scopes, uint32_t literalId, uint32_t type
+// ) {
+//     Binding binding = {
+//         .kind = VARIABLE_BINDING,
+//         .identifier = literalId,
+//         .type = type
+//     };
+//     stack_push(arena, scopes->bindings, binding);
+// }
+
+static void addFunctionBinding(
+    Context* context, uint32_t literal, uint32_t id, uint32_t module
+) {
+    Binding binding = {
+        .kind = FUNCTION_BINDING,
+        .literal = literal,
+        .asFunction = (FunctionBinding){.id = id, .module = module}
+    };
+    stack_push(&context->arena, context->scopes.bindings, binding);
+}
+
+static void addInterfaceBinding(
+    Context* context, uint32_t literalId, uint32_t id, uint32_t module
+) {
+    Binding binding = {
+        .kind = INTERFACE_BINDING,
+        .literal = literalId,
+        .asInterface = (InterfaceBinding){.id = id, .module = module}
+    };
+    stack_push(&context->arena, context->scopes.bindings, binding);
+}
+
+static void addTypeBinding(
+    Context* context, uint32_t literal, uint32_t module
+) {
+    TypeBinding binding = {.literal = literal, .module = module};
+    stack_push(&context->arena, context->scopes.types, binding);
+}
+
+static TypeBinding* getTypeBinding(Context* context, uint32_t literalId) {
+    uint32_t bindingsCount = stack_size(context->scopes.types);
+    for (uint32_t i = bindingsCount - 1; 0 <= i && i < bindingsCount; i--) {
+        TypeBinding* binding = stack_get(context->scopes.types, i);
+        if (binding->literal == literalId) return binding;
+    }
+    return NULL;
+}
+
+// static LLVMValueRef getBindingLLVMValueRef(Context* context, Binding binding) {
+//     todo();
+// }
+
+static bool addTopLevelDefinitionsToBindings(Context* context, uint32_t astId) {
+    // Add types bindings
+    for (uint32_t i = 0; i < list_size(context->ast->typeDefinitions); i++) {
+        TypeDefinition typeDef = *list_get(context->ast->typeDefinitions, i);
+        TypeBinding* binding = getTypeBinding(context, typeDef.identifier);
+        assert(binding == NULL);
+        addTypeBinding(context, typeDef.identifier, astId);
+    }
+
+    for (uint32_t i = 0; i < list_size(context->ast->importedTypeDefinitions);
+         i++) {
+        ImportedTypeDefinition typeDef =
+            *list_get(context->ast->importedTypeDefinitions, i);
+        TypeBinding* binding = getTypeBinding(context, typeDef.identifier);
+        assert(binding == NULL);
+        addTypeBinding(context, typeDef.identifier, typeDef.module);
+    }
+
+    // Add interface bindings
+    for (uint32_t i = 0; i < list_size(context->ast->interfaces); i++) {
+        Interface* interface = list_get(context->ast->interfaces, i);
+        Binding* binding =
+            getBindingInCurrentScope(context, interface->identifier);
+        assert(binding == NULL);
+        addInterfaceBinding(context, interface->identifier, i, astId);
+    }
+
+    for (uint32_t i = 0; i < list_size(context->ast->importedInterfaces); i++) {
+        ImportedInterface* interface =
+            list_get(context->ast->importedInterfaces, i);
+        Binding* binding =
+            getBindingInCurrentScope(context, interface->identifier);
+        assert(binding == NULL);
+        addInterfaceBinding(
+            context,
+            interface->identifier,
+            i,
+            interface->module
+        );
+    }
+
+    // Add function bindings
+    for (uint32_t i = 0; i < list_size(context->ast->functions); i++) {
+        Function* function = list_get(context->ast->functions, i);
+        if (function->isImplementation) continue;
+        Binding* binding =
+            getBindingInCurrentScope(context, function->identifier);
+        assert(binding == NULL);
+        addFunctionBinding(context, function->identifier, i, astId);
+    }
+
+    for (uint32_t i = 0; i < list_size(context->ast->importedFunctions); i++) {
+        ImportedFunction* function =
+            list_get(context->ast->importedFunctions, i);
+        if (function->isImplementation) continue;
+        Binding* binding =
+            getBindingInCurrentScope(context, function->identifier);
+        assert(binding == NULL);
+        addFunctionBinding(context, function->identifier, i, function->module);
+    }
+
+    return true;
+}
+
 static void init_context(
-    Context* context, Program program, Ast* ast, Arena arena
+    Context* context, Program* program, Ast* ast, uint32_t astId, Arena arena
 ) {
     context->ast = ast;
+    context->astId = astId;
+    context->program = program;
     context->arena = arena;
-    scopes_addScope(&context->arena, &context->bindings);
     context->llvmContext = LLVMContextCreate();
     context->llvmModule = LLVMModuleCreateWithNameInContext(
-        list_get(program.paths, 0)->buffer,
+        list_get(program->paths, 0)->buffer,
         context->llvmContext
     );
     context->llvmBuilder = LLVMCreateBuilderInContext(context->llvmContext);
 }
 
-static bool declaration(
-    Context* ctx, Code* code, uint32_t id, AstDeclaration* data, Arena scratch
+static LLVMTypeRef getTypeAsLLVMType(
+    Arena* arena, Context* context, uint32_t typeId
+) {
+    assert(typeId != None());
+    Type* type = ast_findType(context->ast, typeId);
+    switch (type->kind) {
+    case TYPE_VARIABLE: unreachable();
+    case TYPE_WITH_PARAMS: {
+        if (ast_isTypeVariable(*context->ast, &type->withParams)) {
+            unreachable();
+        }
+
+        TypeWithParams* data = &type->withParams;
+        if (data->literal == ast_getLiteral(context->ast, "Bool")) {
+            return LLVMInt1TypeInContext(context->llvmContext);
+        } else if (data->literal == ast_getLiteral(context->ast, "Float64")) {
+            return LLVMDoubleTypeInContext(context->llvmContext);
+        } else if (data->literal == ast_getLiteral(context->ast, "None")) {
+            return LLVMVoidTypeInContext(context->llvmContext);
+        } else if (data->literal == ast_getLiteral(context->ast, "->")) {
+            assert(data->parameterCount >= 1);
+            uint32_t argsCount = data->parameterCount - 1;
+            LLVMTypeRef* args = arena_alloc(arena, LLVMTypeRef, argsCount);
+            for (uint32_t i = 0; i < argsCount; i++) {
+                args[i] =
+                    getTypeAsLLVMType(arena, context, data->parameters[i]);
+            }
+            LLVMTypeRef returnType =
+                getTypeAsLLVMType(arena, context, data->parameters[argsCount]);
+            return LLVMFunctionType(returnType, args, argsCount, false);
+        } else {
+            todo();
+        }
+    }
+    }
+    unreachable();
+}
+
+static LLVMValueRef getFunction(
+    Context* context,
+    uint32_t module,
+    uint32_t identifier,
+    uint32_t functionTypeId,
+    uint32_t actualTypeId,
+    Arena scratch
+) {
+    // Construct mangled name
+    String mangledName = numberAsString(&scratch, module);
+    string_concat(&scratch, &mangledName, cStringAsView("_"));
+    string_concat(
+        &scratch,
+        &mangledName,
+        ast_literalAsView(*context->ast, identifier)
+    );
+    Type* functionType = ast_getType(*context->ast, functionTypeId);
+    Type* actualType = ast_getType(*context->ast, actualTypeId);
+    assert(
+        (functionType->kind == TYPE_WITH_PARAMS) &&
+        (actualType->kind == TYPE_WITH_PARAMS) &&
+        (functionType->withParams.parameterCount ==
+         actualType->withParams.parameterCount)
+    );
+
+    // Find instantiated parameters
+    Uint32Hashmap mappings = {0};
+    for (uint32_t i = 0; i < functionType->withParams.parameterCount; i++) {
+        Type* parameter =
+            ast_findType(context->ast, functionType->withParams.parameters[i]);
+        Type* actualParameter =
+            ast_findType(context->ast, actualType->withParams.parameters[i]);
+        assert(parameter->kind == TYPE_WITH_PARAMS);
+        assert(actualParameter->kind == TYPE_WITH_PARAMS);
+        if (ast_isTypeVariable(*context->ast, &parameter->withParams)) {
+            if (array_hashmap_get(mappings, parameter->withParams.literal) ==
+                NULL) {
+                array_hashmap_set(
+                    &scratch,
+                    mappings,
+                    parameter->withParams.literal,
+                    actualType->withParams.parameters[i]
+                );
+            }
+        }
+    }
+
+    // Add instantiated parameters to mangled name
+    if (array_hashmap_size(mappings) != 0) {
+        string_concat(&scratch, &mangledName, cStringAsView("["));
+        for (uint32_t i = 0; i < array_hashmap_size(mappings); i++) {
+            String parameter = ast_typeAsString(
+                &scratch,
+                *context->ast,
+                *list_get(mappings.values, i)
+            );
+            string_concat(&scratch, &mangledName, string_asView(parameter));
+        }
+        string_concat(&scratch, &mangledName, cStringAsView("]"));
+    }
+
+    // Check if function already added
+    LLVMValueRef result =
+        LLVMGetNamedFunction(context->llvmModule, mangledName.buffer);
+    if (result == NULL) {
+        LLVMTypeRef llvmFunctionType =
+            getTypeAsLLVMType(&scratch, context, actualTypeId);
+        result = LLVMAddFunction(
+            context->llvmModule,
+            mangledName.buffer,
+            llvmFunctionType
+        );
+    }
+    return result;
+}
+
+static void declaration(
+    Context* context,
+    Code* code,
+    uint32_t id,
+    AstDeclaration* data,
+    Arena scratch
 ) {
     todo();
 }
 
-static bool assignemnt(
+static void assignemnt(
     Context* context,
     Code* code,
     uint32_t id,
@@ -72,13 +406,13 @@ static bool assignemnt(
     todo();
 }
 
-static bool returnStmt(
+static void returnStmt(
     Context* context, Code* code, uint32_t id, AstReturn* data, Arena scratch
 ) {
     todo();
 }
 
-static bool returnExpression(
+static void returnExpression(
     Context* context,
     Code* code,
     uint32_t id,
@@ -88,37 +422,66 @@ static bool returnExpression(
     todo();
 }
 
-static bool breakStmt(
+static void breakStmt(
     Context* context, Code* code, uint32_t id, AstBreak* data, Arena scratch
 ) {
     todo();
 }
 
-static bool continueStmt(
+static void continueStmt(
     Context* context, Code* code, uint32_t id, AstContinue* data, Arena scratch
 ) {
     todo();
 }
 
-static bool ifElse(
+static void ifElse(
     Context* context, Code* code, uint32_t id, AstIfElse* data, Arena scratch
 ) {
     todo();
 }
 
-static bool whileStmt(
+static void whileStmt(
     Context* context, Code* code, uint32_t id, AstWhile* data, Arena scratch
 ) {
     todo();
 }
 
-static bool call(
+static void call(
     Context* context, Code* code, uint32_t id, AstCall* data, Arena scratch
 ) {
-    todo();
+    LLVMValueRef function = *stack_get(
+        context->stack,
+        stack_size(context->stack) - data->argumentsCount - 1
+    );
+    LLVMTypeRef functionType;
+    if (LLVMIsAGlobalValue(function)) {
+        functionType = LLVMGlobalGetValueType(function);
+    } else {
+        functionType = LLVMGetElementType(LLVMTypeOf(function));
+    }
+    LLVMValueRef* args =
+        arena_alloc(&scratch, LLVMValueRef, data->argumentsCount);
+    for (uint32_t i = 0; i < data->argumentsCount; i++) {
+        args[i] = *stack_get(
+            context->stack,
+            stack_size(context->stack) - data->argumentsCount + i
+        );
+    }
+    LLVMValueRef result = LLVMBuildCall2(
+        context->llvmBuilder,
+        functionType,
+        function,
+        args,
+        data->argumentsCount,
+        ""
+    );
+    for (uint32_t i = 0; i < data->argumentsCount + 1; i++) {
+        stack_pop(context->stack);
+    }
+    stack_push(&context->arena, context->stack, result);
 }
 
-static bool ifElseExpression(
+static void ifElseExpression(
     Context* context,
     Code* code,
     uint32_t id,
@@ -128,13 +491,13 @@ static bool ifElseExpression(
     todo();
 }
 
-static bool addressOf(
+static void addressOf(
     Context* context, Code* code, uint32_t id, AstAddressOf* data, Arena scratch
 ) {
     todo();
 }
 
-static bool dereference(
+static void dereference(
     Context* context,
     Code* code,
     uint32_t id,
@@ -144,7 +507,7 @@ static bool dereference(
     todo();
 }
 
-static bool fieldAccess(
+static void fieldAccess(
     Context* context,
     Code* code,
     uint32_t id,
@@ -154,7 +517,7 @@ static bool fieldAccess(
     todo();
 }
 
-static bool indexAccess(
+static void indexAccess(
     Context* context,
     Code* code,
     uint32_t id,
@@ -164,47 +527,108 @@ static bool indexAccess(
     todo();
 }
 
-static bool floatLiteral(
+static void floatLiteral(
     Context* context, Code* code, uint32_t id, AstFloat* data, Arena scratch
 ) {
-    todo();
+    double value;
+    sscanf(ast_literalAsString(*context->ast, data->literal), "%lf", &value);
+    LLVMValueRef llvmValue =
+        LLVMConstReal(LLVMDoubleTypeInContext(context->llvmContext), value);
+    stack_push(&context->arena, context->stack, llvmValue);
 }
 
-static bool integerLiteral(
+static void integerLiteral(
     Context* context, Code* code, uint32_t id, AstInteger* data, Arena scratch
 ) {
     todo();
 }
 
-static bool identifier(
+static void identifier(
     Context* context,
     Code* code,
     uint32_t id,
     AstIdentifier* data,
     Arena scratch
 ) {
-    todo();
+    Binding* binding = getBinding(context, data->literal);
+    assert(binding);
+    switch (binding->kind) {
+    case FUNCTION_BINDING: {
+        if (binding->asFunction.module == context->astId) {
+            Function* function =
+                list_get(context->ast->functions, binding->asFunction.id);
+            printf("%p\n", function);
+            todo();
+        } else {
+            ImportedFunction* impFunction = list_get(
+                context->ast->importedFunctions,
+                binding->asFunction.id
+            );
+            LLVMValueRef value = getFunction(
+                context,
+                impFunction->module,
+                impFunction->identifier,
+                impFunction->type,
+                data->type,
+                scratch
+            );
+            stack_push(&context->arena, context->stack, value);
+        }
+        break;
+    }
+    case INTERFACE_BINDING: {
+        if (binding->asInterface.module == context->astId) {
+            Interface* interface =
+                list_get(context->ast->interfaces, binding->asInterface.id);
+            printf("%p\n", interface);
+            todo();
+        } else {
+            ImportedInterface* impInterface = list_get(
+                context->ast->importedInterfaces,
+                binding->asInterface.id
+            );
+            LLVMValueRef value = getFunction(
+                context,
+                impInterface->module,
+                impInterface->identifier,
+                impInterface->type,
+                data->type,
+                scratch
+            );
+            stack_push(&context->arena, context->stack, value);
+        }
+        break;
+    }
+    case ARGUMENT_BINDING: {
+        todo();
+        break;
+    }
+    case VARIABLE_BINDING: {
+        todo();
+        break;
+    }
+    }
 }
 
-static bool booleanLiteral(
+static void booleanLiteral(
     Context* context, Code* code, uint32_t id, AstBoolean* data, Arena scratch
 ) {
     todo();
 }
 
-static bool stringLiteral(
+static void stringLiteral(
     Context* context, Code* code, uint32_t id, AstString* data, Arena scratch
 ) {
     todo();
 }
 
-static bool arrayLiteral(
+static void arrayLiteral(
     Context* context, Code* code, uint32_t id, AstArray* data, Arena scratch
 ) {
     todo();
 }
 
-static bool structLiteral(
+static void structLiteral(
     Context* context,
     Code* code,
     uint32_t id,
@@ -214,7 +638,7 @@ static bool structLiteral(
     todo();
 }
 
-static bool codegenInstruction(
+static void codegenInstruction(
     Context* context, Code* code, uint32_t id, Arena scratch
 ) {
     AstInstructionKind kind = ast_getInstruction(*code, id);
@@ -248,39 +672,71 @@ static bool codegenInstruction(
     }
 }
 
-// static bool codegenTypeDefinition(
+// static void codegenTypeDefinition(
 //     Context* context, TypeDefinition* typeDefinition, Arena scratch
 // ) {
 //     todo();
 // }
 
-// static bool codengenFunction(
-//     Context* context, Function* function, Arena scratch
-// ) {
-//     todo();
-// }
-
-static bool codegenCode(Context* context, Code* code, Arena scratch) {
-    return false;
-    for (uint32_t id = 1; id <= list_size(code->instructions); id++) {
-        bool result = codegenInstruction(context, code, id, scratch);
-        if (!result) return false;
-    }
-    return true;
+static void codengenFunctionPrototype(
+    Context* context, Function* function, Arena scratch
+) {
+    if (function->builtin || function->parameters.count != 0) return;
+    LLVMTypeRef functionType =
+        getTypeAsLLVMType(&scratch, context, function->type);
+    char* identifier = ast_literalAsString(*context->ast, function->identifier);
+    LLVMAddFunction(context->llvmModule, identifier, functionType);
 }
 
-static void codegen(Context* context, Ast* ast, bool isEntry, Arena scratch) {
-    LLVMTypeRef int32Type = LLVMInt32TypeInContext(context->llvmContext);
-    LLVMTypeRef int8Type = LLVMInt8TypeInContext(context->llvmContext);
-    LLVMTypeRef charPointerType = LLVMPointerType(int8Type, 0);
+static void codengenFunction(
+    Context* context, Function* function, Arena scratch
+) {
+    if (function->builtin || function->parameters.count != 0) return;
+    char* identifier = ast_literalAsString(*context->ast, function->identifier);
+    LLVMValueRef llvmFunction =
+        LLVMGetNamedFunction(context->llvmModule, identifier);
+    LLVMBasicBlockRef body =
+        LLVMAppendBasicBlockInContext(context->llvmContext, llvmFunction, "");
+    LLVMPositionBuilderAtEnd(context->llvmBuilder, body);
+    context->currentBlockEntry = LLVMGetEntryBasicBlock(llvmFunction);
+    todo();
+}
 
-    // Create printf declaration
-    LLVMTypeRef printfParams[] = {charPointerType};
-    LLVMTypeRef printfType = LLVMFunctionType(int32Type, printfParams, 1, 1);
-    LLVMValueRef printfFunction =
-        LLVMAddFunction(context->llvmModule, "printf", printfType);
+static void codegenCode(Context* context, Code* code, Arena scratch) {
+    for (uint32_t id = 1; id <= list_size(code->instructions); id++) {
+        codegenInstruction(context, code, id, scratch);
+    }
+}
+
+static void codegen(
+    Context* context, Ast* ast, uint32_t astId, bool isEntry, Arena scratch
+) {
+    addScope(context);
+    addTopLevelDefinitionsToBindings(context, astId);
+
+    LLVMTypeRef int32Type = LLVMInt32TypeInContext(context->llvmContext);
+    // LLVMTypeRef int8Type = LLVMInt8TypeInContext(context->llvmContext);
+    // LLVMTypeRef charPointerType = LLVMPointerType(int8Type, 0);
+
+    // // Create printf declaration
+    // LLVMTypeRef printfParams[] = {charPointerType};
+    // LLVMTypeRef printfType = LLVMFunctionType(int32Type, printfParams, 1, 1);
+    // LLVMValueRef printfFunction =
+    //     LLVMAddFunction(context->llvmModule, "printf", printfType);
 
     if (isEntry) {
+        // Generate function prototypes
+        for (uint32_t i = 0; i < list_size(ast->functions); i++) {
+            Function* function = list_get(ast->functions, i);
+            codengenFunctionPrototype(context, function, scratch);
+        }
+
+        // Generate function bodies
+        for (uint32_t i = 0; i < list_size(ast->functions); i++) {
+            Function* function = list_get(ast->functions, i);
+            codengenFunction(context, function, scratch);
+        }
+
         // Create main function
         LLVMTypeRef mainType = LLVMFunctionType(int32Type, NULL, 0, 0);
 
@@ -295,46 +751,54 @@ static void codegen(Context* context, Ast* ast, bool isEntry, Arena scratch) {
             "entry"
         );
         LLVMPositionBuilderAtEnd(context->llvmBuilder, entryBlock);
-        context->currentEntryBlock = entryBlock;
+        context->currentBlockEntry = entryBlock;
 
         // Codegen statements
         codegenCode(context, &context->ast->code, scratch);
 
-        // Create hello world constant
-        char* helloWorld = "Hello world!\n";
-        LLVMValueRef helloConstant =
-            LLVMBuildGlobalString(context->llvmBuilder, helloWorld, "constant");
-        LLVMValueRef printfArgs[] = {helloConstant};
-        (void)LLVMBuildCall2(
-            context->llvmBuilder,
-            printfType,
-            printfFunction,
-            printfArgs,
-            1,
-            "call"
-        );
+        // // Create hello world constant
+        // char* helloWorld = "Hello world!\n";
+        // LLVMValueRef helloConstant =
+        //     LLVMBuildGlobalString(context->llvmBuilder, helloWorld, "constant");
+        // LLVMValueRef printfArgs[] = {helloConstant};
+        // (void)LLVMBuildCall2(
+        //     context->llvmBuilder,
+        //     printfType,
+        //     printfFunction,
+        //     printfArgs,
+        //     1,
+        //     "call"
+        // );
 
         // Create return 0 statement
         LLVMValueRef returnValue = LLVMConstInt(int32Type, 0, 0);
         LLVMBuildRet(context->llvmBuilder, returnValue);
     }
+
+    removeScope(context);
 }
 
 void generateObjectCode(
-    Program program,
-    Ast* ast,
+    Program* program,
+    uint32_t astId,
     String objectFileName,
     bool isEntry,
     Arena scratch
 ) {
+    Ast* ast = NULL;
+    if (astId == 0) {
+        ast = &program->builtin;
+    } else {
+        ast = program_getAst(program, astId);
+    }
     char* error = NULL;
 
     // Initialize context
     Context context = {0};
-    init_context(&context, program, ast, arena_new());
+    init_context(&context, program, ast, astId, arena_new());
 
     // Codegen
-    codegen(&context, ast, isEntry, scratch);
+    codegen(&context, ast, astId, isEntry, scratch);
 
     // Initialize code generation
     LLVMInitializeAllTargetInfos();
@@ -438,11 +902,11 @@ void linkObjectFiles(
     }
 }
 
-void printLLVMIR(Program program, uint32_t astId, Arena scratch) {
-    Ast* ast = list_get(program.asts, astId);
+void printLLVMIR(Program* program, uint32_t astId, Arena scratch) {
+    Ast* ast = program_getAst(program, astId);
     Context context = {0};
-    init_context(&context, program, ast, arena_new());
-    codegen(&context, ast, true, scratch);
+    init_context(&context, program, ast, astId, arena_new());
+    codegen(&context, ast, astId, true, scratch);
     LLVMDumpModule(context.llvmModule);
     arena_free(&context.arena);
 }

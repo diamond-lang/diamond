@@ -22,8 +22,8 @@
 static void findImports(
     Arena* arena, Program* program, uint32_t current, Arena scratch
 ) {
-    Ast* currentAst = list_get(program->asts, current);
-    String path = *list_get(program->paths, current);
+    Ast* currentAst = program_getAst(program, current);
+    String path = program_getPath(program, current);
 
     // Parse imports
     String source = readFile(&scratch, string_asCString(path));
@@ -31,7 +31,7 @@ static void findImports(
 
     // Check for errors
     if (list_size(currentAst->errors) != 0) {
-        reportErrors(*currentAst, *list_get(program->paths, current), scratch);
+        reportErrors(*currentAst, program_getPath(program, current), scratch);
         exit(EXIT_FAILURE);
     }
 
@@ -45,9 +45,9 @@ static void findImports(
 
         // Check that it has not been added
         bool founded = false;
-        for (uint32_t j = 0; j < list_size(program->asts); j++) {
+        for (uint32_t astId = 1; astId <= list_size(program->asts); astId++) {
             if (string_equal(
-                    string_asView(*list_get(program->paths, j)),
+                    string_asView(program_getPath(program, astId)),
                     string_asView(canonicalPath)
                 )) {
                 founded = true;
@@ -98,12 +98,17 @@ static Uint32ListList findDependencyGraph(
             // If AST doesn't have imports
             ImportsForGraph* imports = list_get(importsList, i);
             if (!imports->added && list_size(imports->imports) == 0) {
+                uint32_t astId = i + 1;
+
                 // Add to current stage of dependecy graph
-                list_append(arena, list, i);
+                list_append(arena, list, astId);
 
                 // Remove from imports list from other ASTs
                 for (uint32_t j = 0; j < list_size(importsList); j++) {
-                    list_removeFirstMatch(list_get(importsList, j)->imports, i);
+                    list_removeFirstMatch(
+                        list_get(importsList, j)->imports,
+                        astId
+                    );
                 }
 
                 // Set as added
@@ -129,7 +134,7 @@ Program getProgramGraph(Arena* arena, StringView file, Arena scratch) {
     assert(list_size(program.builtin.errors) == 0);
 
     // Find what each file imports
-    findImports(arena, &program, 0, scratch);
+    findImports(arena, &program, 1, scratch);
 
     // Find dependecy graph
     program.dependencyGraph =
@@ -148,8 +153,8 @@ void parseProgram(Program* program, Arena scratch) {
             uint32_t astId = *list_get(stage, j);
 
             // reset AST
-            Ast* ast = list_get(program->asts, astId);
-            String path = *list_get(program->paths, astId);
+            Ast* ast = program_getAst(program, astId);
+            String path = program_getPath(program, astId);
             ast_clear(ast);
 
             // Parse AST
@@ -159,7 +164,7 @@ void parseProgram(Program* program, Arena scratch) {
 
             // Report errors if they are
             if (list_size(ast->errors) != 0) {
-                String path = *list_get(program->paths, astId);
+                String path = program_getPath(program, astId);
                 reportErrors(*ast, path, newScratch);
                 exit(EXIT_FAILURE);
             }
@@ -177,9 +182,9 @@ void analyzeProgram(Program* program, Arena scratch) {
             analyze(*program, astId, scratch);
 
             // Report errors if they are
-            Ast ast = *list_get(program->asts, astId);
+            Ast ast = *program_getAst(program, astId);
             if (list_size(ast.errors) != 0) {
-                String path = *list_get(program->paths, astId);
+                String path = program_getPath(program, astId);
                 reportErrors(ast, path, scratch);
                 exit(EXIT_FAILURE);
             }
@@ -197,18 +202,17 @@ void codegenObjectFiles(Program program, Arena scratch1, Arena scratch2) {
     }
     }
     generateObjectCode(
-        program,
-        &program.builtin,
+        &program,
+        0,
         getBuiltinObjectFileName(&scratch1),
         false,
         scratch2
     );
-    for (uint32_t i = 0; i < list_size(program.asts); i++) {
-        Ast* ast = list_get(program.asts, i);
-        String path = *list_get(program.paths, i);
+    for (uint32_t i = 1; i <= list_size(program.asts); i++) {
+        String path = program_getPath(&program, i);
         String objectFileName = getObjectFileName(&scratch1, i, path, scratch2);
-        bool isEntry = i == 0;
-        generateObjectCode(program, ast, objectFileName, isEntry, scratch2);
+        bool isEntry = i == 1;
+        generateObjectCode(&program, i, objectFileName, isEntry, scratch2);
     }
 }
 
@@ -220,11 +224,11 @@ void linkProgram(Program program, Arena scratch1, Arena scratch2) {
     // Get object files
     StringList objectFiles = {0};
     list_append(&scratch1, objectFiles, getBuiltinObjectFileName(&scratch1));
-    for (uint32_t i = 0; i < list_size(program.asts); i++) {
+    for (uint32_t i = 1; i <= list_size(program.asts); i++) {
         String objectFile = getObjectFileName(
             &scratch1,
             i,
-            *list_get(program.paths, i),
+            program_getPath(&program, i),
             scratch2
         );
         list_append(&scratch1, objectFiles, objectFile);

@@ -110,23 +110,11 @@ String string_substring(
     return result;
 }
 
-// Hashmap
-static uint32_t hash(uint32_t x) {
-    x = ((x >> 16) ^ x) * 0x45d9f3b;
-    x = ((x >> 16) ^ x) * 0x45d9f3b;
-    x = (x >> 16) ^ x;
-    return x;
-}
-
-uint32_t _hashmap_findLocation(Uint32List keys, uint32_t key) {
-    assert(list_capacity(keys) != 0);
-    uint32_t capacity = list_capacity(keys);
-    uint32_t index = hash(key) % capacity;
-    while (true) {
-        uint32_t keyFound = *_list_get(keys, index);
-        if (keyFound == key || keyFound == None()) {
-            return index;
-        }
-        index = (index + 1) % capacity;
+// Array hashmap
+uint64_t _array_hashmap_findLocation(Uint32List keys, uint32_t key) {
+    uint64_t i = 0;
+    for (; i < list_size(keys); i++) {
+        if (*list_get(keys, i) == key) break;
     }
+    return i;
 }

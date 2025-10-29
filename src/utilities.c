@@ -240,8 +240,8 @@ bool fileExists(char* path) { return (access(path, F_OK) == 0); }
 String getObjectFileName(
     Arena* arena, uint32_t astId, String canonicalPath, Arena scratch
 ) {
-    String result = getWorkingDirectory(&scratch);
-    String baseName = getPathWithoutExtension(arena, canonicalPath);
+    String result = getWorkingDirectory(arena);
+    String baseName = getPathWithoutExtension(&scratch, canonicalPath);
     baseName = getBasePath(&scratch, baseName);
     String number = numberAsString(&scratch, astId);
     string_concat(arena, &result, cStringAsView("/.diamond-cache/"));
