@@ -59,6 +59,7 @@ typedef StackType(Binding) BindingStack;
 
 typedef struct {
     uint32_t literal;
+    uint32_t id;
     uint32_t module;
 } TypeBinding;
 
@@ -174,9 +175,9 @@ static void addInterfaceBinding(
 }
 
 static void addTypeBinding(
-    Context* context, uint32_t literal, uint32_t module
+    Context* context, uint32_t literal, uint32_t id, uint32_t module
 ) {
-    TypeBinding binding = {.literal = literal, .module = module};
+    TypeBinding binding = {.literal = literal, .id = id, .module = module};
     stack_push(&context->arena, context->scopes.types, binding);
 }
 
@@ -193,22 +194,51 @@ static TypeBinding* getTypeBinding(Context* context, uint32_t literalId) {
 //     todo();
 // }
 
-static bool addTopLevelDefinitionsToBindings(Context* context, uint32_t astId) {
+static bool addTopLevelBindings(Context* context, uint32_t astId) {
+    // Add builtin type bindings
+    Ast* builtin = &context->program->builtin;
+    for (uint32_t i = 0; i < list_size(builtin->typeDefinitions); i++) {
+        TypeDefinition* typeDef = list_get(builtin->typeDefinitions, i);
+        char* literal = ast_literalAsString(*builtin, typeDef->identifier);
+        uint32_t identifier = ast_getLiteral(context->ast, literal);
+        TypeBinding* binding = getTypeBinding(context, identifier);
+        if (binding != NULL) {
+            todo();
+        }
+        addTypeBinding(context, identifier, i, 0);
+    }
+
+    // Add builtin interface bindings
+    for (uint32_t i = 0; i < list_size(builtin->interfaces); i++) {
+        Interface* interface = list_get(builtin->interfaces, i);
+        char* literal = ast_literalAsString(*builtin, interface->identifier);
+        uint32_t identifier = ast_getLiteral(context->ast, literal);
+        Binding* binding = getBindingInCurrentScope(context, identifier);
+        if (binding != NULL) {
+            todo();
+        }
+        addInterfaceBinding(context, identifier, i, 0);
+    }
+
+    // Add builtin function bindings
+    for (uint32_t i = 0; i < list_size(builtin->functions); i++) {
+        Function* function = list_get(builtin->functions, i);
+        char* literal = ast_literalAsString(*builtin, function->identifier);
+        uint32_t identifier = ast_getLiteral(context->ast, literal);
+        if (function->isImplementation) continue;
+        Binding* binding = getBindingInCurrentScope(context, identifier);
+        if (binding != NULL) {
+            todo();
+        }
+        addFunctionBinding(context, identifier, i, 0);
+    }
+
     // Add types bindings
     for (uint32_t i = 0; i < list_size(context->ast->typeDefinitions); i++) {
         TypeDefinition typeDef = *list_get(context->ast->typeDefinitions, i);
         TypeBinding* binding = getTypeBinding(context, typeDef.identifier);
         assert(binding == NULL);
-        addTypeBinding(context, typeDef.identifier, astId);
-    }
-
-    for (uint32_t i = 0; i < list_size(context->ast->importedTypeDefinitions);
-         i++) {
-        ImportedTypeDefinition typeDef =
-            *list_get(context->ast->importedTypeDefinitions, i);
-        TypeBinding* binding = getTypeBinding(context, typeDef.identifier);
-        assert(binding == NULL);
-        addTypeBinding(context, typeDef.identifier, typeDef.module);
+        addTypeBinding(context, typeDef.identifier, i, astId);
     }
 
     // Add interface bindings
@@ -220,20 +250,6 @@ static bool addTopLevelDefinitionsToBindings(Context* context, uint32_t astId) {
         addInterfaceBinding(context, interface->identifier, i, astId);
     }
 
-    for (uint32_t i = 0; i < list_size(context->ast->importedInterfaces); i++) {
-        ImportedInterface* interface =
-            list_get(context->ast->importedInterfaces, i);
-        Binding* binding =
-            getBindingInCurrentScope(context, interface->identifier);
-        assert(binding == NULL);
-        addInterfaceBinding(
-            context,
-            interface->identifier,
-            i,
-            interface->module
-        );
-    }
-
     // Add function bindings
     for (uint32_t i = 0; i < list_size(context->ast->functions); i++) {
         Function* function = list_get(context->ast->functions, i);
@@ -242,16 +258,6 @@ static bool addTopLevelDefinitionsToBindings(Context* context, uint32_t astId) {
             getBindingInCurrentScope(context, function->identifier);
         assert(binding == NULL);
         addFunctionBinding(context, function->identifier, i, astId);
-    }
-
-    for (uint32_t i = 0; i < list_size(context->ast->importedFunctions); i++) {
-        ImportedFunction* function =
-            list_get(context->ast->importedFunctions, i);
-        if (function->isImplementation) continue;
-        Binding* binding =
-            getBindingInCurrentScope(context, function->identifier);
-        assert(binding == NULL);
-        addFunctionBinding(context, function->identifier, i, function->module);
     }
 
     return true;
@@ -312,21 +318,22 @@ static LLVMTypeRef getTypeAsLLVMType(
 
 static LLVMValueRef getFunction(
     Context* context,
-    uint32_t module,
+    uint32_t moduleId,
+    Ast* module,
     uint32_t identifier,
     uint32_t functionTypeId,
     uint32_t actualTypeId,
     Arena scratch
 ) {
     // Construct mangled name
-    String mangledName = numberAsString(&scratch, module);
+    String mangledName = numberAsString(&scratch, moduleId);
     string_concat(&scratch, &mangledName, cStringAsView("_"));
     string_concat(
         &scratch,
         &mangledName,
-        ast_literalAsView(*context->ast, identifier)
+        ast_literalAsView(*module, identifier)
     );
-    Type* functionType = ast_getType(*context->ast, functionTypeId);
+    Type* functionType = ast_getType(*module, functionTypeId);
     Type* actualType = ast_getType(*context->ast, actualTypeId);
     assert(
         (functionType->kind == TYPE_WITH_PARAMS) &&
@@ -339,12 +346,12 @@ static LLVMValueRef getFunction(
     Uint32Hashmap mappings = {0};
     for (uint32_t i = 0; i < functionType->withParams.parameterCount; i++) {
         Type* parameter =
-            ast_findType(context->ast, functionType->withParams.parameters[i]);
+            ast_findType(module, functionType->withParams.parameters[i]);
         Type* actualParameter =
             ast_findType(context->ast, actualType->withParams.parameters[i]);
         assert(parameter->kind == TYPE_WITH_PARAMS);
         assert(actualParameter->kind == TYPE_WITH_PARAMS);
-        if (ast_isTypeVariable(*context->ast, &parameter->withParams)) {
+        if (ast_isTypeVariable(*module, &parameter->withParams)) {
             if (array_hashmap_get(mappings, parameter->withParams.literal) ==
                 NULL) {
                 array_hashmap_set(
@@ -554,49 +561,38 @@ static void identifier(
     assert(binding);
     switch (binding->kind) {
     case FUNCTION_BINDING: {
-        if (binding->asFunction.module == context->astId) {
-            Function* function =
-                list_get(context->ast->functions, binding->asFunction.id);
-            printf("%p\n", function);
-            todo();
-        } else {
-            ImportedFunction* impFunction = list_get(
-                context->ast->importedFunctions,
-                binding->asFunction.id
-            );
-            LLVMValueRef value = getFunction(
-                context,
-                impFunction->module,
-                impFunction->identifier,
-                impFunction->type,
-                data->type,
-                scratch
-            );
-            stack_push(&context->arena, context->stack, value);
-        }
+        Ast* module =
+            program_getAst(context->program, binding->asFunction.module);
+        Function* function =
+            list_get(module->functions, binding->asFunction.id);
+        LLVMValueRef value = getFunction(
+            context,
+            binding->asFunction.module,
+            module,
+            function->identifier,
+            function->type,
+            data->type,
+            scratch
+        );
+        stack_push(&context->arena, context->stack, value);
         break;
     }
     case INTERFACE_BINDING: {
-        if (binding->asInterface.module == context->astId) {
-            Interface* interface =
-                list_get(context->ast->interfaces, binding->asInterface.id);
-            printf("%p\n", interface);
-            todo();
-        } else {
-            ImportedInterface* impInterface = list_get(
-                context->ast->importedInterfaces,
-                binding->asInterface.id
-            );
-            LLVMValueRef value = getFunction(
-                context,
-                impInterface->module,
-                impInterface->identifier,
-                impInterface->type,
-                data->type,
-                scratch
-            );
-            stack_push(&context->arena, context->stack, value);
-        }
+        Ast* module =
+            program_getAst(context->program, binding->asFunction.module);
+        Interface* interface =
+            list_get(module->interfaces, binding->asFunction.id);
+        LLVMValueRef value = getFunction(
+            context,
+            binding->asInterface.module,
+            module,
+            interface->identifier,
+            interface->type,
+            data->type,
+            scratch
+        );
+        stack_push(&context->arena, context->stack, value);
+
         break;
     }
     case ARGUMENT_BINDING: {
@@ -712,7 +708,7 @@ static void codegen(
     Context* context, Ast* ast, uint32_t astId, bool isEntry, Arena scratch
 ) {
     addScope(context);
-    addTopLevelDefinitionsToBindings(context, astId);
+    addTopLevelBindings(context, astId);
 
     LLVMTypeRef int32Type = LLVMInt32TypeInContext(context->llvmContext);
     // LLVMTypeRef int8Type = LLVMInt8TypeInContext(context->llvmContext);

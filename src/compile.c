@@ -173,13 +173,16 @@ void parseProgram(Program* program, Arena scratch) {
 }
 
 void analyzeProgram(Program* program, Arena scratch) {
+    // Check the interface of each module
+    analyzeModulesInterfaces(program, scratch);
+
     // Do semantic analysis following dependecy graph
     for (uint32_t i = 0; i < list_size(program->dependencyGraph); i++) {
         Uint32List stage = *list_get(program->dependencyGraph, i);
 
         for (uint32_t j = 0; j < list_size(stage); j++) {
             uint32_t astId = *list_get(stage, j);
-            analyze(*program, astId, scratch);
+            analyzeModule(program, astId, scratch);
 
             // Report errors if they are
             Ast ast = *program_getAst(program, astId);

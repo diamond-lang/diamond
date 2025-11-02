@@ -233,24 +233,23 @@ typedef struct {
 typedef ListType(Function) FunctionList;
 
 typedef struct {
-    uint32_t identifier;
-    FunctionArgumentList arguments;
-    uint32_t returnType;
-    uint32_t type;
-    ConstraintList constraints;
-    uint32_t id;
-    uint32_t module;
-    bool isImplementation;
-} ImportedFunction;
+    uint32_t literalId;
+    uint32_t moduleId;
+} ImplementationKey;
 
-typedef ListType(ImportedFunction) ImportedFunctionList;
+typedef ListType(ImplementationKey) ImplementationKeyList;
 
 typedef struct {
-    uint32_t astId;
+    uint32_t module;
     uint32_t functionId;
 } Implementation;
 
 typedef ListType(Implementation) ImplementationList;
+
+typedef struct {
+    ImplementationKeyList keys;
+    ImplementationList implementations;
+} Implementations;
 
 typedef struct {
     uint32_t identifier;
@@ -265,33 +264,11 @@ typedef ListType(Interface) InterfaceList;
 
 typedef struct {
     uint32_t identifier;
-    uint32_t parameter;
-    FunctionArgumentList arguments;
-    uint32_t returnType;
-    uint32_t type;
-    uint32_t id;
-    uint32_t module;
-} ImportedInterface;
-
-typedef ListType(ImportedInterface) ImportedInterfaceList;
-
-typedef struct {
-    uint32_t identifier;
     Uint32List fields;
     Uint32List fieldTypes;
 } TypeDefinition;
 
 typedef ListType(TypeDefinition) TypeDefinitionList;
-
-typedef struct {
-    uint32_t identifier;
-    Uint32List fields;
-    Uint32List fieldTypes;
-    uint32_t id;
-    uint32_t module;
-} ImportedTypeDefinition;
-
-typedef ListType(ImportedTypeDefinition) ImportedTypeDefinitionList;
 
 // Types
 typedef struct {
@@ -329,11 +306,8 @@ typedef struct Ast {
     Uint32List importedAsts;
     ImportList imports;
     FunctionList functions;
-    ImportedFunctionList importedFunctions;
     InterfaceList interfaces;
-    ImportedInterfaceList importedInterfaces;
     TypeDefinitionList typeDefinitions;
-    ImportedTypeDefinitionList importedTypeDefinitions;
     Code code;
     LiteralList literals;
     ErrorList errors;
@@ -381,6 +355,18 @@ char *ast_literalAsString(Ast ast, uint32_t literal);
                 list_get((ast).literals, id - 1)->arenaId \
             ))                                            \
     }
+
+// Interfaces implementations handling
+Implementation *ast_getImplementation(
+    Implementations *implementations, uint32_t literalId, uint32_t moduleId
+);
+void ast_setImplementation(
+    Arena *arena,
+    Implementations *implementations,
+    uint32_t literalId,
+    uint32_t moduleId,
+    Implementation implementation
+);
 
 // Printing
 void ast_printType(Ast ast, uint32_t typeId, Arena scratch);

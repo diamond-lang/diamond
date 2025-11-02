@@ -16,11 +16,8 @@ void ast_clear(Ast* ast) {
     ast->importedAsts.count = 0;
     ast->imports.count = 0;
     ast->functions.count = 0;
-    ast->importedFunctions.count = 0;
     ast->interfaces.count = 0;
-    ast->importedInterfaces.count = 0;
     ast->typeDefinitions.count = 0;
-    ast->importedTypeDefinitions.count = 0;
     ast->code.instructions.count = 0;
     ast->code.dataOrIndex.count = 0;
     ast->errors.count = 0;
@@ -349,8 +346,38 @@ char* ast_literalAsString(Ast ast, uint32_t literal) {
     ));
 }
 
-void ast_setBit(uint32_t* data, uint32_t position) {
-    *data = *data | 1 << position;
+Implementation* ast_getImplementation(
+    Implementations* implementations, uint32_t typeId, uint32_t moduleId
+) {
+    for (uint64_t i = 0; i < list_size(implementations->keys); i++) {
+        ImplementationKey key = *list_get(implementations->keys, i);
+        if (key.literalId == typeId && key.moduleId == moduleId) {
+            return list_get(implementations->implementations, i);
+        }
+    }
+    return NULL;
+}
+
+void ast_setImplementation(
+    Arena* arena,
+    Implementations* implementations,
+    uint32_t typeId,
+    uint32_t moduleId,
+    Implementation implementation
+) {
+    bool founded = false;
+    for (uint64_t i = 0; i < list_size(implementations->keys); i++) {
+        ImplementationKey key = *list_get(implementations->keys, i);
+        if (key.literalId == typeId && key.moduleId == moduleId) {
+            *list_get(implementations->implementations, i) = implementation;
+            founded = true;
+        }
+    }
+    if (!founded) {
+        ImplementationKey key = {typeId, moduleId};
+        list_append(arena, implementations->keys, key);
+        list_append(arena, implementations->implementations, implementation);
+    }
 }
 
 static void ast_printIndentation(uint32_t indentatioLevel) {

@@ -13,6 +13,11 @@
 #include "types.h"
 #include "utilities.h"
 
+typedef struct {
+    Ast* module;
+    uint32_t id;
+} BindingType;
+
 typedef enum {
     FUNCTION_BINDING,
     INTERFACE_BINDING,
@@ -53,6 +58,7 @@ typedef StackType(Binding) BindingStack;
 
 typedef struct {
     uint32_t literal;
+    uint32_t id;
     uint32_t module;
 } TypeBinding;
 
@@ -66,6 +72,7 @@ typedef struct {
 
 typedef struct {
     Ast* ast;
+    Program* program;
     uint32_t astId;
     Scopes scopes;
     Uint32Stack stack;
@@ -152,9 +159,9 @@ static void addInterfaceBinding(
 }
 
 static void addTypeBinding(
-    Context* context, uint32_t literal, uint32_t module
+    Context* context, uint32_t literal, uint32_t id, uint32_t module
 ) {
-    TypeBinding binding = {.literal = literal, .module = module};
+    TypeBinding binding = {.literal = literal, .id = id, .module = module};
     stack_push(&context->arena, context->scopes.types, binding);
 }
 
@@ -167,19 +174,13 @@ static TypeBinding* getTypeBinding(Context* context, uint32_t literalId) {
     return NULL;
 }
 
-static uint32_t getBindingType(Context* context, Binding binding) {
+static BindingType getBindingType(Context* context, Binding binding) {
     switch (binding.kind) {
     case FUNCTION_BINDING: {
         FunctionBinding* b = &binding.asFunction;
-        if (b->module == context->astId) {
-            Function* function = list_get(context->ast->functions, b->id);
-            return function->type;
-        } else {
-            ImportedFunction* function =
-                list_get(context->ast->importedFunctions, b->id);
-            return function->type;
-        }
-        break;
+        Ast* module = program_getAst(context->program, b->id);
+        Function* function = list_get(module->functions, b->id);
+        return (BindingType){module, function->type};
     }
     case INTERFACE_BINDING: {
         todo();
@@ -193,9 +194,45 @@ static uint32_t getBindingType(Context* context, Binding binding) {
     }
 }
 
-static bool addTopLevelDefinitionsBindings(
-    Context* context, uint32_t currentAstId
-) {
+static bool addTopLevelBindings(Context* context, uint32_t currentAstId) {
+    // Add builtin type bindings
+    Ast* builtin = &context->program->builtin;
+    for (uint32_t i = 0; i < list_size(builtin->typeDefinitions); i++) {
+        TypeDefinition* typeDef = list_get(builtin->typeDefinitions, i);
+        char* literal = ast_literalAsString(*builtin, typeDef->identifier);
+        uint32_t identifier = ast_getLiteral(context->ast, literal);
+        TypeBinding* binding = getTypeBinding(context, identifier);
+        if (binding != NULL) {
+            todo();
+        }
+        addTypeBinding(context, identifier, i, 0);
+    }
+
+    // Add builtin interface bindings
+    for (uint32_t i = 0; i < list_size(builtin->interfaces); i++) {
+        Interface* interface = list_get(builtin->interfaces, i);
+        char* literal = ast_literalAsString(*builtin, interface->identifier);
+        uint32_t identifier = ast_getLiteral(context->ast, literal);
+        Binding* binding = getBindingInCurrentScope(context, identifier);
+        if (binding != NULL) {
+            todo();
+        }
+        addInterfaceBinding(context, identifier, i, 0);
+    }
+
+    // Add builtin function bindings
+    for (uint32_t i = 0; i < list_size(builtin->functions); i++) {
+        Function* function = list_get(builtin->functions, i);
+        char* literal = ast_literalAsString(*builtin, function->identifier);
+        uint32_t identifier = ast_getLiteral(context->ast, literal);
+        if (function->isImplementation) continue;
+        Binding* binding = getBindingInCurrentScope(context, identifier);
+        if (binding != NULL) {
+            todo();
+        }
+        addFunctionBinding(context, identifier, i, 0);
+    }
+
     // Add types bindings
     for (uint32_t i = 0; i < list_size(context->ast->typeDefinitions); i++) {
         TypeDefinition typeDef = *list_get(context->ast->typeDefinitions, i);
@@ -203,18 +240,7 @@ static bool addTopLevelDefinitionsBindings(
         if (binding != NULL) {
             todo();
         }
-        addTypeBinding(context, typeDef.identifier, currentAstId);
-    }
-
-    for (uint32_t i = 0; i < list_size(context->ast->importedTypeDefinitions);
-         i++) {
-        ImportedTypeDefinition typeDef =
-            *list_get(context->ast->importedTypeDefinitions, i);
-        TypeBinding* binding = getTypeBinding(context, typeDef.identifier);
-        if (binding != NULL) {
-            todo();
-        }
-        addTypeBinding(context, typeDef.identifier, typeDef.module);
+        addTypeBinding(context, typeDef.identifier, i, currentAstId);
     }
 
     // Add interface bindings
@@ -226,22 +252,6 @@ static bool addTopLevelDefinitionsBindings(
             todo();
         }
         addInterfaceBinding(context, interface->identifier, i, currentAstId);
-    }
-
-    for (uint32_t i = 0; i < list_size(context->ast->importedInterfaces); i++) {
-        ImportedInterface* interface =
-            list_get(context->ast->importedInterfaces, i);
-        Binding* binding =
-            getBindingInCurrentScope(context, interface->identifier);
-        if (binding != NULL) {
-            todo();
-        }
-        addInterfaceBinding(
-            context,
-            interface->identifier,
-            i,
-            interface->module
-        );
     }
 
     // Add function bindings
@@ -256,168 +266,20 @@ static bool addTopLevelDefinitionsBindings(
         addFunctionBinding(context, function->identifier, i, currentAstId);
     }
 
-    for (uint32_t i = 0; i < list_size(context->ast->importedFunctions); i++) {
-        ImportedFunction* function =
-            list_get(context->ast->importedFunctions, i);
-        if (function->isImplementation) continue;
-        Binding* binding =
-            getBindingInCurrentScope(context, function->identifier);
-        if (binding != NULL) {
-            todo();
-        }
-        addFunctionBinding(context, function->identifier, i, function->module);
-    }
-
     return true;
-}
-
-static uint32_t literalInContext(Context* context, Ast ast, uint32_t literal) {
-    return ast_getLiteral(context->ast, ast_literalAsString(ast, literal));
-}
-
-static uint32_t typeInContext(
-    Context* context, Ast ast, uint32_t typeId, Arena scratch
-) {
-    uint32_t newType = None();
-    Type* type = ast_getType(ast, typeId);
-    switch (type->kind) {
-    case TYPE_VARIABLE: {
-        TypeVariable data = type->variable;
-        newType = ast_addTypeVariable(context->ast, data.id);
-        break;
-    }
-    case TYPE_WITH_PARAMS: {
-        TypeWithParams* data = &type->withParams;
-        Uint32List parameters = {0};
-        for (uint32_t i = 0; i < data->parameterCount; i++) {
-            uint32_t parameter =
-                typeInContext(context, ast, data->parameters[i], scratch);
-            list_append(&scratch, parameters, parameter);
-        }
-        newType = ast_addTypeWithParams(
-            context->ast,
-            literalInContext(context, ast, data->literal),
-            parameters
-        );
-        break;
-    }
-    }
-    return newType;
-}
-
-static void importModuleUnqualified(
-    Context* context, Ast other, uint32_t otherId, Arena scratch
-) {
-    // Add types
-    for (uint32_t i = 0; i < list_size(other.typeDefinitions); i++) {
-        TypeDefinition typeDef = *list_get(other.typeDefinitions, i);
-        ImportedTypeDefinition impTypeDef = {0};
-        impTypeDef.identifier = ast_getLiteral(
-            context->ast,
-            ast_literalAsString(other, typeDef.identifier)
-        );
-        if (list_size(typeDef.fields) != 0) {
-            todo();
-        }
-        list_append(
-            &context->ast->arena,
-            context->ast->importedTypeDefinitions,
-            impTypeDef
-        );
-    }
-
-    // Add interfaces
-    for (uint32_t i = 0; i < list_size(other.interfaces); i++) {
-        Interface interface = *list_get(other.interfaces, i);
-        ImportedInterface impInterface = {0};
-        impInterface.module = otherId;
-        impInterface.id = i;
-        impInterface.identifier = ast_getLiteral(
-            context->ast,
-            ast_literalAsString(other, interface.identifier)
-        );
-        Uint32List argsTypes = {0};
-        for (uint32_t i = 0; i < list_size(interface.arguments); i++) {
-            FunctionArgument arg = *list_get(interface.arguments, i);
-            FunctionArgument newArg = {0};
-            newArg.identifier = ast_getLiteral(
-                context->ast,
-                ast_literalAsString(other, arg.identifier)
-            );
-            newArg.mutable = arg.mutable;
-            newArg.type = typeInContext(context, other, arg.type, scratch);
-            list_append(&context->ast->arena, impInterface.arguments, newArg);
-            list_append(&scratch, argsTypes, newArg.type);
-        }
-        impInterface.parameter =
-            typeInContext(context, other, interface.parameter, scratch);
-        impInterface.returnType =
-            typeInContext(context, other, interface.returnType, scratch);
-        impInterface.type = ast_addFunctionType(
-            context->ast,
-            argsTypes,
-            impInterface.returnType
-        );
-        list_append(
-            &context->ast->arena,
-            context->ast->importedInterfaces,
-            impInterface
-        );
-    }
-
-    // Add function definitions
-    for (uint32_t i = 0; i < list_size(other.functions); i++) {
-        Function function = *list_get(other.functions, i);
-        if (!function.private) {
-            ImportedFunction impFunction = {0};
-            impFunction.id = i;
-            impFunction.module = otherId;
-            impFunction.identifier = ast_getLiteral(
-                context->ast,
-                ast_literalAsString(other, function.identifier)
-            );
-            Uint32List argsTypes = {0};
-            for (uint32_t i = 0; i < list_size(function.arguments); i++) {
-                FunctionArgument arg = *list_get(function.arguments, i);
-                FunctionArgument newArg = {0};
-                newArg.identifier = ast_getLiteral(
-                    context->ast,
-                    ast_literalAsString(other, arg.identifier)
-                );
-                newArg.mutable = arg.mutable;
-                newArg.type = typeInContext(context, other, arg.type, scratch);
-                list_append(
-                    &context->ast->arena,
-                    impFunction.arguments,
-                    newArg
-                );
-                list_append(&scratch, argsTypes, newArg.type);
-            }
-            impFunction.returnType =
-                typeInContext(context, other, function.returnType, scratch);
-            impFunction.type = ast_addFunctionType(
-                context->ast,
-                argsTypes,
-                impFunction.returnType
-            );
-            list_append(
-                &context->ast->arena,
-                context->ast->importedFunctions,
-                impFunction
-            );
-        }
-    }
 }
 
 static void init_context(
     Context* context,
     Arena contextArena,
     Ast* ast,
+    Program* program,
     uint32_t astId,
     Arena scratch
 ) {
     context->arena = contextArena;
     context->ast = ast;
+    context->program = program;
     context->astId = astId;
 }
 
@@ -436,16 +298,17 @@ static uint32_t getBuiltInType(Context* context, char* type) {
 }
 
 static uint32_t _instantiateType(
-    Arena* arena, Context* context, uint32_t typeId, Uint32Hashmap* mappings
+    Arena* arena, Context* context, BindingType type, Uint32Hashmap* mappings
 ) {
-    Type* type = ast_findType(context->ast, typeId);
-    switch (type->kind) {
+    Type* t = ast_findType(type.module, type.id);
+    switch (t->kind) {
     case TYPE_VARIABLE: {
-        return typeId;
+        assert(type.module == context->ast);
+        return type.id;
     }
     case TYPE_WITH_PARAMS: {
         // Get type with params
-        TypeWithParams* data = &type->withParams;
+        TypeWithParams* data = &t->withParams;
 
         // If is type variable, eg: t, a, b
         bool isTypeVariable = ast_isTypeVariable(*context->ast, data);
@@ -467,14 +330,22 @@ static uint32_t _instantiateType(
             Uint32List parameters = {0};
             for (uint32_t i = 0; i < data->parameterCount; i++) {
                 uint32_t parameter = data->parameters[i];
-                uint32_t instType =
-                    _instantiateType(arena, context, parameter, mappings);
+                uint32_t instType = _instantiateType(
+                    arena,
+                    context,
+                    (BindingType){type.module, parameter},
+                    mappings
+                );
                 list_append(arena, parameters, instType);
             }
 
             // Instantiate type
+            uint32_t newLiteral = ast_getLiteral(
+                context->ast,
+                ast_literalAsString(*type.module, data->literal)
+            );
             uint32_t newId =
-                ast_addTypeWithParams(context->ast, data->literal, parameters);
+                ast_addTypeWithParams(context->ast, newLiteral, parameters);
             return newId;
         }
     }
@@ -482,39 +353,34 @@ static uint32_t _instantiateType(
     return None();
 }
 
-static uint32_t instantiateType(Context* context, uint32_t id, Arena scratch) {
-    if (id == 0) return 0;
+static uint32_t instantiateType(
+    Context* context, BindingType type, Arena scratch
+) {
     Uint32Hashmap mappings = {0};
-    uint32_t result = _instantiateType(&scratch, context, id, &mappings);
+    uint32_t result = _instantiateType(&scratch, context, type, &mappings);
     return result;
 }
 
 static uint32_t instantiateInterface(
-    Context* context, uint32_t module, uint32_t id, Arena scratch
+    Context* context, uint32_t moduleId, uint32_t id, Arena scratch
 ) {
-    uint32_t parameter;
-    uint32_t identifier;
-    uint32_t type;
-    if (module == context->astId) {
-        Interface* interface = list_get(context->ast->interfaces, id);
-        parameter = interface->parameter;
-        identifier = interface->identifier;
-        type = interface->type;
-    } else {
-        ImportedInterface* interface =
-            list_get(context->ast->importedInterfaces, id);
-        parameter = interface->parameter;
-        identifier = interface->identifier;
-        type = interface->type;
-    }
+    Ast* module = program_getAst(context->program, moduleId);
+    Interface* interface = list_get(module->interfaces, id);
+    uint32_t parameter = interface->parameter;
+    uint32_t identifier = interface->identifier;
+    uint32_t type = interface->type;
     Uint32Hashmap mappings = {0};
-    uint32_t instParameter =
-        _instantiateType(&scratch, context, parameter, &mappings);
+    uint32_t instParameter = _instantiateType(
+        &scratch,
+        context,
+        (BindingType){module, parameter},
+        &mappings
+    );
     if (context->functionBeingAnalyzed != NULL) {
         Constraint constraint = {
             .identifier = identifier,
             .parameter = instParameter,
-            .module = module,
+            .module = moduleId,
         };
         list_append(
             &context->ast->arena,
@@ -522,7 +388,12 @@ static uint32_t instantiateInterface(
             constraint
         );
     }
-    return _instantiateType(&scratch, context, type, &mappings);
+    return _instantiateType(
+        &scratch,
+        context,
+        (BindingType){module, type},
+        &mappings
+    );
 }
 
 static bool contains(Context* context, Type* a, TypeVariable* b) {
@@ -1086,21 +957,21 @@ static bool analyzeCode(Context* context, Code* code, Arena scratch) {
     return true;
 }
 
-bool analyze(Program program, uint32_t astId, Arena scratch) {
+void analyzeModule(Program* program, uint32_t astId, Arena scratch) {
     // Initialize context
     Context context = {0};
     init_context(
         &context,
         arena_new(),
-        program_getAst(&program, astId),
+        program_getAst(program, astId),
+        program,
         astId,
         scratch
     );
-    importModuleUnqualified(&context, program.builtin, 0, scratch);
 
     // Add top level bindings
     addScope(&context);
-    bool result = addTopLevelDefinitionsBindings(&context, astId);
+    bool result = addTopLevelBindings(&context, astId);
     if (!result) {
         todo();
     }
@@ -1123,7 +994,194 @@ bool analyze(Program program, uint32_t astId, Arena scratch) {
 
     // Free arena
     arena_free(&context.arena);
+}
 
-    // Return
+typedef struct {
+    uint32_t id;
+    uint32_t module;
+} TypeAnalyzed;
+
+typedef StackType(TypeAnalyzed) TypeAnalyzedStack;
+
+static bool analyzeTypeDefinition(
+    Arena* arena,
+    Program* program,
+    TypeAnalyzedStack* stack,
+    uint32_t typeDefId,
+    uint32_t moduleId,
+    Arena scratch
+);
+
+static bool analyzeFieldType(
+    Arena* arena,
+    Program* program,
+    TypeAnalyzedStack* stack,
+    uint32_t moduleId,
+    uint32_t literal,
+    Arena scratch
+) {
+    Ast* module = program_getAst(program, moduleId);
+    char* literalAsString = ast_literalAsString(*module, literal);
+
+    // Check type exists
+    uint32_t typeDefId = 0;
+    uint32_t moduleTypeDefId = 0;
+    bool founded = false;
+    for (uint32_t i = 0; i < list_size(program->builtin.typeDefinitions); i++) {
+        TypeDefinition* t = list_get(program->builtin.typeDefinitions, i);
+        char* otherLiteral =
+            ast_literalAsString(program->builtin, t->identifier);
+        if (strcmp(literalAsString, otherLiteral) == 0) {
+            founded = true;
+            typeDefId = i;
+            moduleTypeDefId = 0;
+            break;
+        }
+    }
+    if (!founded) {
+        for (uint32_t i = 0; i < list_size(module->typeDefinitions); i++) {
+            TypeDefinition* t = list_get(module->typeDefinitions, i);
+            char* otherLiteral = ast_literalAsString(*module, t->identifier);
+            if (strcmp(literalAsString, otherLiteral) == 0) {
+                founded = true;
+                typeDefId = i;
+                moduleTypeDefId = moduleId;
+                break;
+            }
+        }
+    }
+
+    // Analyze type definition
+    if (!founded) {
+        todo();  // Type doesn't exists
+    } else {
+        analyzeTypeDefinition(
+            arena,
+            program,
+            stack,
+            typeDefId,
+            moduleTypeDefId,
+            scratch
+        );
+    }
     return true;
+}
+
+static bool analyzeTypeDefinition(
+    Arena* arena,
+    Program* program,
+    TypeAnalyzedStack* stack,
+    uint32_t typeDefId,
+    uint32_t moduleId,
+    Arena scratch
+) {
+    Ast* module = program_getAst(program, moduleId);
+    TypeDefinition* typeDef = list_get(module->typeDefinitions, typeDefId);
+
+    // Check we dont't have recursive type definitions
+    for (uint32_t i = 0; i < stack_size(*stack); i++) {
+        TypeAnalyzed beingAnalyzed = *stack_get(*stack, i);
+        if (beingAnalyzed.module == moduleId && beingAnalyzed.id == typeDefId) {
+            todo();  // Recursive type defintions
+            return false;
+        }
+    }
+    TypeAnalyzed beingAnalyzed = {typeDefId, moduleId};
+    stack_push(arena, *stack, beingAnalyzed);
+
+    // Analyze fields
+    for (uint32_t i = 0; i < list_size(typeDef->fieldTypes); i++) {
+        Type* fieldType =
+            ast_getType(*module, *list_get(typeDef->fieldTypes, i));
+        assert(fieldType->kind == TYPE_WITH_PARAMS);
+        analyzeFieldType(
+            arena,
+            program,
+            stack,
+            moduleId,
+            fieldType->withParams.literal,
+            scratch
+        );
+    }
+    stack_pop(*stack);
+    return true;
+}
+
+static void findImplementationsOfInterfaceOnModule(
+    Program* program,
+    uint32_t moduleId,
+    uint32_t interfaceId,
+    uint32_t otherModuleId,
+    Arena scratch
+) {
+    Ast* module = program_getAst(program, moduleId);
+    Interface* interface = list_get(module->interfaces, interfaceId);
+    char* interfaceIdentifier =
+        ast_literalAsString(*module, interface->identifier);
+    Ast* otherModule = program_getAst(program, otherModuleId);
+    for (uint32_t i = 0; i < list_size(otherModule->functions); i++) {
+        Function* function = list_get(otherModule->functions, i);
+        char* functionIdentifier =
+            ast_literalAsString(*otherModule, function->identifier);
+        if (strcmp(interfaceIdentifier, functionIdentifier) == 0) {
+            function->isImplementation = true;
+            Implementation impl = {moduleId, i};
+            list_append(&module->arena, interface->implementations, impl);
+        }
+    }
+}
+
+static void findImplementationsOfInterface(
+    Program* program, uint32_t moduleId, uint32_t interfaceId, Arena scratch
+) {
+    for (uint32_t i = 0; i <= list_size(program->asts); i++) {
+        findImplementationsOfInterfaceOnModule(
+            program,
+            moduleId,
+            interfaceId,
+            i,
+            scratch
+        );
+    }
+}
+
+static void findImplementationsOfInterfaces(
+    Program* program, uint32_t moduleId, Arena scratch
+) {
+    Ast* module = program_getAst(program, moduleId);
+    for (uint32_t i = 0; i < list_size(module->interfaces); i++) {
+        findImplementationsOfInterface(program, moduleId, i, scratch);
+    }
+}
+
+void analyzeModulesInterfaces(Program* program, Arena scratch) {
+    Arena arena = arena_new();
+
+    // Check types aren't recursive
+    for (uint32_t moduleId = 1; moduleId < list_size(program->asts);
+         moduleId++) {
+        Ast* module = program_getAst(program, moduleId);
+        TypeAnalyzedStack stack = {0};
+        Arena scratch = scratch;
+        for (uint32_t i = 0; i < list_size(module->typeDefinitions); i++) {
+            bool result = analyzeTypeDefinition(
+                &arena,
+                program,
+                &stack,
+                i,
+                moduleId,
+                scratch
+            );
+            if (!result) goto exit;
+        }
+    }
+
+    // Find interface implementations
+    for (uint32_t moduleId = 0; moduleId <= list_size(program->asts);
+         moduleId++) {
+        findImplementationsOfInterfaces(program, moduleId, scratch);
+    }
+exit:
+    arena_free(&arena);
+    return;
 }
