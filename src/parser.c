@@ -385,7 +385,7 @@ static uint32_t functionArgument(
     return list_size(*args);
 }
 
-static void addTypeParameters(
+static void addTypeParametersIfTypeVariable(
     Parser *parser, Uint32List *parameters, uint32_t typeId
 ) {
     Type *type = ast_getType(*parser->ast, typeId);
@@ -402,11 +402,7 @@ static void addTypeParameters(
                 }
             }
             if (!alreadyIn) {
-                list_append(
-                    &parser->ast->arena,
-                    *parameters,
-                    type->withParams.literal
-                );
+                list_append(&parser->ast->arena, *parameters, typeId);
             }
         }
     }
@@ -436,13 +432,21 @@ static uint32_t function(Parser *parser, Token keyword, Arena scratch) {
         if (arg->type == None()) {
             allTypesSet = false;
         } else {
-            addTypeParameters(parser, &function.parameters, arg->type);
+            addTypeParametersIfTypeVariable(
+                parser,
+                &function.parameters,
+                arg->type
+            );
         }
     }
     if (function.returnType == None()) {
         allTypesSet = false;
     } else {
-        addTypeParameters(parser, &function.parameters, function.returnType);
+        addTypeParametersIfTypeVariable(
+            parser,
+            &function.parameters,
+            function.returnType
+        );
     }
     if (allTypesSet) {
         Uint32List argTypes = {0};

@@ -4,7 +4,8 @@
 #include "arena.h"
 #include "program.h"
 
-void analyzeModulesInterfaces(Program* program, Arena scracth);
-void analyzeModule(Program* program, uint32_t astId, Arena scratch);
+void analyzeModulesInterfaces(Program* program, Arena scracth1, Arena scratch2);
+void analyzeModule(Program* program, uint32_t moduleId, Arena scratch);
+void checkFunctionsUsed(Program* program, Arena scratch);
 
 #endif

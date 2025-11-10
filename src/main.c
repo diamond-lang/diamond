@@ -83,7 +83,7 @@ static void build(Command command, Arena scratch1, Arena scratch2) {
     Program program =
         getProgramGraph(&scratch1, string_asView(command.path), scratch2);
     parseProgram(&program, scratch1);
-    analyzeProgram(&program, scratch1);
+    analyzeProgram(&program, scratch1, scratch2);
     codegenObjectFiles(program, scratch1, scratch2);
     linkProgram(program, scratch1, scratch2);
 }
@@ -95,7 +95,7 @@ static void run(Command command, Arena scratch1, Arena scratch2) {
         getExecutableName(&scratch1, *list_get(program.paths, 0));
     bool alreadyExisted = fileExists(executableName.buffer);
     parseProgram(&program, scratch1);
-    analyzeProgram(&program, scratch1);
+    analyzeProgram(&program, scratch1, scratch2);
     codegenObjectFiles(program, scratch1, scratch2);
     linkProgram(program, scratch1, scratch2);
     system(executableName.buffer);
@@ -140,7 +140,7 @@ static void emit(Command command, Arena scratch1, Arena scratch2) {
         }
         return;
     }
-    analyzeProgram(&program, scratch1);
+    analyzeProgram(&program, scratch1, scratch2);
     if (strcmp(list_get(command.options, 0)->buffer, "--ast-with-types") == 0) {
         for (uint32_t i = 0; i < list_size(program.asts); i++) {
             ast_print(
@@ -154,7 +154,15 @@ static void emit(Command command, Arena scratch1, Arena scratch2) {
         return;
     }
     if (strcmp(list_get(command.options, 0)->buffer, "--llvm-ir") == 0) {
-        printLLVMIR(&program, 1, scratch1);
+        String builtinPath = {0};
+        string_concat(&scratch1, &builtinPath, cStringAsView("builtin"));
+        printLLVMIR(&program, 0, builtinPath, scratch1);
+        printf("\n\n");
+        for (uint32_t i = 1; i <= list_size(program.asts); i++) {
+            String path = program_getPath(&program, i);
+            printLLVMIR(&program, i, path, scratch1);
+            if (i != list_size(program.asts)) printf("\n\n");
+        }
         return;
     }
 }

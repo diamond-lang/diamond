@@ -172,9 +172,9 @@ void parseProgram(Program* program, Arena scratch) {
     }
 }
 
-void analyzeProgram(Program* program, Arena scratch) {
+void analyzeProgram(Program* program, Arena scratch1, Arena scratch2) {
     // Check the interface of each module
-    analyzeModulesInterfaces(program, scratch);
+    analyzeModulesInterfaces(program, scratch1, scratch2);
 
     // Do semantic analysis following dependecy graph
     for (uint32_t i = 0; i < list_size(program->dependencyGraph); i++) {
@@ -182,17 +182,20 @@ void analyzeProgram(Program* program, Arena scratch) {
 
         for (uint32_t j = 0; j < list_size(stage); j++) {
             uint32_t astId = *list_get(stage, j);
-            analyzeModule(program, astId, scratch);
+            analyzeModule(program, astId, scratch1);
 
             // Report errors if they are
             Ast ast = *program_getAst(program, astId);
             if (list_size(ast.errors) != 0) {
                 String path = program_getPath(program, astId);
-                reportErrors(ast, path, scratch);
+                reportErrors(ast, path, scratch1);
                 exit(EXIT_FAILURE);
             }
         }
     }
+
+    // Check functions used (Reachability analysis)
+    checkFunctionsUsed(program, scratch1);
 }
 
 void codegenObjectFiles(Program program, Arena scratch1, Arena scratch2) {
@@ -204,10 +207,13 @@ void codegenObjectFiles(Program program, Arena scratch1, Arena scratch2) {
         break;
     }
     }
+    String builtinPath = {0};
+    string_concat(&scratch1, &builtinPath, cStringAsView("builtin"));
     generateObjectCode(
         &program,
         0,
         getBuiltinObjectFileName(&scratch1),
+        builtinPath,
         false,
         scratch2
     );
@@ -215,7 +221,14 @@ void codegenObjectFiles(Program program, Arena scratch1, Arena scratch2) {
         String path = program_getPath(&program, i);
         String objectFileName = getObjectFileName(&scratch1, i, path, scratch2);
         bool isEntry = i == 1;
-        generateObjectCode(&program, i, objectFileName, isEntry, scratch2);
+        generateObjectCode(
+            &program,
+            i,
+            objectFileName,
+            path,
+            isEntry,
+            scratch2
+        );
     }
 }
 

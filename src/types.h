@@ -199,7 +199,7 @@ uint64_t _array_hashmap_findLocation(Uint32List keys, uint32_t key);
             }                                              \
         }                                                  \
         if (i__ < list_size((hashmap).keys)) {             \
-            *list_get((hashmap).keys, i__) = value;        \
+            *list_get((hashmap).values, i__) = value;      \
         } else {                                           \
             list_append(arena, (hashmap).keys, key);       \
             list_append(arena, (hashmap).values, value);   \

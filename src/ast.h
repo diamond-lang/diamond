@@ -217,8 +217,22 @@ typedef struct {
 typedef ListType(FunctionArgument) FunctionArgumentList;
 
 typedef struct {
+    uint32_t id;
+    uint32_t moduleId;
+    uint32_t parameterCount;
+    uint32_t parameters[];
+} TypeReference;
+
+typedef ArrayHashmapType(TypeReference) TypeReferenceHashmap;
+typedef ListType(TypeReference) TypeReferenceList;
+
+typedef TypeReferenceList Instantiation;
+typedef ListType(Instantiation) Instantiations;
+
+typedef struct {
     uint32_t identifier;
     Uint32List parameters;
+    Instantiations instantiations;
     FunctionArgumentList arguments;
     uint32_t returnType;
     uint32_t type;
@@ -228,16 +242,10 @@ typedef struct {
     bool builtin;
     bool private;
     bool isImplementation;
+    TypeReference implementationFor;  // only valid if .isImplementation = true
 } Function;
 
 typedef ListType(Function) FunctionList;
-
-typedef struct {
-    uint32_t literalId;
-    uint32_t moduleId;
-} ImplementationKey;
-
-typedef ListType(ImplementationKey) ImplementationKeyList;
 
 typedef struct {
     uint32_t module;
@@ -247,8 +255,8 @@ typedef struct {
 typedef ListType(Implementation) ImplementationList;
 
 typedef struct {
-    ImplementationKeyList keys;
-    ImplementationList implementations;
+    TypeReferenceList keys;
+    ImplementationList functions;
 } Implementations;
 
 typedef struct {
@@ -257,7 +265,7 @@ typedef struct {
     FunctionArgumentList arguments;
     uint32_t returnType;
     uint32_t type;
-    ImplementationList implementations;
+    Implementations implementations;
 } Interface;
 
 typedef ListType(Interface) InterfaceList;
@@ -337,11 +345,19 @@ uint32_t ast_addFunctionType(
     Ast *ast, Uint32List arguments, uint32_t returnType
 );
 Type *ast_findType(Ast *ast, uint32_t type);
+Type *ast_findTypeWithMappings(
+    Ast *ast, uint32_t type, TypeReferenceHashmap mappings
+);
 void ast_makeEqual(TypeVariable *typeVariable, uint32_t other);
 Type *ast_getType(Ast ast, uint32_t type);
 uint32_t ast_getTypeOfInstruction(Ast *ast, Code *code, uint32_t instruction);
 String ast_typeAsString(Arena *arena, Ast ast, uint32_t typeId);
+String ast_typeReferenceAsString(Arena *arena, Ast ast, TypeReference typeRef);
 bool ast_isTypeVariable(Ast ast, TypeWithParams *type);
+bool ast_areTypesEqual(Ast *ast, uint32_t aId, uint32_t bId);
+bool ast_areTypesEqualAccrossModules(
+    Ast *moduleA, Ast *moduleB, uint32_t aId, uint32_t bId
+);
 
 // Literals handling
 uint32_t ast_getLiteral(Ast *ast, char *literal);
@@ -358,13 +374,12 @@ char *ast_literalAsString(Ast ast, uint32_t literal);
 
 // Interfaces implementations handling
 Implementation *ast_getImplementation(
-    Implementations *implementations, uint32_t literalId, uint32_t moduleId
+    Implementations *implementations, TypeReference typeRef
 );
 void ast_setImplementation(
     Arena *arena,
     Implementations *implementations,
-    uint32_t literalId,
-    uint32_t moduleId,
+    TypeReference typeRef,
     Implementation implementation
 );
 

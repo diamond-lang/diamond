@@ -189,6 +189,14 @@ Type* ast_findType(Ast* ast, uint32_t type) {
     return result;
 }
 
+Type* ast_findTypeWithMappings(
+    Ast* ast, uint32_t type, TypeReferenceHashmap mappings
+) {
+    Type* result = ast_findType(ast, type);
+
+    return result;
+}
+
 void ast_makeEqual(TypeVariable* typeVariable, uint32_t other) {
     typeVariable->forwarded = other;
 }
@@ -285,11 +293,88 @@ String ast_typeAsString(Arena* arena, Ast ast, uint32_t typeId) {
     return result;
 }
 
+String ast_typeReferenceAsString(Arena* arena, Ast ast, TypeReference typeRef) {
+    TypeDefinition* type = list_get(ast.typeDefinitions, typeRef.id);
+    String result = {0};
+    string_concat(arena, &result, ast_literalAsView(ast, type->identifier));
+    if (typeRef.parameterCount != 0) {
+        todo();
+    }
+    return result;
+}
+
 bool ast_isTypeVariable(Ast ast, TypeWithParams* type) {
     StringView view = ast_literalAsView(ast, type->literal);
     bool result = string_isLowerCase(view);
     assert(!result || type->parameterCount == 0);
     return result;
+}
+
+bool ast_areTypesEqual(Ast* ast, uint32_t aId, uint32_t bId) {
+    Type* a = ast_findType(ast, aId);
+    Type* b = ast_findType(ast, bId);
+    if (a->kind == b->kind) {
+        TypeKind kind = a->kind;
+        switch (kind) {
+        case TYPE_VARIABLE: {
+            return a->variable.id = b->variable.id;
+            break;
+        }
+        case TYPE_WITH_PARAMS: {
+            if (a->withParams.literal != b->withParams.literal) {
+                return false;
+            }
+            assert(
+                a->withParams.parameterCount == b->withParams.parameterCount
+            );
+            for (uint32_t i = 0; i < a->withParams.parameterCount; i++) {
+                bool result = ast_areTypesEqual(
+                    ast,
+                    a->withParams.parameters[i],
+                    b->withParams.parameters[i]
+                );
+                if (result == false) return result;
+            }
+            return true;
+        }
+        }
+    }
+    return false;
+}
+
+bool ast_areTypesEqualAccrossModules(
+    Ast* moduleA, Ast* moduleB, uint32_t aId, uint32_t bId
+) {
+    Type* a = ast_findType(moduleA, aId);
+    Type* b = ast_findType(moduleB, bId);
+    if (a->kind == b->kind) {
+        TypeKind kind = a->kind;
+        switch (kind) {
+        case TYPE_VARIABLE: {
+            return a->variable.id = b->variable.id;
+            break;
+        }
+        case TYPE_WITH_PARAMS: {
+            assert(
+                a->withParams.parameterCount == b->withParams.parameterCount
+            );
+            char* strA = ast_literalAsString(*moduleA, a->withParams.literal);
+            char* strB = ast_literalAsString(*moduleB, b->withParams.literal);
+            if (strcmp(strA, strB) != 0) return false;
+            for (uint32_t i = 0; i < a->withParams.parameterCount; i++) {
+                bool result = ast_areTypesEqualAccrossModules(
+                    moduleA,
+                    moduleB,
+                    a->withParams.parameters[i],
+                    b->withParams.parameters[i]
+                );
+                if (result == false) return result;
+            }
+            return true;
+        }
+        }
+    }
+    return false;
 }
 
 static uint32_t ast_hashString(const char* key, uint32_t length) {
@@ -347,12 +432,12 @@ char* ast_literalAsString(Ast ast, uint32_t literal) {
 }
 
 Implementation* ast_getImplementation(
-    Implementations* implementations, uint32_t typeId, uint32_t moduleId
+    Implementations* implementations, TypeReference typeRef
 ) {
     for (uint64_t i = 0; i < list_size(implementations->keys); i++) {
-        ImplementationKey key = *list_get(implementations->keys, i);
-        if (key.literalId == typeId && key.moduleId == moduleId) {
-            return list_get(implementations->implementations, i);
+        TypeReference key = *list_get(implementations->keys, i);
+        if (key.id == typeRef.id && key.moduleId == typeRef.moduleId) {
+            return list_get(implementations->functions, i);
         }
     }
     return NULL;
@@ -361,22 +446,20 @@ Implementation* ast_getImplementation(
 void ast_setImplementation(
     Arena* arena,
     Implementations* implementations,
-    uint32_t typeId,
-    uint32_t moduleId,
+    TypeReference typeRef,
     Implementation implementation
 ) {
     bool founded = false;
     for (uint64_t i = 0; i < list_size(implementations->keys); i++) {
-        ImplementationKey key = *list_get(implementations->keys, i);
-        if (key.literalId == typeId && key.moduleId == moduleId) {
-            *list_get(implementations->implementations, i) = implementation;
+        TypeReference key = *list_get(implementations->keys, i);
+        if (key.id == typeRef.id && key.moduleId == typeRef.moduleId) {
+            *list_get(implementations->functions, i) = implementation;
             founded = true;
         }
     }
     if (!founded) {
-        ImplementationKey key = {typeId, moduleId};
-        list_append(arena, implementations->keys, key);
-        list_append(arena, implementations->implementations, implementation);
+        list_append(arena, implementations->keys, typeRef);
+        list_append(arena, implementations->functions, implementation);
     }
 }
 

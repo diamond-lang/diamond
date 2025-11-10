@@ -15,5 +15,6 @@ typedef struct {
 
 Ast* program_getAst(Program* program, uint32_t astId);
 String program_getPath(Program* program, uint32_t astId);
+bool program_areTypesEqual(Program* program, TypeReference a, TypeReference b);
 
 #endif

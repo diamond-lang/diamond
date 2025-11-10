@@ -10,177 +10,50 @@
 #include "ast.h"
 #include "common.h"
 #include "program.h"
+#include "scopes.h"
 #include "types.h"
 #include "utilities.h"
+
+defineScopesWith(uint32_t);
 
 typedef struct {
     Ast* module;
     uint32_t id;
-} BindingType;
-
-typedef enum {
-    FUNCTION_BINDING,
-    INTERFACE_BINDING,
-    VARIABLE_BINDING,
-    ARGUMENT_BINDING
-} BindingKind;
+} TypeOfBinding;
 
 typedef struct {
-    uint32_t id;
-    uint32_t module;
-} FunctionBinding;
-
-typedef struct {
-    uint32_t id;
-    uint32_t module;
-} InterfaceBinding;
-
-typedef struct {
-    uint32_t id;
-} VariableBinding;
-
-typedef struct {
-    uint32_t id;
-} ArgumentBinding;
-
-typedef struct {
-    BindingKind kind;
-    uint32_t literal;
-    union {
-        FunctionBinding asFunction;
-        InterfaceBinding asInterface;
-        VariableBinding asVariable;
-        ArgumentBinding asArgument;
-    };
-} Binding;
-
-typedef StackType(Binding) BindingStack;
-
-typedef struct {
-    uint32_t literal;
-    uint32_t id;
-    uint32_t module;
-} TypeBinding;
-
-typedef ListType(TypeBinding) TypeBindingList;
-
-typedef struct {
-    BindingStack bindings;
-    Uint32Stack scopeStart;
-    TypeBindingList types;
-} Scopes;
-
-typedef struct {
-    Ast* ast;
+    Ast* module;
     Program* program;
-    uint32_t astId;
+    uint32_t moduleId;
     Scopes scopes;
     Uint32Stack stack;
     uint32_t lastTypeVariable;
     Arena arena;
     Function* functionBeingAnalyzed;
+    TypeReferenceHashmap mappings;
 } Context;
 
-static void addScope(Context* context) {
-    stack_push(
-        &context->arena,
-        context->scopes.scopeStart,
-        stack_size(context->scopes.bindings)
-    );
-}
-
-static void removeScope(Context* context) {
-    context->scopes.bindings.count = *stack_top(context->scopes.scopeStart);
-    stack_pop(context->scopes.scopeStart);
-}
-
-static Binding* getBinding(Context* context, uint32_t literalId) {
-    uint32_t bindingsCount = stack_size(context->scopes.bindings);
-    for (uint32_t i = bindingsCount - 1; 0 <= i && i < bindingsCount; i--) {
-        Binding* binding = stack_get(context->scopes.bindings, i);
-        if (binding->literal == literalId) return binding;
-    }
-    return NULL;
-}
-
-static Binding* getBindingInCurrentScope(Context* context, uint32_t literalId) {
-    uint32_t start = *stack_top(context->scopes.scopeStart);
-    uint32_t bindingsCount = stack_size(context->scopes.bindings);
-    assert(bindingsCount >= start);
-    for (uint32_t i = bindingsCount - 1; start <= i && i < bindingsCount; i--) {
-        Binding* binding = stack_get(context->scopes.bindings, i);
-        if (binding->literal == literalId) return binding;
-    }
-    return NULL;
-}
-
-static void addArgumentBinding(
-    Context* context, uint32_t literal, uint32_t id
+static void init_context(
+    Context* context,
+    Arena contextArena,
+    Ast* ast,
+    Program* program,
+    uint32_t astId,
+    Arena scratch
 ) {
-    Binding binding = {
-        .kind = ARGUMENT_BINDING,
-        .literal = literal,
-        .asArgument = (ArgumentBinding){.id = id}
-    };
-    stack_push(&context->arena, context->scopes.bindings, binding);
+    context->arena = contextArena;
+    context->module = ast;
+    context->program = program;
+    context->moduleId = astId;
 }
 
-// static void scopes_addVariableBinding(
-//     Arena* arena, Scopes* scopes, uint32_t literalId, uint32_t type
-// ) {
-//     Binding binding = {
-//         .kind = VARIABLE_BINDING,
-//         .identifier = literalId,
-//         .type = type
-//     };
-//     stack_push(arena, scopes->bindings, binding);
-// }
-
-static void addFunctionBinding(
-    Context* context, uint32_t literal, uint32_t id, uint32_t module
-) {
-    Binding binding = {
-        .kind = FUNCTION_BINDING,
-        .literal = literal,
-        .asFunction = (FunctionBinding){.id = id, .module = module}
-    };
-    stack_push(&context->arena, context->scopes.bindings, binding);
-}
-
-static void addInterfaceBinding(
-    Context* context, uint32_t literalId, uint32_t id, uint32_t module
-) {
-    Binding binding = {
-        .kind = INTERFACE_BINDING,
-        .literal = literalId,
-        .asInterface = (InterfaceBinding){.id = id, .module = module}
-    };
-    stack_push(&context->arena, context->scopes.bindings, binding);
-}
-
-static void addTypeBinding(
-    Context* context, uint32_t literal, uint32_t id, uint32_t module
-) {
-    TypeBinding binding = {.literal = literal, .id = id, .module = module};
-    stack_push(&context->arena, context->scopes.types, binding);
-}
-
-static TypeBinding* getTypeBinding(Context* context, uint32_t literalId) {
-    uint32_t bindingsCount = stack_size(context->scopes.types);
-    for (uint32_t i = bindingsCount - 1; 0 <= i && i < bindingsCount; i--) {
-        TypeBinding* binding = stack_get(context->scopes.types, i);
-        if (binding->literal == literalId) return binding;
-    }
-    return NULL;
-}
-
-static BindingType getBindingType(Context* context, Binding binding) {
+static TypeOfBinding getTypeOfBinding(Context* context, Binding binding) {
     switch (binding.kind) {
     case FUNCTION_BINDING: {
         FunctionBinding* b = &binding.asFunction;
         Ast* module = program_getAst(context->program, b->id);
         Function* function = list_get(module->functions, b->id);
-        return (BindingType){module, function->type};
+        return (TypeOfBinding){module, function->type};
     }
     case INTERFACE_BINDING: {
         todo();
@@ -194,93 +67,12 @@ static BindingType getBindingType(Context* context, Binding binding) {
     }
 }
 
-static bool addTopLevelBindings(Context* context, uint32_t currentAstId) {
-    // Add builtin type bindings
-    Ast* builtin = &context->program->builtin;
-    for (uint32_t i = 0; i < list_size(builtin->typeDefinitions); i++) {
-        TypeDefinition* typeDef = list_get(builtin->typeDefinitions, i);
-        char* literal = ast_literalAsString(*builtin, typeDef->identifier);
-        uint32_t identifier = ast_getLiteral(context->ast, literal);
-        TypeBinding* binding = getTypeBinding(context, identifier);
-        if (binding != NULL) {
-            todo();
-        }
-        addTypeBinding(context, identifier, i, 0);
-    }
-
-    // Add builtin interface bindings
-    for (uint32_t i = 0; i < list_size(builtin->interfaces); i++) {
-        Interface* interface = list_get(builtin->interfaces, i);
-        char* literal = ast_literalAsString(*builtin, interface->identifier);
-        uint32_t identifier = ast_getLiteral(context->ast, literal);
-        Binding* binding = getBindingInCurrentScope(context, identifier);
-        if (binding != NULL) {
-            todo();
-        }
-        addInterfaceBinding(context, identifier, i, 0);
-    }
-
-    // Add builtin function bindings
-    for (uint32_t i = 0; i < list_size(builtin->functions); i++) {
-        Function* function = list_get(builtin->functions, i);
-        char* literal = ast_literalAsString(*builtin, function->identifier);
-        uint32_t identifier = ast_getLiteral(context->ast, literal);
-        if (function->isImplementation) continue;
-        Binding* binding = getBindingInCurrentScope(context, identifier);
-        if (binding != NULL) {
-            todo();
-        }
-        addFunctionBinding(context, identifier, i, 0);
-    }
-
-    // Add types bindings
-    for (uint32_t i = 0; i < list_size(context->ast->typeDefinitions); i++) {
-        TypeDefinition typeDef = *list_get(context->ast->typeDefinitions, i);
-        TypeBinding* binding = getTypeBinding(context, typeDef.identifier);
-        if (binding != NULL) {
-            todo();
-        }
-        addTypeBinding(context, typeDef.identifier, i, currentAstId);
-    }
-
-    // Add interface bindings
-    for (uint32_t i = 0; i < list_size(context->ast->interfaces); i++) {
-        Interface* interface = list_get(context->ast->interfaces, i);
-        Binding* binding =
-            getBindingInCurrentScope(context, interface->identifier);
-        if (binding != NULL) {
-            todo();
-        }
-        addInterfaceBinding(context, interface->identifier, i, currentAstId);
-    }
-
-    // Add function bindings
-    for (uint32_t i = 0; i < list_size(context->ast->functions); i++) {
-        Function* function = list_get(context->ast->functions, i);
-        if (function->isImplementation) continue;
-        Binding* binding =
-            getBindingInCurrentScope(context, function->identifier);
-        if (binding != NULL) {
-            todo();
-        }
-        addFunctionBinding(context, function->identifier, i, currentAstId);
-    }
-
-    return true;
-}
-
-static void init_context(
-    Context* context,
-    Arena contextArena,
-    Ast* ast,
-    Program* program,
-    uint32_t astId,
-    Arena scratch
-) {
-    context->arena = contextArena;
-    context->ast = ast;
-    context->program = program;
-    context->astId = astId;
+static TypeReference getTypeReference(Context* context, uint32_t typeId) {
+    Type* type = ast_findType(context->module, typeId);
+    assert(type->kind == TYPE_WITH_PARAMS);
+    TypeBinding* typeBinding =
+        getTypeBinding(&context->scopes, type->withParams.literal);
+    return typeBindingAsTypeReference(typeBinding);
 }
 
 static uint32_t newTypeVariable(Context* context) {
@@ -288,22 +80,22 @@ static uint32_t newTypeVariable(Context* context) {
 }
 
 static uint32_t getBuiltInType(Context* context, char* type) {
-    uint32_t literal = ast_getLiteral(context->ast, type);
-    TypeBinding* binding = getTypeBinding(context, literal);
+    uint32_t literal = ast_getLiteral(context->module, type);
+    TypeBinding* binding = getTypeBinding(&context->scopes, literal);
     assert(binding);
-    assert(binding->module == None());
+    assert(binding->moduleId == 0);
     uint32_t newType =
-        ast_addTypeWithParams(context->ast, literal, (Uint32List){0});
+        ast_addTypeWithParams(context->module, literal, (Uint32List){0});
     return newType;
 }
 
 static uint32_t _instantiateType(
-    Arena* arena, Context* context, BindingType type, Uint32Hashmap* mappings
+    Arena* arena, Context* context, TypeOfBinding type, Uint32Hashmap* mappings
 ) {
     Type* t = ast_findType(type.module, type.id);
     switch (t->kind) {
     case TYPE_VARIABLE: {
-        assert(type.module == context->ast);
+        assert(type.module == context->module);
         return type.id;
     }
     case TYPE_WITH_PARAMS: {
@@ -311,7 +103,7 @@ static uint32_t _instantiateType(
         TypeWithParams* data = &t->withParams;
 
         // If is type variable, eg: t, a, b
-        bool isTypeVariable = ast_isTypeVariable(*context->ast, data);
+        bool isTypeVariable = ast_isTypeVariable(*type.module, data);
         if (isTypeVariable) {
             // Instantiate type variable
             assert(data->parameterCount == 0);
@@ -320,7 +112,10 @@ static uint32_t _instantiateType(
                     arena,
                     *mappings,
                     data->literal,
-                    ast_addTypeVariable(context->ast, newTypeVariable(context))
+                    ast_addTypeVariable(
+                        context->module,
+                        newTypeVariable(context)
+                    )
                 );
             }
             uint32_t mappedType = *array_hashmap_get(*mappings, data->literal);
@@ -333,7 +128,7 @@ static uint32_t _instantiateType(
                 uint32_t instType = _instantiateType(
                     arena,
                     context,
-                    (BindingType){type.module, parameter},
+                    (TypeOfBinding){type.module, parameter},
                     mappings
                 );
                 list_append(arena, parameters, instType);
@@ -341,11 +136,11 @@ static uint32_t _instantiateType(
 
             // Instantiate type
             uint32_t newLiteral = ast_getLiteral(
-                context->ast,
+                context->module,
                 ast_literalAsString(*type.module, data->literal)
             );
             uint32_t newId =
-                ast_addTypeWithParams(context->ast, newLiteral, parameters);
+                ast_addTypeWithParams(context->module, newLiteral, parameters);
             return newId;
         }
     }
@@ -354,7 +149,7 @@ static uint32_t _instantiateType(
 }
 
 static uint32_t instantiateType(
-    Context* context, BindingType type, Arena scratch
+    Context* context, TypeOfBinding type, Arena scratch
 ) {
     Uint32Hashmap mappings = {0};
     uint32_t result = _instantiateType(&scratch, context, type, &mappings);
@@ -373,7 +168,7 @@ static uint32_t instantiateInterface(
     uint32_t instParameter = _instantiateType(
         &scratch,
         context,
-        (BindingType){module, parameter},
+        (TypeOfBinding){module, parameter},
         &mappings
     );
     if (context->functionBeingAnalyzed != NULL) {
@@ -383,7 +178,7 @@ static uint32_t instantiateInterface(
             .module = moduleId,
         };
         list_append(
-            &context->ast->arena,
+            &context->module->arena,
             context->functionBeingAnalyzed->constraints,
             constraint
         );
@@ -391,7 +186,7 @@ static uint32_t instantiateInterface(
     return _instantiateType(
         &scratch,
         context,
-        (BindingType){module, type},
+        (TypeOfBinding){module, type},
         &mappings
     );
 }
@@ -402,7 +197,7 @@ static bool contains(Context* context, Type* a, TypeVariable* b) {
     } else if (a->kind == TYPE_WITH_PARAMS) {
         for (uint32_t i = 0; i < a->withParams.parameterCount; i++) {
             Type* param =
-                ast_getType(*context->ast, a->withParams.parameters[i]);
+                ast_getType(*context->module, a->withParams.parameters[i]);
             if (contains(context, param, b)) {
                 return true;
             }
@@ -412,8 +207,8 @@ static bool contains(Context* context, Type* a, TypeVariable* b) {
 }
 
 static void makeEqual(Context* context, uint32_t aId, uint32_t bId) {
-    Type* a = ast_findType(context->ast, aId);
-    Type* b = ast_findType(context->ast, bId);
+    Type* a = ast_findType(context->module, aId);
+    Type* b = ast_findType(context->module, bId);
     if (a == b) return;
 
     if (a->kind == TYPE_VARIABLE) {
@@ -444,11 +239,11 @@ static void makeEqual(Context* context, uint32_t aId, uint32_t bId) {
 }
 
 static bool analyzeType(Context* context, uint32_t typeId, Arena scratch) {
-    Type* type = ast_getType(*context->ast, typeId);
+    Type* type = ast_getType(*context->module, typeId);
     assert(type->kind == TYPE_WITH_PARAMS);
-    TypeBinding* binding = getTypeBinding(context, type->withParams.literal);
+    TypeBinding* binding =
+        getTypeBinding(&context->scopes, type->withParams.literal);
     assert(binding);
-    assert(binding->module == None());
     return true;
 }
 
@@ -459,6 +254,7 @@ static bool declaration(
     AstDeclaration* data,
     Arena scratch
 ) {
+    addVariableBinding(&context->arena, &context->scopes, data->identifier, id);
     todo();
 }
 
@@ -493,7 +289,7 @@ static bool returnLastExpression(
 
     // Get type of expression
     uint32_t expr = *stack_top(context->stack);
-    uint32_t exprType = ast_getTypeOfInstruction(context->ast, code, expr);
+    uint32_t exprType = ast_getTypeOfInstruction(context->module, code, expr);
 
     // Make return type equal to type of expression
     makeEqual(context, returnType, exprType);
@@ -531,17 +327,17 @@ static bool call(
     assert(ast_getInstruction(*code, id) == AST_CALL);
 
     // Add new type variable
-    data->type = ast_addTypeVariable(context->ast, newTypeVariable(context));
+    data->type = ast_addTypeVariable(context->module, newTypeVariable(context));
 
     // Get expected type from expression called
     uint32_t called = *stack_get(
         context->stack,
         stack_size(context->stack) - 1 - data->argumentsCount
     );
-    uint32_t expected = ast_getTypeOfInstruction(context->ast, code, called);
-    if (ast_getType(*context->ast, expected)->kind == TYPE_WITH_PARAMS) {
-        if (ast_getType(*context->ast, expected)->withParams.literal !=
-            ast_getLiteral(context->ast, "->")) {
+    uint32_t expected = ast_getTypeOfInstruction(context->module, code, called);
+    if (ast_getType(*context->module, expected)->kind == TYPE_WITH_PARAMS) {
+        if (ast_getType(*context->module, expected)->withParams.literal !=
+            ast_getLiteral(context->module, "->")) {
             todo();
         }
     }
@@ -553,11 +349,11 @@ static bool call(
             context->stack,
             stack_size(context->stack) - data->argumentsCount + i
         );
-        uint32_t argType = ast_getTypeOfInstruction(context->ast, code, arg);
+        uint32_t argType = ast_getTypeOfInstruction(context->module, code, arg);
         list_append(&scratch, argsTypes, argType);
     }
     uint32_t actualTypeId =
-        ast_addFunctionType(context->ast, argsTypes, data->type);
+        ast_addFunctionType(context->module, argsTypes, data->type);
 
     // Make type of called expression equal to expected type
     if (expected != None()) {
@@ -646,18 +442,19 @@ static bool identifier(
     AstIdentifier* data,
     Arena scratch
 ) {
-    Binding* binding = getBinding(context, data->literal);
+    Binding* binding = getBinding(&context->scopes, data->literal);
     if (binding == NULL) {
         todo();
     } else if (binding->kind == FUNCTION_BINDING) {
-        if (binding->asFunction.module == context->astId) {
+        if (binding->asFunction.module == context->moduleId) {
             Function* function =
-                list_get(context->ast->functions, binding->asFunction.id);
+                list_get(context->module->functions, binding->asFunction.id);
             if (function->type == None() && !function->beingAnalyzed) {
                 analyzeFunctionNotCompletelyTyped(context, function, scratch);
             }
         }
     }
+
     if (binding->kind == INTERFACE_BINDING) {
         data->type = instantiateInterface(
             context,
@@ -668,10 +465,11 @@ static bool identifier(
     } else {
         data->type = instantiateType(
             context,
-            getBindingType(context, *binding),
+            getTypeOfBinding(context, *binding),
             scratch
         );
     }
+
     stack_push(&context->arena, context->stack, id);
     return true;
 }
@@ -711,7 +509,7 @@ static bool analyzeInstruction(
     Context* context, Code* code, uint32_t id, Arena scratch
 ) {
     AstInstructionKind kind = ast_getInstruction(*code, id);
-    void* data = ast_getData(context->ast, code, id);
+    void* data = ast_getData(context->module, code, id);
     switch (kind) {
     case AST_DECLARATION: return declaration(context, code, id, data, scratch);
     case AST_ASSIGNMENT: return assignemnt(context, code, id, data, scratch);
@@ -756,7 +554,7 @@ static bool analyzeFunction(
     // Reset scopes
     newContext.scopes.bindings = (BindingStack){0};
     newContext.scopes.scopeStart = (Uint32Stack){0};
-    addScope(&newContext);
+    addScope(&newContext.arena, &newContext.scopes);
     for (uint32_t i = 0; i < stack_size(context->scopes.bindings); i++) {
         Binding binding = *stack_get(context->scopes.bindings, i);
         stack_push(&newContext.arena, newContext.scopes.bindings, binding);
@@ -770,7 +568,12 @@ static bool analyzeFunction(
     for (uint32_t i = 0; i < list_size(function->arguments); i++) {
         FunctionArgument* argument = list_get(function->arguments, i);
         analyzeType(context, argument->type, scratch);
-        addArgumentBinding(&newContext, argument->identifier, argument->type);
+        addArgumentBinding(
+            &newContext.arena,
+            &newContext.scopes,
+            argument->identifier,
+            argument->type
+        );
     }
 
     // For return type
@@ -826,11 +629,11 @@ static void generalizeType(
     Uint32List* parameters,
     Arena scratch
 ) {
-    Type* type = ast_findType(context->ast, typeId);
+    Type* type = ast_findType(context->module, typeId);
     switch (type->kind) {
     case TYPE_VARIABLE: {
         uint32_t newParam = addNewParameter(
-            context->ast,
+            context->module,
             newParametersCount,
             parameters,
             scratch
@@ -866,7 +669,7 @@ static bool analyzeFunctionNotCompletelyTyped(
     // Reset scopes
     newContext.scopes.bindings = (BindingStack){0};
     newContext.scopes.scopeStart = (Uint32Stack){0};
-    addScope(&newContext);
+    addScope(&newContext.arena, &newContext.scopes);
     for (uint32_t i = 0; i < stack_size(context->scopes.bindings); i++) {
         Binding binding = *stack_get(context->scopes.bindings, i);
         stack_push(&newContext.arena, newContext.scopes.bindings, binding);
@@ -881,19 +684,26 @@ static bool analyzeFunctionNotCompletelyTyped(
         FunctionArgument* argument = list_get(function->arguments, i);
         if (argument->type == None()) {
             argument->type = ast_addTypeVariable(
-                newContext.ast,
+                newContext.module,
                 newTypeVariable(&newContext)
             );
         } else {
             todo();  // Analyze type if it has
         }
-        addArgumentBinding(&newContext, argument->identifier, argument->type);
+        addArgumentBinding(
+            &newContext.arena,
+            &newContext.scopes,
+            argument->identifier,
+            argument->type
+        );
     }
 
     // For return type
     if (function->returnType == None()) {
-        function->returnType =
-            ast_addTypeVariable(newContext.ast, newTypeVariable(&newContext));
+        function->returnType = ast_addTypeVariable(
+            newContext.module,
+            newTypeVariable(&newContext)
+        );
     } else {
         todo();  // Analyze type if it has
     }
@@ -922,7 +732,7 @@ static bool analyzeFunctionNotCompletelyTyped(
         list_append(&scratch, args, argType);
     }
     function->type =
-        ast_addFunctionType(newContext.ast, args, function->returnType);
+        ast_addFunctionType(newContext.module, args, function->returnType);
 
     // Remove repeated constraints
     for (uint32_t i = 0; i < list_size(function->constraints); i++) {
@@ -931,8 +741,8 @@ static bool analyzeFunctionNotCompletelyTyped(
             bool constraintRemoved = false;
             Constraint b = *list_get(function->constraints, i);
             if (a.identifier == b.identifier) {
-                Type* typeA = ast_findType(context->ast, a.parameter);
-                Type* typeB = ast_findType(context->ast, a.parameter);
+                Type* typeA = ast_findType(context->module, a.parameter);
+                Type* typeB = ast_findType(context->module, a.parameter);
                 if (typeA == typeB) {
                     list_removeIndex(function->constraints, j);
                     constraintRemoved = true;
@@ -957,28 +767,34 @@ static bool analyzeCode(Context* context, Code* code, Arena scratch) {
     return true;
 }
 
-void analyzeModule(Program* program, uint32_t astId, Arena scratch) {
+void analyzeModule(Program* program, uint32_t moduleId, Arena scratch) {
     // Initialize context
     Context context = {0};
     init_context(
         &context,
         arena_new(),
-        program_getAst(program, astId),
+        program_getAst(program, moduleId),
         program,
-        astId,
+        moduleId,
         scratch
     );
 
     // Add top level bindings
-    addScope(&context);
-    bool result = addTopLevelBindings(&context, astId);
+    addScope(&context.arena, &context.scopes);
+    bool result = addTopLevelBindings(
+        &context.arena,
+        &context.scopes,
+        &context.program->builtin,
+        context.module,
+        moduleId
+    );
     if (!result) {
         todo();
     }
 
     // Analyze functions
-    for (uint32_t i = 0; i < list_size(context.ast->functions); i++) {
-        Function* function = list_get(context.ast->functions, i);
+    for (uint32_t i = 0; i < list_size(context.module->functions); i++) {
+        Function* function = list_get(context.module->functions, i);
         if (function->type != None()) {
             analyzeFunction(&context, function, scratch);
         } else {
@@ -987,10 +803,10 @@ void analyzeModule(Program* program, uint32_t astId, Arena scratch) {
     }
 
     // Analyze code
-    analyzeCode(&context, &context.ast->code, scratch);
+    analyzeCode(&context, &context.module->code, scratch);
 
     // Remove scope
-    removeScope(&context);
+    removeScope(&context.scopes);
 
     // Free arena
     arena_free(&context.arena);
@@ -1112,8 +928,28 @@ static void findImplementationsOfInterfaceOnModule(
     uint32_t moduleId,
     uint32_t interfaceId,
     uint32_t otherModuleId,
-    Arena scratch
+    Arena scratch1,
+    Arena scratch2
 ) {
+    Context otherContext = {0};
+    init_context(
+        &otherContext,
+        scratch1,
+        program_getAst(program, otherModuleId),
+        program,
+        otherModuleId,
+        scratch2
+    );
+    addScope(&otherContext.arena, &otherContext.scopes);
+    bool result = addTopLevelTypeBindings(
+        &otherContext.arena,
+        &otherContext.scopes,
+        &otherContext.program->builtin,
+        otherContext.module,
+        otherModuleId
+    );
+    assert(result);
+
     Ast* module = program_getAst(program, moduleId);
     Interface* interface = list_get(module->interfaces, interfaceId);
     char* interfaceIdentifier =
@@ -1123,16 +959,60 @@ static void findImplementationsOfInterfaceOnModule(
         Function* function = list_get(otherModule->functions, i);
         char* functionIdentifier =
             ast_literalAsString(*otherModule, function->identifier);
+        assert(function->type != None());
         if (strcmp(interfaceIdentifier, functionIdentifier) == 0) {
+            TypeReference instantiatedParameter = {0};
+
+            // Find with what type the interface es instanced
+            Type* actualType = ast_getType(*otherModule, function->type);
+            assert(actualType->kind == TYPE_WITH_PARAMS);
+            Type* interfaceType = ast_getType(*module, interface->type);
+            assert(interfaceType->kind == TYPE_WITH_PARAMS);
+            bool founded = false;
+            for (uint32_t i = 0; i < interfaceType->withParams.parameterCount;
+                 i++) {
+                if (ast_areTypesEqual(
+                        module,
+                        interface->parameter,
+                        interfaceType->withParams.parameters[i]
+                    )) {
+                    founded = true;
+                    instantiatedParameter = getTypeReference(
+                        &otherContext,
+                        actualType->withParams.parameters[i]
+                    );
+                    break;
+                }
+            }
+            assert(founded);
+
+            // Set implementation
+            Implementation* exists = ast_getImplementation(
+                &interface->implementations,
+                instantiatedParameter
+            );
+            assert(exists == NULL);
+            Implementation impl = {.module = otherModuleId, .functionId = i};
+            ast_setImplementation(
+                &module->arena,
+                &interface->implementations,
+                instantiatedParameter,
+                impl
+            );
+
+            // Set function as implementation
             function->isImplementation = true;
-            Implementation impl = {moduleId, i};
-            list_append(&module->arena, interface->implementations, impl);
+            function->implementationFor = instantiatedParameter;
         }
     }
 }
 
 static void findImplementationsOfInterface(
-    Program* program, uint32_t moduleId, uint32_t interfaceId, Arena scratch
+    Program* program,
+    uint32_t moduleId,
+    uint32_t interfaceId,
+    Arena scratch1,
+    Arena scratch2
 ) {
     for (uint32_t i = 0; i <= list_size(program->asts); i++) {
         findImplementationsOfInterfaceOnModule(
@@ -1140,48 +1020,334 @@ static void findImplementationsOfInterface(
             moduleId,
             interfaceId,
             i,
-            scratch
+            scratch1,
+            scratch2
         );
     }
 }
 
 static void findImplementationsOfInterfaces(
-    Program* program, uint32_t moduleId, Arena scratch
+    Program* program, uint32_t moduleId, Arena scratch1, Arena scratch2
 ) {
     Ast* module = program_getAst(program, moduleId);
     for (uint32_t i = 0; i < list_size(module->interfaces); i++) {
-        findImplementationsOfInterface(program, moduleId, i, scratch);
+        findImplementationsOfInterface(
+            program,
+            moduleId,
+            i,
+            scratch1,
+            scratch2
+        );
     }
 }
 
-void analyzeModulesInterfaces(Program* program, Arena scratch) {
-    Arena arena = arena_new();
-
-    // Check types aren't recursive
-    for (uint32_t moduleId = 1; moduleId < list_size(program->asts);
-         moduleId++) {
-        Ast* module = program_getAst(program, moduleId);
-        TypeAnalyzedStack stack = {0};
-        Arena scratch = scratch;
-        for (uint32_t i = 0; i < list_size(module->typeDefinitions); i++) {
-            bool result = analyzeTypeDefinition(
-                &arena,
-                program,
-                &stack,
-                i,
-                moduleId,
-                scratch
-            );
-            if (!result) goto exit;
-        }
-    }
+void analyzeModulesInterfaces(
+    Program* program, Arena scratch1, Arena scratch2
+) {
+    // // Check types aren't recursive
+    // for (uint32_t moduleId = 1; moduleId < list_size(program->asts);
+    //      moduleId++) {
+    //     Ast* module = program_getAst(program, moduleId);
+    //     TypeAnalyzedStack stack = {0};
+    //     Arena scratch = scratch;
+    //     for (uint32_t i = 0; i < list_size(module->typeDefinitions); i++) {
+    //         bool result = analyzeTypeDefinition(
+    //             &arena,
+    //             program,
+    //             &stack,
+    //             i,
+    //             moduleId,
+    //             scratch
+    //         );
+    //         if (!result) goto exit;
+    //     }
+    // }
 
     // Find interface implementations
     for (uint32_t moduleId = 0; moduleId <= list_size(program->asts);
          moduleId++) {
-        findImplementationsOfInterfaces(program, moduleId, scratch);
+        findImplementationsOfInterfaces(program, moduleId, scratch1, scratch2);
     }
-exit:
-    arena_free(&arena);
-    return;
+}
+
+static void checkFunctionsUsedInCode(
+    Context* context, Code* code, Arena scratch
+);
+
+static void checkFunctionsUsedInFunction(
+    Context* context,
+    uint32_t moduleId,
+    uint32_t functionId,
+    uint32_t actualTypeId,
+    Arena scratch
+) {
+    Ast* module = program_getAst(context->program, moduleId);
+    Function* function = list_get(module->functions, functionId);
+    TypeReferenceHashmap mappings = {0};
+
+    // If function doesn't have type parameters
+    if (list_size(function->parameters) == 0) {
+        if (list_size(function->instantiations) != 0) {
+            assert(list_size(function->instantiations) == 1);
+            return;
+        } else {
+            Instantiation inst = {0};
+            list_append(&module->arena, function->instantiations, inst);
+        }
+    } else {
+        // else find instantiated parameters
+        Type* actualType = ast_getType(*context->module, actualTypeId);
+        assert(actualType->kind == TYPE_WITH_PARAMS);
+        Type* functionType = ast_getType(*module, function->type);
+        assert(functionType->kind == TYPE_WITH_PARAMS);
+        for (uint32_t i = 0; i < functionType->withParams.parameterCount; i++) {
+            Type* parameter =
+                ast_findType(module, functionType->withParams.parameters[i]);
+            assert(parameter->kind == TYPE_WITH_PARAMS);
+            if (ast_isTypeVariable(*module, &parameter->withParams)) {
+                if (array_hashmap_get(
+                        mappings,
+                        parameter->withParams.literal
+                    ) == NULL) {
+                    TypeReference typeRef = getTypeReference(
+                        context,
+                        actualType->withParams.parameters[i]
+                    );
+                    array_hashmap_set(
+                        &scratch,
+                        mappings,
+                        parameter->withParams.literal,
+                        typeRef
+                    );
+                }
+            }
+        }
+
+        // Check if instantiation was already checked for this parameters
+        for (uint32_t i = 0; i < list_size(function->instantiations); i++) {
+            Instantiation inst = *list_get(function->instantiations, i);
+            assert(list_size(inst) == actualType->withParams.parameterCount);
+            bool founded = true;
+            for (uint32_t j = 0; j < list_size(inst); j++) {
+                TypeReference t = *list_get(inst, j);
+                TypeReference otherT = *list_get(mappings.values, j);
+                if (program_areTypesEqual(context->program, t, otherT)) {
+                    founded = false;
+                    break;
+                }
+            }
+            if (founded) {
+                return;
+            }
+        }
+
+        // Add new instantiation
+        Instantiation inst = {0};
+        for (uint32_t i = 0; i < array_hashmap_size(mappings); i++) {
+            TypeReference t = *list_get(mappings.values, i);
+            list_append(&module->arena, inst, t);
+        }
+        list_append(&module->arena, function->instantiations, inst);
+    }
+
+    // Create new context
+    Context newContext = {0};
+    Arena newArena = context->arena;
+    init_context(
+        &newContext,
+        newArena,
+        module,
+        context->program,
+        moduleId,
+        scratch
+    );
+    newContext.mappings = mappings;
+
+    // Add top level bindings
+    addScope(&newContext.arena, &newContext.scopes);
+    bool result = addTopLevelBindings(
+        &newContext.arena,
+        &newContext.scopes,
+        &newContext.program->builtin,
+        newContext.module,
+        moduleId
+    );
+    assert(result);
+
+    // Check functions used in code
+    checkFunctionsUsedInCode(&newContext, &function->code, scratch);
+}
+
+static void checkFunctionsUsedInInterface(
+    Context* context,
+    uint32_t moduleId,
+    uint32_t interfaceId,
+    uint32_t actualTypeId,
+    Arena scratch
+) {
+    Ast* module = program_getAst(context->program, moduleId);
+    Interface* interface = list_get(module->interfaces, interfaceId);
+    TypeReference instantiatedParameter = {0};
+
+    // Find for what type the interface es instanciated
+    Type* actualType = ast_getType(*context->module, actualTypeId);
+    assert(actualType->kind == TYPE_WITH_PARAMS);
+    Type* interfaceType = ast_getType(*module, interface->type);
+    assert(interfaceType->kind == TYPE_WITH_PARAMS);
+    bool founded = false;
+    for (uint32_t i = 0; i < interfaceType->withParams.parameterCount; i++) {
+        if (ast_areTypesEqual(
+                module,
+                interface->parameter,
+                interfaceType->withParams.parameters[i]
+            )) {
+            founded = true;
+            instantiatedParameter =
+                getTypeReference(context, actualType->withParams.parameters[i]);
+            break;
+        }
+    }
+    assert(founded);
+    Implementation impl = *ast_getImplementation(
+        &interface->implementations,
+        instantiatedParameter
+    );
+    checkFunctionsUsedInFunction(
+        context,
+        impl.module,
+        impl.functionId,
+        actualTypeId,
+        scratch
+    );
+}
+
+static void checkFunctionsUsedInCode(
+    Context* context, Code* code, Arena scratch
+) {
+    for (uint32_t id = 1; id <= list_size(context->module->code.instructions);
+         id++) {
+        AstInstructionKind kind = ast_getInstruction(context->module->code, id);
+        switch (kind) {
+        case AST_DECLARATION: {
+            todo();
+        }
+        case AST_ASSIGNMENT: {
+            todo();
+        }
+        case AST_RETURN: {
+            todo();
+        }
+        case AST_RETURN_LAST_EXPRESSION: {
+            todo();
+        }
+        case AST_BREAK: {
+            todo();
+        }
+        case AST_CONTINUE: {
+            todo();
+        }
+        case AST_IF_ELSE: {
+            todo();
+        }
+        case AST_WHILE: {
+            todo();
+        }
+        case AST_CALL: {
+            todo();
+        }
+        case AST_IF_ELSE_EXPRESSION: {
+            todo();
+        }
+        case AST_ADDRESS_OF: {
+            todo();
+        }
+        case AST_DEREFERENCE: {
+            todo();
+        }
+        case AST_FIELD_ACCESS: {
+            todo();
+        }
+        case AST_INDEX_ACCESS: {
+            todo();
+        }
+        case AST_FLOAT: {
+            return;
+        }
+        case AST_INTEGER: {
+            return;
+        }
+        case AST_IDENTIFIER: {
+            AstIdentifier* data = ast_getData(context->module, code, id);
+            Binding* binding = getBinding(&context->scopes, data->literal);
+            assert(binding != NULL);
+            if (binding->kind == FUNCTION_BINDING) {
+                checkFunctionsUsedInFunction(
+                    context,
+                    binding->asFunction.module,
+                    binding->asFunction.id,
+                    data->type,
+                    scratch
+                );
+
+            } else if (binding->kind == INTERFACE_BINDING) {
+                checkFunctionsUsedInInterface(
+                    context,
+                    binding->asInterface.module,
+                    binding->asInterface.id,
+                    data->type,
+                    scratch
+                );
+            }
+            break;
+        }
+        case AST_BOOLEAN: {
+            return;
+        }
+        case AST_STRING: {
+            return;
+        }
+        case AST_ARRAY: {
+            todo();
+        }
+        case AST_STRUCT_LITERAL: {
+            todo();
+        }
+        default: unreachable();
+        }
+    }
+}
+
+void checkFunctionsUsed(Program* program, Arena scratch) {
+    uint32_t moduleId = 1;
+
+    // Initialize context
+    Context context = {0};
+    init_context(
+        &context,
+        arena_new(),
+        program_getAst(program, moduleId),
+        program,
+        moduleId,
+        scratch
+    );
+
+    // Add top level bindings
+    addScope(&context.arena, &context.scopes);
+    bool result = addTopLevelBindings(
+        &context.arena,
+        &context.scopes,
+        &context.program->builtin,
+        context.module,
+        moduleId
+    );
+    assert(result);
+
+    // Do reachabilty analysis
+    checkFunctionsUsedInCode(&context, &context.module->code, scratch);
+
+    // Remove scope
+    removeScope(&context.scopes);
+
+    // Free arena
+    arena_free(&context.arena);
 }
