@@ -93,14 +93,15 @@ static void run(Command command, Arena scratch1, Arena scratch2) {
         getProgramGraph(&scratch1, string_asView(command.path), scratch2);
     String executableName =
         getExecutableName(&scratch1, *list_get(program.paths, 0));
-    bool alreadyExisted = fileExists(executableName.buffer);
+    String commandToExecute = getCommandToExecute(&scratch1, executableName);
+    bool alreadyExisted = fileExists(commandToExecute.buffer);
     parseProgram(&program, scratch1);
     analyzeProgram(&program, scratch1, scratch2);
     codegenObjectFiles(program, scratch1, scratch2);
     linkProgram(program, scratch1, scratch2);
-    system(executableName.buffer);
+    system(commandToExecute.buffer);
     if (!alreadyExisted) {
-        remove(executableName.buffer);
+        remove(commandToExecute.buffer);
     }
 }
 

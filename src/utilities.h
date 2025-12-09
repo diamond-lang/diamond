@@ -18,6 +18,7 @@ String getObjectFileName(
 );
 String getBuiltinObjectFileName(Arena* arena);
 String getExecutableName(Arena* arena, String path);
+String getCommandToExecute(Arena* arena, String executableName);
 String numberAsString(Arena* arena, uint32_t number);
 int numberOfDigits(uint32_t number);
 

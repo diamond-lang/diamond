@@ -5,7 +5,7 @@
       "type": "cppdbg",
       "request": "launch",
       "program": "${workspaceFolder}/diamond",
-      "args": ["build", "${input:filePath}"],
+      "args": ["run", "${input:filePath}"],
       "stopAtEntry": true,
       "cwd": "${workspaceFolder}",
       "environment": [],

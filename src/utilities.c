@@ -279,6 +279,20 @@ String getExecutableName(Arena* arena, String path) {
     return executableName;
 }
 
+String getCommandToExecute(Arena* arena, String executableName) {
+    String result = {0};
+    switch (currentPlatform()) {
+    case Windows: {
+        string_concat(arena, &result, cStringAsView(".\\"));
+        break;
+    }
+    case Linux: string_concat(arena, &result, cStringAsView("./")); break;
+    case MacOS: string_concat(arena, &result, cStringAsView("./")); break;
+    }
+    string_concat(arena, &result, string_asView(executableName));
+    return result;
+}
+
 int numberOfDigits(uint32_t number) {
     if (number == 0) return 1;
     int numberOfDigits = 0;

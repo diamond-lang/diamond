@@ -16,6 +16,7 @@ char* builtin =
     "interface /[t](left: t, right: t): t\n"
     "interface +[t](left: t, right: t): t\n"
     "interface -[t](left: t, right: t): t\n"
+    "interface -'[t](negable: t): t\n"
     "\n"
     "function ==(left: Bool, right: Bool): Bool builtin\n"
     "function !=(left: Bool, right: Bool): Bool builtin\n"
@@ -30,5 +31,6 @@ char* builtin =
     "function /(left: Float64, right: Float64): Float64 builtin\n"
     "function +(left: Float64, right: Float64): Float64 builtin\n"
     "function -(left: Float64, right: Float64): Float64 builtin\n"
+    "function -'(negable: Float64): Float64 builtin\n"
     "\n"
     "";

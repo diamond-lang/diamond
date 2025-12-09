@@ -1126,13 +1126,13 @@ static void checkFunctionsUsedInFunction(
         // Check if instantiation was already checked for this parameters
         for (uint32_t i = 0; i < list_size(function->instantiations); i++) {
             Instantiation inst = *list_get(function->instantiations, i);
-            assert(list_size(inst) == actualType->withParams.parameterCount);
-            bool founded = true;
+            assert(list_size(inst) == list_size(mappings.values));
+            bool founded = false;
             for (uint32_t j = 0; j < list_size(inst); j++) {
                 TypeReference t = *list_get(inst, j);
                 TypeReference otherT = *list_get(mappings.values, j);
                 if (program_areTypesEqual(context->program, t, otherT)) {
-                    founded = false;
+                    founded = true;
                     break;
                 }
             }
@@ -1253,7 +1253,7 @@ static void checkFunctionsUsedInCode(
             todo();
         }
         case AST_CALL: {
-            todo();
+            continue;
         }
         case AST_IF_ELSE_EXPRESSION: {
             todo();
@@ -1271,10 +1271,10 @@ static void checkFunctionsUsedInCode(
             todo();
         }
         case AST_FLOAT: {
-            return;
+            continue;
         }
         case AST_INTEGER: {
-            return;
+            continue;
         }
         case AST_IDENTIFIER: {
             AstIdentifier* data = ast_getData(context->module, code, id);
@@ -1301,10 +1301,10 @@ static void checkFunctionsUsedInCode(
             break;
         }
         case AST_BOOLEAN: {
-            return;
+            continue;
         }
         case AST_STRING: {
-            return;
+            continue;
         }
         case AST_ARRAY: {
             todo();

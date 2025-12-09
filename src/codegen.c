@@ -478,7 +478,12 @@ static void identifier(
 static void booleanLiteral(
     Context* context, Code* code, uint32_t id, AstBoolean* data, Arena scratch
 ) {
-    todo();
+    LLVMValueRef value = LLVMConstInt(
+        LLVMInt1TypeInContext(context->llvmContext),
+        data->value,
+        0
+    );
+    stack_push(&context->arena, context->stack, value);
 }
 
 static void stringLiteral(
@@ -593,57 +598,7 @@ static void codegenFunction(
         LLVMPositionBuilderAtEnd(context->llvmBuilder, body);
 
         if (function->builtin) {
-            if (function->identifier ==
-                ast_getLiteral(context->module, "print")) {
-                LLVMTypeRef int32Type =
-                    LLVMInt32TypeInContext(context->llvmContext);
-                LLVMTypeRef int8Type =
-                    LLVMInt8TypeInContext(context->llvmContext);
-                LLVMTypeRef charPointerType = LLVMPointerType(int8Type, 0);
-                LLVMTypeRef printfParams[] = {charPointerType};
-                LLVMTypeRef printfType =
-                    LLVMFunctionType(int32Type, printfParams, 1, 1);
-                LLVMValueRef printfFunction =
-                    LLVMGetNamedFunction(context->llvmModule, "printf");
-                if (printfFunction == NULL) {
-                    printfFunction = LLVMAddFunction(
-                        context->llvmModule,
-                        "printf",
-                        printfType
-                    );
-                }
-
-                // Create string format
-                char* stringFormat = "%g\n";
-                LLVMValueRef llvmStringFormat = LLVMBuildGlobalString(
-                    context->llvmBuilder,
-                    stringFormat,
-                    "constant"
-                );
-                LLVMValueRef arg = LLVMGetParam(llvmFunction, 0);
-                LLVMTypeRef argType = LLVMTypeOf(arg);
-                LLVMValueRef argAllocation =
-                    LLVMBuildAlloca(context->llvmBuilder, argType, "");
-                LLVMBuildStore(context->llvmBuilder, arg, argAllocation);
-                LLVMValueRef argValue = LLVMBuildLoad2(
-                    context->llvmBuilder,
-                    argType,
-                    argAllocation,
-                    ""
-                );
-
-                LLVMValueRef printfArgs[] = {llvmStringFormat, argValue};
-                (void)LLVMBuildCall2(
-                    context->llvmBuilder,
-                    printfType,
-                    printfFunction,
-                    printfArgs,
-                    2,
-                    ""
-                );
-                LLVMBuildRetVoid(context->llvmBuilder);
-            } else if (function->identifier ==
-                       ast_getLiteral(context->module, "+")) {
+            if (list_size(function->arguments) == 2) {
                 // Left
                 LLVMValueRef arg1 = LLVMGetParam(llvmFunction, 0);
                 LLVMTypeRef arg1Type = LLVMTypeOf(arg1);
@@ -670,21 +625,289 @@ static void codegenFunction(
                     ""
                 );
 
-                LLVMTypeKind kind = LLVMGetTypeKind(arg1Type);
-                if (kind == LLVMDoubleTypeKind) {
-                    LLVMValueRef value = LLVMBuildFAdd(
-                        context->llvmBuilder,
-                        arg1Value,
-                        arg2Value,
-                        ""
-                    );
-                    LLVMBuildRet(context->llvmBuilder, value);
-                } else {
-                    todo();
-                }
+                if (function->identifier ==
+                    ast_getLiteral(context->module, "==")) {
+                    LLVMTypeKind kind = LLVMGetTypeKind(arg1Type);
+                    if (kind == LLVMDoubleTypeKind) {
+                        LLVMValueRef value = LLVMBuildFCmp(
+                            context->llvmBuilder,
+                            LLVMRealUEQ,
+                            arg1Value,
+                            arg2Value,
+                            ""
+                        );
+                        LLVMBuildRet(context->llvmBuilder, value);
+                    } else {
+                        todo();
+                    }
+                } else if (function->identifier ==
+                           ast_getLiteral(context->module, "<")) {
+                    LLVMTypeKind kind = LLVMGetTypeKind(arg1Type);
+                    if (kind == LLVMDoubleTypeKind) {
+                        LLVMValueRef value = LLVMBuildFCmp(
+                            context->llvmBuilder,
+                            LLVMRealULT,
+                            arg1Value,
+                            arg2Value,
+                            ""
+                        );
+                        LLVMBuildRet(context->llvmBuilder, value);
+                    } else {
+                        todo();
+                    }
+                } else if (function->identifier ==
+                           ast_getLiteral(context->module, "<=")) {
+                    LLVMTypeKind kind = LLVMGetTypeKind(arg1Type);
+                    if (kind == LLVMDoubleTypeKind) {
+                        LLVMValueRef value = LLVMBuildFCmp(
+                            context->llvmBuilder,
+                            LLVMRealULE,
+                            arg1Value,
+                            arg2Value,
+                            ""
+                        );
+                        LLVMBuildRet(context->llvmBuilder, value);
+                    } else {
+                        todo();
+                    }
+                } else if (function->identifier ==
+                           ast_getLiteral(context->module, ">")) {
+                    LLVMTypeKind kind = LLVMGetTypeKind(arg1Type);
+                    if (kind == LLVMDoubleTypeKind) {
+                        LLVMValueRef value = LLVMBuildFCmp(
+                            context->llvmBuilder,
+                            LLVMRealUGT,
+                            arg1Value,
+                            arg2Value,
+                            ""
+                        );
+                        LLVMBuildRet(context->llvmBuilder, value);
+                    } else {
+                        todo();
+                    }
+                } else if (function->identifier ==
+                           ast_getLiteral(context->module, ">=")) {
+                    LLVMTypeKind kind = LLVMGetTypeKind(arg1Type);
+                    if (kind == LLVMDoubleTypeKind) {
+                        LLVMValueRef value = LLVMBuildFCmp(
+                            context->llvmBuilder,
+                            LLVMRealUGE,
+                            arg1Value,
+                            arg2Value,
+                            ""
+                        );
+                        LLVMBuildRet(context->llvmBuilder, value);
+                    } else {
+                        todo();
+                    }
 
+                } else if (function->identifier ==
+                           ast_getLiteral(context->module, "+")) {
+                    LLVMTypeKind kind = LLVMGetTypeKind(arg1Type);
+                    if (kind == LLVMDoubleTypeKind) {
+                        LLVMValueRef value = LLVMBuildFAdd(
+                            context->llvmBuilder,
+                            arg1Value,
+                            arg2Value,
+                            ""
+                        );
+                        LLVMBuildRet(context->llvmBuilder, value);
+                    } else {
+                        todo();
+                    }
+
+                } else if (function->identifier ==
+                           ast_getLiteral(context->module, "-")) {
+                    LLVMTypeKind kind = LLVMGetTypeKind(arg1Type);
+                    if (kind == LLVMDoubleTypeKind) {
+                        LLVMValueRef value = LLVMBuildFSub(
+                            context->llvmBuilder,
+                            arg1Value,
+                            arg2Value,
+                            ""
+                        );
+                        LLVMBuildRet(context->llvmBuilder, value);
+                    } else {
+                        todo();
+                    }
+
+                } else if (function->identifier ==
+                           ast_getLiteral(context->module, "*")) {
+                    LLVMTypeKind kind = LLVMGetTypeKind(arg1Type);
+                    if (kind == LLVMDoubleTypeKind) {
+                        LLVMValueRef value = LLVMBuildFMul(
+                            context->llvmBuilder,
+                            arg1Value,
+                            arg2Value,
+                            ""
+                        );
+                        LLVMBuildRet(context->llvmBuilder, value);
+                    } else {
+                        todo();
+                    }
+
+                } else if (function->identifier ==
+                           ast_getLiteral(context->module, "/")) {
+                    LLVMTypeKind kind = LLVMGetTypeKind(arg1Type);
+                    if (kind == LLVMDoubleTypeKind) {
+                        LLVMValueRef value = LLVMBuildFDiv(
+                            context->llvmBuilder,
+                            arg1Value,
+                            arg2Value,
+                            ""
+                        );
+                        LLVMBuildRet(context->llvmBuilder, value);
+                    } else {
+                        todo();
+                    }
+
+                } else {
+                    unreachable();
+                }
+            } else if (list_size(function->arguments) == 1) {
+                LLVMValueRef arg = LLVMGetParam(llvmFunction, 0);
+                LLVMTypeRef argType = LLVMTypeOf(arg);
+                LLVMValueRef argAllocation =
+                    LLVMBuildAlloca(context->llvmBuilder, argType, "");
+                LLVMBuildStore(context->llvmBuilder, arg, argAllocation);
+                LLVMValueRef argValue = LLVMBuildLoad2(
+                    context->llvmBuilder,
+                    argType,
+                    argAllocation,
+                    ""
+                );
+
+                if (function->identifier ==
+                    ast_getLiteral(context->module, "print")) {
+                    LLVMTypeRef int32Type =
+                        LLVMInt32TypeInContext(context->llvmContext);
+                    LLVMTypeRef int8Type =
+                        LLVMInt8TypeInContext(context->llvmContext);
+                    LLVMTypeRef charPointerType = LLVMPointerType(int8Type, 0);
+                    LLVMTypeRef printfParams[] = {charPointerType};
+                    LLVMTypeRef printfType =
+                        LLVMFunctionType(int32Type, printfParams, 1, 1);
+                    LLVMValueRef printfFunction =
+                        LLVMGetNamedFunction(context->llvmModule, "printf");
+                    if (printfFunction == NULL) {
+                        printfFunction = LLVMAddFunction(
+                            context->llvmModule,
+                            "printf",
+                            printfType
+                        );
+                    }
+
+                    LLVMTypeKind kind = LLVMGetTypeKind(argType);
+                    if (kind == LLVMDoubleTypeKind) {
+                        // Create string format
+                        char* stringFormat = "%g\n";
+                        LLVMValueRef llvmStringFormat = LLVMBuildGlobalString(
+                            context->llvmBuilder,
+                            stringFormat,
+                            ""
+                        );
+
+                        LLVMValueRef printfArgs[] = {
+                            llvmStringFormat,
+                            argValue
+                        };
+                        (void)LLVMBuildCall2(
+                            context->llvmBuilder,
+                            printfType,
+                            printfFunction,
+                            printfArgs,
+                            2,
+                            ""
+                        );
+                        LLVMBuildRetVoid(context->llvmBuilder);
+                    } else if (kind == LLVMIntegerTypeKind &&
+                               LLVMGetIntTypeWidth(argType) == 1) {
+                        LLVMBasicBlockRef then_bb =
+                            LLVMAppendBasicBlockInContext(
+                                context->llvmContext,
+                                llvmFunction,
+                                ""
+                            );
+                        LLVMBasicBlockRef else_bb =
+                            LLVMAppendBasicBlockInContext(
+                                context->llvmContext,
+                                llvmFunction,
+                                ""
+                            );
+                        LLVMBasicBlockRef merge_bb =
+                            LLVMAppendBasicBlockInContext(
+                                context->llvmContext,
+                                llvmFunction,
+                                ""
+                            );
+
+                        LLVMBuildCondBr(
+                            context->llvmBuilder,
+                            argValue,
+                            then_bb,
+                            else_bb
+                        );
+
+                        LLVMPositionBuilderAtEnd(context->llvmBuilder, then_bb);
+
+                        // Then
+                        char* stringFormat = "true\n";
+                        LLVMValueRef llvmStringFormat = LLVMBuildGlobalString(
+                            context->llvmBuilder,
+                            stringFormat,
+                            ""
+                        );
+                        LLVMValueRef printfArgs[] = {
+                            llvmStringFormat,
+                            argValue
+                        };
+                        (void)LLVMBuildCall2(
+                            context->llvmBuilder,
+                            printfType,
+                            printfFunction,
+                            printfArgs,
+                            2,
+                            ""
+                        );
+                        LLVMBuildBr(context->llvmBuilder, merge_bb);
+
+                        // Else
+                        LLVMPositionBuilderAtEnd(context->llvmBuilder, else_bb);
+                        stringFormat = "false\n";
+                        llvmStringFormat = LLVMBuildGlobalString(
+                            context->llvmBuilder,
+                            stringFormat,
+                            ""
+                        );
+                        printfArgs[0] = llvmStringFormat;
+                        printfArgs[1] = argValue;
+                        (void)LLVMBuildCall2(
+                            context->llvmBuilder,
+                            printfType,
+                            printfFunction,
+                            printfArgs,
+                            2,
+                            ""
+                        );
+                        LLVMBuildBr(context->llvmBuilder, merge_bb);
+
+                        // Merge
+                        LLVMPositionBuilderAtEnd(
+                            context->llvmBuilder,
+                            merge_bb
+                        );
+                        LLVMBuildRetVoid(context->llvmBuilder);
+                    } else {
+                        todo();
+                    }
+                } else if (function->identifier ==
+                           ast_getLiteral(context->module, "-'")) {
+                    LLVMValueRef value =
+                        LLVMBuildFNeg(context->llvmBuilder, argValue, "");
+                    LLVMBuildRet(context->llvmBuilder, value);
+                }
             } else {
-                todo();
+                unreachable();
             }
         } else {
             addArgumentBinding(&context->arena, &context->scopes, 0, NULL);

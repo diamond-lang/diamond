@@ -14,7 +14,6 @@ String program_getPath(Program* program, uint32_t astId) {
 }
 
 bool program_areTypesEqual(Program* program, TypeReference a, TypeReference b) {
-    Ast* moduleA = program_getAst(program, a.moduleId);
-    Ast* moduleB = program_getAst(program, b.moduleId);
-    return ast_areTypesEqualAccrossModules(moduleA, moduleB, a.id, b.id);
+    assert(a.parameterCount == 0 && b.parameterCount == 0);
+    return a.moduleId == b.moduleId && a.id == b.id;
 }

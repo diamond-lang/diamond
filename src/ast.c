@@ -342,41 +342,6 @@ bool ast_areTypesEqual(Ast* ast, uint32_t aId, uint32_t bId) {
     return false;
 }
 
-bool ast_areTypesEqualAccrossModules(
-    Ast* moduleA, Ast* moduleB, uint32_t aId, uint32_t bId
-) {
-    Type* a = ast_findType(moduleA, aId);
-    Type* b = ast_findType(moduleB, bId);
-    if (a->kind == b->kind) {
-        TypeKind kind = a->kind;
-        switch (kind) {
-        case TYPE_VARIABLE: {
-            return a->variable.id = b->variable.id;
-            break;
-        }
-        case TYPE_WITH_PARAMS: {
-            assert(
-                a->withParams.parameterCount == b->withParams.parameterCount
-            );
-            char* strA = ast_literalAsString(*moduleA, a->withParams.literal);
-            char* strB = ast_literalAsString(*moduleB, b->withParams.literal);
-            if (strcmp(strA, strB) != 0) return false;
-            for (uint32_t i = 0; i < a->withParams.parameterCount; i++) {
-                bool result = ast_areTypesEqualAccrossModules(
-                    moduleA,
-                    moduleB,
-                    a->withParams.parameters[i],
-                    b->withParams.parameters[i]
-                );
-                if (result == false) return result;
-            }
-            return true;
-        }
-        }
-    }
-    return false;
-}
-
 static uint32_t ast_hashString(const char* key, uint32_t length) {
     uint32_t hash = 2166136261u;
     for (uint32_t i = 0; i < length; i++) {

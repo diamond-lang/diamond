@@ -355,9 +355,6 @@ String ast_typeAsString(Arena *arena, Ast ast, uint32_t typeId);
 String ast_typeReferenceAsString(Arena *arena, Ast ast, TypeReference typeRef);
 bool ast_isTypeVariable(Ast ast, TypeWithParams *type);
 bool ast_areTypesEqual(Ast *ast, uint32_t aId, uint32_t bId);
-bool ast_areTypesEqualAccrossModules(
-    Ast *moduleA, Ast *moduleB, uint32_t aId, uint32_t bId
-);
 
 // Literals handling
 uint32_t ast_getLiteral(Ast *ast, char *literal);

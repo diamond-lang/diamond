@@ -1,9 +1,0 @@
-2 + 2
-
-
--- Output
--- Expecting statement (test/errors/expectingAStatement.dmd)
--- 
--- 1│ 2 + 2
---    ^^^^^
--- 

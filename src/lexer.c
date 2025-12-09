@@ -120,6 +120,9 @@ start:
             advanceUntilNewLine(lexer);
             goto start;
         }
+        if (match(lexer, '\'')) {
+            return createTokenWithLiteral(lexer, IDENTIFIER);
+        }
         return createTokenWithLiteral(lexer, IDENTIFIER);
     case '*': return createTokenWithLiteral(lexer, IDENTIFIER);
     case '/': return createTokenWithLiteral(lexer, IDENTIFIER);

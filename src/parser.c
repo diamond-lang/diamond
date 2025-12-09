@@ -877,8 +877,8 @@ uint32_t unary(Parser *parser, Arena scratch) {
 // negation → "-" unary
 uint32_t negation(Parser *parser, Token operator, Arena scratch) {
     assert(operator.kind == IDENTIFIER && operator.literal ==
-           ast_getLiteral(parser->ast, "-'"));
-    addIdentifierInstruction(parser, operator.literal);
+           ast_getLiteral(parser->ast, "-"));
+    addIdentifierInstruction(parser, ast_getLiteral(parser->ast, "-'"));
     expect(unary(parser, scratch));
     return addCallInstruction(parser, 1);
 }

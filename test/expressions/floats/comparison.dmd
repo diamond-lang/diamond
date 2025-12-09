@@ -1,0 +1,19 @@
+print(5.0 < 5.0)
+print(5.0 <= 5.0)
+print(10.0 < 5.0)
+print(3.0 < 5.0)
+
+print(5.0 > 5.0)
+print(5.0 >= 5.0)
+print(10.0 > 5.0)
+print(3.0 > 5.0)
+
+-- Output
+-- false
+-- true
+-- false
+-- true
+-- false
+-- true
+-- true
+-- false
