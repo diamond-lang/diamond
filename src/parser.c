@@ -856,7 +856,7 @@ uint32_t term(Parser *parser, Arena scratch) {
 uint32_t factor(Parser *parser, Arena scratch) {
     uint32_t offset = list_size(parser->ast->code.instructions);
     bind(left, unary(parser, scratch));
-    while (matchId(parser, "*") || matchId(parser, "/") || matchId(parser, "%%")
+    while (matchId(parser, "*") || matchId(parser, "/") || matchId(parser, "%")
     ) {
         insertIdentifierInstruction(parser, parser->previous.literal, offset);
         expect(unary(parser, scratch));
