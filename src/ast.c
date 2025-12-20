@@ -518,7 +518,12 @@ static void ast_printCode(
         }
         case AST_INTEGER: {
             AstInteger* data = ast_getData(&ast, &code, i);
-            printf("integer(%s)\n", ast_literalAsString(ast, data->literal));
+            printf("%s", ast_literalAsString(ast, data->literal));
+            if (data->type != None()) {
+                printf(": ");
+                ast_printType(ast, data->type, scratch);
+            }
+            printf("\n");
             break;
         }
         case AST_IDENTIFIER: {

@@ -185,7 +185,7 @@ static Token scanNumber(Lexer* lexer) {
         return createTokenWithLiteral(lexer, FLOAT);
     }
 
-    return createTokenWithLiteral(lexer, FLOAT);
+    return createTokenWithLiteral(lexer, INTEGER);
 }
 
 static bool identifierEquals(Lexer* lexer, char* literal) {

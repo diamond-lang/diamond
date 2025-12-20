@@ -1,5 +1,6 @@
 #include "codegen.h"
 
+#include <inttypes.h>
 #include <llvm-c/Core.h>
 #include <llvm-c/Target.h>
 #include <llvm-c/TargetMachine.h>
@@ -76,6 +77,8 @@ static LLVMTypeRef getTypReferenceAsLLVMType(
         return LLVMInt1TypeInContext(context->llvmContext);
     } else if (typeDef->identifier == ast_getLiteral(module, "Float64")) {
         return LLVMDoubleTypeInContext(context->llvmContext);
+    } else if (typeDef->identifier == ast_getLiteral(module, "Int64")) {
+        return LLVMInt64TypeInContext(context->llvmContext);
     } else if (typeDef->identifier == ast_getLiteral(module, "None")) {
         return LLVMVoidTypeInContext(context->llvmContext);
     } else {
@@ -416,7 +419,15 @@ static void floatLiteral(
 static void integerLiteral(
     Context* context, Code* code, uint32_t id, AstInteger* data, Arena scratch
 ) {
-    todo();
+    int64_t value;
+    sscanf(
+        ast_literalAsString(*context->module, data->literal),
+        "%" SCNd64,
+        &value
+    );
+    LLVMValueRef llvmValue =
+        LLVMConstInt(LLVMInt64TypeInContext(context->llvmContext), value, true);
+    stack_push(&context->arena, context->stack, llvmValue);
 }
 
 static void identifier(
@@ -801,6 +812,29 @@ static void codegenFunction(
                     if (kind == LLVMDoubleTypeKind) {
                         // Create string format
                         char* stringFormat = "%g\n";
+                        LLVMValueRef llvmStringFormat = LLVMBuildGlobalString(
+                            context->llvmBuilder,
+                            stringFormat,
+                            ""
+                        );
+
+                        LLVMValueRef printfArgs[] = {
+                            llvmStringFormat,
+                            argValue
+                        };
+                        (void)LLVMBuildCall2(
+                            context->llvmBuilder,
+                            printfType,
+                            printfFunction,
+                            printfArgs,
+                            2,
+                            ""
+                        );
+                        LLVMBuildRetVoid(context->llvmBuilder);
+                    } else if (kind == LLVMIntegerTypeKind &&
+                               LLVMGetIntTypeWidth(argType) == 64) {
+                        // Create string format
+                        char* stringFormat = "%d\n";
                         LLVMValueRef llvmStringFormat = LLVMBuildGlobalString(
                             context->llvmBuilder,
                             stringFormat,

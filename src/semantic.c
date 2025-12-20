@@ -428,7 +428,9 @@ static bool floatLiteral(
 static bool integerLiteral(
     Context* context, Code* code, uint32_t id, AstInteger* data, Arena scratch
 ) {
-    todo();
+    data->type = getBuiltInType(context, "Int64");
+    stack_push(&context->arena, context->stack, id);
+    return true;
 }
 
 static bool analyzeFunctionNotCompletelyTyped(
