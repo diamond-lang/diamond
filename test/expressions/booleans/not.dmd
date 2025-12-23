@@ -1,0 +1,6 @@
+print(not false)
+print(not true)
+
+-- Output
+-- true
+-- false

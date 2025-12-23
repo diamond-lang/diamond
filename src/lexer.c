@@ -215,8 +215,6 @@ static Token scanIdentifierOrKeyword(Lexer* lexer) {
     if (identifierEquals(lexer, "be")) return createToken(lexer, BE);
     if (identifierEquals(lexer, "true")) return createToken(lexer, TRUE);
     if (identifierEquals(lexer, "false")) return createToken(lexer, FALSE);
-    if (identifierEquals(lexer, "and")) return createToken(lexer, AND);
-    if (identifierEquals(lexer, "or")) return createToken(lexer, OR);
     if (identifierEquals(lexer, "break")) return createToken(lexer, BREAK);
     if (identifierEquals(lexer, "continue"))
         return createToken(lexer, CONTINUE);

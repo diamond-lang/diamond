@@ -895,7 +895,37 @@ static void codegenFunction(
                         );
                         LLVMBuildRet(context->llvmBuilder, value);
                     } else {
-                        todo();
+                        unreachable();
+                    }
+                } else if (function->identifier ==
+                           ast_getLiteral(context->module, "and")) {
+                    LLVMTypeKind kind = LLVMGetTypeKind(arg1Type);
+                    if (kind == LLVMIntegerTypeKind &&
+                        LLVMGetIntTypeWidth(arg1Type) == 1) {
+                        LLVMValueRef value = LLVMBuildAnd(
+                            context->llvmBuilder,
+                            arg1Value,
+                            arg2Value,
+                            ""
+                        );
+                        LLVMBuildRet(context->llvmBuilder, value);
+                    } else {
+                        unreachable();
+                    }
+                } else if (function->identifier ==
+                           ast_getLiteral(context->module, "or")) {
+                    LLVMTypeKind kind = LLVMGetTypeKind(arg1Type);
+                    if (kind == LLVMIntegerTypeKind &&
+                        LLVMGetIntTypeWidth(arg1Type) == 1) {
+                        LLVMValueRef value = LLVMBuildOr(
+                            context->llvmBuilder,
+                            arg1Value,
+                            arg2Value,
+                            ""
+                        );
+                        LLVMBuildRet(context->llvmBuilder, value);
+                    } else {
+                        unreachable();
                     }
                 } else {
                     unreachable();
@@ -1074,6 +1104,18 @@ static void codegenFunction(
                     } else {
                         todo();
                     }
+                } else if (function->identifier ==
+                           ast_getLiteral(context->module, "not")) {
+                    LLVMTypeKind kind = LLVMGetTypeKind(argType);
+                    assert(
+                        kind == LLVMIntegerTypeKind &&
+                        LLVMGetIntTypeWidth(argType) == 1
+                    );
+                    LLVMValueRef value =
+                        LLVMBuildNot(context->llvmBuilder, argValue, "");
+                    LLVMBuildRet(context->llvmBuilder, value);
+                } else {
+                    todo();
                 }
             } else {
                 unreachable();

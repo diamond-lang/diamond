@@ -538,7 +538,7 @@ static void ast_printCode(
         }
         case AST_BOOLEAN: {
             AstBoolean* data = ast_getData(&ast, &code, i);
-            printf("boolean(%s)\n", data->value ? "true" : "false");
+            printf("%s\n", data->value ? "true" : "false");
             break;
         }
         case AST_STRING: {

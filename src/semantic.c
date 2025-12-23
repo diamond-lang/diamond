@@ -51,7 +51,7 @@ static TypeOfBinding getTypeOfBinding(Context* context, Binding binding) {
     switch (binding.kind) {
     case FUNCTION_BINDING: {
         FunctionBinding* b = &binding.asFunction;
-        Ast* module = program_getAst(context->program, b->id);
+        Ast* module = program_getAst(context->program, b->module);
         Function* function = list_get(module->functions, b->id);
         return (TypeOfBinding){module, function->type};
     }

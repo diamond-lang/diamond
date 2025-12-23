@@ -795,7 +795,7 @@ static uint32_t notExpression(Parser *parser, Token keyword, Arena scratch) {
 uint32_t or (Parser * parser, Arena scratch) {
     uint32_t offset = list_size(parser->ast->code.instructions);
     bind(left, and(parser, scratch));
-    while (match(parser, OR)) {
+    while (matchId(parser, "or")) {
         insertIdentifierInstruction(parser, parser->previous.literal, offset);
         expect(and(parser, scratch));
         left = addCallInstruction(parser, 2);
@@ -807,7 +807,7 @@ uint32_t or (Parser * parser, Arena scratch) {
 uint32_t and (Parser * parser, Arena scratch) {
     uint32_t offset = list_size(parser->ast->code.instructions);
     bind(left, equality(parser, scratch));
-    while (match(parser, AND)) {
+    while (matchId(parser, "and")) {
         insertIdentifierInstruction(parser, parser->previous.literal, offset);
         expect(equality(parser, scratch));
         left = addCallInstruction(parser, 2);

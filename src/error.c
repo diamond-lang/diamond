@@ -59,8 +59,6 @@ static char* token_getLiteral(Ast ast, Token token) {
     case CASE: return "case";
     case TRUE: return "true";
     case FALSE: return "false";
-    case OR: return "or";
-    case AND: return "and";
     case IMPORT: return "import";
     case BREAK: return "break";
     case CONTINUE: return "continue";
@@ -107,8 +105,6 @@ static char* ast_tokenAsString(TokenKind kind) {
     case CASE: return "case";
     case TRUE: return "true";
     case FALSE: return "false";
-    case OR: return "or";
-    case AND: return "and";
     case IMPORT: return "import";
     case BREAK: return "break";
     case CONTINUE: return "continue";

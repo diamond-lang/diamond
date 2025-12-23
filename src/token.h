@@ -38,8 +38,6 @@ typedef enum {
     CASE,
     TRUE,
     FALSE,
-    OR,
-    AND,
     IMPORT,
     BREAK,
     CONTINUE,
