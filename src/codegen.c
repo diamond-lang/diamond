@@ -658,8 +658,18 @@ static void codegenFunction(
                             ""
                         );
                         LLVMBuildRet(context->llvmBuilder, value);
+                    } else if (kind == LLVMIntegerTypeKind &&
+                               LLVMGetIntTypeWidth(arg1Type) == 1) {
+                        LLVMValueRef value = LLVMBuildICmp(
+                            context->llvmBuilder,
+                            LLVMIntEQ,
+                            arg1Value,
+                            arg2Value,
+                            ""
+                        );
+                        LLVMBuildRet(context->llvmBuilder, value);
                     } else {
-                        todo();
+                        unreachable();
                     }
                 } else if (function->identifier ==
                            ast_getLiteral(context->module, "!=")) {
@@ -683,8 +693,18 @@ static void codegenFunction(
                             ""
                         );
                         LLVMBuildRet(context->llvmBuilder, value);
+                    } else if (kind == LLVMIntegerTypeKind &&
+                               LLVMGetIntTypeWidth(arg1Type) == 1) {
+                        LLVMValueRef value = LLVMBuildICmp(
+                            context->llvmBuilder,
+                            LLVMIntNE,
+                            arg1Value,
+                            arg2Value,
+                            ""
+                        );
+                        LLVMBuildRet(context->llvmBuilder, value);
                     } else {
-                        todo();
+                        unreachable();
                     }
                 } else if (function->identifier ==
                            ast_getLiteral(context->module, "<")) {

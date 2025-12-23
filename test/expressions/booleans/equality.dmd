@@ -1,0 +1,18 @@
+print(true == true)
+print(false == true)
+print(true == false)
+print(false == false)
+print(true != true)
+print(false != false)
+print(true != false)
+print(false != true)
+
+-- Output
+-- true
+-- false
+-- false
+-- true
+-- false
+-- false
+-- true
+-- true
