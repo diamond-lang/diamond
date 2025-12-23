@@ -648,6 +648,41 @@ static void codegenFunction(
                             ""
                         );
                         LLVMBuildRet(context->llvmBuilder, value);
+                    } else if (kind == LLVMIntegerTypeKind &&
+                               LLVMGetIntTypeWidth(arg1Type) == 64) {
+                        LLVMValueRef value = LLVMBuildICmp(
+                            context->llvmBuilder,
+                            LLVMIntEQ,
+                            arg1Value,
+                            arg2Value,
+                            ""
+                        );
+                        LLVMBuildRet(context->llvmBuilder, value);
+                    } else {
+                        todo();
+                    }
+                } else if (function->identifier ==
+                           ast_getLiteral(context->module, "!=")) {
+                    LLVMTypeKind kind = LLVMGetTypeKind(arg1Type);
+                    if (kind == LLVMDoubleTypeKind) {
+                        LLVMValueRef value = LLVMBuildFCmp(
+                            context->llvmBuilder,
+                            LLVMRealUNE,
+                            arg1Value,
+                            arg2Value,
+                            ""
+                        );
+                        LLVMBuildRet(context->llvmBuilder, value);
+                    } else if (kind == LLVMIntegerTypeKind &&
+                               LLVMGetIntTypeWidth(arg1Type) == 64) {
+                        LLVMValueRef value = LLVMBuildICmp(
+                            context->llvmBuilder,
+                            LLVMIntNE,
+                            arg1Value,
+                            arg2Value,
+                            ""
+                        );
+                        LLVMBuildRet(context->llvmBuilder, value);
                     } else {
                         todo();
                     }
@@ -658,6 +693,16 @@ static void codegenFunction(
                         LLVMValueRef value = LLVMBuildFCmp(
                             context->llvmBuilder,
                             LLVMRealULT,
+                            arg1Value,
+                            arg2Value,
+                            ""
+                        );
+                        LLVMBuildRet(context->llvmBuilder, value);
+                    } else if (kind == LLVMIntegerTypeKind &&
+                               LLVMGetIntTypeWidth(arg1Type) == 64) {
+                        LLVMValueRef value = LLVMBuildICmp(
+                            context->llvmBuilder,
+                            LLVMIntULT,
                             arg1Value,
                             arg2Value,
                             ""
@@ -678,6 +723,16 @@ static void codegenFunction(
                             ""
                         );
                         LLVMBuildRet(context->llvmBuilder, value);
+                    } else if (kind == LLVMIntegerTypeKind &&
+                               LLVMGetIntTypeWidth(arg1Type) == 64) {
+                        LLVMValueRef value = LLVMBuildICmp(
+                            context->llvmBuilder,
+                            LLVMIntULE,
+                            arg1Value,
+                            arg2Value,
+                            ""
+                        );
+                        LLVMBuildRet(context->llvmBuilder, value);
                     } else {
                         todo();
                     }
@@ -693,6 +748,16 @@ static void codegenFunction(
                             ""
                         );
                         LLVMBuildRet(context->llvmBuilder, value);
+                    } else if (kind == LLVMIntegerTypeKind &&
+                               LLVMGetIntTypeWidth(arg1Type) == 64) {
+                        LLVMValueRef value = LLVMBuildICmp(
+                            context->llvmBuilder,
+                            LLVMIntUGT,
+                            arg1Value,
+                            arg2Value,
+                            ""
+                        );
+                        LLVMBuildRet(context->llvmBuilder, value);
                     } else {
                         todo();
                     }
@@ -703,6 +768,16 @@ static void codegenFunction(
                         LLVMValueRef value = LLVMBuildFCmp(
                             context->llvmBuilder,
                             LLVMRealUGE,
+                            arg1Value,
+                            arg2Value,
+                            ""
+                        );
+                        LLVMBuildRet(context->llvmBuilder, value);
+                    } else if (kind == LLVMIntegerTypeKind &&
+                               LLVMGetIntTypeWidth(arg1Type) == 64) {
+                        LLVMValueRef value = LLVMBuildICmp(
+                            context->llvmBuilder,
+                            LLVMIntUGE,
                             arg1Value,
                             arg2Value,
                             ""

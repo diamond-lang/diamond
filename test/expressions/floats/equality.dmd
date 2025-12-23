@@ -1,6 +1,10 @@
 print(4.0 == 4.0)
 print(5.0 == 4.0)
+print(4.0 != 4.0)
+print(5.0 != 4.0)
 
 -- Output
 -- true
 -- false
+-- false
+-- true

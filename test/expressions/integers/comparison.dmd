@@ -1,0 +1,19 @@
+print(5 < 5)
+print(5 <= 5)
+print(10 < 5)
+print(3 < 5)
+
+print(5 > 5)
+print(5 >= 5)
+print(10 > 5)
+print(3 > 5)
+
+-- Output
+-- false
+-- true
+-- false
+-- true
+-- false
+-- true
+-- true
+-- false
