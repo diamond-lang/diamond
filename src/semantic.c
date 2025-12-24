@@ -324,8 +324,6 @@ static bool whileStmt(
 static bool call(
     Context* context, Code* code, uint32_t id, AstCall* data, Arena scratch
 ) {
-    assert(ast_getInstruction(*code, id) == AST_CALL);
-
     // Add new type variable
     data->type = ast_addTypeVariable(context->module, newTypeVariable(context));
 
@@ -358,6 +356,8 @@ static bool call(
     // Make type of called expression equal to expected type
     if (expected != None()) {
         makeEqual(context, actualTypeId, expected);
+    } else {
+        todo();
     }
 
     // Pop arguments and expression called
@@ -378,7 +378,42 @@ static bool ifElseExpression(
     AstIfElseExpression* data,
     Arena scratch
 ) {
-    todo();
+    // Add new type variable
+    data->type = ast_addTypeVariable(context->module, newTypeVariable(context));
+
+    // Get condition
+    uint32_t condition =
+        *stack_get(context->stack, stack_size(context->stack) - 3);
+    uint32_t conditionType =
+        ast_getTypeOfInstruction(context->module, code, condition);
+    makeEqual(context, conditionType, getBuiltInType(context, "Bool"));
+
+    // Get expression 1
+    uint32_t expression1 =
+        *stack_get(context->stack, stack_size(context->stack) - 2);
+    uint32_t expression1Type =
+        ast_getTypeOfInstruction(context->module, code, expression1);
+
+    // Get expression 2
+    uint32_t expression2 =
+        *stack_get(context->stack, stack_size(context->stack) - 1);
+    uint32_t expression2Type =
+        ast_getTypeOfInstruction(context->module, code, expression2);
+
+    // Make types equal
+    makeEqual(context, data->type, expression1Type);
+    makeEqual(context, expression1Type, expression2Type);
+
+    // Pop expressions and conditions
+    stack_pop(context->stack);  // Condition
+    stack_pop(context->stack);  // Expression 1
+    stack_pop(context->stack);  // Expression 2
+
+    // then add if else expression
+    stack_push(&context->arena, context->stack, id);
+
+    // Return
+    return true;
 }
 
 static bool addressOf(
@@ -524,7 +559,7 @@ static bool analyzeInstruction(
     case AST_WHILE: return whileStmt(context, code, id, data, scratch);
     case AST_CALL: return call(context, code, id, data, scratch);
     case AST_IF_ELSE_EXPRESSION:
-        ifElseExpression(context, code, id, data, scratch);
+        return ifElseExpression(context, code, id, data, scratch);
     case AST_ADDRESS_OF: return addressOf(context, code, id, data, scratch);
     case AST_DEREFERENCE: return dereference(context, code, id, data, scratch);
     case AST_FIELD_ACCESS: return fieldAccess(context, code, id, data, scratch);
@@ -1258,7 +1293,7 @@ static void checkFunctionsUsedInCode(
             continue;
         }
         case AST_IF_ELSE_EXPRESSION: {
-            todo();
+            continue;
         }
         case AST_ADDRESS_OF: {
             todo();

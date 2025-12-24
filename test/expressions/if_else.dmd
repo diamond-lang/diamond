@@ -1,0 +1,14 @@
+print(if true 10 else 50)
+print(if false 5.0 else 1.5)
+
+print(
+    if true
+        false
+    else
+        true
+)
+
+-- Output
+-- 10
+-- 1.5
+-- false

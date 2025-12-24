@@ -120,8 +120,9 @@ void ast_addData(Ast* ast, Code* code, uint32_t instruction) {
 }
 
 void* ast_getData(Ast* ast, Code* code, uint32_t instruction) {
-    uint32_t numberOfSlotsUsed =
-        sizeOfData(ast_getInstruction(*code, instruction));
+    AstInstructionKind inst = ast_getInstruction(*code, instruction);
+    uint32_t size = sizeOfData(inst);
+    uint32_t numberOfSlotsUsed = size / sizeof(uint32_t);
     if (numberOfSlotsUsed == 0) return NULL;
     if (numberOfSlotsUsed == 1) {
         return ast_getDataOrIndex(*code, instruction);
@@ -217,7 +218,9 @@ uint32_t ast_getTypeOfInstruction(Ast* ast, Code* code, uint32_t instruction) {
     case AST_IF_ELSE: unreachable();
     case AST_WHILE: unreachable();
     case AST_CALL: return ((AstCall*)ast_getData(ast, code, instruction))->type;
-    case AST_IF_ELSE_EXPRESSION: todo();
+    case AST_IF_ELSE_EXPRESSION:
+        return ((AstIfElseExpression*)ast_getData(ast, code, instruction))
+            ->type;
     case AST_DEREFERENCE: todo();
     case AST_ADDRESS_OF: todo();
     case AST_FIELD_ACCESS: todo();
@@ -501,7 +504,16 @@ static void ast_printCode(
             printf("\n");
             break;
         }
-        case AST_IF_ELSE_EXPRESSION: printf("ifElseExpression\n"); break;
+        case AST_IF_ELSE_EXPRESSION: {
+            AstIfElseExpression* data = ast_getData(&ast, &code, i);
+            printf("ifElseExpression");
+            if (data->type != None()) {
+                printf(": ");
+                ast_printType(ast, data->type, scratch);
+            }
+            printf("\n");
+            break;
+        }
         case AST_DEREFERENCE: printf("dereference\n"); break;
         case AST_ADDRESS_OF: printf("addressOf\n"); break;
         case AST_FIELD_ACCESS: printf("fieldAccess\n"); break;
@@ -538,7 +550,12 @@ static void ast_printCode(
         }
         case AST_BOOLEAN: {
             AstBoolean* data = ast_getData(&ast, &code, i);
-            printf("%s\n", data->value ? "true" : "false");
+            printf("%s", data->value ? "true" : "false");
+            if (data->type != None()) {
+                printf(": ");
+                ast_printType(ast, data->type, scratch);
+            }
+            printf("\n");
             break;
         }
         case AST_STRING: {

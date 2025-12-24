@@ -367,7 +367,55 @@ static void ifElseExpression(
     AstIfElseExpression* data,
     Arena scratch
 ) {
-    todo();
+    // Get condition
+    LLVMValueRef condition =
+        *stack_get(context->stack, stack_size(context->stack) - 3);
+
+    // Get expression 1
+    LLVMValueRef expression1 =
+        *stack_get(context->stack, stack_size(context->stack) - 2);
+
+    // Get expression 2
+    LLVMValueRef expression2 =
+        *stack_get(context->stack, stack_size(context->stack) - 1);
+
+    // Create blocks
+    LLVMValueRef currentFunction =
+        LLVMGetBasicBlockParent(context->currentBlockEntry);
+    LLVMBasicBlockRef thenBlock =
+        LLVMCreateBasicBlockInContext(context->llvmContext, "");
+    LLVMBasicBlockRef elseBlock =
+        LLVMCreateBasicBlockInContext(context->llvmContext, "");
+    LLVMBasicBlockRef mergeBlock =
+        LLVMCreateBasicBlockInContext(context->llvmContext, "");
+    LLVMBuildCondBr(context->llvmBuilder, condition, thenBlock, elseBlock);
+
+    // Codegen then block
+    LLVMAppendExistingBasicBlock(currentFunction, thenBlock);
+    LLVMPositionBuilderAtEnd(context->llvmBuilder, thenBlock);
+    LLVMBuildBr(context->llvmBuilder, mergeBlock);
+
+    // Codegen else block
+    LLVMAppendExistingBasicBlock(currentFunction, elseBlock);
+    LLVMPositionBuilderAtEnd(context->llvmBuilder, elseBlock);
+    LLVMBuildBr(context->llvmBuilder, mergeBlock);
+
+    // Codegen merge block
+    LLVMAppendExistingBasicBlock(currentFunction, mergeBlock);
+    LLVMPositionBuilderAtEnd(context->llvmBuilder, mergeBlock);
+    LLVMValueRef phi =
+        LLVMBuildPhi(context->llvmBuilder, LLVMTypeOf(expression1), "");
+    LLVMValueRef phiValues[] = {expression1, expression2};
+    LLVMBasicBlockRef phiBlocks[] = {thenBlock, elseBlock};
+    LLVMAddIncoming(phi, phiValues, phiBlocks, 2);
+
+    // Pop expressions and conditions
+    stack_pop(context->stack);  // Condition
+    stack_pop(context->stack);  // Expression 1
+    stack_pop(context->stack);  // Expression 2
+
+    // then add if else expression
+    stack_push(&context->arena, context->stack, phi);
 }
 
 static void addressOf(
