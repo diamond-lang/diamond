@@ -50,7 +50,7 @@ def test(file, expected, max_file_path_len):
     result = result == expected
 
     # Print result
-    status = '\u001b[32mOK\u001b[0m' if result == True else '\u001b[31mFailed\u001b[0m'
+    status = '\u001b[32mOK\u001b[0m' if result else '\u001b[31mFailed\u001b[0m'
     spacing = " " * (max_file_path_len - len(file) + 1)
     print(f"{file}{spacing}{status}", flush=True)
 
@@ -91,18 +91,13 @@ def main():
         file_paths = get_all_files(folder)
         max_file_path_len = get_max_path_len(file_paths)
 
-        for file in file_paths:
-            result = read_file_and_test(file, max_file_path_len)
-            if result == False:
-                sys.exit(1)
-
-        # num_cores = multiprocessing.cpu_count()
-        # with multiprocessing.Pool(num_cores) as pool:
-        #     results = pool.map(functools.partial(read_file_and_test, max_file_path_len=max_file_path_len), file_paths)
+        num_cores = multiprocessing.cpu_count()
+        with multiprocessing.Pool(num_cores) as pool:
+            results = pool.map(functools.partial(read_file_and_test, max_file_path_len=max_file_path_len), file_paths)
     
-        #     for result in results:
-        #         if result == False:
-        #             sys.exit(1)
+            for result in results:
+                if result == False:
+                    sys.exit(1)
 
     else:
         read_file_and_test(folder, get_max_path_len([folder]))
