@@ -13,6 +13,7 @@ String getBasePath(Arena* arena, String path);
 String getPathWithoutExtension(Arena* arena, String path);
 String readFile(Arena* arena, char* path);
 bool fileExists(char* path);
+String getCachePath(Arena* arena);
 String getObjectFileName(
     Arena* arena, uint32_t astId, String canonicalPath, Arena scratch
 );
@@ -21,5 +22,6 @@ String getExecutableName(Arena* arena, String path);
 String getCommandToExecute(Arena* arena, String executableName);
 String numberAsString(Arena* arena, uint32_t number);
 int numberOfDigits(uint32_t number);
+int getProccessId();
 
 #endif

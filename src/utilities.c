@@ -237,14 +237,33 @@ String numberAsString(Arena* arena, uint32_t number) {
 
 bool fileExists(char* path) { return (access(path, F_OK) == 0); }
 
+String getCachePath(Arena* arena) {
+    String result = {0};
+    switch (currentPlatform()) {
+    case Windows: todo();
+    case Linux: todo();
+    case MacOS: {
+        char* homeDir = getenv("HOME");
+        string_concat(arena, &result, cStringAsView(homeDir));
+        string_concat(arena, &result, cStringAsView("/.cache/diamond/"));
+        string_concat(
+            arena,
+            &result,
+            string_asView(numberAsString(arena, getProccessId()))
+        );
+    }
+    }
+    return result;
+}
+
 String getObjectFileName(
     Arena* arena, uint32_t astId, String canonicalPath, Arena scratch
 ) {
-    String result = getWorkingDirectory(arena);
+    String result = getCachePath(arena);
     String baseName = getPathWithoutExtension(&scratch, canonicalPath);
     baseName = getBasePath(&scratch, baseName);
     String number = numberAsString(&scratch, astId);
-    string_concat(arena, &result, cStringAsView("/.diamond-cache/"));
+    string_concat(arena, &result, cStringAsView("/"));
     string_concat(arena, &result, string_asView(number));
     string_concat(arena, &result, cStringAsView("_"));
     string_concat(arena, &result, string_asView(baseName));
@@ -257,14 +276,13 @@ String getObjectFileName(
 }
 
 String getBuiltinObjectFileName(Arena* arena) {
-    String result = getWorkingDirectory(arena);
-    string_concat(arena, &result, cStringAsView("/.diamond-cache/builtin.o"));
+    String result = getCachePath(arena);
+    string_concat(arena, &result, cStringAsView("/builtin.o"));
     return result;
 }
 
 String getExecutableName(Arena* arena, String path) {
-    String executableName =
-        getBasePath(arena, getPathWithoutExtension(arena, path));
+    String executableName = getPathWithoutExtension(arena, path);
     switch (currentPlatform()) {
     case Windows: {
         string_concat(arena, &executableName, cStringAsView(".exe"));
@@ -273,24 +291,11 @@ String getExecutableName(Arena* arena, String path) {
     case Linux: break;
     case MacOS: break;
     }
-    String result = getWorkingDirectory(arena);
-    string_concat(arena, &result, cStringAsView("/"));
-    string_concat(arena, &result, string_asView(executableName));
     return executableName;
 }
 
 String getCommandToExecute(Arena* arena, String executableName) {
-    String result = {0};
-    switch (currentPlatform()) {
-    case Windows: {
-        string_concat(arena, &result, cStringAsView(".\\"));
-        break;
-    }
-    case Linux: string_concat(arena, &result, cStringAsView("./")); break;
-    case MacOS: string_concat(arena, &result, cStringAsView("./")); break;
-    }
-    string_concat(arena, &result, string_asView(executableName));
-    return result;
+    return executableName;
 }
 
 int numberOfDigits(uint32_t number) {
@@ -302,3 +307,5 @@ int numberOfDigits(uint32_t number) {
     }
     return numberOfDigits;
 }
+
+int getProccessId() { return getpid(); }

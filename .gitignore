@@ -6,4 +6,3 @@ deps/llvm
 bindings
 .DS_Store
 *.dSYM
-.diamond-cache

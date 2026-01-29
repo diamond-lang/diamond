@@ -1,9 +1,12 @@
 #include "compile.h"
 
 #include <assert.h>
+#include <errno.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -203,7 +206,19 @@ void codegenObjectFiles(Program program, Arena scratch1, Arena scratch2) {
     case Windows: todo();
     case Linux: todo();
     case MacOS: {
-        system("mkdir -p .diamond-cache && rm -f .diamond-cache/*.o");
+        String cachePath = getCachePath(&scratch1);
+        struct stat info;
+        assert(
+            stat(cachePath.buffer, &info) != 0 &&
+            (ENOENT == errno || ENOTDIR == errno)
+        );
+        String command = {0};
+        string_concat(&scratch1, &command, cStringAsView("mkdir -p "));
+        string_concat(&scratch1, &command, string_asView(cachePath));
+        string_concat(&scratch1, &command, cStringAsView("&& rm -f "));
+        string_concat(&scratch1, &command, string_asView(cachePath));
+        string_concat(&scratch1, &command, cStringAsView("/*.o"));
+        system(command.buffer);
         break;
     }
     }
@@ -252,4 +267,11 @@ void linkProgram(Program program, Arena scratch1, Arena scratch2) {
 
     // Link
     linkObjectFiles(executableName, objectFiles, scratch1);
+
+    // Delete object files
+    String cachePath = getCachePath(&scratch1);
+    String command = {0};
+    string_concat(&scratch1, &command, cStringAsView("rm -rf "));
+    string_concat(&scratch1, &command, string_asView(cachePath));
+    system(command.buffer);
 }
